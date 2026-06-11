@@ -42,6 +42,10 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<!-- ===== RESUME PARSING LIBRARIES: real in-browser PDF + DOCX text extraction ===== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <style>
   :root {
     --plum:#120F1D;--plum2:#1C1830;--plum3:#251F3A;--plum4:#2E2850;
@@ -761,7 +765,7 @@
           <div class="field-label">Education</div>
           <input class="field-input autofilled" id="pr-edu" value="B.S. Computer Science · UT Austin · 2019" style="margin-bottom:10px;"/>
           <div class="field-label">Detected Skills</div>
-          <div>
+          <div id="skill-chips">
             <span class="skill-chip">JavaScript</span><span class="skill-chip">React</span><span class="skill-chip">TypeScript</span><span class="skill-chip">Node.js</span><span class="skill-chip">CSS/Tailwind</span><span class="skill-chip">REST APIs</span><span class="skill-chip">Git</span><span class="skill-chip">Agile</span>
           </div>
           <div style="font-size:11px;color:var(--mint);margin-top:8px;">✨ Auto-Apply Profile filled from these fields — review it below.</div>
@@ -1428,20 +1432,47 @@ function renderBrowse(){
 }
 
 /* ===== RESUME PARSE (simulated for prototype) ===== */
+async function extractResumeText(file){
+  const name=file.name.toLowerCase();
+  try{
+    if(name.endsWith('.txt')||file.type==='text/plain'){
+      return await file.text();
+    }
+    if(name.endsWith('.pdf')&&window.pdfjsLib){
+      const buf=await file.arrayBuffer();
+      const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+      let out='';
+      for(let p=1;p<=Math.min(pdf.numPages,8);p++){
+        const page=await pdf.getPage(p);
+        const tc=await page.getTextContent();
+        /* preserve line structure: break on big Y jumps */
+        let lastY=null;
+        tc.items.forEach(it=>{
+          if(lastY!==null&&Math.abs(it.transform[5]-lastY)>4) out+='\n';
+          out+=it.str+' ';
+          lastY=it.transform[5];
+        });
+        out+='\n';
+      }
+      return out;
+    }
+    if((name.endsWith('.docx'))&&window.mammoth){
+      const buf=await file.arrayBuffer();
+      const res=await mammoth.extractRawText({arrayBuffer:buf});
+      return res.value;
+    }
+  }catch(e){ console.warn('extract failed:',e); }
+  return null; /* .doc (legacy binary) and failures fall back to demo */
+}
+
 function startParse(input){
   if(!input.files||!input.files.length) return;
   const file=input.files[0];
   document.getElementById('upload-zone').style.display='none';
   const card=document.getElementById('parse-card');
   card.style.display='block';
-  /* Browser-native text parsing for .txt — binary formats (pdf/docx) fall back to demo */
-  const isText=/\.txt$/i.test(file.name)||file.type==='text/plain';
-  let rawText=null;
-  if(isText){
-    const r=new FileReader();
-    r.onload=e=>{rawText=e.target.result;};
-    r.readAsText(file);
-  }
+  /* kick off real extraction immediately; the staged animation runs in parallel */
+  const extraction=extractResumeText(file);
   const stages=['ps0','ps1','ps2','ps3','ps4'];
   stages.forEach((id,i)=>{
     setTimeout(()=>{
@@ -1449,31 +1480,38 @@ function startParse(input){
       el.classList.add('done');
       el.textContent='✅ '+el.textContent.replace('⏳ ','');
       if(i===stages.length-1){
-        setTimeout(()=>{
+        extraction.then(rawText=>{
           card.style.display='none';
           document.getElementById('parsed-sections').style.display='block';
           resumeReady=true;
           let foundCompanies=[];
-          if(rawText){ foundCompanies=applyRealParse(rawText); }
-          autofillProfile();
+          const realParse=!!(rawText&&rawText.trim().length>40);
+          if(realParse){ foundCompanies=applyRealParse(rawText); }
+          autofillProfile(realParse);            /* demo seeding only when real parse failed */
           revealMatches();
           renderTplPreview();
           marketAdvice();
-          showToast(rawText?'✨ Resume text parsed natively!':'✨ Resume parsed! (Text extraction for PDF/DOCX needs the backend)');
+          showToast(realParse?'✨ Your resume parsed — review the extracted fields!':'⚠️ Couldn\u2019t read that format — demo data shown. Try PDF, DOCX, or TXT.');
           if(foundCompanies.length){ startRateExLoop(foundCompanies); }
-          else { startRateExLoop(['Stripe','Dell','IBM']); }
-        },500);
+          else if(!realParse){ startRateExLoop(['Stripe','Dell','IBM']); }
+        });
       }
     },600*(i+1));
   });
 }
-function autofillProfile(){
-  const fill=(cls,val)=>{const el=document.querySelector(cls);if(el){el.value=val;el.classList.add('autofilled');}};
+function autofillProfile(realParse){
+  /* Only fill EMPTY fields, and only seed demo values when real parsing failed.
+     This fixes the bug where demo data overwrote genuinely parsed resumes. */
+  const fill=(cls,val)=>{
+    const el=document.querySelector(cls);
+    if(el&&!el.value.trim()&&!realParse){ el.value=val; el.classList.add('autofilled'); }
+  };
   fill('.pf-first','Alex'); fill('.pf-last','Rivera'); fill('.pf-email','alex.rivera@email.com');
   fill('.pf-title','Senior Frontend Engineer'); fill('.pf-company','Stripe');
   fill('.pf-start','Mar 2022'); fill('.pf-end','Present');
   fill('.pf-major','Computer Science'); fill('.pf-school','University of Texas at Austin'); fill('.pf-gradyr','2019');
-  const deg=document.querySelector('.pf-degree'); if(deg){deg.value="Bachelor's Degree";deg.classList.add('autofilled');}
+  const deg=document.querySelector('.pf-degree');
+  if(deg&&!deg.value&&!realParse){deg.value="Bachelor's Degree";deg.classList.add('autofilled');}
   document.getElementById('profile-progress').style.width='75%';
   document.getElementById('progress-pct').textContent='75%';
 }
@@ -2226,11 +2264,21 @@ function applyRealParse(text){
   const titleLine=lines.find(l=>/(engineer|developer|designer|manager|analyst|specialist|consultant|director|coordinator|representative|technician|nurse|teacher|accountant)/i.test(l)&&l.length<60);
   /* education line */
   const eduLine=lines.find(l=>/(b\.?s\.?|b\.?a\.?|m\.?s\.?|mba|ph\.?d|bachelor|master|associate|university|college)/i.test(l)&&l.length<90);
-  /* companies: "at X", "@ X", or Capitalized line followed near a year range */
+  /* companies: "at X", company line above a date line, or company + dates on same line */
   const comps=new Set();
-  [...text.matchAll(/(?:\bat|@)\s+([A-Z][A-Za-z&.]+(?:\s[A-Z][A-Za-z&.]+){0,2})/g)].forEach(m=>comps.add(m[1].trim()));
+  const TITLE_RX=/(engineer|developer|designer|manager|analyst|specialist|consultant|director|coordinator|representative|technician|nurse|teacher|accountant|lead|intern|associate)/i;
+  const SECTION_RX=/^(experience|education|skills|summary|objective|projects|certifications|references|work history|employment)/i;
+  const okCompany=s=>{
+    s=s.trim().replace(/[.,]$/,'');
+    return s.length>1&&s.length<=40&&!TITLE_RX.test(s)&&!SECTION_RX.test(s)&&!/\bat\b/i.test(s)&&s!==s.toUpperCase();
+  };
+  [...text.matchAll(/(?:\bat|@)\s+([A-Z][A-Za-z&.]+(?:\s[A-Z][A-Za-z&.]+){0,2})/g)].forEach(m=>{if(okCompany(m[1]))comps.add(m[1].trim());});
   lines.forEach((l,i)=>{
-    if(/^[A-Z][A-Za-z&.,'’ ]{1,40}$/.test(l)&&/\b(19|20)\d{2}\b/.test(lines[i+1]||'')) comps.add(l.replace(/[.,]$/,''));
+    /* company name directly above a date-range line */
+    if(/^[A-Z][A-Za-z&.,'’ ]{1,40}$/.test(l)&&/\b(19|20)\d{2}\b/.test(lines[i+1]||'')&&okCompany(l)) comps.add(l.replace(/[.,]$/,''));
+    /* company + dates on the same line, e.g. "Salesforce  2021 - Present" */
+    const m=l.match(/^([A-Z][A-Za-z&.' ]{1,35}?)\s{1,}.*\b(19|20)\d{2}\b/);
+    if(m&&okCompany(m[1])) comps.add(m[1].trim());
   });
   /* write what we found into the parsed review card + profile */
   if(nameLine){ set('pr-name',nameLine);
@@ -2243,6 +2291,23 @@ function applyRealParse(text){
   if(titleLine){ set('pr-title',titleLine); resumeData.title=titleLine; }
   if(eduLine) set('pr-edu',eduLine);
   if(email){ const e=document.querySelector('.pf-email'); if(e){e.value=email;e.classList.add('autofilled');} resumeData.contact=email+(phone?' · '+phone:''); }
+  /* skills: scan against a broad cross-industry keyword bank */
+  const SKILL_BANK=['JavaScript','TypeScript','Python','Java','C#','C++','SQL','React','Angular','Vue','Node.js','Next.js','HTML','CSS','Tailwind','REST','GraphQL','AWS','Azure','GCP','Docker','Kubernetes','CI/CD','Git','Agile','Scrum','Figma','Photoshop','Excel','PowerPoint','Salesforce','HubSpot','SEO','Google Analytics','Project Management','Customer Service','Sales','Negotiation','CRM','QuickBooks','Tableau','Power BI','Machine Learning','Data Analysis','Nursing','Phlebotomy','Forklift','OSHA','CDL','Welding','AutoCAD','Spanish','French'];
+  const foundSkills=SKILL_BANK.filter(s=>new RegExp('\\b'+s.replace(/[+.]/g,'\\$&')+'\\b','i').test(text));
+  if(foundSkills.length){
+    const chips=document.getElementById('skill-chips');
+    if(chips) chips.innerHTML=foundSkills.slice(0,12).map(s=>'<span class="skill-chip">'+s+'</span>').join('');
+    resumeData.skills=foundSkills.slice(0,12).join(' · ');
+  }
+  /* push parsed values into the Auto-Apply Profile too */
+  const pfSet=(cls,v)=>{const el=document.querySelector(cls);if(el&&v){el.value=v;el.classList.add('autofilled');}};
+  if(titleLine) pfSet('.pf-title',titleLine);
+  if(comps.size) pfSet('.pf-company',[...comps][0]);
+  if(eduLine){
+    const yr=(eduLine.match(/\b(19|20)\d{2}\b/)||[])[0];
+    if(yr) pfSet('.pf-gradyr',yr);
+    pfSet('.pf-school',eduLine.replace(/\b(19|20)\d{2}\b/,'').replace(/[·,]\s*$/,'').trim());
+  }
   return [...comps].slice(0,4);
 }
 
