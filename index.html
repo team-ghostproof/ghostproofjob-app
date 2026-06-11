@@ -983,12 +983,20 @@
           <div style="margin-top:10px;"><div class="field-label">Phone *</div><input class="field-input" placeholder="+1 (555) 000-0000" type="tel" oninput="updateProgress()"/></div>
           <div style="margin-top:12px;background:var(--plum3);border-radius:10px;padding:10px;">
             <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">🔒 PRIVACY PROTECTED (Optional)</div>
-            <div class="toggle-row"><div style="font-size:13px;">City & State</div><div class="toggle-switch on" onclick="this.classList.toggle('on')"></div></div>
-            <div class="field-row" style="margin-top:8px;">
+            <div class="toggle-row"><div style="font-size:13px;">City & State</div><div class="toggle-switch on" onclick="togglePriv(this,'cs-fields')"></div></div>
+            <div class="field-row" id="cs-fields" style="margin-top:8px;">
               <div><input class="field-input" placeholder="Houston" style="font-size:13px;"/></div>
               <div><input class="field-input" placeholder="TX" style="font-size:13px;"/></div>
             </div>
-            <div class="toggle-row"><div style="font-size:13px;">Street Address <span style="font-size:10px;color:var(--danger);">(Hidden by default)</span></div><div class="toggle-switch" onclick="this.classList.toggle('on')"></div></div>
+            <div class="toggle-row"><div style="font-size:13px;">Street Address <span style="font-size:10px;color:var(--danger);">(Hidden by default)</span></div><div class="toggle-switch" onclick="togglePriv(this,'addr-fields')"></div></div>
+            <div id="addr-fields" style="display:none;margin-top:8px;">
+              <input class="field-input" placeholder="123 Main Street" style="font-size:13px;margin-bottom:8px;"/>
+              <div class="field-row">
+                <div><input class="field-input" placeholder="Apt / Unit (optional)" style="font-size:13px;"/></div>
+                <div><input class="field-input" placeholder="ZIP Code" style="font-size:13px;"/></div>
+              </div>
+              <div style="font-size:10px;color:var(--muted);margin-top:6px;">Only included on applications that strictly require it — never shown otherwise.</div>
+            </div>
           </div>
         </div></div>
       </div>
@@ -1960,7 +1968,6 @@ function marketAdvice(){
     creative:'📊 <strong>Creative/on-camera:</strong> headshot recommended — it is part of the evaluation. Lead with portfolio links. Modern Split with a bolder accent color performs well.'
   };
   el.innerHTML=advice[m];
-  showToast('💡 Suggestions updated for your market');
 }
 function downloadResume(){
   if(!resumeReady){ showToast('Upload a resume first so we have your data'); return; }
@@ -2270,7 +2277,10 @@ function applyRealParse(text){
   const SECTION_RX=/^(experience|education|skills|summary|objective|projects|certifications|references|work history|employment)/i;
   const okCompany=s=>{
     s=s.trim().replace(/[.,]$/,'');
-    return s.length>1&&s.length<=40&&!TITLE_RX.test(s)&&!SECTION_RX.test(s)&&!/\bat\b/i.test(s)&&s!==s.toUpperCase();
+    if(s.length<2||s.length>40||TITLE_RX.test(s)||SECTION_RX.test(s)||/\sat\s/.test(s)) return false;
+    /* exclude shouting section headers, but keep acronym companies (IBM, HEB, AT&T) */
+    if(s===s.toUpperCase()&&s.replace(/[^A-Z]/g,'').length>5) return false;
+    return true;
   };
   [...text.matchAll(/(?:\bat|@)\s+([A-Z][A-Za-z&.]+(?:\s[A-Z][A-Za-z&.]+){0,2})/g)].forEach(m=>{if(okCompany(m[1]))comps.add(m[1].trim());});
   lines.forEach((l,i)=>{
@@ -2772,6 +2782,39 @@ switchView=function(id,el){
 /* ---------- v3 INIT ---------- */
 loadLists();
 updateHRRemaining();
+
+/* ============================================================
+   APPENDED BLOCK: RELEASE DIAGNOSTICS FIXES
+   ============================================================ */
+
+/* FIX 1: privacy toggles now actually show/hide their fields */
+function togglePriv(sw,id){
+  sw.classList.toggle('on');
+  const el=document.getElementById(id);
+  if(el) el.style.display=sw.classList.contains('on')?'':'none';
+}
+
+/* FIX 2: the intel drawer physically lives in card-0's markup — when another
+   card rotated to top, tapping expanded the drawer invisibly inside the back
+   card. Now the drawer relocates into whichever card is on top before opening. */
+const _diagToggleDrawer=toggleDrawer;
+toggleDrawer=function(e){
+  const drawer=document.getElementById('card-drawer');
+  const top=document.querySelector('.job-card.top');
+  if(drawer&&top&&drawer.parentElement!==top){
+    drawer.classList.remove('open');
+    top.appendChild(drawer);
+  }
+  _diagToggleDrawer(e);
+};
+
+/* FIX 3: cover-letter offer no longer stacks on top of the daily-cap modals */
+const _diagOfferCL=offerCoverLetter;
+offerCoverLetter=function(title,co,external){
+  if(document.getElementById('energy-modal').classList.contains('open')||
+     document.getElementById('overlimit-modal').classList.contains('open')) return;
+  _diagOfferCL(title,co,external);
+};
 renderBrowse();
 </script>
 </body>
