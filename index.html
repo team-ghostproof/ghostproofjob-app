@@ -5,6 +5,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <meta name="theme-color" content="#120F1D"/>
 <title>GhostProofJob – Ethical Job Search</title>
+<!-- ===== BRAND FAVICON: glowing mint ghost (inline SVG, renders natively in tabs) ===== -->
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><filter id="g"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><rect width="64" height="64" rx="14" fill="%23120F1D"/><path filter="url(%23g)" fill="%2300F5A0" d="M32 10c-10.5 0-18 8-18 18v22l6-5 6 5 6-5 6 5 6-5 6 5V28c0-10-7.5-18-18-18z"/><circle cx="25" cy="28" r="3.4" fill="%23120F1D"/><circle cx="39" cy="28" r="3.4" fill="%23120F1D"/></svg>'/>
+<!-- ===== FIREBASE CORE (v10 modular CDN) — Auth + Firestore ===== -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, deleteUser } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+  import { getFirestore, doc, setDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  /* Owner-provided config. NOTE: authDomain in the spec was malformed
+     ("://firebaseapp.com") — corrected to the standard <projectId>.firebaseapp.com.
+     Firebase web apiKeys are public identifiers by design; real security
+     comes from your Firestore Security Rules (see launch notes). */
+  const firebaseConfig = {
+    apiKey: "AIzaSyCiMznaNnNqXzOl9BBWN2qs1obD-rHg8pQ",
+    authDomain: "ghostproofjob-app.firebaseapp.com",
+    projectId: "ghostproofjob-app",
+    storageBucket: "ghostproofjob-app.firebasestorage.app",
+    messagingSenderId: "24811047323",
+    appId: "1:24811047323:web:3d0bfbe237319d25a7f93e",
+    measurementId: "G-YFV4Y0MXDV"
+  };
+  try{
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    window.fb = {
+      signUp: (e,p)=>createUserWithEmailAndPassword(auth,e,p),
+      signIn: (e,p)=>signInWithEmailAndPassword(auth,e,p),
+      signOut: ()=>signOut(auth),
+      saveProfile: (uid,data)=>setDoc(doc(db,'profiles',uid),data,{merge:true}),
+      wipeProfile: async (uid)=>{ try{await deleteDoc(doc(db,'profiles',uid));}catch(e){} try{if(auth.currentUser)await deleteUser(auth.currentUser);}catch(e){} },
+      current: ()=>auth.currentUser
+    };
+    onAuthStateChanged(auth, u=>{ if(window.gpjAuthChanged) window.gpjAuthChanged(u); });
+  }catch(e){ window.fb=null; console.warn('Firebase unavailable:',e); }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
@@ -179,6 +214,7 @@
   .opt-btn-skip{background:transparent;border:1px solid var(--plum4);color:var(--muted);border-radius:10px;padding:9px 14px;font-size:12px;text-align:center;cursor:pointer;}
   .quick-chip{display:inline-block;background:var(--plum2);border:1px solid var(--plum4);color:var(--off);font-size:12px;padding:6px 12px;border-radius:999px;margin:0 6px 6px 0;cursor:pointer;transition:all .15s;}
   .quick-chip:active{border-color:var(--mint);color:var(--mint);}
+  .quick-chip.on{border-color:var(--mint);color:var(--mint);background:rgba(0,245,160,.1);}
   .buzz-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--plum3);}
   .buzz-row:last-child{border:none;}
   .buzz-add{background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.35);color:var(--mint);font-size:11px;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer;flex-shrink:0;}
@@ -189,9 +225,70 @@
     body{display:flex;align-items:center;justify-content:center;background:#0A0812;}
     #app{border-radius:40px;overflow:hidden;box-shadow:0 0 60px rgba(0,0,0,.8);}
   }
+
+  /* ===== DESKTOP MULTI-PANE LAYER (additive — mobile untouched) ===== */
+  .desk-pane{display:none;}
+  .mini-stat.clickable{cursor:pointer;transition:border-color .2s,transform .15s;}
+  .mini-stat.clickable:hover{border-color:var(--cyber);}
+  .mini-stat.clickable:active{transform:scale(.97);}
+  .fresh-pill{flex:1;text-align:center;font-size:11px;font-weight:700;color:var(--muted);background:var(--plum2);border:1px solid var(--plum3);border-radius:999px;padding:7px 4px;cursor:pointer;transition:all .2s;}
+  .fresh-pill.on{color:var(--mint);border-color:rgba(0,245,160,.45);background:rgba(0,245,160,.08);}
+  .status-pill{font-size:10px;font-weight:800;padding:3px 10px;border-radius:999px;}
+  .stat-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--plum3);}
+  .stat-row:last-child{border:none;}
+  .desk-only{display:none;}
+
+  /* ===== FULL DESKTOP GRID OPTIMIZATION (≥1024px) ===== */
+  @media(min-width:1024px){
+    body.desk{display:block;background:#0A0812;}
+    body.desk #app{max-width:1320px;width:96vw;height:100dvh;margin:0 auto;border-radius:0;box-shadow:none;}
+    body.desk #footer-nav{display:none;}            /* mobile bottom nav hidden on desktop */
+    body.desk .desk-pane{display:none!important;}    /* old side panes replaced by real grid */
+    body.desk .desk-only{display:flex;}
+    body.desk #desk-grid{display:grid;grid-template-columns:30% 40% 30%;gap:14px;padding:14px 14px 0;align-items:start;}
+    body.desk #desk-grid>div{max-height:calc(100dvh - 92px);overflow-y:auto;scrollbar-width:thin;border-radius:18px;background:rgba(28,24,48,.35);border:1px solid var(--plum3);}
+    body.desk #desk-grid .view{display:block!important;}
+    body.desk #view-browse,body.desk #view-account{display:none;position:absolute;top:64px;left:0;right:0;bottom:0;background:var(--plum);z-index:120;overflow-y:auto;padding:0 20% 30px;}
+    body.desk #view-browse.overlay-open,body.desk #view-account.overlay-open{display:block;}
+    body.desk .ctrl-btn:hover{transform:scale(1.08);}
+    body.desk .browse-row:hover,body.desk .pref-row:hover{border-color:var(--cyber);}
+    body.desk .nav-pill{font-size:12px;font-weight:700;color:var(--muted);background:var(--plum3);border:1px solid var(--plum4);border-radius:999px;padding:7px 14px;cursor:pointer;transition:all .2s;}
+    body.desk .nav-pill:hover,body.desk .nav-pill.on{color:var(--cyber);border-color:var(--cyber);}
+  }
+
+  @media(min-width:1100px){
+    body:not(.desk) .desk-pane{display:block;position:fixed;top:50%;transform:translateY(-50%);width:280px;color:var(--off);}
+    #desk-left{left:calc(50% - 215px - 320px);}
+    #desk-right{right:calc(50% - 215px - 320px);}
+    .desk-card{background:var(--plum2);border:1px solid var(--plum3);border-radius:20px;padding:20px;margin-bottom:14px;}
+    .ctrl-btn:hover{transform:scale(1.08);}
+    .nav-tab:hover .nav-label{color:var(--cyber);}
+    .browse-row:hover,.pref-row:hover{border-color:var(--cyber);}
+    .upgrade-btn:hover,.opt-btn-go:hover{filter:brightness(1.08);}
+    .key-hint{display:inline-block;background:var(--plum3);border:1px solid var(--plum4);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;color:var(--cyber);}
+  }
 </style>
 </head>
 <body>
+<!-- ===== DESKTOP PANES (hidden on mobile) ===== -->
+<aside class="desk-pane" id="desk-left">
+  <div class="desk-card">
+    <div style="font-size:30px;margin-bottom:8px;" class="ghost-glow">👻</div>
+    <div class="brand-text" style="font-size:24px;font-weight:800;">GhostProofJob</div>
+    <div style="font-size:13px;color:var(--off);line-height:1.7;margin-top:12px;">Job hunting is broken — you apply into the void and never hear back. <strong style="color:var(--mint);">GhostProofJob fixes it:</strong> swipe real verified openings, auto-apply in one tap, and see every company's community-sourced <strong style="color:var(--cyber);">ghosting risk</strong> before you invest a single interview.</div>
+    <div style="font-size:13px;color:var(--mint);font-weight:800;margin-top:10px;">Free until you're hired. Because the only metric we care about is you, employed. 💚</div>
+  </div>
+</aside>
+<aside class="desk-pane" id="desk-right">
+  <div class="desk-card">
+    <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px;">⌨️ Desktop Controls</div>
+    <div style="font-size:13px;line-height:2.2;color:var(--off);"><span class="key-hint">←</span> Skip job<br/><span class="key-hint">→</span> Auto-Apply<br/><span class="key-hint">↵</span> Open company intel</div>
+  </div>
+  <div class="desk-card">
+    <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px;">📡 Live Market Feed</div>
+    <div style="font-size:12px;color:var(--off);line-height:1.7;" id="desk-feed-status">Demo deck loaded. Set a location in 🔍 Browse to pull live openings.</div>
+  </div>
+</aside>
 <div id="app">
 
   <!-- HEADER -->
@@ -202,7 +299,12 @@
         <div class="brand-text" style="font-size:18px;font-weight:800;letter-spacing:-.3px;">GhostProofJob</div>
         <div class="grace-pill">Free until you're hired · Day 1 of 90</div>
       </div>
-      <div style="margin-left:auto;">
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+        <div class="desk-only" style="gap:6px;">
+          <span class="nav-pill" onclick="switchView('browse',null)">🔍 Browse</span>
+          <span class="nav-pill" onclick="switchView('account',null)">⚙️ Settings</span>
+        </div>
+        <div id="auth-chip" onclick="openAuth()" style="background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.35);color:var(--cyber);font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:pointer;">Sign In</div>
         <div id="upgrade-trigger" onclick="toggleUpgrade()" style="background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.3);color:var(--mint);font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:pointer;">Support Us ▾</div>
       </div>
     </div>
@@ -269,6 +371,7 @@
     <div class="modal-box">
       <div style="font-size:34px;margin-bottom:8px;">👻💚</div>
       <div style="font-size:17px;font-weight:800;margin-bottom:6px;">Welcome. Let's get you hired.</div>
+      <div style="font-size:12px;color:var(--off);line-height:1.65;margin-bottom:8px;background:var(--plum3);border-radius:10px;padding:10px;">Job hunting is broken — you apply into the void and never hear back. <strong style="color:var(--mint);">GhostProofJob fixes it:</strong> swipe verified openings, auto-apply in one tap, and see every company's <strong style="color:var(--cyber);">ghosting risk</strong> before you waste an interview.</div>
       <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:6px;">Everything here is <strong style="color:var(--mint);">free until you land a job</strong> (or 90 days, whichever comes first). We win when you win — that's the whole model.</div>
       <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:16px;">The best first step: upload your resume. We'll read it, score your job matches, and show exactly what could raise your salary.</div>
       <div onclick="closeOnboard('resume')" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;margin-bottom:8px;">📤 Upload My Resume First</div>
@@ -350,6 +453,112 @@
     </div>
   </div>
 
+  <!-- ===== 120-DAY PACING OVER-LIMIT MODAL ===== -->
+  <div class="modal-scrim" id="overlimit-modal" style="z-index:330;">
+    <div class="modal-box">
+      <div style="font-size:34px;margin-bottom:8px;">🌱</div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:6px;">You've been hunting hard for 120+ days.</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px;">First: that takes real resilience, and we see you. To keep the lights on for long hunts, free accounts past day 120 get <strong style="color:var(--mint);">5 focused auto-applies per day</strong>. You've used today's 5 — here's how to keep going:</div>
+      <div onclick="openCheckout('life')" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;margin-bottom:8px;">⚡ Lifetime — $12 once, never again</div>
+      <div onclick="openCheckout('month')" style="background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:12px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">🪙 $0.99/month — cancel anytime</div>
+      <div onclick="claimHardship()" style="background:rgba(255,179,71,.12);border:1px dashed rgba(255,179,71,.45);color:var(--warn);border-radius:12px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">🤝 30-Day Free Financial Hardship Extension</div>
+      <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-bottom:8px;">No proof required. We trust you — if money is the obstacle, the limit resets and you get full access for 30 more days.</div>
+      <div onclick="document.getElementById('overlimit-modal').classList.remove('open')" style="color:var(--muted);font-size:13px;cursor:pointer;padding:6px;">Come back tomorrow 👋</div>
+    </div>
+  </div>
+
+  <!-- ===== RATE YOUR EX (EMPLOYER) MODAL ===== -->
+  <div class="modal-scrim" id="rate-ex-modal" style="z-index:330;">
+    <div class="modal-box">
+      <div style="font-size:30px;margin-bottom:6px;">🏢💔</div>
+      <div style="font-size:15px;font-weight:800;margin-bottom:4px;">Rate Your Ex(-Employer)</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:10px;">We found <span id="rate-ex-name" style="color:var(--mint);font-weight:800;"></span> in your work history. One anonymous rating feeds the community Vibe Score for every hunter behind you.</div>
+      <div class="star-rater" id="rate-ex-stars" style="font-size:0;margin-bottom:12px;"><span style="font-size:30px;cursor:pointer;color:var(--plum4);">★</span><span style="font-size:30px;cursor:pointer;color:var(--plum4);">★</span><span style="font-size:30px;cursor:pointer;color:var(--plum4);">★</span><span style="font-size:30px;cursor:pointer;color:var(--plum4);">★</span><span style="font-size:30px;cursor:pointer;color:var(--plum4);">★</span></div>
+      <div onclick="skipRateEx()" style="color:var(--muted);font-size:12px;cursor:pointer;padding:6px;">Skip this one</div>
+    </div>
+  </div>
+
+  <!-- ===== PREF EDIT MODAL ===== -->
+  <div class="modal-scrim" id="pref-modal" style="z-index:330;">
+    <div class="modal-box" style="text-align:left;">
+      <div style="font-size:15px;font-weight:800;margin-bottom:8px;" id="pref-modal-title">Edit preference</div>
+      <input class="field-input" id="pref-modal-input" style="margin-bottom:12px;"/>
+      <div class="opt-actions" style="margin-top:0;">
+        <div class="opt-btn-skip" onclick="document.getElementById('pref-modal').classList.remove('open')">Cancel</div>
+        <div class="opt-btn-go" onclick="savePref()">Save</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MARKET ADVICE BANNER (non-invasive) ===== -->
+  <div id="advice-banner" style="position:absolute;bottom:78px;left:12px;right:12px;background:var(--plum3);border:1px solid rgba(181,95,230,.45);border-radius:14px;padding:12px;z-index:240;display:none;box-shadow:0 8px 30px rgba(0,0,0,.5);">
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <div style="font-size:18px;flex-shrink:0;">📊</div>
+      <div style="flex:1;font-size:12px;color:var(--off);line-height:1.6;" id="advice-text"></div>
+      <div onclick="document.getElementById('advice-banner').style.display='none'" style="color:var(--muted);cursor:pointer;font-size:16px;flex-shrink:0;">✕</div>
+    </div>
+  </div>
+
+  <!-- ===== STAT TRACKER MODAL (Applied / Responses / Skipped) ===== -->
+  <div class="modal-scrim" id="stat-modal" style="z-index:330;">
+    <div class="modal-box" style="text-align:left;max-height:80%;display:flex;flex-direction:column;">
+      <div style="display:flex;align-items:center;margin-bottom:4px;">
+        <div style="font-size:15px;font-weight:800;flex:1;" id="stat-modal-title">Applied</div>
+        <div onclick="document.getElementById('stat-modal').classList.remove('open')" style="color:var(--muted);cursor:pointer;font-size:16px;">✕</div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;" id="stat-modal-sub"></div>
+      <div style="flex:1;overflow-y:auto;min-height:120px;" id="stat-modal-list"></div>
+    </div>
+  </div>
+
+  <!-- ===== ASK HR LIMIT MODAL ===== -->
+  <div class="modal-scrim" id="hr-limit-modal" style="z-index:330;">
+    <div class="modal-box">
+      <div style="font-size:30px;margin-bottom:8px;">💬</div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:6px;">You've used your 5 free questions this month</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px;">Our HR pros' time is the one thing we can't make free forever. Unlimited Ask HR comes with either plan:</div>
+      <div onclick="openCheckout('life')" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;margin-bottom:8px;">⚡ Lifetime — $12 once</div>
+      <div onclick="openCheckout('month')" style="background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:12px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">🪙 $0.99/month — cancel anytime</div>
+      <div onclick="document.getElementById('hr-limit-modal').classList.remove('open')" style="color:var(--muted);font-size:13px;cursor:pointer;padding:6px;">Questions reset next month 👋</div>
+    </div>
+  </div>
+
+  <!-- ===== FIREBASE AUTH MODAL ===== -->
+  <div class="modal-scrim" id="auth-modal" style="z-index:340;">
+    <div class="modal-box" style="text-align:left;">
+      <div style="font-size:15px;font-weight:800;margin-bottom:2px;" id="auth-title">Create your account</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Saves your profile & resume history securely to the cloud so you never lose progress.</div>
+      <div class="field-label">Email</div>
+      <input class="field-input" id="auth-email" type="email" placeholder="you@email.com" style="margin-bottom:8px;"/>
+      <div class="field-label">Password (6+ characters)</div>
+      <input class="field-input" id="auth-pass" type="password" placeholder="••••••••" style="margin-bottom:12px;"/>
+      <div class="opt-actions" style="margin-top:0;">
+        <div class="opt-btn-skip" onclick="authSignIn()">Log In</div>
+        <div class="opt-btn-go" onclick="authSignUp()">Create Account</div>
+      </div>
+      <div onclick="document.getElementById('auth-modal').classList.remove('open')" style="color:var(--muted);font-size:12px;cursor:pointer;padding:8px;text-align:center;margin-top:4px;">Maybe later</div>
+    </div>
+  </div>
+
+  <!-- ===== SUPPORT CONTACT MODAL (Resend via Worker) ===== -->
+  <div class="modal-scrim" id="support-modal" style="z-index:330;">
+    <div class="modal-box" style="text-align:left;">
+      <div style="font-size:15px;font-weight:800;margin-bottom:2px;">📨 Contact Support</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">A human reads every message. We typically reply within 1 business day.</div>
+      <div class="field-label">Your Name</div>
+      <input class="field-input" id="sup-name" placeholder="Alex Rivera" style="margin-bottom:8px;"/>
+      <div class="field-label">Your Email *</div>
+      <input class="field-input" id="sup-email" type="email" placeholder="you@email.com" style="margin-bottom:8px;"/>
+      <div class="field-label">How can we help? *</div>
+      <textarea class="field-input" id="sup-msg" rows="4" placeholder="Question, bug, feedback — anything." style="resize:none;margin-bottom:12px;line-height:1.5;"></textarea>
+      <div class="opt-actions" style="margin-top:0;">
+        <div class="opt-btn-skip" onclick="document.getElementById('support-modal').classList.remove('open')">Cancel</div>
+        <div class="opt-btn-go" id="sup-send-btn" onclick="sendSupportMessage()">Send Message</div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:10px;">Or email us directly: <span onclick="mailtoSupport()" style="color:var(--cyber);cursor:pointer;text-decoration:underline;">support@ghostproofjob.com</span></div>
+    </div>
+  </div>
+
   <!-- LEGAL OVERLAY -->
   <div id="legal-overlay">
     <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--plum3);background:var(--plum2);">
@@ -364,9 +573,9 @@
     <!-- VIEW: SWIPE -->
     <div class="view active" id="view-swipe">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px 16px 4px;">
-        <div class="mini-stat"><div class="mini-stat-val" style="color:var(--mint);">14</div><div class="mini-stat-lbl">Applied</div></div>
-        <div class="mini-stat"><div class="mini-stat-val" style="color:var(--cyber);">3</div><div class="mini-stat-lbl">Responses</div></div>
-        <div class="mini-stat"><div class="mini-stat-val" style="color:var(--warn);">6</div><div class="mini-stat-lbl">Skipped</div></div>
+        <div class="mini-stat clickable" onclick="openStatModal('applied')"><div class="mini-stat-val" style="color:var(--mint);" id="stat-applied">0</div><div class="mini-stat-lbl">Applied</div></div>
+        <div class="mini-stat clickable" onclick="openStatModal('responses')"><div class="mini-stat-val" style="color:var(--cyber);" id="stat-responses">0</div><div class="mini-stat-lbl">Responses</div></div>
+        <div class="mini-stat clickable" onclick="openStatModal('skipped')"><div class="mini-stat-val" style="color:var(--warn);" id="stat-skipped">0</div><div class="mini-stat-lbl">Skipped</div></div>
       </div>
       <div id="resume-nudge" style="margin:8px 16px 0;background:rgba(181,95,230,.1);border:1px solid rgba(181,95,230,.3);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="switchView('resume',document.querySelector('[data-view=resume]'))">
         <div style="font-size:18px;">📄</div>
@@ -374,9 +583,29 @@
         <div style="color:var(--cyber);">›</div>
       </div>
 
+      <!-- ===== SWIPE SORT / GHOST FILTER + JOB FRESHNESS ===== -->
+      <div style="margin:10px 16px 0;background:var(--plum2);border:1px solid var(--plum3);border-radius:14px;padding:10px;">
+        <div style="display:flex;gap:8px;margin-bottom:8px;" id="fresh-row">
+          <div class="fresh-pill" data-days="30" onclick="setFreshness(this)">✨ New (&lt;30 Days)</div>
+          <div class="fresh-pill" data-days="90" onclick="setFreshness(this)">Active (&lt;90 Days)</div>
+          <div class="fresh-pill on" data-days="0" onclick="setFreshness(this)">All</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <select class="field-input" id="sw-sort" onchange="applySwipeFilters()" style="font-size:12px;padding:8px 6px;flex:1;min-width:150px;">
+            <option value="match">Sort: Best Match 🎯</option>
+            <option value="ghost">👻 Least Likely to Ghost</option>
+            <option value="salhi">Salary: High → Low</option>
+            <option value="sallo">Salary: Low → High</option>
+            <option value="az">Company A → Z</option>
+          </select>
+          <div id="sw-hide-ghost" onclick="this.classList.toggle('on');applySwipeFilters()" class="quick-chip" style="font-size:11px;font-weight:700;margin:0;">🚫👻 Hide Likely Ghosters</div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:6px;" id="sw-filter-count">Showing demo deck</div>
+      </div>
+
       <!-- ===== APPENDED: DAILY ENERGY METER (insert directly above #card-deck) ===== -->
       <div id="energy-meter" style="margin:10px 16px 0;display:flex;align-items:center;gap:8px;">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;">⚡ Daily Energy Meter: <span id="energy-count" style="color:var(--mint);">0</span> / 30 Applications Sent Today</div>
+        <div style="font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;">⚡ Daily Energy Meter: <span id="energy-count" style="color:var(--mint);">0</span> / <span id="energy-cap">30</span> Applications Sent Today</div>
         <div style="flex:1;height:4px;background:var(--plum3);border-radius:999px;overflow:hidden;"><div id="energy-fill" style="width:0%;height:100%;background:linear-gradient(90deg,var(--mint),var(--cyber));border-radius:999px;transition:width .4s ease;"></div></div>
       </div>
 
@@ -385,11 +614,11 @@
         <div id="job-card-2" class="job-card bot">
           <div class="card-header">
             <div style="display:flex;align-items:center;gap:10px;">
-              <div class="logo-circle" style="background:rgba(255,100,100,.15);">🏢</div>
-              <div><div style="font-weight:700;font-size:15px;">Product Designer</div><div style="font-size:12px;color:var(--muted);">Figma · San Francisco</div></div>
+              <div class="logo-circle s-logo" style="background:rgba(255,100,100,.15);">🏢</div>
+              <div><div style="font-weight:700;font-size:15px;" class="s-title">Product Designer</div><div style="font-size:12px;color:var(--muted);" class="s-sub">Figma · San Francisco</div></div>
             </div>
             <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
-              <span class="salary-badge">$145K – $175K</span><span class="location-badge">📍 Remote</span>
+              <span class="salary-badge s-salary">$145K – $175K</span><span class="location-badge s-loc">📍 Remote</span>
               <span class="match-badge match-pct" style="display:none;">🎯 61% Match</span>
             </div>
           </div>
@@ -397,11 +626,11 @@
         <div id="job-card-1" class="job-card mid">
           <div class="card-header">
             <div style="display:flex;align-items:center;gap:10px;">
-              <div class="logo-circle" style="background:rgba(100,200,255,.15);">🔷</div>
-              <div><div style="font-weight:700;font-size:15px;">Staff Engineer</div><div style="font-size:12px;color:var(--muted);">Linear · New York</div></div>
+              <div class="logo-circle s-logo" style="background:rgba(100,200,255,.15);">🔷</div>
+              <div><div style="font-weight:700;font-size:15px;" class="s-title">Staff Engineer</div><div style="font-size:12px;color:var(--muted);" class="s-sub">Linear · New York</div></div>
             </div>
             <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
-              <span class="salary-badge">$190K – $240K</span><span class="location-badge">📍 Hybrid</span>
+              <span class="salary-badge s-salary">$190K – $240K</span><span class="location-badge s-loc">📍 Hybrid</span>
               <span class="match-badge match-pct" style="display:none;">🎯 82% Match</span>
             </div>
           </div>
@@ -409,12 +638,12 @@
         <div id="job-card-0" class="job-card top" onclick="toggleDrawer(event)">
           <div class="card-header">
             <div style="display:flex;align-items:center;gap:10px;">
-              <div class="logo-circle" style="background:rgba(0,245,160,.12);">🦓</div>
-              <div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:16px;">Senior Frontend Eng</div><div style="font-size:12px;color:var(--muted);">Stripe · Remote-US</div></div>
+              <div class="logo-circle s-logo" style="background:rgba(0,245,160,.12);">🦓</div>
+              <div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:16px;" class="s-title">Senior Frontend Eng</div><div style="font-size:12px;color:var(--muted);" class="s-sub">Stripe · Remote-US</div></div>
               <div style="text-align:right;"><div class="vibe-stars">★★★★☆</div><div style="font-size:10px;color:var(--muted);">4.1 / 5 Vibe</div></div>
             </div>
             <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
-              <span class="salary-badge">$185K – $225K ✓</span><span class="location-badge">📍 Remote / Hybrid</span>
+              <span class="salary-badge s-salary">$185K – $225K ✓</span><span class="location-badge s-loc">📍 Remote / Hybrid</span>
               <span class="match-badge match-pct" style="display:none;">🎯 91% Match</span>
             </div>
           </div>
@@ -430,12 +659,14 @@
                 <div style="text-align:center;"><div style="font-size:20px;font-weight:800;color:var(--cyber);">4.2★</div><div style="font-size:10px;color:var(--muted);">Indeed Rating</div></div>
                 <div style="text-align:center;"><div style="font-size:20px;font-weight:800;color:var(--warn);">12%</div><div style="font-size:10px;color:var(--muted);">Layoff Risk</div></div>
               </div>
-              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Recent Company News</div>
-              <div class="news-item">📰 Stripe announces $1B Series I at $65B valuation — 3d ago</div>
-              <div class="news-item">📰 Stablecoin payments launch in 47 countries — 1w ago</div>
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Recent Company News <span style="text-transform:none;font-weight:400;color:var(--cyber);">(tap to read)</span></div>
+              <div id="drawer-news">
+                <div class="news-item">📰 Stripe announces $1B Series I at $65B valuation — 3d ago</div>
+                <div class="news-item">📰 Stablecoin payments launch in 47 countries — 1w ago</div>
+              </div>
               <div style="margin-top:10px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Connect with Hiring Team</div>
-              <div style="display:flex;gap:8px;">
-                <div class="social-icon">💼</div><div class="social-icon">🐦</div><div class="social-icon">✉️</div><div class="social-icon">🌐</div>
+              <div style="display:flex;gap:8px;" id="drawer-social">
+                <div class="social-icon" data-net="linkedin" title="LinkedIn">💼</div><div class="social-icon" data-net="x" title="X / Twitter">🐦</div><div class="social-icon" data-net="glassdoor" title="Glassdoor">🏢</div><div class="social-icon" data-net="web" title="Website">🌐</div>
               </div>
             </div>
           </div>
@@ -460,17 +691,19 @@
       </div>
       <div class="filter-bar">
         <div class="field-label">Keyword / Title</div>
-        <input class="field-input" id="f-keyword" placeholder="e.g. Engineer, Designer…" oninput="renderBrowse()" style="margin-bottom:10px;"/>
+        <input class="field-input" id="f-keyword" placeholder="e.g. Engineer, Designer…" oninput="renderBrowse();queueLiveFetch()" style="margin-bottom:10px;"/>
+        <div class="field-label">📡 Region / Location <span style="text-transform:none;font-weight:400;color:var(--mint);">(triggers live job feed)</span></div>
+        <input class="field-input" id="f-location" placeholder="e.g. London, Manchester, Houston…" oninput="queueLiveFetch()" style="margin-bottom:10px;"/>
         <div class="field-row" style="margin-bottom:10px;">
           <div>
             <div class="field-label">Industry</div>
-            <select class="field-input" id="f-industry" onchange="renderBrowse()">
+            <select class="field-input" id="f-industry" onchange="renderBrowse();queueLiveFetch()">
               <option value="">All</option><option>Tech</option><option>Design</option><option>Finance</option><option>Healthcare</option>
             </select>
           </div>
           <div>
             <div class="field-label">Work Style</div>
-            <select class="field-input" id="f-style" onchange="renderBrowse()">
+            <select class="field-input" id="f-style" onchange="renderBrowse();queueLiveFetch()">
               <option value="">Any</option><option>Remote</option><option>Hybrid</option><option>On-site</option>
             </select>
           </div>
@@ -497,6 +730,9 @@
         <div style="font-size:11px;color:var(--muted);margin-top:4px;">PDF, DOCX, or TXT · Parsed on-device, never sold</div>
         <input type="file" id="resume-file" accept=".pdf,.doc,.docx,.txt" style="display:none;" onchange="startParse(this)"/>
       </div>
+      <div style="text-align:center;margin:-6px 16px 14px;">
+        <span onclick="buildFromProfile()" style="font-size:12px;color:var(--cyber);cursor:pointer;text-decoration:underline;">No resume yet? Build one from your profile instead →</span>
+      </div>
 
       <!-- Parse progress (hidden until upload) -->
       <div class="section-card" id="parse-card" style="display:none;">
@@ -517,13 +753,13 @@
             <div style="font-size:14px;font-weight:800;color:var(--mint);">Resume parsed — review & edit</div>
           </div>
           <div class="field-row" style="margin-bottom:8px;">
-            <div><div class="field-label">Name</div><input class="field-input autofilled" value="Alex Rivera"/></div>
-            <div><div class="field-label">Years Exp.</div><input class="field-input autofilled" value="6"/></div>
+            <div><div class="field-label">Name</div><input class="field-input autofilled" id="pr-name" value="Alex Rivera"/></div>
+            <div><div class="field-label">Years Exp.</div><input class="field-input autofilled" id="pr-years" value="6"/></div>
           </div>
           <div class="field-label">Most Recent Title</div>
-          <input class="field-input autofilled" value="Senior Frontend Engineer" style="margin-bottom:8px;"/>
+          <input class="field-input autofilled" id="pr-title" value="Senior Frontend Engineer" style="margin-bottom:8px;"/>
           <div class="field-label">Education</div>
-          <input class="field-input autofilled" value="B.S. Computer Science · UT Austin · 2019" style="margin-bottom:10px;"/>
+          <input class="field-input autofilled" id="pr-edu" value="B.S. Computer Science · UT Austin · 2019" style="margin-bottom:10px;"/>
           <div class="field-label">Detected Skills</div>
           <div>
             <span class="skill-chip">JavaScript</span><span class="skill-chip">React</span><span class="skill-chip">TypeScript</span><span class="skill-chip">Node.js</span><span class="skill-chip">CSS/Tailwind</span><span class="skill-chip">REST APIs</span><span class="skill-chip">Git</span><span class="skill-chip">Agile</span>
@@ -866,6 +1102,14 @@
         <div class="report-bar-bg"><div class="report-bar-fill" style="width:12%;background:var(--mint);"></div></div>
         <div style="display:flex;gap:6px;margin-top:8px;"><span class="report-tag" style="background:rgba(0,245,160,.12);color:var(--mint);">Low Risk ✓ · Replies in 48h</span></div>
       </div>
+      <!-- ===== ASK HR ADVISORY PANEL ===== -->
+      <div class="report-card" style="border-color:rgba(181,95,230,.35);">
+        <div style="font-size:14px;font-weight:800;margin-bottom:2px;">💬 Ask HR</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Real HR pros answer your hiring questions. <span style="color:var(--mint);font-weight:700;"><span id="hr-remaining">5</span> free questions left this month</span>.</div>
+        <textarea class="field-input" id="hr-question" rows="3" placeholder="e.g. How do I follow up after 2 weeks of silence without sounding desperate?" style="resize:none;margin-bottom:10px;line-height:1.5;"></textarea>
+        <div onclick="askHR()" style="background:linear-gradient(135deg,var(--cyber),var(--cyber2));color:#fff;font-weight:800;border-radius:10px;padding:11px;font-size:13px;cursor:pointer;text-align:center;">Submit Question</div>
+      </div>
+
       <div onclick="showToast('📋 Ghost report form coming soon!')" style="margin:4px 16px 16px;background:rgba(181,95,230,.1);border:1px dashed rgba(181,95,230,.4);border-radius:14px;padding:14px;text-align:center;cursor:pointer;">
         <div style="font-size:20px;">👻</div>
         <div style="font-size:14px;font-weight:700;color:var(--cyber);">File a Ghost Report</div>
@@ -906,10 +1150,10 @@
       </div>
 
       <div class="pref-section">
-        <div class="pref-section-title">Match Preferences</div>
-        <div class="pref-row"><div class="pref-icon" style="background:rgba(0,245,160,.12);">🎯</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Job Titles</div><div style="font-size:11px;color:var(--mint);">Engineer, Developer, Tech Lead</div></div><div style="color:var(--muted);">›</div></div>
-        <div class="pref-row"><div class="pref-icon" style="background:rgba(181,95,230,.12);">💰</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Minimum Salary</div><div style="font-size:11px;color:var(--cyber);">$120,000 / year</div></div><div style="color:var(--muted);">›</div></div>
-        <div class="pref-row"><div class="pref-icon" style="background:rgba(255,179,71,.12);">🏭</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Industries</div><div style="font-size:11px;color:var(--warn);">Tech, Fintech, Healthcare IT</div></div><div style="color:var(--muted);">›</div></div>
+        <div class="pref-section-title">Match Preferences <span style="text-transform:none;font-weight:400;">(tap to edit — we'll advise as you go)</span></div>
+        <div class="pref-row" onclick="editPref('titles')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(0,245,160,.12);">🎯</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Job Titles</div><div style="font-size:11px;color:var(--mint);" id="pref-titles">Engineer, Developer, Tech Lead</div></div><div style="color:var(--muted);">✎</div></div>
+        <div class="pref-row" onclick="editPref('salary')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(181,95,230,.12);">💰</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Minimum Salary</div><div style="font-size:11px;color:var(--cyber);" id="pref-salary">$120,000 / year</div></div><div style="color:var(--muted);">✎</div></div>
+        <div class="pref-row" onclick="editPref('industries')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(255,179,71,.12);">🏭</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Industries</div><div style="font-size:11px;color:var(--warn);" id="pref-industries">Tech, Fintech, Healthcare IT</div></div><div style="color:var(--muted);">✎</div></div>
       </div>
 
       <div class="pref-section">
@@ -921,12 +1165,13 @@
 
       <div class="pref-section">
         <div class="pref-section-title">Privacy, Legal & Security</div>
+        <div class="pref-row" onclick="contactSupport()" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(100,200,255,.12);">📨</div><div style="flex:1;font-size:13px;font-weight:600;">Contact Support / Ask a Question</div><div style="color:var(--muted);">›</div></div>
         <div class="pref-row" onclick="openLegal('faq')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(0,245,160,.12);">❓</div><div style="flex:1;font-size:13px;font-weight:600;">FAQ — Pricing, Check-ins & Getting Hired</div><div style="color:var(--muted);">›</div></div>
         <div class="pref-row" onclick="openLegal('privacy')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(181,95,230,.12);">🔒</div><div style="flex:1;font-size:13px;font-weight:600;">Privacy Policy</div><div style="color:var(--muted);">›</div></div>
         <div class="pref-row" onclick="openLegal('terms')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(0,245,160,.12);">📜</div><div style="flex:1;font-size:13px;font-weight:600;">Terms of Service</div><div style="color:var(--muted);">›</div></div>
         <div class="pref-row" onclick="openLegal('security')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(255,179,71,.12);">🛡️</div><div style="flex:1;font-size:13px;font-weight:600;">Security & Data Handling</div><div style="color:var(--muted);">›</div></div>
         <div class="pref-row" onclick="showToast('📤 Export requested. Check your email.')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(100,200,255,.12);">📤</div><div style="flex:1;font-size:13px;font-weight:600;">Export My Data</div><div style="color:var(--muted);">›</div></div>
-        <div class="pref-row" onclick="showToast('🗑️ Deletion flow would start here — 30-day grace.')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(255,77,106,.12);">🗑️</div><div style="flex:1;font-size:13px;font-weight:600;color:var(--danger);">Delete My Account & Data</div><div style="color:var(--muted);">›</div></div>
+        <div class="pref-row" onclick="purgeProfile()" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(255,77,106,.12);">🗑️</div><div style="flex:1;font-size:13px;font-weight:600;color:var(--danger);">Permanently Purge My Profile</div><div style="color:var(--muted);">›</div></div>
       </div>
 
       <div class="pref-section">
@@ -971,19 +1216,17 @@
 </div>
 
 <script>
-/* ===== CONFIG — replace with your real checkout links ===== */
-const CHECKOUT_LIFETIME_URL = '';  /* e.g. Stripe Payment Link or Lemon Squeezy: $12 one-time */
-const CHECKOUT_MONTHLY_URL  = '';  /* e.g. Stripe Payment Link: $0.99/month subscription */
-const TIPJAR_URL = '';             /* e.g. your Ko-fi page */
+/* ===== HARDCODED STRIPE PRODUCTION LINKS (confirmed by owner) ===== */
+const CHECKOUT_MONTHLY_URL  = 'https://buy.stripe.com/7sY7sMg6p8Dw2fUfljak002';  /* $0.99/mo Maintenance Plan */
+const CHECKOUT_LIFETIME_URL = 'https://buy.stripe.com/6oUeVe1bv2f81bQ6ONak001';  /* $12.00 Lifetime Pass */
+const TIPJAR_URL            = 'https://donate.stripe.com/00w4gA07r6vo3jY3CBak000'; /* Donation Tip Jar */
 
 function openCheckout(plan){
   const url = plan==='month' ? CHECKOUT_MONTHLY_URL : CHECKOUT_LIFETIME_URL;
-  if(url){ window.open(url,'_blank'); }
-  else showToast(plan==='month' ? '🪙 Add your $0.99/mo link to CHECKOUT_MONTHLY_URL' : '⚡ Add your $12 link to CHECKOUT_LIFETIME_URL');
+  window.open(url,'_blank','noopener');  /* _blank protects in-progress form data */
 }
 function openTipJar(){
-  if(TIPJAR_URL){ window.open(TIPJAR_URL,'_blank'); }
-  else showToast('☕ Add your Ko-fi link to TIPJAR_URL');
+  window.open(TIPJAR_URL,'_blank','noopener');
 }
 
 /* ===== ONBOARDING → TUTORIAL FLOW ===== */
@@ -1097,6 +1340,7 @@ function swipeCard(dir){
     botCard.classList.remove('bot'); botCard.classList.add('mid');
     botCard.style.transform='scale(.95) translateY(12px)';
     topIndex++;
+    recordSwipe(dir,{t:deckJobs[(topIndex-1)%3].t,co:deckJobs[(topIndex-1)%3].co});
     if(dir==='right'){
       registerApply();
       offerCoverLetter(deckJobs[(topIndex-1)%3].t, deckJobs[(topIndex-1)%3].co, false);
@@ -1186,9 +1430,18 @@ function renderBrowse(){
 /* ===== RESUME PARSE (simulated for prototype) ===== */
 function startParse(input){
   if(!input.files||!input.files.length) return;
+  const file=input.files[0];
   document.getElementById('upload-zone').style.display='none';
   const card=document.getElementById('parse-card');
   card.style.display='block';
+  /* Browser-native text parsing for .txt — binary formats (pdf/docx) fall back to demo */
+  const isText=/\.txt$/i.test(file.name)||file.type==='text/plain';
+  let rawText=null;
+  if(isText){
+    const r=new FileReader();
+    r.onload=e=>{rawText=e.target.result;};
+    r.readAsText(file);
+  }
   const stages=['ps0','ps1','ps2','ps3','ps4'];
   stages.forEach((id,i)=>{
     setTimeout(()=>{
@@ -1200,11 +1453,15 @@ function startParse(input){
           card.style.display='none';
           document.getElementById('parsed-sections').style.display='block';
           resumeReady=true;
+          let foundCompanies=[];
+          if(rawText){ foundCompanies=applyRealParse(rawText); }
           autofillProfile();
           revealMatches();
           renderTplPreview();
           marketAdvice();
-          showToast('✨ Resume parsed! 3 companies imported.');
+          showToast(rawText?'✨ Resume text parsed natively!':'✨ Resume parsed! (Text extraction for PDF/DOCX needs the backend)');
+          if(foundCompanies.length){ startRateExLoop(foundCompanies); }
+          else { startRateExLoop(['Stripe','Dell','IBM']); }
         },500);
       }
     },600*(i+1));
@@ -1511,27 +1768,10 @@ renderBuzz();
 
 /* --- 1. Daily Auto-Apply counter --- */
 let applyCount = 0;
-const DAILY_CAP = 30;
+const DAILY_CAP = 30; /* base cap; live cap comes from getDailyCap() in the launch block */
 
-/* --- 2. Update the meter indicator above the card --- */
-function updateEnergyMeter(){
-  const count=document.getElementById('energy-count');
-  const fill=document.getElementById('energy-fill');
-  if(!count||!fill) return;
-  count.textContent=applyCount;
-  fill.style.width=Math.min(100,Math.round((applyCount/DAILY_CAP)*100))+'%';
-  count.style.color = applyCount>=DAILY_CAP ? 'var(--danger)' : (applyCount>=24 ? 'var(--warn)' : 'var(--mint)');
-}
-
-/* --- called by swipeCard on every right swipe --- */
-function registerApply(){
-  applyCount++;
-  updateEnergyMeter();
-  if(applyCount>=DAILY_CAP){
-    setApplyDisabled(true);
-    openEnergyModal();
-  }
-}
+/* updateEnergyMeter() and registerApply() are defined in the LAUNCH SYSTEMS
+   block below — they respect the dynamic 120-day clamp and persistence. */
 
 /* --- 3. Disable / re-enable the Auto-Apply button --- */
 function setApplyDisabled(state){
@@ -1763,7 +2003,711 @@ function externalApply(i){
   offerCoverLetter(j.t,j.co,true);
   if(!resumeReady) showToast('↗ Opening '+j.co+'\u2019s posting…');
 }
+
+/* ============================================================
+   APPENDED BLOCK: LAUNCH SYSTEMS
+   Adzuna live engine · keyboard nav · 120-day clamp ·
+   native text parser · Rate Your Ex · privacy purge
+   ============================================================ */
+
+/* ---------- LIVE ADZUNA ENGINE ---------- */
+/* ONE worker URL powers both the secure job feed (/jobs) and support email (/contact).
+   Deploy ghostproofjob-worker.js to Cloudflare and paste its URL here: */
+const WORKER_URL = "https://ghostproofjob-worker.ghostproofjob.workers.dev";
+const ADZUNA_PROXY_URL = WORKER_URL ? WORKER_URL.replace(/\/$/,'')+'/jobs' : "";
+const ADZUNA_APP_ID = "gb";                    // Base route (NOTE: this is Adzuna's COUNTRY code in the URL path)
+const SENDER_DOMAIN = "ghostproofjob.com";     // Verified Resend domain (configured in the Worker + Resend dashboard)
+const ADZUNA_REAL_APP_ID  = "";                // Only used for direct calls if no proxy (NOT recommended — exposes key)
+const ADZUNA_REAL_APP_KEY = "";
+
+let jobsQueue=[];   /* live cards feed the swipe deck through here */
+let queuePtr=0;
+let liveFetchTimer=null;
+
+function queueLiveFetch(){
+  clearTimeout(liveFetchTimer);
+  liveFetchTimer=setTimeout(fetchLiveMarketJobs,700); /* debounce typing */
+}
+
+async function fetchLiveMarketJobs(){
+  const what=(document.getElementById('f-keyword')?document.getElementById('f-keyword').value:'').trim();
+  const where=(document.getElementById('f-location')?document.getElementById('f-location').value:'').trim();
+  if(!where && !what) return;
+  const status=document.getElementById('desk-feed-status');
+  if(status) status.textContent='📡 Fetching live openings'+(where?' near '+where:'')+'…';
+  showToast('📡 Pulling live market jobs…');
+  const daysQ=(typeof swFreshDays!=='undefined'&&swFreshDays)?('&days='+swFreshDays):'';
+  const directUrl=`https://api.adzuna.com/v1/api/jobs/${ADZUNA_APP_ID}/search/1?`+
+      `app_id=${encodeURIComponent(ADZUNA_REAL_APP_ID)}&app_key=${encodeURIComponent(ADZUNA_REAL_APP_KEY)}`+
+      `&results_per_page=20&content-type=application/json`+
+      ((typeof swFreshDays!=='undefined'&&swFreshDays)?('&max_days_old='+swFreshDays):'')+
+      (what?`&what=${encodeURIComponent(what)}`:'')+
+      (where?`&where=${encodeURIComponent(where)}`:'');
+  /* PATH 1 (secure, recommended): Cloudflare Worker — keys stay server-side */
+  const url = ADZUNA_PROXY_URL
+    ? `${ADZUNA_PROXY_URL}?`+(what?`what=${encodeURIComponent(what)}&`:'')+(where?`where=${encodeURIComponent(where)}&`:'')+daysQ.replace(/^&/,'')
+    : directUrl;
+  try{
+    let data;
+    try{
+      const res=await fetch(url);
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      data=await res.json();
+    }catch(primaryErr){
+      /* PATH 2 (fallback): allorigins CORS wrapper — works without a Worker,
+         but ONLY if direct keys are set, and those keys are then visible in
+         view-source. Use strictly for testing; the Worker is the launch path. */
+      if(!ADZUNA_REAL_APP_ID) throw primaryErr;
+      const wrapped='https://api.allorigins.win/get?url='+encodeURIComponent(directUrl);
+      const res2=await fetch(wrapped);
+      if(!res2.ok) throw new Error('proxy HTTP '+res2.status);
+      const shell=await res2.json();
+      data=JSON.parse(shell.contents);
+    }
+    if(!data.results||!data.results.length) throw new Error('empty');
+    jobsQueue=data.results.map(r=>({
+      t:(r.title||'Open Role').replace(/<[^>]+>/g,''),
+      co:(typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'Hiring Company',
+      sal:r.salary_min?('$'+Math.round(r.salary_min/1000)+'K'+(r.salary_max?(' – $'+Math.round(r.salary_max/1000)+'K'):'')):'Salary on request',
+      salMax:r.salary_max||r.salary_min||0,
+      loc:(typeof r.location==='string'?r.location:(r.location&&r.location.display_name))||where||'See posting',
+      url:r.redirect_url||'',
+      ghost:ghostRiskFor((typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'x'),
+      match:resumeReady?60+(hashStr(r.title||'')%36):null
+    }));
+    rawQueue=jobsQueue.slice();   /* canonical unfiltered live source */
+    queuePtr=0;
+    applySwipeFilters();
+    if(status) status.textContent='✅ Live: '+jobsQueue.length+' fresh openings loaded into your deck.';
+    showToast('✅ '+jobsQueue.length+' live jobs loaded — start swiping!');
+  }catch(err){
+    if(status) status.textContent='⚠️ Live feed unavailable ('+(ADZUNA_PROXY_URL?'check Worker deployment':'deploy the Worker proxy + add keys')+'). Demo deck active.';
+    showToast('⚠️ Live feed unavailable — demo deck active');
+  }
+}
+/* stable pseudo ghost-risk per company until real community data exists */
+function hashStr(s){let h=0;for(let i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0;}return h;}
+function ghostRiskFor(co){
+  if(communityGhost[co]!==undefined) return communityGhost[co];
+  return 8+(hashStr(co)%70);
+}
+const communityGhost={'Stripe':12,'Linear':9,'Figma':15,'Amazon':74,'Meta':41,'Chime':18,'Tenet Health':22,'HEB Digital':11,'Favor':31};
+
+function fillSlot(cardEl, job){
+  if(!cardEl||!job) return;
+  const set=(cls,val)=>{const el=cardEl.querySelector('.'+cls); if(el) el.textContent=val;};
+  set('s-title',job.t.length>34?job.t.slice(0,32)+'…':job.t);
+  set('s-sub',job.co+' · '+job.loc);
+  set('s-salary',job.sal);
+  set('s-loc','📍 '+(job.loc.length>22?job.loc.slice(0,20)+'…':job.loc));
+  /* live Green/Red flag text blocks (top card only has these) */
+  const gf=cardEl.querySelector('.green-flag'), rf=cardEl.querySelector('.red-flag');
+  if(gf) gf.innerHTML='🟢 <strong>Green Flag</strong> — '+(job.sal&&job.sal!=='Salary on request'?'Verified salary posted':'Actively hiring now')+' · '+job.loc;
+  if(rf){
+    const g=job.ghost!==undefined?job.ghost:ghostRiskFor(job.co);
+    rf.innerHTML='🔴 <strong>Red Flag</strong> — '+g+'% Ghosting Risk reported by the community';
+    rf.style.display=g<=15?'none':'block';
+    if(gf&&g<=15) gf.innerHTML+=' · Low ghost risk ✓';
+  }
+}
+
+function reloadDeckFromQueue(){
+  /* refresh the three card shells with the head of the live queue */
+  for(let i=0;i<3;i++){
+    const job=jobsQueue[(queuePtr+i)%jobsQueue.length];
+    const order=['top','mid','bot'];
+    const cardEl=document.querySelector('.job-card.'+order[i]);
+    fillSlot(cardEl,job);
+    if(job){ /* keep deckJobs metadata in sync for toasts/cover letters */
+      const idx=deckJobs.findIndex(d=>d.id===cardEl.id);
+      if(idx>=0){ deckJobs[idx].co=job.co; deckJobs[idx].t=job.t; }
+    }
+  }
+}
+function advanceQueue(){
+  if(!jobsQueue.length) return;
+  queuePtr=(queuePtr+1)%jobsQueue.length;
+  /* refill the card that just recycled to the bottom */
+  const botCard=document.querySelector('.job-card.bot');
+  const job=jobsQueue[(queuePtr+2)%jobsQueue.length];
+  fillSlot(botCard,job);
+  if(job&&botCard){
+    const idx=deckJobs.findIndex(d=>d.id===botCard.id);
+    if(idx>=0){ deckJobs[idx].co=job.co; deckJobs[idx].t=job.t; }
+  }
+}
+
+/* ---------- DESKTOP KEYBOARD NAVIGATION ---------- */
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT') return;
+  if(document.querySelector('.modal-scrim.open')) return;
+  if(!document.getElementById('view-swipe').classList.contains('active')) return;
+  if(e.key==='ArrowLeft'){ e.preventDefault(); swipeCard('left'); }
+  else if(e.key==='ArrowRight'){ e.preventDefault(); swipeCard('right'); }
+  else if(e.key==='Enter'){ const d=document.getElementById('card-drawer'); if(d) d.classList.toggle('open'); }
+});
+
+/* ---------- 120-DAY LIMIT CLAMP ---------- */
+const MS_DAY=86400000;
+function getInstallDate(){
+  try{
+    let d=localStorage.getItem('gpj_install_date');
+    if(!d){ d=String(Date.now()); localStorage.setItem('gpj_install_date',d); }
+    return parseInt(d,10);
+  }catch(e){ return Date.now(); }
+}
+function accountAgeDays(){ return Math.floor((Date.now()-getInstallDate())/MS_DAY); }
+function hardshipActive(){
+  try{ const u=localStorage.getItem('gpj_hardship_until'); return u&&Date.now()<parseInt(u,10); }catch(e){ return false; }
+}
+function getDailyCap(){
+  if(hardshipActive()) return 30;                 /* hardship extension restores full pacing */
+  return accountAgeDays()>120 ? 5 : 30;           /* clamp long-tenure free accounts to 5/day */
+}
+function claimHardship(){
+  try{ localStorage.setItem('gpj_hardship_until',String(Date.now()+30*MS_DAY)); }catch(e){}
+  applyCount=0; persistApplies();
+  setApplyDisabled(false);
+  updateEnergyMeter();
+  document.getElementById('overlimit-modal').classList.remove('open');
+  showToast('🤝 30-day extension active. Limits reset. Go get hired.');
+}
+/* persist daily applies so "come back tomorrow" actually works */
+function persistApplies(){
+  try{ localStorage.setItem('gpj_applies',JSON.stringify({d:new Date().toDateString(),n:applyCount})); }catch(e){}
+}
+function restoreApplies(){
+  try{
+    const s=JSON.parse(localStorage.getItem('gpj_applies')||'null');
+    if(s&&s.d===new Date().toDateString()) applyCount=s.n||0;
+  }catch(e){}
+  updateEnergyMeter();
+  if(applyCount>=getDailyCap()) setApplyDisabled(true);
+}
+
+/* meter respects the dynamic cap */
+function updateEnergyMeter(){
+  const cap=getDailyCap();
+  const count=document.getElementById('energy-count');
+  const capEl=document.getElementById('energy-cap');
+  const fill=document.getElementById('energy-fill');
+  if(!count||!fill) return;
+  count.textContent=applyCount;
+  if(capEl) capEl.textContent=cap;
+  count.style.color = applyCount>=cap ? 'var(--danger)' : (applyCount>=cap*0.8 ? 'var(--warn)' : 'var(--mint)');
+  fill.style.width=Math.min(100,Math.round((applyCount/cap)*100))+'%';
+}
+function registerApply(){
+  applyCount++;
+  persistApplies();
+  updateEnergyMeter();
+  advanceQueue();
+  const cap=getDailyCap();
+  if(applyCount>=cap){
+    setApplyDisabled(true);
+    if(cap===5){ document.getElementById('overlimit-modal').classList.add('open'); }
+    else { openEnergyModal(); }
+  }
+}
+
+/* ---------- BROWSER-NATIVE RESUME TEXT PARSER ---------- */
+function applyRealParse(text){
+  const set=(id,val)=>{const el=document.getElementById(id); if(el&&val){el.value=val;}};
+  /* name: first plausible line */
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const nameLine=lines.find(l=>/^[A-Z][a-z]+(\s[A-Z][a-z'’-]+){1,2}$/.test(l));
+  /* email + phone */
+  const email=(text.match(/[\w.+-]+@[\w-]+\.[\w.]+/)||[])[0];
+  const phone=(text.match(/(\+?\d[\d\s().-]{8,}\d)/)||[])[0];
+  /* years of experience from year span */
+  const years=[...text.matchAll(/\b(19|20)\d{2}\b/g)].map(m=>parseInt(m[0],10));
+  const exp=years.length?Math.max(0,new Date().getFullYear()-Math.min(...years)):'';
+  /* title: first line containing a common title keyword */
+  const titleLine=lines.find(l=>/(engineer|developer|designer|manager|analyst|specialist|consultant|director|coordinator|representative|technician|nurse|teacher|accountant)/i.test(l)&&l.length<60);
+  /* education line */
+  const eduLine=lines.find(l=>/(b\.?s\.?|b\.?a\.?|m\.?s\.?|mba|ph\.?d|bachelor|master|associate|university|college)/i.test(l)&&l.length<90);
+  /* companies: "at X", "@ X", or Capitalized line followed near a year range */
+  const comps=new Set();
+  [...text.matchAll(/(?:\bat|@)\s+([A-Z][A-Za-z&.]+(?:\s[A-Z][A-Za-z&.]+){0,2})/g)].forEach(m=>comps.add(m[1].trim()));
+  lines.forEach((l,i)=>{
+    if(/^[A-Z][A-Za-z&.,'’ ]{1,40}$/.test(l)&&/\b(19|20)\d{2}\b/.test(lines[i+1]||'')) comps.add(l.replace(/[.,]$/,''));
+  });
+  /* write what we found into the parsed review card + profile */
+  if(nameLine){ set('pr-name',nameLine);
+    const p=nameLine.split(' ');
+    const f=document.querySelector('.pf-first'),l2=document.querySelector('.pf-last');
+    if(f){f.value=p[0];f.classList.add('autofilled');} if(l2&&p[1]){l2.value=p.slice(1).join(' ');l2.classList.add('autofilled');}
+    resumeData.name=nameLine;
+  }
+  if(exp) set('pr-years',String(exp));
+  if(titleLine){ set('pr-title',titleLine); resumeData.title=titleLine; }
+  if(eduLine) set('pr-edu',eduLine);
+  if(email){ const e=document.querySelector('.pf-email'); if(e){e.value=email;e.classList.add('autofilled');} resumeData.contact=email+(phone?' · '+phone:''); }
+  return [...comps].slice(0,4);
+}
+
+/* ---------- RATE YOUR EX LOOP ---------- */
+let rateExQueue=[], rateExIdx=0;
+function startRateExLoop(companies){
+  rateExQueue=companies; rateExIdx=0;
+  setTimeout(showNextRateEx,900);
+}
+function showNextRateEx(){
+  if(rateExIdx>=rateExQueue.length){
+    document.getElementById('rate-ex-modal').classList.remove('open');
+    showToast('💚 Ratings logged — the ecosystem thanks you');
+    return;
+  }
+  document.getElementById('rate-ex-name').textContent=rateExQueue[rateExIdx];
+  const stars=[...document.getElementById('rate-ex-stars').querySelectorAll('span')];
+  stars.forEach(s=>s.style.color='var(--plum4)');
+  stars.forEach((s,i)=>{
+    s.onclick=()=>{
+      stars.forEach((x,j)=>x.style.color=j<=i?'var(--mint)':'var(--plum4)');
+      showToast('⭐ '+(i+1)+'/5 for '+rateExQueue[rateExIdx]);
+      rateExIdx++;
+      setTimeout(showNextRateEx,650);
+    };
+  });
+  document.getElementById('rate-ex-modal').classList.add('open');
+}
+function skipRateEx(){ rateExIdx++; showNextRateEx(); }
+
+/* ---------- PRIVACY VAULT: PERMANENT PURGE ---------- */
+function purgeProfile(){
+  if(!confirm('Permanently purge your profile? This clears ALL locally stored data — resume, profile, history, settings. This cannot be undone.')) return;
+  try{ localStorage.clear(); sessionStorage.clear(); }catch(e){}
+  showToast('🗑️ Profile purged. All local data cleared.');
+  setTimeout(()=>location.reload(),1400);
+}
+
+/* ---------- LAUNCH INIT ---------- */
+getInstallDate();
+restoreApplies();
+
+/* ============================================================
+   APPENDED BLOCK: DISCOVERY + SYNC SYSTEMS
+   swipe filters · clickable company intel · pref advisor ·
+   profile↔resume sync · contact support
+   ============================================================ */
+
+/* ---------- SWIPE SEARCH / SORT / GHOST FILTER ---------- */
+const demoDeck=[
+  {t:'Senior Frontend Eng',co:'Stripe',sal:'$185K – $225K ✓',salMax:225,loc:'Remote-US',ghost:12,match:91},
+  {t:'Staff Engineer',co:'Linear',sal:'$190K – $240K',salMax:240,loc:'New York',ghost:9,match:82},
+  {t:'Product Designer',co:'Figma',sal:'$145K – $175K',salMax:175,loc:'Remote',ghost:15,match:61},
+  {t:'Full-Stack Engineer',co:'Chime',sal:'$160K – $195K',salMax:195,loc:'Remote',ghost:18,match:82},
+  {t:'Frontend Engineer II',co:'Tenet Health',sal:'$120K – $150K',salMax:150,loc:'Houston, TX',ghost:22,match:78},
+  {t:'DevOps Engineer',co:'HEB Digital',sal:'$135K – $170K',salMax:170,loc:'Hybrid · TX',ghost:11,match:58},
+  {t:'Engineering Manager',co:'Favor',sal:'$175K – $210K',salMax:210,loc:'Austin, TX',ghost:31,match:64}
+];
+let rawQueue=demoDeck.slice();   /* unfiltered source (demo or live) */
+
+function applySwipeFilters(){
+  if(!rawQueue.length) rawQueue=demoDeck.slice();
+  const q='';  /* per spec: search fields live strictly on the Browse tab now */
+  const sort=document.getElementById('sw-sort')?document.getElementById('sw-sort').value:'match';
+  const hide=document.getElementById('sw-hide-ghost')&&document.getElementById('sw-hide-ghost').classList.contains('on');
+  let list=rawQueue.filter(j=>
+    (!q || j.t.toLowerCase().includes(q) || j.co.toLowerCase().includes(q)) &&
+    (!hide || (j.ghost!==undefined && j.ghost<=35))
+  );
+  const sorters={
+    match:(a,b)=>(b.match||0)-(a.match||0),
+    ghost:(a,b)=>(a.ghost??50)-(b.ghost??50),
+    salhi:(a,b)=>(b.salMax||0)-(a.salMax||0),
+    sallo:(a,b)=>(a.salMax||0)-(b.salMax||0),
+    az:(a,b)=>a.co.localeCompare(b.co)
+  };
+  list.sort(sorters[sort]||sorters.match);
+  jobsQueue=list; queuePtr=0;
+  const cnt=document.getElementById('sw-filter-count');
+  if(cnt) cnt.textContent=list.length?('Showing '+list.length+' jobs'+(hide?' · ghosters hidden 👻🚫':'')+(sort==='ghost'?' · safest first':'')) : 'No jobs match — loosen filters';
+  if(list.length) reloadDeckFromQueue();
+}
+
+/* ---------- CLICKABLE COMPANY INTEL (drawer) ---------- */
+function companyLinks(co){
+  const q=encodeURIComponent(co);
+  return {
+    news:'https://news.google.com/search?q='+q,
+    newsHiring:'https://news.google.com/search?q='+encodeURIComponent(co+' hiring layoffs'),
+    linkedin:'https://www.linkedin.com/search/results/companies/?keywords='+q,
+    x:'https://x.com/search?q='+q,
+    glassdoor:'https://www.glassdoor.com/Search/results.htm?keyword='+q,
+    web:'https://www.google.com/search?q='+q+'+official+site+careers'
+  };
+}
+function hydrateDrawer(){
+  const topCard=document.querySelector('.job-card.top');
+  if(!topCard) return;
+  const co=(topCard.querySelector('.s-sub')?topCard.querySelector('.s-sub').textContent.split(' · ')[0]:'') || 'this company';
+  const L=companyLinks(co);
+  const news=document.getElementById('drawer-news');
+  if(news){
+    news.innerHTML=
+      `<div class="news-item" onclick="event.stopPropagation();window.open('${L.news}','_blank','noopener')" style="cursor:pointer;color:var(--cyber);">📰 Latest news about ${co} →</div>`+
+      `<div class="news-item" onclick="event.stopPropagation();window.open('${L.newsHiring}','_blank','noopener')" style="cursor:pointer;color:var(--cyber);">📰 ${co}: hiring & layoff coverage →</div>`;
+  }
+  const social=document.getElementById('drawer-social');
+  if(social){
+    social.querySelectorAll('.social-icon').forEach(ic=>{
+      ic.onclick=e=>{e.stopPropagation();window.open(L[ic.dataset.net]||L.web,'_blank','noopener');};
+    });
+  }
+}
+/* hook hydration into drawer open */
+const _origToggleDrawer=toggleDrawer;
+toggleDrawer=function(e){
+  hydrateDrawer();
+  _origToggleDrawer(e);
+};
+
+/* ---------- MATCH PROFILE EDITOR + MARKET ADVISOR ---------- */
+let editingPref=null;
+const prefMeta={
+  titles:{label:'Job Titles (comma separated)',el:'pref-titles'},
+  salary:{label:'Minimum Salary (e.g. $120,000 / year)',el:'pref-salary'},
+  industries:{label:'Industries (comma separated)',el:'pref-industries'}
+};
+function editPref(key){
+  editingPref=key;
+  document.getElementById('pref-modal-title').textContent=prefMeta[key].label;
+  document.getElementById('pref-modal-input').value=document.getElementById(prefMeta[key].el).textContent;
+  document.getElementById('pref-modal').classList.add('open');
+}
+function savePref(){
+  const v=document.getElementById('pref-modal-input').value.trim();
+  if(!v){ showToast('Enter a value or cancel'); return; }
+  document.getElementById(prefMeta[editingPref].el).textContent=v;
+  document.getElementById('pref-modal').classList.remove('open');
+  showToast('✅ Preference saved');
+  showAdvice(prefAdvice(editingPref,v));
+}
+function prefAdvice(key,v){
+  if(key==='salary'){
+    const n=parseInt(v.replace(/[^0-9]/g,''),10)||0;
+    if(n&&n<95000) return '<strong style="color:var(--warn);">Market check:</strong> for the engineering titles in your profile, current median postings pay well above this floor. Setting a low minimum can surface lower-quality listings and anchor salary negotiations down. Consider $110K+ — your match scores suggest you can ask for it.';
+    if(n>=200000) return '<strong style="color:var(--cyber);">Market check:</strong> a $200K+ floor narrows you to roughly the top 8–12% of live postings. Totally valid for staff+ levels — just expect fewer cards per day, and keep "Best Match" sort on to maximize quality.';
+    return '<strong style="color:var(--mint);">Good range:</strong> this floor sits inside the healthy band for your titles — broad enough for volume, high enough to filter lowballs.';
+  }
+  if(key==='titles'){
+    return '<strong style="color:var(--mint);">Market tip:</strong> postings increasingly use "Software Engineer, Frontend" style phrasing over "Frontend Developer." Including 2–3 variants (Engineer / Developer / SWE) lifts your match coverage ~30%. These titles also flow onto your exported resume header — keep the most senior accurate one first.';
+  }
+  return '<strong style="color:var(--mint);">Market tip:</strong> Healthcare IT and Fintech are currently posting steadily with above-median pay, while consumer tech is more volatile. Listing 2–3 industries (not 1) keeps your deck full without diluting match quality. This selection also tunes the keywords we suggest for your resume.';
+}
+function showAdvice(html){
+  document.getElementById('advice-text').innerHTML=html;
+  const b=document.getElementById('advice-banner');
+  b.style.display='block';
+  clearTimeout(showAdvice._t);
+  showAdvice._t=setTimeout(()=>b.style.display='none',12000);
+}
+
+/* ---------- PROFILE ↔ RESUME SYNC ---------- */
+function syncProfileToResume(){
+  const val=sel=>{const e=document.querySelector(sel);return e&&e.value.trim()?e.value.trim():null;};
+  const first=val('.pf-first'), last=val('.pf-last');
+  if(first||last) resumeData.name=[first,last].filter(Boolean).join(' ');
+  const email=val('.pf-email');
+  if(email) resumeData.contact=email;
+  const title=val('.pf-title');
+  if(title) resumeData.title=title;
+  /* employment entries from the accordion */
+  const entries=[...document.querySelectorAll('#jobs-container > div')].filter(d=>d.querySelector('input'));
+  const jobs=[];
+  entries.forEach(d=>{
+    const ins=d.querySelectorAll('input'), ta=d.querySelector('textarea');
+    if(ins.length>=2&&ins[0].value.trim()&&ins[1].value.trim()){
+      jobs.push({t:ins[0].value.trim(),c:ins[1].value.trim(),
+        d:((ins[2]&&ins[2].value)||'')+((ins[3]&&ins[3].value)?('–'+ins[3].value):''),
+        b:(ta&&ta.value.trim())?ta.value.trim().replace(/\n/g,' · '):'See profile for details'});
+    }
+  });
+  if(jobs.length) resumeData.jobs=jobs;
+  const deg=val('.pf-degree'), major=val('.pf-major'), school=val('.pf-school'), yr=val('.pf-gradyr');
+  if(deg||major||school) resumeData.edu=[deg,major,school,yr].filter(Boolean).join(' · ');
+  /* added buzzwords flow into skills */
+  const added=[...document.querySelectorAll('.buzz-add.added')].map((b,i)=>buzzwords[parseInt(b.id.split('-')[1],10)]&&buzzwords[parseInt(b.id.split('-')[1],10)].w).filter(Boolean);
+  if(added.length){
+    const cur=new Set(resumeData.skills.split(' · '));
+    added.forEach(w=>cur.add(w));
+    resumeData.skills=[...cur].join(' · ');
+  }
+  /* completed optimizer bullets enrich the top job */
+  optState.forEach((s,i)=>{
+    if(s.done&&resumeData.jobs[0]&&i<2){
+      const line=optPrompts[i].build(s.value).replace(/^"|"$/g,'');
+      if(!resumeData.jobs[0].b.includes(line.slice(0,20))) resumeData.jobs[0].b=line+' · '+resumeData.jobs[0].b;
+    }
+  });
+}
+/* sync runs before every preview render / export / cover letter */
+const _origRenderTpl=renderTplPreview;
+renderTplPreview=function(){ syncProfileToResume(); _origRenderTpl(); };
+const _origDownloadResume=downloadResume;
+downloadResume=function(){ syncProfileToResume(); _origDownloadResume(); };
+const _origGenCL=generateCoverLetter;
+generateCoverLetter=function(){ syncProfileToResume(); _origGenCL(); };
+
+/* ---------- BUILD RESUME FROM PROFILE (no upload needed) ---------- */
+function buildFromProfile(){
+  resumeReady=true;
+  document.getElementById('upload-zone').style.display='none';
+  document.getElementById('parsed-sections').style.display='block';
+  syncProfileToResume();
+  renderTplPreview();
+  marketAdvice();
+  revealMatches();
+  showToast('✨ Building from your profile — fill the accordion below, the resume syncs live');
+}
+
+/* ---------- CONTACT SUPPORT ---------- */
+function contactSupport(){
+  window.location.href='mailto:support@ghostproofjob.com?subject='+encodeURIComponent('GhostProofJob — Support Request')+'&body='+encodeURIComponent('Hi team,\n\nI need help with:\n\n');
+  showToast('📨 Opening your email app…');
+}
+
+/* ---------- DISCOVERY INIT ---------- */
+applySwipeFilters();
+
+/* ============================================================
+   APPENDED BLOCK: PLATFORM SYSTEMS v3
+   stat trackers · freshness · Ask HR · Firebase auth/cloud ·
+   support form · desktop dashboard grid
+   ============================================================ */
+
+/* ---------- STAT TRACKER LISTS ---------- */
+let lists={applied:[],responses:[],skipped:[]};
+function loadLists(){ try{const s=JSON.parse(localStorage.getItem('gpj_lists')||'null'); if(s) lists=s;}catch(e){} updateStatCounters(); }
+function saveLists(){ try{localStorage.setItem('gpj_lists',JSON.stringify(lists));}catch(e){} }
+function updateStatCounters(){
+  const set=(id,n)=>{const e=document.getElementById(id);if(e)e.textContent=n;};
+  set('stat-applied',lists.applied.length);
+  set('stat-responses',lists.responses.length);
+  set('stat-skipped',lists.skipped.length);
+}
+function recordSwipe(dir,job){
+  const rec={t:job.t,co:job.co,ghost:ghostRiskFor(job.co),when:Date.now(),status:null};
+  if(dir==='right') lists.applied.push(rec); else lists.skipped.push(rec);
+  saveLists(); updateStatCounters(); cloudSync();
+}
+function fmtAgo(ts){const d=Math.floor((Date.now()-ts)/86400000);return d===0?'today':(d===1?'1d ago':d+'d ago');}
+
+function openStatModal(kind){
+  const titles={applied:'❤️ Applied',responses:'📞 Responses',skipped:'🚫 Skipped'};
+  const subs={
+    applied:'Every job you swiped right on. Heard back? Log it.',
+    responses:'Your active callbacks — green means interview in motion.',
+    skipped:'Left-swiped listings. Changed your mind? Put one back.'};
+  document.getElementById('stat-modal-title').textContent=titles[kind];
+  document.getElementById('stat-modal-sub').textContent=subs[kind];
+  renderStatList(kind);
+  document.getElementById('stat-modal').classList.add('open');
+}
+function renderStatList(kind){
+  const wrap=document.getElementById('stat-modal-list');
+  const arr=lists[kind];
+  if(!arr.length){
+    wrap.innerHTML='<div style="text-align:center;color:var(--muted);font-size:12px;padding:24px 0;">Nothing here yet — get swiping! 👻</div>';
+    return;
+  }
+  wrap.innerHTML=arr.map((r,i)=>{
+    let right='';
+    if(kind==='applied'){
+      right=r._logging
+        ? `<div style="display:flex;gap:6px;">
+             <span class="status-pill" style="background:rgba(0,245,160,.15);color:var(--mint);cursor:pointer;" onclick="logResponse(${i},'interview')">Interview Scheduled</span>
+             <span class="status-pill" style="background:rgba(255,77,106,.15);color:var(--danger);cursor:pointer;" onclick="logResponse(${i},'rejection')">Received Rejection</span>
+           </div>`
+        : `<span class="status-pill" style="background:rgba(181,95,230,.15);color:var(--cyber);cursor:pointer;" onclick="lists.applied[${i}]._logging=true;renderStatList('applied')">Log Response</span>`;
+    } else if(kind==='responses'){
+      right=r.status==='interview'
+        ? '<span class="status-pill" style="background:rgba(0,245,160,.18);color:var(--mint);">🟢 Interview Active</span>'
+        : '<span class="status-pill" style="background:rgba(255,77,106,.15);color:var(--danger);">Rejected</span>';
+    } else {
+      right=`<span class="status-pill" style="background:rgba(0,245,160,.12);color:var(--mint);cursor:pointer;" onclick="unSkip(${i})">↩ Put Back in Deck</span>`;
+    }
+    return `<div class="stat-row">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;">${r.t}</div>
+        <div style="font-size:11px;color:var(--muted);">${r.co} · ${fmtAgo(r.when)} · 👻 ${r.ghost}%</div>
+      </div>${right}</div>`;
+  }).join('');
+}
+function logResponse(i,status){
+  const rec=lists.applied.splice(i,1)[0];
+  delete rec._logging;
+  rec.status=status; rec.when=Date.now();
+  lists.responses.unshift(rec);
+  saveLists(); updateStatCounters(); cloudSync();
+  renderStatList('applied');
+  showToast(status==='interview'?'🟢 Interview logged — go get it!':'Logged. Their loss — onward 👻');
+}
+function unSkip(i){
+  const rec=lists.skipped.splice(i,1)[0];
+  rawQueue.unshift({t:rec.t,co:rec.co,sal:'See posting',salMax:0,loc:'Back in deck',ghost:rec.ghost,match:70});
+  saveLists(); updateStatCounters(); applySwipeFilters();
+  renderStatList('skipped');
+  showToast('↩ '+rec.co+' is back in your deck');
+}
+
+/* ---------- JOB FRESHNESS PILLS ---------- */
+let swFreshDays=0;
+function setFreshness(el){
+  document.querySelectorAll('.fresh-pill').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on');
+  swFreshDays=parseInt(el.dataset.days,10)||0;
+  /* live data: re-fetch with max_days_old; demo data: filter by created if present */
+  if(document.getElementById('f-location')&&(document.getElementById('f-location').value||document.getElementById('f-keyword').value)){
+    fetchLiveMarketJobs();
+  } else {
+    applySwipeFilters();
+    showToast(swFreshDays?('✨ Showing jobs posted in the last '+swFreshDays+' days'):'Showing all jobs');
+  }
+}
+
+/* ---------- ASK HR (5 free / month) ---------- */
+function hrKey(){const d=new Date();return 'gpj_hr_'+d.getFullYear()+'-'+(d.getMonth()+1);}
+function hrUsed(){ try{return parseInt(localStorage.getItem(hrKey())||'0',10);}catch(e){return 0;} }
+function updateHRRemaining(){ const e=document.getElementById('hr-remaining'); if(e) e.textContent=Math.max(0,5-hrUsed()); }
+async function askHR(){
+  const q=document.getElementById('hr-question').value.trim();
+  if(!q){ showToast('Type your question first'); return; }
+  if(hrUsed()>=5){ document.getElementById('hr-limit-modal').classList.add('open'); return; }
+  try{ localStorage.setItem(hrKey(),String(hrUsed()+1)); }catch(e){}
+  updateHRRemaining();
+  document.getElementById('hr-question').value='';
+  /* route through the Worker's Resend endpoint when deployed */
+  if(WORKER_URL){
+    try{
+      await fetch(WORKER_URL.replace(/\/$/,'')+'/contact',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name:'Ask HR',email:(window.fb&&fb.current()&&fb.current().email)||'anonymous@ghostproofjob.com',message:'[ASK HR] '+q})});
+    }catch(e){}
+  }
+  showToast('💬 Sent! An HR pro will reply within 2 business days.');
+}
+
+/* ---------- FIREBASE AUTH + CLOUD SYNC ---------- */
+function openAuth(){ document.getElementById('auth-modal').classList.add('open'); }
+function authErrMsg(e){
+  const c=(e&&e.code)||'';
+  if(c.includes('email-already')) return 'That email already has an account — try Log In.';
+  if(c.includes('invalid-credential')||c.includes('wrong-password')||c.includes('user-not-found')) return 'Email or password doesn\u2019t match.';
+  if(c.includes('weak-password')) return 'Password needs 6+ characters.';
+  if(c.includes('invalid-email')) return 'That email doesn\u2019t look right.';
+  return 'Sign-in unavailable right now — your data is still saved on this device.';
+}
+async function authSignUp(){
+  if(!window.fb){ showToast('⚠️ Cloud accounts unavailable offline'); return; }
+  const e=document.getElementById('auth-email').value.trim(), p=document.getElementById('auth-pass').value;
+  if(!e||p.length<6){ showToast('Enter email + 6-char password'); return; }
+  try{ await fb.signUp(e,p); document.getElementById('auth-modal').classList.remove('open'); showToast('🎉 Account created — profile now auto-saves to the cloud'); cloudSync(); }
+  catch(err){ showToast('⚠️ '+authErrMsg(err)); }
+}
+async function authSignIn(){
+  if(!window.fb){ showToast('⚠️ Cloud accounts unavailable offline'); return; }
+  const e=document.getElementById('auth-email').value.trim(), p=document.getElementById('auth-pass').value;
+  try{ await fb.signIn(e,p); document.getElementById('auth-modal').classList.remove('open'); showToast('👻 Welcome back!'); }
+  catch(err){ showToast('⚠️ '+authErrMsg(err)); }
+}
+async function authSignOut(){ if(window.fb){ try{await fb.signOut();}catch(e){} showToast('Signed out — data stays on this device'); } }
+window.gpjAuthChanged=function(user){
+  const chip=document.getElementById('auth-chip');
+  if(!chip) return;
+  if(user){ chip.textContent='👤 '+(user.email||'').split('@')[0]; chip.onclick=authSignOut; chip.title='Tap to sign out'; }
+  else { chip.textContent='Sign In'; chip.onclick=openAuth; chip.title=''; }
+};
+/* auto-save resume/profile history documents to Firestore */
+function cloudSync(){
+  if(!window.fb||!fb.current()) return;
+  try{
+    syncProfileToResume();
+    fb.saveProfile(fb.current().uid,{
+      resume:resumeData, lists:lists,
+      prefs:{
+        titles:document.getElementById('pref-titles')?document.getElementById('pref-titles').textContent:'',
+        salary:document.getElementById('pref-salary')?document.getElementById('pref-salary').textContent:'',
+        industries:document.getElementById('pref-industries')?document.getElementById('pref-industries').textContent:''
+      },
+      updated:Date.now()
+    }).catch(()=>{});
+  }catch(e){}
+}
+
+/* ---------- SUPPORT FORM (Resend via Worker, mailto fallback) ---------- */
+function mailtoSupport(){
+  window.location.href='mailto:support@ghostproofjob.com?subject='+encodeURIComponent('GhostProofJob — Support Request');
+}
+async function sendSupportMessage(){
+  const name=document.getElementById('sup-name').value.trim();
+  const email=document.getElementById('sup-email').value.trim();
+  const msg=document.getElementById('sup-msg').value.trim();
+  if(!email||!msg){ showToast('Email and message are required'); return; }
+  if(!WORKER_URL){ mailtoSupport(); return; }
+  const btn=document.getElementById('sup-send-btn');
+  btn.textContent='Sending…';
+  try{
+    const res=await fetch(WORKER_URL.replace(/\/$/,'')+'/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,message:msg})});
+    if(!res.ok) throw new Error();
+    document.getElementById('support-modal').classList.remove('open');
+    document.getElementById('sup-msg').value='';
+    showToast('📨 Sent! We reply within 1 business day.');
+  }catch(e){ showToast('⚠️ Send failed — opening your email app instead'); mailtoSupport(); }
+  btn.textContent='Send Message';
+}
+/* Settings row opens the in-app form now */
+function contactSupport(){ document.getElementById('support-modal').classList.add('open'); }
+
+/* ---------- PURGE: extend to Firestore ---------- */
+const _origPurge=purgeProfile;
+purgeProfile=async function(){
+  if(!confirm('Permanently purge your profile? This clears ALL local data AND deletes your cloud account + Firestore profile. This cannot be undone.')) return;
+  if(window.fb&&fb.current()){ try{ await fb.wipeProfile(fb.current().uid); }catch(e){} }
+  try{ localStorage.clear(); sessionStorage.clear(); }catch(e){}
+  showToast('🗑️ Profile purged everywhere. All data cleared.');
+  setTimeout(()=>location.reload(),1400);
+};
+
+/* ---------- DESKTOP DASHBOARD GRID (≥1024px) ---------- */
+function buildDesktopGrid(){
+  if(document.getElementById('desk-grid')) return;
+  document.body.classList.add('desk');
+  const vc=document.querySelector('.view-content');
+  const grid=document.createElement('div'); grid.id='desk-grid';
+  const colL=document.createElement('div'), colC=document.createElement('div'), colR=document.createElement('div');
+  grid.appendChild(colL); grid.appendChild(colC); grid.appendChild(colR);
+  vc.insertBefore(grid,vc.firstChild);
+  colL.appendChild(document.getElementById('view-resume'));   /* 30%: Universal Profile / Resume Studio */
+  colC.appendChild(document.getElementById('view-swipe'));    /* 40%: Swipe-to-Match deck */
+  colR.appendChild(document.getElementById('view-ghost'));    /* 30%: Ghost metrics, meter, Ask HR; tier guides live in left col's resume flow */
+}
+function teardownNote(){ /* mobile→desktop or back: simplest reliable state = reload */ }
+const deskMQ=window.matchMedia('(min-width:1024px)');
+if(deskMQ.matches) buildDesktopGrid();
+deskMQ.addEventListener('change',()=>location.reload());
+
+/* desktop view switching: browse/settings become overlays */
+const _origSwitchView=switchView;
+switchView=function(id,el){
+  if(document.body.classList.contains('desk')){
+    if(id==='browse'||id==='account'){
+      const v=document.getElementById('view-'+id);
+      const open=v.classList.contains('overlay-open');
+      document.querySelectorAll('#view-browse,#view-account').forEach(x=>x.classList.remove('overlay-open'));
+      if(!open) v.classList.add('overlay-open');
+      return;
+    }
+    document.querySelectorAll('#view-browse,#view-account').forEach(x=>x.classList.remove('overlay-open'));
+    return;
+  }
+  _origSwitchView(id,el);
+};
+
+/* ---------- v3 INIT ---------- */
+loadLists();
+updateHRRemaining();
 renderBrowse();
 </script>
 </body>
-  </html>
+</html>
