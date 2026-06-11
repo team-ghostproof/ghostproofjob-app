@@ -1,0 +1,152 @@
+/**
+ * GhostProofJob — Backend Worker (Cloudflare)
+ * ============================================
+ * ONE worker, TWO secure endpoints:
+ *
+ *   GET  /jobs     → Adzuna job search proxy (keys stay server-side)
+ *   POST /contact  → Support email via Resend (key stays server-side)
+ *
+ * DEPLOY (free tier, ~5 minutes):
+ *   1. dash.cloudflare.com → Workers & Pages → Create Worker
+ *   2. Paste this file, Deploy
+ *   3. Settings → Variables and Secrets → add as SECRETS (encrypted):
+ *        ADZUNA_APP_ID   = your app_id   (developer.adzuna.com — free)
+ *        ADZUNA_APP_KEY  = your app_key
+ *        RESEND_API_KEY  = your key      (resend.com — free tier: 100 emails/day)
+ *   4. In Resend: verify the domain ghostproofjob.com (add their DNS records)
+ *      so mail sends from support@ghostproofjob.com without spam-flagging.
+ *   5. Copy your worker URL into WORKER_URL at the top of GhostProofJob.html
+ *
+ * SECURITY:
+ *   - All third-party API keys live ONLY here, encrypted, never in the browser.
+ *   - ALLOWED_ORIGINS locks both endpoints to your site.
+ *   - /contact is rate-limited per IP (in-memory, best-effort) and
+ *     length-capped to prevent abuse of your Resend quota.
+ *   - /jobs responses cache 5 min at the edge to protect your Adzuna quota.
+ *   - No customer data is stored or logged by this worker.
+ */
+
+const ALLOWED_ORIGINS = [
+  'https://ghostproofjob.com',
+  'https://www.ghostproofjob.com',
+  'http://localhost:8000',   // local testing — remove for production
+  'null',                    // file:// testing — REMOVE for production
+];
+
+const ADZUNA_COUNTRY = 'us';      // IMPORTANT: was 'gb' — US searches like Houston need 'us'
+const CACHE_SECONDS  = 300;
+const SUPPORT_TO     = 'support@ghostproofjob.com';
+const SUPPORT_FROM   = 'GhostProofJob Support <support@ghostproofjob.com>'; // must be on your verified Resend domain
+
+/* naive per-isolate rate limiter for /contact (best-effort; fine at this scale) */
+const contactHits = new Map();
+const CONTACT_LIMIT = 5;          // max messages
+const CONTACT_WINDOW = 3600_000;  // per hour per IP
+
+export default {
+  async fetch(request, env) {
+    const origin = request.headers.get('Origin') || 'null';
+    const cors = {
+      'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    };
+    if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
+
+    const url = new URL(request.url);
+
+    /* ---------------- GET /jobs — Adzuna proxy ---------------- */
+    if (url.pathname === '/jobs' && request.method === 'GET') {
+      const what  = (url.searchParams.get('what')  || '').slice(0, 100);
+      const where = (url.searchParams.get('where') || '').slice(0, 100);
+      const days  = Math.min(parseInt(url.searchParams.get('days') || '0', 10) || 0, 365);
+      const page  = Math.min(parseInt(url.searchParams.get('page') || '1', 10) || 1, 10);
+
+      const cacheKey = new Request(url.toString(), request);
+      const cache = caches.default;
+      const hit = await cache.match(cacheKey);
+      if (hit) return hit;
+
+      const upstream =
+        `https://api.adzuna.com/v1/api/jobs/${ADZUNA_COUNTRY}/search/${page}` +
+        `?app_id=${encodeURIComponent(env.ADZUNA_APP_ID)}` +
+        `&app_key=${encodeURIComponent(env.ADZUNA_APP_KEY)}` +
+        `&results_per_page=20&content-type=application/json` +
+        (days  ? `&max_days_old=${days}`               : '') +
+        (what  ? `&what=${encodeURIComponent(what)}`   : '') +
+        (where ? `&where=${encodeURIComponent(where)}` : '');
+
+      try {
+        const res = await fetch(upstream);
+        if (!res.ok) return json({ error: 'upstream', status: res.status }, 502, cors);
+        const data = await res.json();
+        const slim = {
+          count: data.count,
+          results: (data.results || []).map(r => ({
+            title: r.title,
+            company: r.company && r.company.display_name,
+            salary_min: r.salary_min,
+            salary_max: r.salary_max,
+            location: r.location && r.location.display_name,
+            redirect_url: r.redirect_url,
+            created: r.created,
+          })),
+        };
+        const out = json(slim, 200, { ...cors, 'Cache-Control': `public, max-age=${CACHE_SECONDS}` });
+        await cache.put(cacheKey, out.clone());
+        return out;
+      } catch (e) {
+        return json({ error: 'proxy_failure' }, 502, cors);
+      }
+    }
+
+    /* ---------------- POST /contact — Resend email ---------------- */
+    if (url.pathname === '/contact' && request.method === 'POST') {
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const now = Date.now();
+      const rec = contactHits.get(ip) || { n: 0, t: now };
+      if (now - rec.t > CONTACT_WINDOW) { rec.n = 0; rec.t = now; }
+      if (rec.n >= CONTACT_LIMIT) return json({ error: 'rate_limited' }, 429, cors);
+
+      let body;
+      try { body = await request.json(); } catch (e) { return json({ error: 'bad_json' }, 400, cors); }
+      const name    = String(body.name    || '').slice(0, 100).trim();
+      const email   = String(body.email   || '').slice(0, 150).trim();
+      const message = String(body.message || '').slice(0, 3000).trim();
+      if (!message || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        return json({ error: 'invalid_fields' }, 400, cors);
+      }
+
+      try {
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: SUPPORT_FROM,
+            to: [SUPPORT_TO],
+            reply_to: email,
+            subject: `Support: ${name || email}`,
+            text: `From: ${name || '(no name)'} <${email}>\n\n${message}`,
+          }),
+        });
+        if (!res.ok) return json({ error: 'send_failed' }, 502, cors);
+        rec.n++; contactHits.set(ip, rec);
+        return json({ ok: true }, 200, cors);
+      } catch (e) {
+        return json({ error: 'send_failed' }, 502, cors);
+      }
+    }
+
+    return json({ error: 'not_found' }, 404, cors);
+  },
+};
+
+function json(obj, status, headers) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { ...headers, 'Content-Type': 'application/json' },
+  });
+}
