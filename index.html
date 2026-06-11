@@ -439,8 +439,10 @@
       <div style="font-size:16px;font-weight:800;margin-bottom:6px;" id="cl-prompt-title">Tailored cover letter?</div>
       <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:6px;" id="cl-prompt-text"></div>
       <div style="font-size:11px;color:var(--cyber);background:rgba(181,95,230,.08);border-radius:8px;padding:8px 10px;line-height:1.6;margin-bottom:14px;">📊 Built from your resume + this job's description, with current high-credibility keywords. Hiring data: 150–250 words gets the highest read-through — we stay in that range.</div>
-      <div onclick="generateCoverLetter()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;margin-bottom:8px;">✨ Yes, Write It</div>
+      <div onclick="generateCoverLetter()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;margin-bottom:4px;">✨ Yes, Write It</div>
+      <div id="cl-quota" style="font-size:10px;color:var(--muted);margin-bottom:8px;"></div>
       <div onclick="declineCoverLetter()" style="color:var(--muted);font-size:13px;cursor:pointer;padding:8px;" id="cl-decline-label">No thanks, just apply</div>
+      <div onclick="optOutCL()" style="color:var(--muted);font-size:11px;cursor:pointer;padding:4px;text-decoration:underline;">Opt out of these offers <span style="text-decoration:none;">·</span> re-enable anytime in ⚙️ Settings</div>
     </div>
   </div>
 
@@ -524,6 +526,18 @@
       <div onclick="openCheckout('life')" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;margin-bottom:8px;">⚡ Lifetime — $12 once</div>
       <div onclick="openCheckout('month')" style="background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:12px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">🪙 $0.99/month — cancel anytime</div>
       <div onclick="document.getElementById('hr-limit-modal').classList.remove('open')" style="color:var(--muted);font-size:13px;cursor:pointer;padding:6px;">Questions reset next month 👋</div>
+    </div>
+  </div>
+
+  <!-- ===== COVER LETTER DAILY LIMIT MODAL ===== -->
+  <div class="modal-scrim" id="cl-limit-modal" style="z-index:330;">
+    <div class="modal-box">
+      <div style="font-size:30px;margin-bottom:8px;">✉️</div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:6px;">10 tailored letters today — nice hustle!</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px;">Your free quota resets tomorrow. Need unlimited letters right now? Either plan unlocks them:</div>
+      <div onclick="openCheckout('life')" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;margin-bottom:8px;">⚡ Lifetime — $12 once</div>
+      <div onclick="openCheckout('month')" style="background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:12px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">🪙 $0.99/month — cancel anytime</div>
+      <div onclick="document.getElementById('cl-limit-modal').classList.remove('open')" style="color:var(--muted);font-size:13px;cursor:pointer;padding:6px;">I'll wait for tomorrow 👋</div>
     </div>
   </div>
 
@@ -619,12 +633,19 @@
           <div class="card-header">
             <div style="display:flex;align-items:center;gap:10px;">
               <div class="logo-circle s-logo" style="background:rgba(255,100,100,.15);">🏢</div>
-              <div><div style="font-weight:700;font-size:15px;" class="s-title">Product Designer</div><div style="font-size:12px;color:var(--muted);" class="s-sub">Figma · San Francisco</div></div>
+              <div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:16px;" class="s-title">Product Designer</div><div style="font-size:12px;color:var(--muted);" class="s-sub">Figma · San Francisco</div></div>
+              <div style="text-align:right;"><div class="vibe-stars">★★★★☆</div><div style="font-size:10px;color:var(--muted);">Vibe Score</div></div>
             </div>
             <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
               <span class="salary-badge s-salary">$145K – $175K</span><span class="location-badge s-loc">📍 Remote</span>
+              <span class="location-badge s-ghost" style="display:none;">👻</span>
               <span class="match-badge match-pct" style="display:none;">🎯 61% Match</span>
             </div>
+          </div>
+          <div class="card-body">
+            <div class="green-flag">🟢 <strong>Green Flag</strong> — Actively hiring now</div>
+            <div class="red-flag">🔴 <strong>Red Flag</strong> — Ghosting data loading…</div>
+            <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:10px;padding-bottom:4px;">👆 Tap to see company intel</div>
           </div>
         </div>
         <div id="job-card-1" class="job-card mid">
@@ -1172,6 +1193,7 @@
         <div class="pref-section-title">Notifications</div>
         <div class="pref-row"><div class="pref-icon" style="background:rgba(0,245,160,.12);">🔔</div><div style="flex:1;font-size:13px;font-weight:600;">New Job Matches</div><div class="toggle-switch on" onclick="this.classList.toggle('on')"></div></div>
         <div class="pref-row"><div class="pref-icon" style="background:rgba(255,77,106,.12);">👻</div><div style="flex:1;font-size:13px;font-weight:600;">Ghost Risk Alerts</div><div class="toggle-switch on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="pref-row"><div class="pref-icon" style="background:rgba(0,245,160,.12);">✉️</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Tailored Cover Letter Offers</div><div style="font-size:11px;color:var(--muted);">Ask after each apply · 10 free per day</div></div><div class="toggle-switch on" id="cl-offers-toggle" onclick="toggleCLOffers(this)"></div></div>
         <div class="pref-row"><div class="pref-icon" style="background:rgba(181,95,230,.12);">⭐</div><div style="flex:1;font-size:13px;font-weight:600;">Company Rating Reminders</div><div class="toggle-switch on" onclick="this.classList.toggle('on')"></div></div>
       </div>
 
@@ -1440,6 +1462,47 @@ function renderBrowse(){
 }
 
 /* ===== RESUME PARSE (simulated for prototype) ===== */
+/* Repairs the two classic PDF extraction wounds:
+   1. Unicode ligature glyphs (ﬁ ﬂ ﬀ ﬃ) that survive as odd characters
+   2. MISSING ligature glyphs — design-tool PDFs (careerkit, Canva, Figma)
+      often map "ti"/"fi"/"ff" to custom glyphs that extract as nothing,
+      producing "Marke ng" (Marketing) and "Opera ons" (Operations). */
+function repairExtractedText(t){
+  if(!t) return t;
+  const LIG={'\uFB00':'ff','\uFB01':'fi','\uFB02':'fl','\uFB03':'ffi','\uFB04':'ffl','\uFB05':'ft','\uFB06':'st'};
+  t=t.replace(/[\uFB00-\uFB06]/g,c=>LIG[c]||c).replace(/\u00AD/g,'');
+  /* common resume words with a vanished 'ti' / 'fi' / 'ff' / 'ffi' glyph;
+     \s? matches whether the hole collapsed or left a space */
+  const FIX=[
+    ['marke ng','marketing'],['opera ons','operations'],['opera on','operation'],
+    ['communica ons','communications'],['communica on','communication'],
+    ['informa on','information'],['posi ons','positions'],['posi on','position'],
+    ['educa on','education'],['administra on','administration'],['organiza on','organization'],
+    ['coordina on','coordination'],['op miza on','optimization'],['implementa on','implementation'],
+    ['presenta ons','presentations'],['presenta on','presentation'],
+    ['applica ons','applications'],['applica on','application'],['nego a on','negotiation'],
+    ['cer fica ons','certifications'],['cer fica on','certification'],['cer fied','certified'],
+    ['qualifica ons','qualifications'],['rela ons','relations'],['solu ons','solutions'],
+    ['interna onal','international'],['ini a ves','initiatives'],['ini a ve','initiative'],
+    ['crea ve','creative'],['effec ve','effective'],['innova ve','innovative'],
+    ['analy cs','analytics'],['analy cal','analytical'],['mul ple','multiple'],
+    ['rela onship','relationship'],['cul va','cultiva'],['mo va','motiva'],
+    ['o ce','office'],['e cient','efficient'],['e ciency','efficiency'],
+    ['pro ciency','proficiency'],['pro cient','proficient'],['quali ed','qualified'],
+    ['speci c','specific'],['signi cant','significant'],['bene ts','benefits'],
+    ['pro ts','profits'],['pro t','profit'],['certi cate','certificate'],
+    ['identi ed','identified'],['veri ed','verified'],['con dent','confident'],
+    ['con gura','configura'],['sta ng','staffing'],['quan ta ve','quantitative']
+  ];
+  FIX.forEach(([b,g])=>{
+    const rx=new RegExp('\\b'+b.replace(/ /g,'\\s?'),'gi');
+    t=t.replace(rx,m=>m[0]===m[0].toUpperCase()?g[0].toUpperCase()+g.slice(1):g);
+  });
+  /* word-start 'fi' vanished: " nance" → finance, " rst" → first */
+  t=t.replace(/\b(nance|nancial|rst|eld|elds|gure|gures|lter|lters|nish|nished|tness)\b/g,'fi$1');
+  return t.replace(/[ \t]{2,}/g,' ');
+}
+
 async function extractResumeText(file){
   const name=file.name.toLowerCase();
   try{
@@ -1453,21 +1516,24 @@ async function extractResumeText(file){
       for(let p=1;p<=Math.min(pdf.numPages,8);p++){
         const page=await pdf.getPage(p);
         const tc=await page.getTextContent();
-        /* preserve line structure: break on big Y jumps */
-        let lastY=null;
+        /* join fragments by actual x-gap so words split across items
+           don't get phantom spaces ("Mark eting" bug) */
+        let lastY=null,lastX=null;
         tc.items.forEach(it=>{
-          if(lastY!==null&&Math.abs(it.transform[5]-lastY)>4) out+='\n';
-          out+=it.str+' ';
-          lastY=it.transform[5];
+          const x=it.transform[4], y=it.transform[5];
+          if(lastY!==null&&Math.abs(y-lastY)>4){ out+='\n'; lastX=null; }
+          if(lastX!==null && (x-lastX)>1.5) out+=' ';
+          out+=it.str;
+          lastX=x+(it.width||0); lastY=y;
         });
         out+='\n';
       }
-      return out;
+      return repairExtractedText(out);
     }
     if((name.endsWith('.docx'))&&window.mammoth){
       const buf=await file.arrayBuffer();
       const res=await mammoth.extractRawText({arrayBuffer:buf});
-      return res.value;
+      return repairExtractedText(res.value);
     }
   }catch(e){ console.warn('extract failed:',e); }
   return null; /* .doc (legacy binary) and failures fall back to demo */
@@ -2269,8 +2335,13 @@ function applyRealParse(text){
   const exp=years.length?Math.max(0,new Date().getFullYear()-Math.min(...years)):'';
   /* title: first line containing a common title keyword */
   const titleLine=lines.find(l=>/(engineer|developer|designer|manager|analyst|specialist|consultant|director|coordinator|representative|technician|nurse|teacher|accountant)/i.test(l)&&l.length<60);
-  /* education line */
-  const eduLine=lines.find(l=>/(b\.?s\.?|b\.?a\.?|m\.?s\.?|mba|ph\.?d|bachelor|master|associate|university|college)/i.test(l)&&l.length<90);
+  /* education: word-bounded keywords; prefer lines just under the EDUCATION header
+     (the old pattern had no boundaries — "ba" matched inside "brand") */
+  const EDU_RX=/\b(b\.?s\.?c?|b\.?a\.?|m\.?s\.?c?|m\.?b\.?a\.?|ph\.?d|bachelor'?s?|master'?s?|associate'?s?|diploma|degree|university|college)\b/i;
+  const eduIdx=lines.findIndex(l=>/^education\b/i.test(l));
+  const eduPool=eduIdx>=0?lines.slice(eduIdx+1,eduIdx+7):[];
+  const eduLine=eduPool.find(l=>EDU_RX.test(l)&&l.length<90)
+             || lines.find(l=>EDU_RX.test(l)&&l.length<90&&!/\b(and|the|with|across)\b.*\b(and|the|with|across)\b/i.test(l));
   /* companies: "at X", company line above a date line, or company + dates on same line */
   const comps=new Set();
   const TITLE_RX=/(engineer|developer|designer|manager|analyst|specialist|consultant|director|coordinator|representative|technician|nurse|teacher|accountant|lead|intern|associate)/i;
@@ -2815,6 +2886,55 @@ offerCoverLetter=function(title,co,external){
      document.getElementById('overlimit-modal').classList.contains('open')) return;
   _diagOfferCL(title,co,external);
 };
+
+/* ============================================================
+   COVER LETTER CONTROLS: opt-out + 10/day free quota
+   ============================================================ */
+function clKey(){ return 'gpj_cl_'+new Date().toDateString(); }
+function clUsed(){ try{return parseInt(localStorage.getItem(clKey())||'0',10);}catch(e){return 0;} }
+function clOptedOut(){ try{return localStorage.getItem('gpj_cl_optout')==='1';}catch(e){return false;} }
+function setCLOptOut(v){
+  try{localStorage.setItem('gpj_cl_optout',v?'1':'0');}catch(e){}
+  const t=document.getElementById('cl-offers-toggle');
+  if(t) t.classList.toggle('on',!v);
+}
+function toggleCLOffers(el){
+  const turningOff=el.classList.contains('on');
+  setCLOptOut(turningOff);
+  showToast(turningOff?'✉️ Offers paused — flip this back anytime':'✉️ Cover letter offers back on');
+}
+function optOutCL(){
+  setCLOptOut(true);
+  document.getElementById('cl-prompt-modal').classList.remove('open');
+  showToast(clContext.external?'↗ Opening posting… Offers off — Settings to re-enable':'Got it — offers off. Re-enable anytime in Settings.');
+}
+/* respect opt-out + show remaining quota on the prompt */
+const _quotaOfferCL=offerCoverLetter;
+offerCoverLetter=function(title,co,external){
+  if(clOptedOut()){
+    if(external) showToast('↗ Opening '+co+'\u2019s posting…');
+    return;
+  }
+  const q=document.getElementById('cl-quota');
+  if(q){
+    const left=Math.max(0,10-clUsed());
+    q.textContent=left>0?(left+' of 10 free letters left today'):'Daily free quota used — plans unlock unlimited';
+  }
+  _quotaOfferCL(title,co,external);
+};
+/* enforce the 10/day quota at generation time */
+const _quotaGenCL=generateCoverLetter;
+generateCoverLetter=function(){
+  if(clUsed()>=10){
+    document.getElementById('cl-prompt-modal').classList.remove('open');
+    document.getElementById('cl-limit-modal').classList.add('open');
+    return;
+  }
+  try{localStorage.setItem(clKey(),String(clUsed()+1));}catch(e){}
+  _quotaGenCL();
+};
+/* sync the Settings toggle to the saved state on load */
+setCLOptOut(clOptedOut());
 renderBrowse();
 </script>
 </body>
