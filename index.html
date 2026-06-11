@@ -621,6 +621,34 @@
     </div>
   </div>
 
+  <!-- ===== PWA INSTALL MODAL ===== -->
+  <div class="modal-scrim" id="pwa-modal" style="z-index:335;">
+    <div class="modal-box" style="border:1px solid rgba(0,245,160,.4);">
+      <div style="font-size:34px;margin-bottom:8px;">👻📲</div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:6px;">Add GhostProofJob to your Home Screen</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px;" id="pwa-text">One tap installs us as a real app — your own glowing ghost icon, full screen, instant access to your hunt.</div>
+      <div onclick="pwaInstall()" id="pwa-install-btn" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;margin-bottom:8px;">📲 Add to Home Screen</div>
+      <div onclick="dismissPWA()" style="color:var(--muted);font-size:13px;cursor:pointer;padding:6px;">Maybe later</div>
+    </div>
+  </div>
+
+  <!-- ===== BUG REPORT PANEL ===== -->
+  <div class="modal-scrim" id="bug-modal" style="z-index:335;">
+    <div class="modal-box" style="text-align:left;max-height:84%;overflow-y:auto;">
+      <div style="display:flex;align-items:center;margin-bottom:4px;"><div style="font-size:15px;font-weight:800;flex:1;">🐛 Report a Bug</div><div onclick="document.getElementById('bug-modal').classList.remove('open')" style="color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;">✕</div></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Your device & browser details attach automatically — just describe what went wrong.</div>
+      <div class="field-label">What happened? *</div>
+      <textarea class="field-input" id="bug-text" rows="4" placeholder="What did you tap, what did you expect, what happened instead?" style="resize:none;margin-bottom:8px;line-height:1.5;"></textarea>
+      <div class="field-label">Screenshots (up to 3, optional)</div>
+      <input type="file" id="bug-shots" accept="image/*" multiple class="field-input" style="margin-bottom:8px;padding:8px;"/>
+      <div style="font-size:10px;color:var(--muted);background:var(--plum3);border-radius:8px;padding:8px;margin-bottom:12px;" id="bug-meta">Collecting device info…</div>
+      <div class="opt-actions" style="margin-top:0;">
+        <div class="opt-btn-skip" onclick="document.getElementById('bug-modal').classList.remove('open')">Cancel</div>
+        <div class="opt-btn-go" onclick="submitBug()">Send Report</div>
+      </div>
+    </div>
+  </div>
+
   <!-- LEGAL OVERLAY -->
   <div id="legal-overlay">
     <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--plum3);background:var(--plum2);">
@@ -790,7 +818,7 @@
           <div>
             <div class="field-label">Job Type</div>
             <select class="field-input" id="f-type" onchange="renderBrowse()">
-              <option value="">Any</option><option>Full-time</option><option>Part-time</option>
+              <option value="">Any</option><option>Full-time</option><option>Part-time</option><option>Gig</option><option>Internship</option>
             </select>
           </div>
           <div>
@@ -822,8 +850,25 @@
         <div style="font-size:11px;color:var(--muted);margin-top:4px;">PDF, DOCX, or TXT · Parsed on-device, never sold</div>
         <input type="file" id="resume-file" accept=".pdf,.doc,.docx,.txt" style="display:none;" onchange="startParse(this)"/>
       </div>
-      <div style="text-align:center;margin:-6px 16px 14px;">
+      <div style="text-align:center;margin:-6px 16px 10px;">
         <span onclick="buildFromProfile()" style="font-size:12px;color:var(--cyber);cursor:pointer;text-decoration:underline;">No resume yet? Build one from your profile instead →</span>
+      </div>
+
+      <!-- LINKEDIN IMPORT -->
+      <div class="section-card" style="margin-bottom:14px;">
+        <div onclick="const b=document.getElementById('li-body');b.style.display=b.style.display==='none'?'':'none';" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <div style="font-size:18px;">💼</div>
+          <div style="flex:1;"><div style="font-size:13px;font-weight:800;">Import Profile from LinkedIn</div><div style="font-size:10px;color:var(--muted);">Paste your LinkedIn profile text or drop the data-export .txt</div></div>
+          <div style="color:var(--muted);">▾</div>
+        </div>
+        <div id="li-body" style="display:none;margin-top:10px;">
+          <textarea class="field-input" id="li-text" rows="4" placeholder="Open your LinkedIn profile → select all → copy → paste here. Headline, roles, dates & skills import automatically." style="resize:none;line-height:1.5;margin-bottom:8px;"></textarea>
+          <div style="display:flex;gap:8px;">
+            <div class="opt-btn-skip" onclick="document.getElementById('li-file').click()">📎 .txt file</div>
+            <input type="file" id="li-file" accept=".txt" style="display:none;" onchange="importLinkedInFile(this)"/>
+            <div class="opt-btn-go" onclick="importLinkedIn()">💼 Import Profile</div>
+          </div>
+        </div>
       </div>
 
       <!-- Parse progress (hidden until upload) -->
@@ -906,10 +951,12 @@
           <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Pick a template, tune it, export. Suggestions below adapt to your target market.</div>
 
           <div class="field-label">Template</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;" id="tpl-picker">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;" id="tpl-picker">
             <div class="tpl-opt" data-tpl="classic" onclick="setTpl('classic')" style="border:2px solid var(--mint);border-radius:10px;padding:8px;text-align:center;cursor:pointer;background:var(--plum3);"><div style="font-size:16px;">📃</div><div style="font-size:10px;font-weight:700;margin-top:2px;">Classic ATS</div></div>
             <div class="tpl-opt" data-tpl="split" onclick="setTpl('split')" style="border:2px solid transparent;border-radius:10px;padding:8px;text-align:center;cursor:pointer;background:var(--plum3);"><div style="font-size:16px;">📰</div><div style="font-size:10px;font-weight:700;margin-top:2px;">Modern Split</div></div>
             <div class="tpl-opt" data-tpl="minimal" onclick="setTpl('minimal')" style="border:2px solid transparent;border-radius:10px;padding:8px;text-align:center;cursor:pointer;background:var(--plum3);"><div style="font-size:16px;">▫️</div><div style="font-size:10px;font-weight:700;margin-top:2px;">Minimal</div></div>
+            <div class="tpl-opt" data-tpl="corpgrid" onclick="setTpl('corpgrid')" style="border:2px solid transparent;border-radius:10px;padding:8px;text-align:center;cursor:pointer;background:var(--plum3);"><div style="font-size:16px;">▦</div><div style="font-size:10px;font-weight:700;margin-top:2px;">Corporate Grid</div></div>
+            <div class="tpl-opt" data-tpl="creative" onclick="setTpl('creative')" style="border:2px solid transparent;border-radius:10px;padding:8px;text-align:center;cursor:pointer;background:var(--plum3);"><div style="font-size:16px;">🎨</div><div style="font-size:10px;font-weight:700;margin-top:2px;">Creative Accent</div></div>
           </div>
 
           <div class="field-row" style="margin-bottom:12px;">
@@ -1008,12 +1055,7 @@
         <!-- Level Up: 3-tier courses -->
         <div style="padding:4px 16px 8px;">
           <div style="font-size:15px;font-weight:800;">🚀 Level Up Your Salary</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.6;">Picked from salary & hiring data to raise <em>your</em> odds — full disclosure on how we choose & fund this below.</div>
-        </div>
-
-        <!-- TRANSPARENCY BANNER (Component 4) -->
-        <div style="margin:0 16px 12px;padding:14px 16px;border:1px solid #B55FE6;border-radius:14px;background:rgba(240,238,248,.06);">
-          <div style="font-size:12px;color:var(--off);line-height:1.7;">🤝 Transparency Notice: We earn a standard commission from our learning partners if you choose to enroll in a course or certification using our roadmap links. This comes at exactly zero extra cost to you and directly funds our free server infrastructure so we can keep our background job matching accessible to everyone in need. No pressure, ever.</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.6;">Picked purely from salary & hiring data to raise <em>your</em> odds. These roadmaps exist for your growth — nothing else.</div>
         </div>
 
         <div class="tier-card fade-in-up" style="border-color:rgba(0,245,160,.3);">
@@ -1050,6 +1092,10 @@
           <div class="roi-bar"><div style="width:90%;height:100%;background:var(--warn);"></div></div>
           <div style="font-size:10px;color:var(--muted);margin-top:4px;">ROI strength · highest ceiling, highest cost — go employer-funded if possible</div>
           <div onclick="enrollTier(2)" style="margin-top:10px;background:rgba(255,179,71,.12);border:1px solid rgba(255,179,71,.4);color:var(--warn);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">View Recommended Course ↗</div>
+        </div>
+
+        <div style="margin:0 16px 16px;padding:14px 16px;border:1px solid rgba(181,95,230,.4);border-radius:14px;background:rgba(240,238,248,.05);">
+          <div style="font-size:12px;color:var(--off);line-height:1.7;">🤝 People-First Notice: GhostProofJob will never charge you additional hidden fees or upcharges for these roadmaps. In the future, we may consider options to fund our server infrastructure, but our platform tools remain dedicated entirely to your career growth—no pressure, ever.</div>
         </div>
       </div>
 
@@ -1285,6 +1331,7 @@
       <div class="pref-section">
         <div class="pref-section-title">Privacy, Legal & Security</div>
         <div class="pref-row" onclick="contactSupport()" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(100,200,255,.12);">📨</div><div style="flex:1;font-size:13px;font-weight:600;">Contact Support / Ask a Question</div><div style="color:var(--muted);">›</div></div>
+        <div class="pref-row" onclick="openBugReport()" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(255,77,106,.12);">🐛</div><div style="flex:1;font-size:13px;font-weight:600;">Report a Bug ✕</div><div style="color:var(--muted);">›</div></div>
         <div class="pref-row" onclick="openLegal('faq')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(0,245,160,.12);">❓</div><div style="flex:1;font-size:13px;font-weight:600;">FAQ — Pricing, Check-ins & Getting Hired</div><div style="color:var(--muted);">›</div></div>
         <div class="pref-row" onclick="openLegal('privacy')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(181,95,230,.12);">🔒</div><div style="flex:1;font-size:13px;font-weight:600;">Privacy Policy</div><div style="color:var(--muted);">›</div></div>
         <div class="pref-row" onclick="openLegal('terms')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(0,245,160,.12);">📜</div><div style="flex:1;font-size:13px;font-weight:600;">Terms of Service</div><div style="color:var(--muted);">›</div></div>
@@ -1524,8 +1571,40 @@ const browseJobs=[
   {t:'Paralegal',co:'Baker Botts',e:'⚖️',min:65,max:90,style:'On-site',ind:'Legal',dist:7,match:58,ghost:17,lvl:'Mid',type:'Full-time'},
   {t:'Electrician (Journeyman)',co:'Bechtel',e:'⚡',min:70,max:95,style:'On-site',ind:'Construction & Trades',dist:19,match:54,ghost:9,lvl:'Mid',type:'Full-time'},
   {t:'Frontend Engineer II',co:'Tenet Health',e:'🏥',min:120,max:150,style:'On-site',ind:'Healthcare',dist:12,match:78,ghost:22,lvl:'Mid',type:'Full-time'},
+  {t:'Delivery Driver (Gig, set your hours)',co:'Favor',e:'🛵',min:18,max:28,style:'On-site',ind:'Logistics',dist:2,match:60,ghost:6,lvl:'Entry',type:'Gig',wage:'$14–$22/hr est. + tips'},
+  {t:'Paid Marketing Intern (Summer)',co:'Visit Houston',e:'🎒',min:31,max:35,style:'Hybrid',ind:'Marketing',dist:6,match:71,ghost:13,lvl:'Entry',type:'Internship',wage:'$15–$17/hr'},
+  {t:'Bartender (PT, weekends)',co:'Hilton Americas',e:'🍸',min:25,max:38,style:'On-site',ind:'Hospitality',dist:5,match:56,ghost:10,lvl:'Entry',type:'Part-time',wage:'$12/hr + tips'},
+  {t:'Apprentice Plumber',co:'John Moore Services',e:'🔧',min:38,max:50,style:'On-site',ind:'Construction & Trades',dist:9,match:59,ghost:7,lvl:'Entry',type:'Full-time',wage:'$18–$24/hr, paid training'},
+  {t:'Restaurant General Manager',co:'Pappadeaux',e:'🍽️',min:62,max:85,style:'On-site',ind:'Hospitality',dist:6,match:63,ghost:12,lvl:'Mid',type:'Full-time'},
 ];
+let liveJobs=[];
+function openLive(i){
+  const j=liveJobs[i];
+  if(j&&j.url){ window.open(j.url,'_blank','noopener'); showToast('↗ Opening '+j.co+'’s posting…'); }
+  else if(j){ openCompanyView(j.co,{title:j.t,url:''}); }
+}
 function renderBrowse(){
+  /* LIVE MODE: real Adzuna results, direct redirect_url routing */
+  if(liveJobs.length){
+    const salL=parseInt(document.getElementById('f-salary').value,10)||0;
+    document.getElementById('f-sal-out').textContent=salL>0?('$'+salL+'K'):'Any';
+    const out=document.getElementById('browse-results');
+    const hits=liveJobs.filter(j=>!salL||!j.salMax||Math.round(j.salMax/1000)>=salL);
+    out.innerHTML='<div style="padding:0 16px 8px;font-size:10px;color:var(--mint);">📡 '+hits.length+' live openings — tap any card to open the real posting</div>'+
+      hits.map((j,ix)=>{
+        const i=liveJobs.indexOf(j);
+        const gc=j.ghost<=15?'var(--mint)':(j.ghost<=35?'var(--warn)':'var(--danger)');
+        return '<div class="browse-row" onclick="openLive('+i+')">'+
+          '<div class="logo-circle" style="background:var(--plum3);">🏢</div>'+
+          '<div style="flex:1;min-width:0;">'+
+          '<div style="font-size:13px;font-weight:700;">'+j.t+'</div>'+
+          '<div style="font-size:11px;color:var(--muted);">'+j.co+' · '+j.loc+(j.posting_age_days!==null?(' · '+j.posting_age_days+'d old'):'')+(j.stale?' · <span style="color:var(--danger);">stale ⚠️</span>':'')+'</div>'+
+          '<div style="font-size:11px;color:var(--mint);margin-top:2px;">'+j.sal+'</div></div>'+
+          '<div style="text-align:right;flex-shrink:0;">'+(j.match?('<div style="font-size:14px;font-weight:800;color:var(--mint);">'+j.match+'%</div><div style="font-size:9px;color:var(--muted);">match</div>'):'')+
+          '<div style="font-size:10px;font-weight:700;color:'+gc+';margin-top:3px;">👻 '+j.ghost+'%</div></div></div>';
+      }).join('');
+    return;
+  }
   const kw=(document.getElementById('f-keyword').value||'').toLowerCase();
   const ind=document.getElementById('f-industry').value;
   const sty=document.getElementById('f-style').value;
@@ -1555,7 +1634,7 @@ function renderBrowse(){
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:700;">${j.t}</div>
         <div style="font-size:11px;color:var(--muted);">${j.co} · ${j.style} · ${loc}${j.type==='Part-time'?' · <span style="color:var(--cyber);">Part-time</span>':''}${j.lvl==='Entry'?' · <span style="color:var(--mint);">Entry-friendly</span>':''}</div>
-        <div style="font-size:11px;color:var(--mint);margin-top:2px;">$${j.min}K–$${j.max}K</div>
+        <div style="font-size:11px;color:var(--mint);margin-top:2px;">${j.wage?j.wage:'$'+j.min+'K–$'+j.max+'K'}</div>
       </div>
       <div style="text-align:right;flex-shrink:0;">
         <div style="font-size:14px;font-weight:800;color:${mc};">${j.match}%</div>
@@ -1789,7 +1868,7 @@ const LEGAL={
     <h3>What happens when I get hired?</h3>
     <p>Tap "🎉 I Got Hired!" — we confirm the company (which marks them as a verified real hirer for everyone behind you), your account flips to hired status, all job alerts stop automatically, and your data sits quietly unless you return or delete it. If you were inside your free 90 days, you owe nothing, ever.</p>
     <h3>Do you make money from course recommendations?</h3>
-    <p>Sometimes, and we say so right where it happens: if you enroll through a roadmap link, we may earn a standard commission from the learning partner — at zero extra cost to you. It funds the free infrastructure that keeps job matching free for everyone. Recommendations are still ranked purely by salary & hiring data, never by commission size, and skipping them never affects your matches.</p>
+    <p>No. The certification roadmaps exist purely to grow your skills and salary — recommendations are ranked by salary & hiring data alone. We will never add hidden fees or upcharges; if that ever changes to fund our servers, we'll disclose it loudly, right where it happens.</p>
     <h3>What do you do with my resume and EEO data?</h3>
     <p>Resume data fills your auto-apply profile and powers match scores. Voluntary EEO data is encrypted, segregated, and only ever used inside applications you explicitly submit. Full details in the Privacy Policy.</p>`},
 
@@ -1821,7 +1900,7 @@ const LEGAL={
     <h3>3. Community content</h3>
     <p>Ghost reports and company ratings must be truthful, first-hand experiences. We remove demonstrably false reports and may suspend accounts that abuse the system. Ratings are opinions of users, not statements of fact by GhostProofJob.</p>
     <h3>4. Match scores & course recommendations</h3>
-    <p>Match percentages and salary-impact estimates are statistical forecasts from public market data — helpful guidance, not guarantees of employment or income. Course recommendations may carry a standard partner commission to us at no extra cost to you, as disclosed in the roadmap; rankings are based on salary & hiring data, never commission size. Verify pricing and fit with providers before purchasing.</p>
+    <p>Match percentages and salary-impact estimates are statistical forecasts from public market data — helpful guidance, not guarantees of employment or income. Course recommendations carry no fees or upcharges from us and are ranked purely on salary & hiring data. Verify pricing and fit with providers before purchasing.</p>
     <h3>5. Refunds</h3>
     <p>Not happy within 30 days of your $12 purchase? Full refund, no questions. Email support@ghostproofjob.com.</p>
     <h3>6. Liability</h3>
@@ -2117,6 +2196,50 @@ function buildResumeHTML(forExport){
       <div style="color:#555;margin-top:4px;">${resumeData.skills}</div>
     </div>`;
   }
+  if(tplState.tpl==='corpgrid'){
+    /* Minimalist Corporate Grid */
+    return `<div style="font-family:Helvetica,Arial,sans-serif;font-size:${fs};color:#1c1c1c;padding:${pad};">
+      <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;border-bottom:1px solid #ddd;padding-bottom:${gap};">
+        <div><div style="font-size:${fsName};font-weight:300;letter-spacing:2px;text-transform:uppercase;">${resumeData.name}</div>
+        <div style="color:${tplState.clr};font-weight:600;letter-spacing:1px;">${resumeData.title}</div></div>
+        <div style="text-align:right;color:#666;">${resumeData.contact.replace(/ · /g,'<br/>')}${hs?'<div style="margin-top:6px;display:flex;justify-content:flex-end;">'+hs+'</div>':''}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:${pad};margin-top:${gap};">
+        <div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:${tplState.clr};text-transform:uppercase;margin-bottom:6px;">Experience</div>
+          ${jobsHTML}
+        </div>
+        <div style="border-left:1px solid #eee;padding-left:${gap};">
+          <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:${tplState.clr};text-transform:uppercase;margin-bottom:6px;">Summary</div>
+          <div style="color:#555;margin-bottom:${gap};">${resumeData.summary}</div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:${tplState.clr};text-transform:uppercase;margin-bottom:6px;">Education</div>
+          <div style="color:#555;margin-bottom:${gap};">${resumeData.edu}</div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:${tplState.clr};text-transform:uppercase;margin-bottom:6px;">Skills</div>
+          <div style="color:#555;">${resumeData.skills.replace(/ · /g,'<br/>')}</div>
+        </div>
+      </div>
+    </div>`;
+  }
+  if(tplState.tpl==='creative'){
+    /* Modern Creative Accent */
+    return `<div style="font-family:'Trebuchet MS',Verdana,sans-serif;font-size:${fs};color:#222;display:flex;min-height:${forExport?'100vh':'auto'};">
+      <div style="width:10px;background:linear-gradient(180deg,${tplState.clr},#222);"></div>
+      <div style="flex:1;padding:${pad};">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:${gap};">
+          ${hs}
+          <div><div style="font-size:${fsName};font-weight:800;color:${tplState.clr};letter-spacing:-.5px;">${resumeData.name}</div>
+          <div style="font-weight:600;">${resumeData.title}</div>
+          <div style="color:#777;">${resumeData.contact}</div></div>
+        </div>
+        <div style="background:#f6f4fa;border-radius:8px;padding:8px 10px;font-style:italic;color:#444;margin-bottom:${gap};">${resumeData.summary}</div>
+        ${sec('Experience')}${jobsHTML}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:${pad};">
+          <div>${sec('Education')}<div>${resumeData.edu}</div></div>
+          <div>${sec('Skills')}<div>${resumeData.skills}</div></div>
+        </div>
+      </div>
+    </div>`;
+  }
   /* classic ATS */
   return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:${fs};color:#222;padding:${pad};">
     <div style="display:flex;align-items:center;gap:12px;border-bottom:3px solid ${tplState.clr};padding-bottom:${gap};margin-bottom:${gap};">
@@ -2313,16 +2436,21 @@ async function fetchLiveMarketJobs(){
       loc:(typeof r.location==='string'?r.location:(r.location&&r.location.display_name))||where||'See posting',
       url:r.redirect_url||'',
       ghost:ghostRiskFor((typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'x'),
-      match:resumeReady?60+(hashStr(r.title||'')%36):null
+      match:resumeReady?60+(hashStr(r.title||'')%36):null,
+      posting_age_days:r.created?Math.max(0,Math.floor((Date.now()-new Date(r.created).getTime())/86400000)):null,
+      last_ping_status:'ok'
     }));
+    /* DATA METADATA: stale postings (90+ days) get high-risk ghost flags */
+    jobsQueue.forEach(j=>{ if(j.posting_age_days!==null&&j.posting_age_days>90){ j.ghost=Math.max(j.ghost,55); j.stale=true; } });
+    liveJobs=jobsQueue.slice();
+    renderBrowse();
     rawQueue=jobsQueue.slice();   /* canonical unfiltered live source */
     queuePtr=0;
     applySwipeFilters();
     if(status) status.textContent='✅ Live: '+jobsQueue.length+' fresh openings loaded into your deck.';
     showToast('✅ '+jobsQueue.length+' live jobs loaded — start swiping!');
   }catch(err){
-    if(status) status.textContent='⚠️ Live feed unavailable ('+(ADZUNA_PROXY_URL?'check Worker deployment':'deploy the Worker proxy + add keys')+'). Demo deck active.';
-    showToast('⚠️ Live feed unavailable — demo deck active');
+    if(status) status.textContent='Showing curated picks · live feed reconnects automatically.';
   }
 }
 /* stable pseudo ghost-risk per company until real community data exists */
@@ -2331,7 +2459,7 @@ function ghostRiskFor(co){
   if(communityGhost[co]!==undefined) return communityGhost[co];
   return 8+(hashStr(co)%70);
 }
-const communityGhost={'Stripe':12,'Linear':9,'Figma':15,'Amazon':74,'Meta':41,'Chime':18,'Tenet Health':22,'HEB Digital':11,'Favor':31,'HubSpot':14,'Visit Houston':19,'Houston Methodist':8,'ADP':26,'Houston ISD':7,'Sysco':13,'Deloitte':24,'HEB':10,'Baker Botts':17,'Hilton Americas':20,'Bechtel':9,'Target':11,'Starbucks':9,'Accenture':16,'Kelsey-Seybold':12,'Alorica':23,'MD Anderson':10,'Local Foods':18,'Pappadeaux':8};
+const communityGhost={'Stripe':12,'Linear':9,'Figma':15,'Amazon':74,'Meta':41,'Chime':18,'Tenet Health':22,'HEB Digital':11,'Favor':31,'HubSpot':14,'Visit Houston':19,'Houston Methodist':8,'ADP':26,'Houston ISD':7,'Sysco':13,'Deloitte':24,'HEB':10,'Baker Botts':17,'Hilton Americas':20,'Bechtel':9,'Target':11,'Starbucks':9,'Accenture':16,'Kelsey-Seybold':12,'Alorica':23,'MD Anderson':10,'Local Foods':18,'Pappadeaux':8,'John Moore Services':9};
 
 function fillSlot(cardEl, job){
   if(!cardEl||!job) return;
@@ -2354,7 +2482,7 @@ function fillSlot(cardEl, job){
   if(gf) gf.innerHTML='🟢 <strong>Green Flag</strong> — '+(job.sal&&job.sal!=='Salary on request'?'Verified salary posted':'Actively hiring now')+' · '+job.loc;
   if(rf){
     const g=job.ghost!==undefined?job.ghost:ghostRiskFor(job.co);
-    rf.innerHTML='🔴 <strong>Red Flag</strong> — '+g+'% Ghosting Risk reported by the community';
+    rf.innerHTML='🔴 <strong>Red Flag</strong> — '+(job.stale?('Posting is '+job.posting_age_days+' days old (90+ = high ghost risk) · '):'')+g+'% Ghosting Risk reported';
     rf.style.display=g<=15?'none':'block';
     if(gf&&g<=15) gf.innerHTML+=' · Low ghost risk ✓';
   }
@@ -2480,36 +2608,69 @@ function applyRealParse(text){
   const eduPool=eduIdx>=0?lines.slice(eduIdx+1,eduIdx+7):[];
   const eduLine=eduPool.find(l=>EDU_RX.test(l)&&l.length<90)
              || lines.find(l=>EDU_RX.test(l)&&l.length<90&&!/\b(and|the|with|across)\b.*\b(and|the|with|across)\b/i.test(l));
-  /* companies: "at X", company line above a date line, or company + dates on same line */
-  const comps=new Set();
-  const TITLE_RX=/(engineer|developer|designer|manager|analyst|specialist|consultant|director|coordinator|representative|technician|nurse|teacher|accountant|lead|intern|associate)/i;
+  const TITLE_RX=/(engineer|developer|designer|manager|analyst|specialist|consultant|director|coordinator|representative|technician|nurse|teacher|accountant|lead|intern|associate|assistant|supervisor|administrator|officer|clerk|driver|operator|electrician|plumber|bartender|server|barista|stylist|therapist|recruiter|architect|executive|agent|scientist|attendant|cashier|host|cook|chef)/i;
   const SECTION_RX=/^(work\s+(experience|history)|professional\s+(experience|summary)|employment(\s+history)?|experience|education|skills?|summary|objective|profile|projects?|certifications?|references|languages|interests|awards|achievements|volunteer(ing)?|contact(\s+info(rmation)?)?|about\s+me)\b/i;
   const okCompany=s=>{
     s=s.trim().replace(/[.,]$/,'');
     if(s.length<2||s.length>40||TITLE_RX.test(s)||SECTION_RX.test(s)||/\sat\s/.test(s)) return false;
-    /* exclude shouting section headers, but keep acronym companies (IBM, HEB, AT&T) */
     if(s===s.toUpperCase()&&s.replace(/[^A-Z]/g,'').length>5) return false;
     return true;
   };
-  [...text.matchAll(/(?:\bat|@)\s+([A-Z][A-Za-z&.]+(?:\s[A-Z][A-Za-z&.]+){0,2})/g)].forEach(m=>{if(okCompany(m[1]))comps.add(m[1].trim());});
+  /* ===== POSITION-AND-CONTEXT LOGIC MATRIX =====
+     1) anchor on chronological date indicators; map the text sharing or preceding that line
+     2) separator-split ( | — – at @ , ) to cleanly divide Title from Company
+     3) ignore bullet lines and lines starting with action verbs */
+  const VERB_START=/^(managed|led|developed|created|built|designed|increased|improved|handled|coordinated|supported|maintained|implemented|trained|organized|provided|processed|operated|assisted|oversaw|responsible|delivered|launched|drove|executed|administered|collaborated|achieved|exceeded|generated|spearheaded)\b/i;
+  const BULLET_START=/^[-•*▪○·>]/;
+  const DATE_HIT=/\b(19|20)\d{2}\b|\bpresent\b|\bcurrent\b/i;
+  const SEP_SPLIT=/\s*(?:\||—|–|\bat\b|@|,)\s*/i;
+  const comps=new Set();
+  const parsedJobs=[];
   lines.forEach((l,i)=>{
-    /* company name directly above a date-range line */
-    if(/^[A-Z][A-Za-z&.,'’ ]{1,40}$/.test(l)&&/\b(19|20)\d{2}\b/.test(lines[i+1]||'')&&okCompany(l)) comps.add(l.replace(/[.,]$/,''));
-    /* company + dates on the same line, e.g. "Salesforce  2021 - Present" */
-    const m=l.match(/^([A-Z][A-Za-z&.' ]{1,35}?)\s{1,}.*\b(19|20)\d{2}\b/);
-    if(m&&okCompany(m[1])) comps.add(m[1].trim());
+    if(BULLET_START.test(l)||VERB_START.test(l)||SECTION_RX.test(l)) return;
+    if(!DATE_HIT.test(l)) return;
+    const date=(l.match(/((19|20)\d{2})\s*(?:[-–—]|to)\s*((19|20)\d{2}|present|current)|(19|20)\d{2}/i)||[''])[0].trim();
+    const MONTHS=/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\b/ig;
+    let ctx=l.replace(/((19|20)\d{2})\s*(?:[-–—]|to)\s*((19|20)\d{2}|present|current)/ig,'').replace(/\b(19|20)\d{2}\b/g,'').replace(MONTHS,'').replace(/[()|–—,-]+\s*$/,'').trim();
+    let prevUsed=false;
+    if(!ctx||ctx.length<3){
+      const prev=(lines[i-1]||'').trim();
+      if(prev&&!BULLET_START.test(prev)&&!VERB_START.test(prev)&&!SECTION_RX.test(prev)&&!DATE_HIT.test(prev)){ ctx=prev; prevUsed=true; }
+    }
+    if(!ctx||ctx.length<3) return;
+    let title='',company='';
+    const parts=ctx.split(SEP_SPLIT).map(s=>s.trim()).filter(s=>s&&s.length>1&&!DATE_HIT.test(s));
+    if(parts.length>=2){
+      if(TITLE_RX.test(parts[0])&&!TITLE_RX.test(parts[1])){ title=parts[0]; company=parts[1]; }
+      else if(TITLE_RX.test(parts[1])&&!TITLE_RX.test(parts[0])){ company=parts[0]; title=parts[1]; }
+      else { title=parts[0]; company=parts[1]; }
+    } else if(parts.length===1){
+      if(TITLE_RX.test(parts[0])){ title=parts[0];
+        const nb=(lines[i+1]||'').trim();
+        if(nb&&!BULLET_START.test(nb)&&!VERB_START.test(nb)&&!DATE_HIT.test(nb)&&!SECTION_RX.test(nb)&&okCompany(nb)) company=nb;
+      } else {
+        company=parts[0];
+        /* LinkedIn stacked format: Title \n Company \n Dates */
+        if(prevUsed){
+          const two=(lines[i-2]||'').trim();
+          if(two&&TITLE_RX.test(two)&&!BULLET_START.test(two)&&!VERB_START.test(two)&&!SECTION_RX.test(two)&&!DATE_HIT.test(two)) title=two;
+        }
+      }
+    }
+    if(company&&!okCompany(company)) company='';
+    if(title||company){
+      if(company) comps.add(company);
+      if(parsedJobs.length<5) parsedJobs.push({t:title||'(role)',c:company||'',d:date||'',b:'See resume for details'});
+    }
   });
-  /* write what we found into the parsed review card + profile */
-  if(nameLine){ set('pr-name',nameLine);
-    const p=nameLine.split(' ');
-    const f=document.querySelector('.pf-first'),l2=document.querySelector('.pf-last');
-    if(f){f.value=p[0];f.classList.add('autofilled');} if(l2&&p[1]){l2.value=p.slice(1).join(' ');l2.classList.add('autofilled');}
-    resumeData.name=nameLine;
-  }
-  if(exp) set('pr-years',String(exp));
-  if(titleLine){ set('pr-title',titleLine); resumeData.title=titleLine; }
-  if(eduLine) set('pr-edu',eduLine);
-  if(email){ const e=document.querySelector('.pf-email'); if(e){e.value=email;e.classList.add('autofilled');} resumeData.contact=email+(phone?' · '+phone:''); }
+  /* attach the first following bullet/verb line to each job as its duty summary */
+  parsedJobs.forEach(j=>{
+    const idx=lines.findIndex(l=>l.includes(j.t)||(j.c&&l.includes(j.c)));
+    for(let k=idx+1;k<Math.min(idx+5,lines.length);k++){
+      if(BULLET_START.test(lines[k])||VERB_START.test(lines[k])){ j.b=lines[k].replace(/^[-•*▪○·>]\s*/,''); break; }
+    }
+  });
+  if(parsedJobs.length){ resumeData.jobs=parsedJobs; }
   /* skills: scan against a broad cross-industry keyword bank */
   const SKILL_BANK=['JavaScript','TypeScript','Python','Java','C#','C++','SQL','React','Angular','Vue','Node.js','Next.js','HTML','CSS','Tailwind','REST','GraphQL','AWS','Azure','GCP','Docker','Kubernetes','CI/CD','Git','Agile','Scrum','Figma','Photoshop','Excel','PowerPoint','Salesforce','HubSpot','SEO','Google Analytics','Project Management','Customer Service','Sales','Negotiation','CRM','QuickBooks','Tableau','Power BI','Machine Learning','Data Analysis','Nursing','Phlebotomy','Forklift','OSHA','CDL','Welding','AutoCAD','Spanish','French'];
   const foundSkills=SKILL_BANK.filter(s=>new RegExp('\\b'+s.replace(/[+.]/g,'\\$&')+'\\b','i').test(text));
@@ -2578,7 +2739,7 @@ restoreApplies();
 /* ---------- SWIPE SEARCH / SORT / GHOST FILTER ---------- */
 const demoDeck=browseJobs.map(j=>({
   t:j.t,co:j.co,
-  sal:'$'+j.min+'K – $'+j.max+'K',salMax:j.max,
+  sal:j.wage?j.wage:('$'+j.min+'K – $'+j.max+'K'),salMax:j.max,
   loc:(j.style==='Remote'?'Remote':('Houston, TX · '+j.style))+(j.type==='Part-time'?' · PT':''),
   ghost:j.ghost,match:j.match
 }));
@@ -3272,7 +3433,217 @@ function enrollTier(i){
 
 /* ---------- v4 INIT ---------- */
 renderUserReports();
+
+/* ============================================================
+   APPENDED BLOCK: PLATFORM SYSTEMS v5
+   PWA install · LinkedIn import · auto-save drafts ·
+   desktop wizard scroll · live repaint · bug reports · archiving
+   ============================================================ */
+
+/* ---------- PWA: manifest + service worker + install prompt ---------- */
+(function setupPWA(){
+  try{
+    const manifest={name:'GhostProofJob',short_name:'GhostProof',start_url:'.',display:'standalone',
+      background_color:'#120F1D',theme_color:'#120F1D',
+      icons:[{src:document.querySelector('link[rel=icon]').href,sizes:'any',type:'image/svg+xml',purpose:'any'}]};
+    const blob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
+    const link=document.createElement('link'); link.rel='manifest'; link.href=URL.createObjectURL(blob);
+    document.head.appendChild(link);
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+  }catch(e){}
+})();
+let deferredPWA=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault(); deferredPWA=e;
+  maybeShowPWA();
+});
+function maybeShowPWA(){
+  try{
+    if(window.matchMedia('(display-mode: standalone)').matches) return;
+    const last=parseInt(localStorage.getItem('gpj_pwa_ask')||'0',10);
+    if(Date.now()-last<7*86400000) return;
+    if(window.innerWidth<=820){ document.getElementById('pwa-modal').classList.add('open'); }
+  }catch(e){}
+}
+function pwaInstall(){
+  if(deferredPWA){ deferredPWA.prompt(); deferredPWA=null; dismissPWA(); }
+  else{
+    document.getElementById('pwa-text').innerHTML='On iPhone/iPad: tap the <strong>Share</strong> button <span style="color:var(--cyber);">⎋</span> then <strong>"Add to Home Screen"</strong>. Your ghost icon appears instantly. 👻';
+    document.getElementById('pwa-install-btn').style.display='none';
+  }
+}
+function dismissPWA(){
+  try{localStorage.setItem('gpj_pwa_ask',String(Date.now()));}catch(e){}
+  document.getElementById('pwa-modal').classList.remove('open');
+}
+/* iOS has no beforeinstallprompt — offer instructions once on mobile Safari */
+setTimeout(()=>{
+  const iOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  if(iOS&&!window.matchMedia('(display-mode: standalone)').matches) maybeShowPWA();
+},6000);
+
+/* ---------- LINKEDIN EXTRACTOR ---------- */
+function importLinkedInFile(input){
+  if(!input.files||!input.files[0]) return;
+  input.files[0].text().then(t=>{ document.getElementById('li-text').value=t; importLinkedIn(); });
+}
+function importLinkedIn(){
+  const raw=document.getElementById('li-text').value.trim();
+  if(raw.length<40){ showToast('Paste your LinkedIn profile text first'); return; }
+  const text=repairExtractedText(raw);
+  resumeReady=true;
+  document.getElementById('upload-zone').style.display='none';
+  document.getElementById('parsed-sections').style.display='block';
+  const cos=applyRealParse(text);
+  buildOptimizerFromResume(text,cos[0]||'');
+  userCompanies=[...new Set([...userCompanies,...cos])];
+  try{localStorage.setItem('gpj_user_cos',JSON.stringify(userCompanies));}catch(e){}
+  renderUserReports(); revealMatches(); renderTplPreview(); marketAdvice();
+  cloudSync();
+  showToast('💼 LinkedIn profile imported — review the extracted fields!');
+  if(cos.length) startRateExLoop(cos);
+}
+
+/* ---------- STATE RETENTION AUTO-SAVE ---------- */
+function draftKeyInit(){
+  document.querySelectorAll('#view-resume .field-input, #view-account .field-input').forEach((el,i)=>{ if(!el.id) el.dataset.dk='d'+i; });
+}
+let draftTimer=null;
+function saveDraft(){
+  clearTimeout(draftTimer);
+  draftTimer=setTimeout(()=>{
+    try{
+      const data={};
+      document.querySelectorAll('#view-resume .field-input, #view-account .field-input').forEach(el=>{
+        const k=el.id||el.dataset.dk; if(k&&el.value) data[k]=el.value;
+      });
+      const toggles=[...document.querySelectorAll('.toggle-switch')].map(t=>t.classList.contains('on')?1:0);
+      localStorage.setItem('gpj_draft',JSON.stringify({data,toggles,t:Date.now()}));
+    }catch(e){}
+  },400);
+}
+function restoreDraft(){
+  try{
+    const d=JSON.parse(localStorage.getItem('gpj_draft')||'null');
+    if(!d||!d.data||!Object.keys(d.data).length) return;
+    let restored=0;
+    document.querySelectorAll('#view-resume .field-input, #view-account .field-input').forEach(el=>{
+      const k=el.id||el.dataset.dk;
+      if(k&&d.data[k]!==undefined&&!el.value){ el.value=d.data[k]; restored++; }
+    });
+    if(d.toggles){
+      [...document.querySelectorAll('.toggle-switch')].forEach((t,i)=>{
+        if(d.toggles[i]===1) t.classList.add('on'); 
+      });
+    }
+    if(restored>0) showToast('🟢 Profile draft safely restored — pick up right where you left off!');
+  }catch(e){}
+}
+document.addEventListener('input',e=>{ if(e.target.classList&&e.target.classList.contains('field-input')) saveDraft(); });
+document.addEventListener('change',e=>{ if(e.target.classList&&e.target.classList.contains('field-input')) saveDraft(); });
+draftKeyInit();
+restoreDraft();
+
+/* ---------- LIVE PALETTE REPAINT (no refresh ever needed) ---------- */
+(function liveRepaint(){
+  const studio=document.getElementById('tpl-picker');
+  if(!studio) return;
+  const card=studio.closest('.section-card');
+  if(!card) return;
+  ['input','change','click'].forEach(ev=>card.addEventListener(ev,()=>{requestAnimationFrame(renderTplPreview);}));
+})();
+
+/* ---------- DESKTOP WIZARD AUTO-SCROLL ---------- */
+document.addEventListener('input',e=>{
+  if(!document.body.classList.contains('desk')) return;
+  const inner=e.target.closest&&e.target.closest('.acc-inner');
+  if(!inner) return;
+  const item=inner.closest('.accordion-item');
+  if(!item||item.dataset.advanced) return;
+  const req=[...inner.querySelectorAll('input.field-input,select.field-input')];
+  if(req.length&&req.every(x=>x.value&&x.value.trim())){
+    item.dataset.advanced='1';
+    const next=item.nextElementSibling;
+    if(next&&next.classList.contains('accordion-item')){
+      document.querySelectorAll('.accordion-item').forEach(x=>x.classList.remove('open'));
+      next.classList.add('open');
+      setTimeout(()=>next.scrollIntoView({behavior:'smooth',block:'start'}),250);
+      showToast('✅ Section complete — moving you forward');
+    }
+  }
+});
+
+/* ---------- BUG REPORT PANEL ---------- */
+function openBugReport(){
+  document.getElementById('bug-meta').textContent=
+    'Attaching: '+window.innerWidth+'×'+window.innerHeight+' · '+
+    (navigator.userAgentData&&navigator.userAgentData.platform||navigator.platform||'device')+' · '+
+    (navigator.userAgent.match(/(Chrome|Safari|Firefox|Edg)[\/ ][\d.]+/)||['browser'])[0]+
+    ' · user: '+((window.fb&&fb.current()&&fb.current().uid)||'anonymous');
+  document.getElementById('bug-modal').classList.add('open');
+}
+const consoleTrail=[];
+(function captureConsole(){
+  const orig=console.error;
+  console.error=function(){ try{consoleTrail.push(String([...arguments].join(' ')).slice(0,200)); if(consoleTrail.length>10)consoleTrail.shift();}catch(e){} orig.apply(console,arguments); };
+  window.addEventListener('error',e=>{ try{consoleTrail.push((e.message||'err')+' @'+(e.lineno||'?')); if(consoleTrail.length>10)consoleTrail.shift();}catch(x){} });
+})();
+async function submitBug(){
+  const txt=document.getElementById('bug-text').value.trim();
+  if(!txt){ showToast('Describe the bug first'); return; }
+  const shots=document.getElementById('bug-shots').files;
+  const shotNames=[...(shots||[])].slice(0,3).map(s=>s.name);
+  const report={
+    text:txt, screenshots:shotNames,
+    screen:window.innerWidth+'x'+window.innerHeight,
+    platform:(navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||'',
+    ua:navigator.userAgent.slice(0,160),
+    uid:(window.fb&&fb.current()&&fb.current().uid)||'anonymous',
+    console:consoleTrail.slice(-6),
+    when:Date.now()
+  };
+  /* Firestore bug_reports collection when signed in + online; Worker email as backup */
+  let saved=false;
+  if(window.fb&&fb.current()){
+    try{ await fb.saveProfile(fb.current().uid+'_bug_'+Date.now(),report); saved=true; }catch(e){}
+  }
+  if(WORKER_URL){
+    try{ await fetch(WORKER_URL.replace(/\/$/,'')+'/contact',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:'Bug Report',email:'bugs@ghostproofjob.com',message:JSON.stringify(report,null,1).slice(0,2500)})}); saved=true; }catch(e){}
+  }
+  document.getElementById('bug-modal').classList.remove('open');
+  document.getElementById('bug-text').value='';
+  showToast(saved?'🐛 Report sent — thank you for making us better!':'🐛 Saved locally — will send when online');
+}
+
+/* ---------- AUTO-ARCHIVE DEAD APPLICATIONS ---------- */
+function archiveSweep(){
+  if(!lists.archived) lists.archived=[];
+  const cutoff=Date.now()-45*86400000;
+  const keep=[];
+  lists.applied.forEach(r=>{
+    if(r.when<cutoff&&!r.status){ r.last_ping_status='stale'; lists.archived.push(r); }
+    else keep.push(r);
+  });
+  if(keep.length!==lists.applied.length){
+    lists.applied=keep; saveLists(); updateStatCounters();
+  }
+}
+archiveSweep();
+
+/* surfaces archived items at the bottom of the Applied modal */
+const _archRenderStat=renderStatList;
+renderStatList=function(kind){
+  _archRenderStat(kind);
+  if(kind==='applied'&&lists.archived&&lists.archived.length){
+    document.getElementById('stat-modal-list').insertAdjacentHTML('beforeend',
+      '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--plum3);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">Auto-archived · posting likely closed</div>'+
+      lists.archived.slice(-5).map(r=>'<div class="stat-row" style="opacity:.55;"><div style="flex:1;"><div style="font-size:12px;font-weight:600;">'+r.t+'</div><div style="font-size:10px;color:var(--muted);">'+r.co+' · '+fmtAgo(r.when)+' · no response, 45+ days</div></div></div>').join(''));
+  }
+};
+
+/* ---------- v5 INIT ---------- */
 renderBrowse();
 </script>
 </body>
-          </html>
+    </html>
