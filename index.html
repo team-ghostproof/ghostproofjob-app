@@ -616,7 +616,15 @@
       </div>
       <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Community Ghost Reports</div>
       <div style="flex:1;overflow-y:auto;min-height:60px;margin-bottom:10px;" id="cm-reports"></div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📡 Open Roles <span id="cm-jobs-status" style="font-weight:400;text-transform:none;"></span></div>
+      <div style="max-height:160px;overflow-y:auto;margin-bottom:10px;" id="cm-jobs"></div>
       <div style="display:flex;gap:8px;margin-bottom:10px;" id="cm-links"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;background:var(--plum3);border-radius:10px;padding:8px 10px;">
+        <div id="cm-save" onclick="toggleSaveCompany()" style="font-size:12px;font-weight:800;color:var(--cyber);cursor:pointer;">🔖 Save Company</div>
+        <div style="flex:1;"></div>
+        <div style="font-size:11px;color:var(--muted);">Rate:</div>
+        <div class="star-rater" id="cm-rate" style="display:flex;gap:2px;"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></div>
+      </div>
       <div onclick="prefillGhostReport()" style="background:rgba(181,95,230,.12);border:1px dashed rgba(181,95,230,.4);color:var(--cyber);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:700;cursor:pointer;">👻 Report this company</div>
     </div>
   </div>
@@ -864,6 +872,13 @@
             </select>
           </div>
         </div>
+        <div class="field-label">Sort Live Results</div>
+        <select class="field-input" id="f-livesort" onchange="renderBrowse()" style="margin-bottom:10px;font-size:13px;">
+          <option value="rel">Best Match (relevance)</option>
+          <option value="date">Newest First 🗓️</option>
+          <option value="salhi">Salary: High → Low</option>
+        </select>
+        <div class="toggle-row" style="margin-bottom:8px;"><div style="font-size:13px;font-weight:600;">💰 Only show jobs with posted salary</div><div class="toggle-switch" id="f-hassal" onclick="this.classList.toggle('on');renderBrowse()"></div></div>
         <div class="field-label">Min Salary: <span id="f-sal-out" style="color:var(--mint);">Any</span></div>
         <input type="range" class="range-input" id="f-salary" min="0" max="250" step="5" value="0" oninput="renderBrowse()"/>
         <div class="field-label" style="margin-top:8px;">Max Distance: <span id="f-dist-out" style="color:var(--cyber);">50 mi</span> <span id="loc-status" style="color:var(--warn);font-weight:400;text-transform:none;">(set location in ⚙️ Settings)</span></div>
@@ -926,13 +941,13 @@
             <div style="font-size:14px;font-weight:800;color:var(--mint);">Resume parsed — review & edit</div>
           </div>
           <div class="field-row" style="margin-bottom:8px;">
-            <div><div class="field-label">Name</div><input class="field-input autofilled" id="pr-name" value="Alex Rivera"/></div>
-            <div><div class="field-label">Years Exp.</div><input class="field-input autofilled" id="pr-years" value="6"/></div>
+            <div><div class="field-label">Name</div><input class="field-input" id="pr-name" placeholder="Your full name"/></div>
+            <div><div class="field-label">Years Exp.</div><input class="field-input" id="pr-years" placeholder="e.g. 6"/></div>
           </div>
           <div class="field-label">Most Recent Title</div>
-          <input class="field-input autofilled" id="pr-title" value="Senior Frontend Engineer" style="margin-bottom:8px;"/>
+          <input class="field-input" id="pr-title" placeholder="Your most recent title" style="margin-bottom:8px;"/>
           <div class="field-label">Education</div>
-          <input class="field-input autofilled" id="pr-edu" value="B.S. Computer Science · UT Austin · 2019" style="margin-bottom:10px;"/>
+          <input class="field-input" id="pr-edu" placeholder="Degree · School · Year" style="margin-bottom:10px;"/>
           <div class="field-label">Detected Skills</div>
           <div id="skill-chips">
             <span class="skill-chip">JavaScript</span><span class="skill-chip">React</span><span class="skill-chip">TypeScript</span><span class="skill-chip">Node.js</span><span class="skill-chip">CSS/Tailwind</span><span class="skill-chip">REST APIs</span><span class="skill-chip">Git</span><span class="skill-chip">Agile</span>
@@ -951,7 +966,7 @@
         </div>
 
         <!-- RESUME OPTIMIZER -->
-        <div class="section-card fade-in-up">
+        <div class="section-card fade-in-up" id="card-optimizer">
           <div style="font-size:14px;font-weight:800;margin-bottom:2px;">🧠 Resume Optimizer</div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">We compared your bullets against what companies <strong style="color:var(--mint);">actively hiring right now</strong> reward. Found <span id="opt-count" style="color:var(--warn);font-weight:800;">3 upgrades</span> — all optional, all explained.</div>
           <div id="opt-cards"></div>
@@ -1047,7 +1062,7 @@
         </div>
 
         <!-- Company rating prompt -->
-        <div class="section-card fade-in-up">
+        <div class="section-card fade-in-up" id="card-pastemp">
           <div style="font-size:14px;font-weight:800;margin-bottom:2px;" id="past-emp-title">🏢 We found 3 past employers</div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Imported from your resume. Rate them anonymously — your reviews power the community Vibe Score.</div>
           <div id="past-employers-list">
@@ -1068,7 +1083,7 @@
         </div>
 
         <!-- Match insights -->
-        <div class="section-card fade-in-up">
+        <div class="section-card fade-in-up" id="card-forecast">
           <div style="font-size:14px;font-weight:800;margin-bottom:2px;">🎯 Your Job Match Forecast</div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Based on your resume vs. live posting requirements, hiring data & applicant pools.</div>
           <div class="match-row">
@@ -1091,6 +1106,7 @@
         </div>
 
         <!-- Level Up: 3-tier courses -->
+        <div id="sec-levelup" style="display:none;">
         <div style="padding:4px 16px 8px;">
           <div style="font-size:15px;font-weight:800;">🚀 Level Up Your Salary</div>
           <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.6;">Picked purely from salary & hiring data to raise <em>your</em> odds. These roadmaps exist for your growth — nothing else.</div>
@@ -1135,6 +1151,7 @@
         <div style="margin:0 16px 16px;padding:14px 16px;border:1px solid rgba(181,95,230,.4);border-radius:14px;background:rgba(240,238,248,.05);">
           <div style="font-size:12px;color:var(--off);line-height:1.7;">🤝 People-First Notice: GhostProofJob will never charge you additional hidden fees or upcharges for these roadmaps. In the future, we may consider options to fund our server infrastructure, but our platform tools remain dedicated entirely to your career growth—no pressure, ever.</div>
         </div>
+        </div>
       </div>
 
       <!-- Auto-Apply Profile accordion -->
@@ -1156,10 +1173,10 @@
         </div>
         <div class="accordion-body"><div class="acc-inner">
           <div class="field-row">
-            <div><div class="field-label">First Name *</div><input class="field-input pf-first" placeholder="Alex" oninput="updateProgress()"/></div>
-            <div><div class="field-label">Last Name *</div><input class="field-input pf-last" placeholder="Rivera" oninput="updateProgress()"/></div>
+            <div><div class="field-label">First Name *</div><input class="field-input pf-first" placeholder="First name" oninput="updateProgress()"/></div>
+            <div><div class="field-label">Last Name *</div><input class="field-input pf-last" placeholder="Last name" oninput="updateProgress()"/></div>
           </div>
-          <div style="margin-top:10px;"><div class="field-label">Email *</div><input class="field-input pf-email" placeholder="alex@example.com" type="email" oninput="updateProgress()"/></div>
+          <div style="margin-top:10px;"><div class="field-label">Email *</div><input class="field-input pf-email" placeholder="you@email.com" type="email" oninput="updateProgress()"/></div>
           <div style="margin-top:10px;"><div class="field-label">Phone *</div><input class="field-input pf-phone" placeholder="+1 (555) 000-0000" type="tel" oninput="updateProgress()"/></div>
           <div style="margin-top:12px;background:var(--plum3);border-radius:10px;padding:10px;">
             <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">🔒 PRIVACY PROTECTED (Optional)</div>
@@ -1263,38 +1280,12 @@
         <div class="mini-stat"><div class="mini-stat-val" style="color:var(--danger);">2,847</div><div class="mini-stat-lbl">Reports Filed</div></div>
         <div class="mini-stat"><div class="mini-stat-val" style="color:var(--mint);">94%</div><div class="mini-stat-lbl">Match Accuracy</div></div>
       </div>
+      <div style="margin:0 16px 12px;position:relative;">
+        <input class="field-input" id="ghost-q" placeholder="🔎 Search any company's ghost intel…" oninput="ghostSuggest(this.value)" autocomplete="off"/>
+        <div id="ghost-sug" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--plum3);border:1px solid var(--plum4);border-radius:0 0 12px 12px;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.5);"></div>
+      </div>
       <div id="user-reports"></div>
-      <div class="report-card" onclick="openCompanyView('Amazon')" style="cursor:pointer;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <div style="font-size:22px;">🏢</div>
-          <div style="flex:1;"><div style="font-weight:700;font-size:14px;">Amazon</div><div style="font-size:11px;color:var(--muted);">SDE · L5</div></div>
-          <div class="ghost-score high">74%</div>
-        </div>
-        <div class="report-bar-bg"><div class="report-bar-fill" style="width:74%;background:var(--danger);"></div></div>
-        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
-          <span class="report-tag" style="background:rgba(255,77,106,.12);color:var(--danger);">After Round 2 ⚠️</span>
-          <span class="report-tag" style="background:rgba(255,179,71,.12);color:var(--warn);">43 Reports</span>
-        </div>
-        <div style="margin-top:8px;font-size:12px;color:var(--muted);border-top:1px solid var(--plum3);padding-top:8px;">"4 interview loops, then recruiter vanished. Zero response to follow-ups." — Verified, 5d ago</div>
-      </div>
-      <div class="report-card" onclick="openCompanyView('Meta')" style="cursor:pointer;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <div style="font-size:22px;">🔵</div>
-          <div style="flex:1;"><div style="font-weight:700;font-size:14px;">Meta</div><div style="font-size:11px;color:var(--muted);">PM · IC5</div></div>
-          <div class="ghost-score mid">41%</div>
-        </div>
-        <div class="report-bar-bg"><div class="report-bar-fill" style="width:41%;background:var(--warn);"></div></div>
-        <div style="display:flex;gap:6px;margin-top:8px;"><span class="report-tag" style="background:rgba(255,179,71,.12);color:var(--warn);">Post-Offer ⚠️ · 21 Reports</span></div>
-      </div>
-      <div class="report-card" onclick="openCompanyView('Stripe')" style="cursor:pointer;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <div style="font-size:22px;">🦓</div>
-          <div style="flex:1;"><div style="font-weight:700;font-size:14px;">Stripe</div><div style="font-size:11px;color:var(--muted);">All Roles</div></div>
-          <div class="ghost-score low">12%</div>
-        </div>
-        <div class="report-bar-bg"><div class="report-bar-fill" style="width:12%;background:var(--mint);"></div></div>
-        <div style="display:flex;gap:6px;margin-top:8px;"><span class="report-tag" style="background:rgba(0,245,160,.12);color:var(--mint);">Low Risk ✓ · Replies in 48h</span></div>
-      </div>
+      <div id="ghost-list"></div>
       <!-- ===== ASK HR ADVISORY PANEL ===== -->
       <div class="report-card" style="border-color:rgba(181,95,230,.35);">
         <div style="font-size:14px;font-weight:800;margin-bottom:2px;">💬 Ask HR</div>
@@ -1337,8 +1328,8 @@
         <div class="pref-section-title">📍 Location & Auto-Match</div>
         <div class="pref-row" style="flex-direction:column;align-items:stretch;gap:10px;">
           <div class="field-row">
-            <div><div class="field-label">City</div><input class="field-input" id="loc-city" placeholder="Houston" style="font-size:13px;"/></div>
-            <div><div class="field-label">State</div><input class="field-input" id="loc-state" placeholder="TX" style="font-size:13px;"/></div>
+            <div><div class="field-label">City</div><input class="field-input" id="loc-city" placeholder="Houston" style="font-size:13px;" onchange="saveDeckLocation()"/></div>
+            <div><div class="field-label">State</div><input class="field-input" id="loc-state" placeholder="TX" style="font-size:13px;" onchange="saveDeckLocation()"/></div>
           </div>
           <div class="toggle-row" style="padding:0;">
             <div style="flex:1;padding-right:8px;">
@@ -1633,7 +1624,11 @@ function renderBrowse(){
     const salL=parseInt(document.getElementById('f-salary').value,10)||0;
     document.getElementById('f-sal-out').textContent=salL>0?('$'+salL+'K'):'Any';
     const out=document.getElementById('browse-results');
-    const hits=liveJobs.filter(j=>!salL||!j.salMax||Math.round(j.salMax/1000)>=salL);
+    const hasSal=document.getElementById('f-hassal')&&document.getElementById('f-hassal').classList.contains('on');
+    let hits=liveJobs.filter(j=>(!hasSal||j.salMax>0)&&(!salL||!j.salMax||Math.round(j.salMax/1000)>=salL));
+    const lsort=(document.getElementById('f-livesort')||{}).value||'rel';
+    if(lsort==='date') hits=hits.slice().sort((a,b)=>(a.posting_age_days??999)-(b.posting_age_days??999));
+    else if(lsort==='salhi') hits=hits.slice().sort((a,b)=>(b.salMax||0)-(a.salMax||0));
     out.innerHTML='<div style="padding:0 16px 8px;font-size:10px;color:var(--mint);">📡 '+hits.length+' live openings — tap any card to open the real posting</div>'+
       hits.map((j,ix)=>{
         const i=liveJobs.indexOf(j);
@@ -1647,7 +1642,12 @@ function renderBrowse(){
           '<div style="text-align:right;flex-shrink:0;">'+(j.match?('<div style="font-size:14px;font-weight:800;color:var(--mint);">'+j.match+'%</div><div style="font-size:9px;color:var(--muted);">match</div>'):'')+
           '<div style="font-size:10px;font-weight:700;color:'+gc+';margin-top:3px;">👻 '+j.ghost+'%</div>'+
           '<div onclick="copyOptLive('+i+',event)" title="Optimize Cover Letter" style="margin-top:5px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:8px;padding:3px 8px;font-size:10px;font-weight:800;cursor:pointer;">✨ Optimize</div></div></div>';
-      }).join('');
+      }).join('')+
+      '<div style="display:flex;gap:10px;margin:4px 16px 14px;">'+
+      (livePage>1?'<div onclick="prevLivePage()" style="flex:1;background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:12px;padding:12px;text-align:center;font-size:13px;font-weight:800;cursor:pointer;">← Previous</div>':'')+
+      '<div onclick="nextLivePage()" style="flex:1;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.35);color:var(--mint);border-radius:12px;padding:12px;text-align:center;font-size:13px;font-weight:800;cursor:pointer;">Next Page →</div></div>'+
+      '<div style="text-align:center;font-size:10px;color:var(--muted);padding-bottom:10px;">Page '+livePage+'</div>';
+    renderGhostCompanies();
     return;
   }
   const kw=(document.getElementById('f-keyword').value||'').toLowerCase();
@@ -1664,6 +1664,7 @@ function renderBrowse(){
     (!kw||j.t.toLowerCase().includes(kw)||j.co.toLowerCase().includes(kw))&&
     (!ind||j.ind===ind)&&(!sty||j.style===sty)&&
     (!jt||j.type===jt)&&(!lv||j.lvl===lv)&&
+    (!(document.getElementById('f-hassal')&&document.getElementById('f-hassal').classList.contains('on'))||j.max>0)&&
     j.max>=sal&&(j.style==='Remote'||j.dist<=dist)
   );
   if(!hits.length){
@@ -1792,7 +1793,9 @@ function startParse(input){
           const realParse=!!(rawText&&rawText.trim().length>40);
           if(realParse){
             foundCompanies=applyRealParse(rawText);
-            buildOptimizerFromResume(rawText,foundCompanies[0]||'');
+            const optOk=buildOptimizerFromResume(rawText,foundCompanies[0]||'');
+            const oc=document.getElementById('card-optimizer');
+            if(oc) oc.style.display=optOk?'':'none';
             userCompanies=[...new Set([...userCompanies,...foundCompanies])];
             try{ localStorage.setItem('gpj_user_cos',JSON.stringify(userCompanies)); }catch(e){}
             renderUserReports();
@@ -1805,27 +1808,14 @@ function startParse(input){
           marketAdvice();
           showToast(realParse?'✨ Your resume parsed — review the extracted fields!':'⚠️ Couldn\u2019t read that format — demo data shown. Try PDF, DOCX, or TXT.');
           if(foundCompanies.length){ startRateExLoop(foundCompanies); }
-          else if(!realParse){ startRateExLoop(['Stripe','Dell','IBM']); }
         });
       }
     },600*(i+1));
   });
 }
 function autofillProfile(realParse){
-  /* Only fill EMPTY fields, and only seed demo values when real parsing failed.
-     This fixes the bug where demo data overwrote genuinely parsed resumes. */
-  const fill=(cls,val)=>{
-    const el=document.querySelector(cls);
-    if(el&&!el.value.trim()&&!realParse){ el.value=val; el.classList.add('autofilled'); }
-  };
-  fill('.pf-first','Alex'); fill('.pf-last','Rivera'); fill('.pf-email','alex.rivera@email.com');
-  fill('.pf-title','Senior Frontend Engineer'); fill('.pf-company','Stripe');
-  fill('.pf-start','Mar 2022'); fill('.pf-end','Present');
-  fill('.pf-major','Computer Science'); fill('.pf-school','University of Texas at Austin'); fill('.pf-gradyr','2019');
-  const deg=document.querySelector('.pf-degree');
-  if(deg&&!deg.value&&!realParse){deg.value="Bachelor's Degree";deg.classList.add('autofilled');}
-  document.getElementById('profile-progress').style.width='75%';
-  document.getElementById('progress-pct').textContent='75%';
+  /* Demo values are never written anymore — placeholders guide, real data fills. */
+  updateProgress();
 }
 function revealMatches(){
   document.querySelectorAll('.match-pct').forEach(el=>el.style.display='inline-block');
@@ -2375,7 +2365,7 @@ ${me.contact||'[Add your email & phone so applications auto-fill]'}`;
 }
 function generateCoverLetter(){
   document.getElementById('cl-prompt-modal').classList.remove('open');
-  const c=clContext;
+  const c=clContext, me=resumeData;
   const letter=buildLetterText(c);
   document.getElementById('cl-text').value=letter;
   document.getElementById('cl-send-btn').style.display=c.external?'none':'block';
@@ -2441,6 +2431,7 @@ let queuePtr=0;
 let liveFetchTimer=null;
 
 function queueLiveFetch(){
+  livePage=1;
   clearTimeout(liveFetchTimer);
   liveFetchTimer=setTimeout(fetchLiveMarketJobs,700); /* debounce typing */
 }
@@ -2469,7 +2460,7 @@ async function fetchLiveMarketJobs(){
   const distMi=parseInt((document.getElementById('f-dist')&&document.getElementById('f-dist').value)||'0',10);
   const distQ=(where&&distMi)?('&distance='+Math.round(distMi*1.609)):'';
   const url = ADZUNA_PROXY_URL
-    ? `${ADZUNA_PROXY_URL}?`+(what?`what=${encodeURIComponent(what)}&`:'')+(where?`where=${encodeURIComponent(where)}&`:'')+daysQ.replace(/^&/,'')+`&country=${country}`+distQ
+    ? `${ADZUNA_PROXY_URL}?`+(what?`what=${encodeURIComponent(what)}&`:'')+(where?`where=${encodeURIComponent(where)}&`:'')+daysQ.replace(/^&/,'')+`&country=${country}`+distQ+`&page=${livePage}`
     : directUrl;
   dbg('live fetch → '+(url.split('?')[1]||''));
   try{
@@ -2504,7 +2495,7 @@ async function fetchLiveMarketJobs(){
     }));
     /* DATA METADATA: stale postings (90+ days) get high-risk ghost flags */
     jobsQueue.forEach(j=>{ if(j.posting_age_days!==null&&j.posting_age_days>90){ j.ghost=Math.max(j.ghost,55); j.stale=true; } });
-    liveJobs=jobsQueue.slice();
+    liveJobs=jobsQueue.slice();   /* page-replace mode: Prev/Next swap clean 20-job pages */
     renderBrowse();
     rawQueue=jobsQueue.slice();   /* canonical unfiltered live source */
     queuePtr=0;
@@ -2742,6 +2733,41 @@ function applyRealParse(text){
     if(chips) chips.innerHTML=foundSkills.slice(0,12).map(s=>'<span class="skill-chip">'+s+'</span>').join('');
     resumeData.skills=foundSkills.slice(0,12).join(' · ');
   }
+  /* fill the review card with what we extracted */
+  const matrixTitle=(parsedJobs[0]&&parsedJobs[0].t!=='(role)')?parsedJobs[0].t:'';
+  const bestTitle=matrixTitle||titleLine||'';
+  set('pr-name',nameLine); set('pr-years',exp); set('pr-title',bestTitle); set('pr-edu',eduLine);
+  /* CONTACT → Auto-Apply Profile: real values land in the form fields */
+  const pfFill=(cls,v)=>{const el=document.querySelector(cls); if(el&&v){el.value=v; el.classList.add('autofilled');}};
+  if(nameLine){
+    const np=nameLine.split(/\s+/);
+    pfFill('.pf-first',np[0]); pfFill('.pf-last',np.slice(1).join(' '));
+  }
+  if(email) pfFill('.pf-email',email);
+  if(phone) pfFill('.pf-phone',phone);
+  /* PERMANENT DEMO ERASE: parsed values (or honest blanks) replace Alex everywhere */
+  resumeData.name=nameLine||'';
+  resumeData.contact=[email,phone].filter(Boolean).join(' · ');
+  if(bestTitle) resumeData.title=bestTitle;
+  resumeData.edu=eduLine||'';
+  resumeData.summary=(bestTitle?bestTitle:'Professional')+(exp?(' with '+exp+'+ years of experience'):'')+' — see experience below.';
+  window.userProfileData=resumeData;
+  /* ZIP MATRIX: lift the candidate's own "City, ST" (or 5-digit zip) from the resume
+     and pre-populate Browse + the live deck before they've ever searched */
+  try{
+    if(!localStorage.getItem('gpj_loc')){
+      const cityLine=lines.find(l=>/^[^,]{0,40}\b[A-Z][a-zA-Z]+(?:[ ][A-Z][a-zA-Z]+)?,[ ]?[A-Z]{2}\b/.test(l)&&l.length<70)||'';
+      const cityHit=(cityLine.match(/\b([A-Z][a-zA-Z]+(?:[ ][A-Z][a-zA-Z]+)?),[ ]?([A-Z]{2})\b/)||[]);
+      const zipHit=(text.match(/\b\d{5}\b/)||[])[0];
+      const loc=cityHit[1]?(cityHit[1]+', '+cityHit[2]):(zipHit||'');
+      if(loc){
+        localStorage.setItem('gpj_loc',loc);
+        const fl=document.getElementById('f-location'); if(fl&&!fl.value){ fl.value=loc; queueLiveFetch(); }
+        const lc=document.getElementById('loc-city'); if(lc&&!lc.value&&cityHit[1]){ lc.value=cityHit[1]; const ls=document.getElementById('loc-state'); if(ls) ls.value=cityHit[2]; }
+        dbg('resume location detected → '+loc);
+      }
+    }
+  }catch(e){}
   /* push parsed values into the Auto-Apply Profile too */
   const pfSet=(cls,v)=>{const el=document.querySelector(cls);if(el&&v){el.value=v;el.classList.add('autofilled');}};
   if(titleLine) pfSet('.pf-title',titleLine);
@@ -3448,7 +3474,7 @@ function injectLegalFooters(){
     '<div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">'+
     '<span onclick="window.open(\'https://www.tiktok.com/@ghostproofjob\',\'_blank\',\'noopener\')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>'+
     '<span onclick="window.open(\'https://www.instagram.com/ghostproofjob\',\'_blank\',\'noopener\')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>'+
-    '<span onclick="window.open(\'https://www.youtube.com/@ghostproofjob\',\'_blank\',\'noopener\')" style="cursor:pointer;" title="YouTube"><svg width="20" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4L15.8 12z"/></svg></span>'+
+    
     '</div></div>';
   ['view-swipe','view-browse','view-ghost','view-resume'].forEach(id=>{
     const v=document.getElementById(id);
@@ -3904,6 +3930,311 @@ function runPersonalizationCascade(){
   renderResumeOptimizer(window.userProfileData);
   populatePastEmployersModal(window.userProfileData);
 }
+
+/* ============================================================
+   APPENDED BLOCK: PLATFORM SYSTEMS v7
+   dynamic ghost intel · company open-roles · deck location ·
+   pagination · clickable stat companies · gating · owner mode
+   ============================================================ */
+
+let livePage=1;
+function loadMoreLive(){ livePage++; fetchLiveMarketJobs(); showToast('📡 Loading page '+livePage+'…'); }
+
+/* ---------- DYNAMIC GHOST COMPANIES (location/search/profile-aware) ---------- */
+function renderGhostCompanies(){
+  const wrap=document.getElementById('ghost-list');
+  if(!wrap) return;
+  const reported=new Set(Object.keys(ghostReports));
+  const seen=new Set(reported);
+  const picks=[];
+  const push=(co,label)=>{ if(co&&!seen.has(co)&&picks.length<6){ seen.add(co); picks.push({co:co,label:label}); } };
+  lists.applied.slice(-8).reverse().forEach(r=>push(r.co,'from your applications'));
+  liveJobs.slice(0,8).forEach(j=>push(j.co,'hiring near your search'));
+  (userCompanies||[]).forEach(c=>push(c,'from your resume'));
+  let heading, cards;
+  if(picks.length){
+    heading='Around your hunt — tap any company for the full breakdown';
+    cards=picks;
+  } else {
+    heading='Trending nationally — tap any company for the full breakdown';
+    cards=[{co:'Amazon',label:'43 reports · After Round 2'},{co:'Meta',label:'21 reports · Post-Offer'},{co:'Stripe',label:'Low risk · replies in 48h'}];
+  }
+  wrap.innerHTML='<div style="padding:0 16px 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">'+heading+'</div>'+
+    cards.map(p=>{
+      const g=ghostRiskFor(p.co);
+      const c=g<=15?'var(--mint)':(g<=35?'var(--warn)':'var(--danger)');
+      const safeCo=p.co.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+      return '<div class="report-card" onclick="openCompanyView(\''+safeCo+'\')" style="cursor:pointer;">'+
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'+
+        '<div style="font-size:22px;">🏢</div>'+
+        '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;">'+p.co+'</div><div style="font-size:11px;color:var(--muted);">'+p.label+'</div></div>'+
+        '<div class="ghost-score" style="color:'+c+';">'+g+'%</div></div>'+
+        '<div class="report-bar-bg"><div class="report-bar-fill" style="width:'+g+'%;background:'+c+';"></div></div></div>';
+    }).join('');
+}
+
+/* ---------- COMPANY VIEW: live Open Roles tab ---------- */
+let cmJobsCache=[];
+async function loadCompanyJobs(co){
+  const box=document.getElementById('cm-jobs');
+  const st=document.getElementById('cm-jobs-status');
+  if(!box) return;
+  if(!ADZUNA_PROXY_URL){ box.innerHTML=''; if(st) st.textContent=''; return; }
+  box.innerHTML=''; if(st) st.textContent='searching live feed…';
+  try{
+    const country=(document.getElementById('f-country')&&document.getElementById('f-country').value)||'us';
+    const res=await fetch(ADZUNA_PROXY_URL+'?what='+encodeURIComponent(co)+'&country='+country,{headers:{'X-Requested-With':'XMLHttpRequest'}});
+    if(!res.ok) throw 0;
+    const data=await res.json();
+    const rows=(data.results||[]).filter(r=>{
+      const rc=(typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'';
+      return rc.toLowerCase().includes(co.toLowerCase().split(' ')[0]);
+    }).slice(0,5);
+    cmJobsCache=rows.map(r=>({t:(r.title||'Open role').replace(/<[^>]+>/g,''),url:r.redirect_url||'',loc:(typeof r.location==='string'?r.location:(r.location&&r.location.display_name))||''}));
+    if(!cmJobsCache.length){ if(st) st.textContent='none found in the live feed right now'; return; }
+    if(st) st.textContent=cmJobsCache.length+' live';
+    box.innerHTML=cmJobsCache.map((j,i)=>
+      '<div onclick="openCompanyJob('+i+')" style="background:var(--plum3);border-radius:10px;padding:9px 10px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:8px;">'+
+      '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;">'+j.t+'</div><div style="font-size:10px;color:var(--muted);">'+j.loc+'</div></div>'+
+      '<div style="color:var(--mint);font-size:11px;font-weight:800;">Apply ↗</div></div>').join('');
+  }catch(e){ if(st) st.textContent='live feed unavailable'; }
+}
+function openCompanyJob(i){
+  const j=cmJobsCache[i];
+  if(!j) return;
+  document.getElementById('company-modal').classList.remove('open');
+  pendingJobUrl=j.url||'';
+  const co=document.getElementById('cm-name').textContent;
+  if(resumeReady&&!clOptedOut()){ offerCoverLetter(j.t,co,true); }
+  else if(j.url){ openSandbox(j.url,j.t,co); }
+}
+const _jobsOpenCompanyView=openCompanyView;
+openCompanyView=function(co,job){
+  try{ _jobsOpenCompanyView(co,job); loadCompanyJobs(co); }
+  catch(err){ console.error('companyView',err); showToast('⚠️ Couldn’t open that company view'); }
+};
+
+/* ---------- DECK LOCATION: opening cards pull jobs local to the user ---------- */
+function saveDeckLocation(){
+  const c=(document.getElementById('loc-city')||{}).value||'';
+  const s=(document.getElementById('loc-state')||{}).value||'';
+  const L=[c.trim(),s.trim()].filter(Boolean).join(', ');
+  if(!L) return;
+  try{ localStorage.setItem('gpj_loc',L); }catch(e){}
+  const f=document.getElementById('f-location');
+  if(f) f.value=L;
+  livePage=1;
+  fetchLiveMarketJobs();
+  showToast('📍 Your deck now pulls live jobs near '+L);
+}
+const _locSave=saveLocation;
+saveLocation=function(){ _locSave(); saveDeckLocation(); };
+/* boot: stored location fills the deck with local live jobs automatically */
+try{
+  const L=localStorage.getItem('gpj_loc');
+  if(L){
+    const f=document.getElementById('f-location');
+    if(f&&!f.value){ f.value=L; setTimeout(fetchLiveMarketJobs,600); }
+    const lc=document.getElementById('loc-city');
+    if(lc&&!lc.value){ const parts=L.split(', '); lc.value=parts[0]||''; const ls=document.getElementById('loc-state'); if(ls) ls.value=parts[1]||''; }
+  }
+}catch(e){}
+
+/* ---------- CLICKABLE COMPANIES IN STAT MODALS ---------- */
+const _coClickRenderStat=renderStatList;
+renderStatList=function(kind){
+  _coClickRenderStat(kind);
+  document.querySelectorAll('#stat-modal-list .stat-row').forEach(row=>{
+    if(row.dataset.coB) return;
+    row.dataset.coB='1';
+    const name=row.querySelector('div > div:first-child');
+    const sub=row.querySelector('div > div:nth-child(2)');
+    if(!name||!sub) return;
+    const co=(sub.textContent||'').split(' · ')[0].trim();
+    if(!co) return;
+    name.style.cursor='pointer'; name.style.textDecoration='underline'; name.style.textDecorationColor='rgba(181,95,230,.4)';
+    name.title='Open '+co+' company intel';
+    name.onclick=e=>{ e.stopPropagation(); document.getElementById('stat-modal').classList.remove('open'); openCompanyView(co,{title:name.textContent}); };
+  });
+};
+
+/* ---------- PERSONALIZATION GATING: nothing fake, ever ---------- */
+function gatePersonalized(){
+  const on=resumeReady||profileComplete();
+  const lv=document.getElementById('sec-levelup');
+  if(lv) lv.style.display=on?'':'none';
+}
+const _gateCascade=runPersonalizationCascade;
+runPersonalizationCascade=function(){ _gateCascade(); gatePersonalized(); };
+const _gateBuildFromProfile=buildFromProfile;
+buildFromProfile=function(){ _gateBuildFromProfile(); runPersonalizationCascade(); };
+
+/* ---------- OWNER / MASTER ACCESS ---------- */
+/* Open the site with ?owner=GPJ-MASTER-2026 once on your own device to unlock.
+   Real cross-user data lives ONLY in your Firebase Console (Firestore → profiles)
+   — no frontend can see other users' devices. This panel shows this device's
+   metrics + tier controls for testing. */
+(function ownerInit(){
+  try{
+    if(location.search.indexOf('owner=GPJ-MASTER-2026')>-1) localStorage.setItem('gpj_owner','1');
+    if(localStorage.getItem('gpj_owner')!=='1') return;
+    const host=document.getElementById('view-account');
+    if(!host) return;
+    const m={
+      applies:(JSON.parse(localStorage.getItem('gpj_lists')||'{}').applied||[]).length,
+      letters:clUsed(), reports:Object.keys(ghostReports).length,
+      tier:userTier(), day:accountAgeDays()
+    };
+    host.insertAdjacentHTML('afterbegin',
+      '<div class="pref-section" style="margin-top:4px;"><div class="pref-section-title" style="color:var(--mint);">👑 Owner Dashboard (this device)</div>'+
+      '<div class="pref-row" style="flex-wrap:wrap;font-size:12px;line-height:1.8;">Applied: <strong style="color:var(--mint);">&nbsp;'+m.applies+'&nbsp;</strong> · Letters today: <strong style="color:var(--cyber);">&nbsp;'+m.letters+'&nbsp;</strong> · Reports: <strong style="color:var(--warn);">&nbsp;'+m.reports+'&nbsp;</strong> · Tier: <strong>&nbsp;'+m.tier+'&nbsp;</strong> · Day '+m.day+'</div>'+
+      '<div class="pref-row" style="gap:8px;"><div class="buzz-add" onclick="setTier(\'lifetime\')">Set Lifetime</div><div class="buzz-add" onclick="setTier(\'monthly\')">Set Monthly</div><div class="buzz-add" onclick="setTier(\'free\')">Set Free</div><div class="buzz-add" onclick="window.open(\'https://console.firebase.google.com/project/ghostproofjob-app/firestore\',\'_blank\',\'noopener\')">Firestore Console ↗</div></div>'+
+      '<div style="font-size:10px;color:var(--muted);padding:0 4px 6px;">All real user accounts & profiles: Firebase Console → Authentication + Firestore. Bug reports land in Firestore + bugs@ email.</div></div>');
+  }catch(e){}
+})();
+
+/* ============================================================
+   APPENDED BLOCK: PLATFORM SYSTEMS v8
+   Prev/Next paging · ghost autocomplete · bookmark+rate ·
+   admin portal via master email
+   ============================================================ */
+
+function nextLivePage(){ livePage++; fetchLiveMarketJobs(); document.querySelector('.view-content').scrollTop=0; }
+function prevLivePage(){ if(livePage>1){ livePage--; fetchLiveMarketJobs(); document.querySelector('.view-content').scrollTop=0; } }
+function loadMoreLive(){ nextLivePage(); } /* legacy alias */
+
+/* ---------- GHOST TAB AUTOCOMPLETE ---------- */
+function allKnownCompanies(){
+  const s=new Set();
+  Object.keys(ghostReports).forEach(c=>s.add(c));
+  Object.keys(communityGhost).forEach(c=>s.add(c));
+  (userCompanies||[]).forEach(c=>s.add(c));
+  lists.applied.forEach(r=>s.add(r.co)); lists.skipped.forEach(r=>s.add(r.co)); (lists.responses||[]).forEach(r=>s.add(r.co));
+  liveJobs.forEach(j=>s.add(j.co)); browseJobs.forEach(j=>s.add(j.co));
+  (savedCompanies()||[]).forEach(c=>s.add(c));
+  return [...s].filter(Boolean);
+}
+function ghostSuggest(q){
+  const box=document.getElementById('ghost-sug');
+  if(!box) return;
+  q=(q||'').trim().toLowerCase();
+  if(q.length<2){ box.style.display='none'; box.innerHTML=''; return; }
+  const hits=allKnownCompanies().filter(c=>c.toLowerCase().includes(q)).slice(0,6);
+  if(!hits.length){
+    box.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--muted);">No matches in your hunt yet — file a report to add <strong style="color:var(--off);">'+q.replace(/</g,'&lt;')+'</strong></div>';
+  } else {
+    box.innerHTML=hits.map(c=>{
+      const g=ghostRiskFor(c);
+      const col=g<=15?'var(--mint)':(g<=35?'var(--warn)':'var(--danger)');
+      return '<div onclick="pickGhostCo(this)" data-co="'+c.replace(/"/g,'&quot;')+'" style="padding:10px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;border-bottom:1px solid var(--plum4);"><span>'+c+'</span><span style="font-weight:800;color:'+col+';">👻 '+g+'%</span></div>';
+    }).join('');
+  }
+  box.style.display='block';
+}
+function pickGhostCo(el){
+  const co=el.getAttribute('data-co');
+  document.getElementById('ghost-sug').style.display='none';
+  document.getElementById('ghost-q').value='';
+  openCompanyView(co);
+}
+document.addEventListener('click',e=>{
+  const box=document.getElementById('ghost-sug');
+  if(box&&!e.target.closest('#ghost-q')&&!e.target.closest('#ghost-sug')) box.style.display='none';
+});
+
+/* ---------- SAVE/BOOKMARK + RATE inside the company drawer ---------- */
+function savedCompanies(){ try{return JSON.parse(localStorage.getItem('gpj_saved_cos')||'[]');}catch(e){return [];} }
+function toggleSaveCompany(){
+  const co=document.getElementById('cm-name').textContent;
+  let s=savedCompanies();
+  if(s.includes(co)){ s=s.filter(x=>x!==co); showToast('🔖 '+co+' removed from saved'); }
+  else { s.push(co); showToast('🔖 '+co+' saved — find it on your Ghosts tab'); }
+  try{ localStorage.setItem('gpj_saved_cos',JSON.stringify(s)); }catch(e){}
+  refreshCmSave(co);
+  renderGhostCompanies();
+}
+function refreshCmSave(co){
+  const b=document.getElementById('cm-save');
+  if(b) b.textContent=savedCompanies().includes(co)?'✅ Saved':'🔖 Save Company';
+}
+function bindCmRate(co){
+  const r=document.getElementById('cm-rate');
+  if(!r) return;
+  let ratings={}; try{ratings=JSON.parse(localStorage.getItem('gpj_corate')||'{}');}catch(e){}
+  const cur=ratings[co]||0;
+  [...r.children].forEach((s,i)=>{
+    s.style.color=i<cur?'var(--warn)':'var(--plum4)';
+    s.style.cursor='pointer'; s.style.fontSize='18px';
+    s.onclick=()=>{
+      ratings[co]=i+1;
+      try{ localStorage.setItem('gpj_corate',JSON.stringify(ratings)); }catch(e){}
+      [...r.children].forEach((x,k)=>x.style.color=k<=i?'var(--warn)':'var(--plum4)');
+      showToast('⭐ '+(i+1)+'/5 for '+co+' — feeds the community Vibe Score');
+    };
+  });
+}
+const _v8OpenCompanyView=openCompanyView;
+openCompanyView=function(co,job){
+  _v8OpenCompanyView(co,job);
+  refreshCmSave(co);
+  bindCmRate(co);
+};
+/* saved companies surface first on the Ghosts tab */
+const _v8RenderGhostCos=renderGhostCompanies;
+renderGhostCompanies=function(){
+  _v8RenderGhostCos();
+  const wrap=document.getElementById('ghost-list');
+  const saved=savedCompanies();
+  if(!wrap||!saved.length) return;
+  wrap.insertAdjacentHTML('afterbegin',
+    '<div style="padding:0 16px 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mint);">🔖 Your saved companies</div>'+
+    saved.slice(-4).reverse().map(co=>{
+      const g=ghostRiskFor(co), c=g<=15?'var(--mint)':(g<=35?'var(--warn)':'var(--danger)');
+      return '<div class="report-card" onclick="openCompanyView(\''+co.replace(/'/g,"\\'")+'\')" style="cursor:pointer;border-color:rgba(0,245,160,.25);">'+
+        '<div style="display:flex;align-items:center;gap:10px;"><div style="font-size:20px;">🔖</div>'+
+        '<div style="flex:1;font-weight:700;font-size:14px;">'+co+'</div>'+
+        '<div class="ghost-score" style="color:'+c+';font-size:20px;">'+g+'%</div></div></div>';
+    }).join(''));
+};
+
+/* ---------- MASTER OWNER ADMIN MODE (asosa@ghostproofjob.com) ---------- */
+/* Signing in with the master email flags isAdmin and reveals the dashboard.
+   HONEST SCOPE: browsers can only read data this device created + what your
+   Firestore rules allow. True aggregate metrics (total sign-ups, all bug
+   tickets, every ghost report) live in your Firebase Console — the panel
+   deep-links straight into each section. */
+let isAdmin=false;
+function adminCheck(user){
+  isAdmin=!!(user&&(user.email||'').toLowerCase()==='asosa@ghostproofjob.com');
+  if(isAdmin){ try{localStorage.setItem('gpj_owner','1');}catch(e){} renderAdminPanel(); }
+}
+function renderAdminPanel(){
+  if(document.getElementById('admin-panel')) return;
+  const host=document.getElementById('view-account');
+  if(!host) return;
+  let bugs=[]; try{ bugs=consoleTrail.slice(-5); }catch(e){}
+  const reps=Object.keys(ghostReports).map(co=>co+' ('+ghostReports[co].length+')').join(' · ')||'none filed on this device yet';
+  host.insertAdjacentHTML('afterbegin',
+    '<div class="pref-section" id="admin-panel" style="margin-top:4px;"><div class="pref-section-title" style="color:var(--mint);">👑 Master Admin — asosa@ghostproofjob.com</div>'+
+    '<div class="pref-row" style="flex-direction:column;align-items:stretch;gap:8px;">'+
+    '<div style="font-size:12px;line-height:1.8;">This device — Applied: <strong style="color:var(--mint);">'+lists.applied.length+'</strong> · Responses: <strong style="color:var(--cyber);">'+(lists.responses||[]).length+'</strong> · Letters today: <strong>'+clUsed()+'</strong> · Tier: <strong>'+userTier()+'</strong></div>'+
+    '<div style="font-size:11px;color:var(--muted);line-height:1.7;">👻 Ghost reports (this device): '+reps+'</div>'+
+    (bugs.length?('<div style="font-size:10px;color:var(--warn);line-height:1.6;">Recent console errors: '+bugs.join(' | ').replace(/</g,'&lt;')+'</div>'):'')+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+    '<div class="buzz-add" onclick="window.open(\'https://console.firebase.google.com/project/ghostproofjob-app/authentication/users\',\'_blank\',\'noopener\')">All Sign-ups ↗</div>'+
+    '<div class="buzz-add" onclick="window.open(\'https://console.firebase.google.com/project/ghostproofjob-app/firestore\',\'_blank\',\'noopener\')">Firestore (profiles & bug tickets) ↗</div>'+
+    '<div class="buzz-add" onclick="setTier(\'lifetime\')">Tier: Lifetime</div><div class="buzz-add" onclick="setTier(\'free\')">Tier: Free</div></div>'+
+    '<div style="font-size:10px;color:var(--muted);">Aggregate platform metrics stream from Firebase Console (client browsers can\u2019t read other users\u2019 data — that\u2019s your security rules working).</div>'+
+    '</div></div>');
+  showToast('👑 Admin mode active');
+  dbg('admin portal revealed');
+}
+const _adminAuthChanged=window.gpjAuthChanged;
+window.gpjAuthChanged=function(u){ _adminAuthChanged(u); adminCheck(u); };
+
+/* ---------- v7 INIT ---------- */
+renderGhostCompanies();
+gatePersonalized();
 
 /* ---------- v5 INIT ---------- */
 renderBrowse();
