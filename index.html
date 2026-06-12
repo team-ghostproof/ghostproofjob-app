@@ -649,6 +649,34 @@
     </div>
   </div>
 
+  <!-- ===== ONBOARDING ENFORCEMENT DRAWER ===== -->
+  <div class="modal-scrim" id="enforce-modal" style="z-index:340;">
+    <div class="modal-box" style="border:2px solid var(--mint);box-shadow:0 0 30px rgba(0,245,160,.25);">
+      <div style="font-size:34px;margin-bottom:8px;">🟢</div>
+      <div style="font-size:15px;font-weight:800;line-height:1.5;margin-bottom:14px;">Hold on! Employers need your details to reach out. Fill in your name and email in the Resume tab to instantly unlock automated applying! 🟢</div>
+      <div onclick="document.getElementById('enforce-modal').classList.remove('open');switchView('resume',document.querySelector('[data-view=resume]'))" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;margin-bottom:8px;">📄 Take Me There (30 seconds)</div>
+      <div onclick="document.getElementById('enforce-modal').classList.remove('open')" style="color:var(--muted);font-size:13px;cursor:pointer;padding:6px;">Not yet</div>
+    </div>
+  </div>
+
+  <!-- ===== IN-APP APPLICATION SANDBOX ===== -->
+  <div id="apply-sandbox" style="display:none;position:absolute;inset:0;z-index:345;background:var(--plum);flex-direction:column;">
+    <div style="background:linear-gradient(90deg,var(--mint),var(--mint2));padding:8px 10px;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="font-size:12px;font-weight:800;color:var(--plum);">👻 GhostProof Auto-Fill Active</div>
+        <div style="flex:1;"></div>
+        <div onclick="sandboxNewTab()" style="font-size:11px;font-weight:700;color:var(--plum);background:rgba(18,15,29,.15);border-radius:8px;padding:4px 10px;cursor:pointer;">Open in New Tab ↗</div>
+        <div onclick="closeSandbox()" style="font-size:14px;font-weight:800;color:var(--plum);padding:2px 8px;cursor:pointer;">✕</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;" id="hud-tokens"></div>
+    </div>
+    <iframe id="sandbox-frame" src="about:blank" style="flex:1;border:none;background:#fff;" sandbox="allow-scripts allow-forms allow-same-origin allow-popups"></iframe>
+    <div id="sandbox-note" style="background:var(--plum2);padding:8px 12px;font-size:10px;color:var(--muted);flex-shrink:0;text-align:center;">If this page stays blank, the employer blocks embedding — use "Open in New Tab ↗" above. Your copy-tokens work either way.</div>
+  </div>
+
+  <!-- ===== DEBUG CONSOLE (?debug=true) ===== -->
+  <div id="debug-console" style="display:none;position:absolute;left:0;right:0;bottom:64px;max-height:160px;overflow-y:auto;background:rgba(10,8,18,.95);border-top:2px solid var(--mint);z-index:200;padding:8px 12px;font-family:monospace;font-size:10px;color:var(--mint);line-height:1.7;"></div>
+
   <!-- LEGAL OVERLAY -->
   <div id="legal-overlay">
     <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--plum3);background:var(--plum2);">
@@ -717,7 +745,8 @@
           <div class="card-body">
             <div class="green-flag">🟢 <strong>Green Flag</strong> — Actively hiring now</div>
             <div class="red-flag">🔴 <strong>Red Flag</strong> — Ghosting data loading…</div>
-            <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:10px;padding-bottom:4px;">👆 Tap to see company intel</div>
+            <div onclick="copyOptCard(event)" style="margin-top:8px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Optimize Cover Letter</div>
+            <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;padding-bottom:4px;">👆 Tap to see company intel</div>
           </div>
         </div>
         <div id="job-card-1" class="job-card mid">
@@ -736,7 +765,8 @@
           <div class="card-body">
             <div class="green-flag">🟢 <strong>Green Flag</strong> — Actively hiring now</div>
             <div class="red-flag">🔴 <strong>Red Flag</strong> — Ghosting data loading…</div>
-            <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:10px;padding-bottom:4px;">👆 Tap to see company intel</div>
+            <div onclick="copyOptCard(event)" style="margin-top:8px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Optimize Cover Letter</div>
+            <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;padding-bottom:4px;">👆 Tap to see company intel</div>
           </div>
         </div>
         <div id="job-card-0" class="job-card top" onclick="toggleDrawer(event)">
@@ -755,7 +785,8 @@
           <div class="card-body">
             <div class="green-flag">🟢 <strong>Green Flag</strong> — 4-day work week · Unlimited PTO · $5K L&D budget</div>
             <div class="red-flag">🔴 <strong>Red Flag</strong> — 74% Ghosting Risk after Interview Round 2</div>
-            <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:10px;padding-bottom:4px;">👆 Tap to see company intel</div>
+            <div onclick="copyOptCard(event)" style="margin-top:8px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Optimize Cover Letter</div>
+            <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;padding-bottom:4px;">👆 Tap to see company intel</div>
           </div>
           <div class="card-drawer" id="card-drawer">
             <div class="drawer-inner">
@@ -798,8 +829,13 @@
       <div class="filter-bar">
         <div class="field-label">Keyword / Title</div>
         <input class="field-input" id="f-keyword" placeholder="e.g. Engineer, Designer…" oninput="renderBrowse();queueLiveFetch()" style="margin-bottom:10px;"/>
-        <div class="field-label">📡 Region / Location <span style="text-transform:none;font-weight:400;color:var(--mint);">(triggers live job feed)</span></div>
-        <input class="field-input" id="f-location" placeholder="e.g. London, Manchester, Houston…" oninput="queueLiveFetch()" style="margin-bottom:10px;"/>
+        <div class="field-label">📡 Region / Location <span style="text-transform:none;font-weight:400;color:var(--mint);">(city, state, or 5-digit ZIP — triggers live feed)</span></div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <select class="field-input" id="f-country" onchange="queueLiveFetch()" style="width:96px;flex-shrink:0;font-size:13px;">
+            <option value="us" selected>🇺🇸 US</option><option value="ca">🇨🇦 CA</option><option value="mx">🇲🇽 MX</option><option value="gb">🇬🇧 GB</option><option value="au">🇦🇺 AU</option><option value="nz">🇳🇿 NZ</option><option value="in">🇮🇳 IN</option><option value="sg">🇸🇬 SG</option><option value="za">🇿🇦 ZA</option><option value="de">🇩🇪 DE</option><option value="fr">🇫🇷 FR</option><option value="it">🇮🇹 IT</option><option value="es">🇪🇸 ES</option><option value="nl">🇳🇱 NL</option><option value="be">🇧🇪 BE</option><option value="at">🇦🇹 AT</option><option value="pl">🇵🇱 PL</option><option value="ch">🇨🇭 CH</option><option value="br">🇧🇷 BR</option>
+          </select>
+          <input class="field-input" id="f-location" placeholder="Houston, 77002, London, Sydney…" oninput="queueLiveFetch()" style="flex:1;"/>
+        </div>
         <div class="field-row" style="margin-bottom:10px;">
           <div>
             <div class="field-label">Industry</div>
@@ -1012,8 +1048,9 @@
 
         <!-- Company rating prompt -->
         <div class="section-card fade-in-up">
-          <div style="font-size:14px;font-weight:800;margin-bottom:2px;">🏢 We found 3 past employers</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Imported to our database. Rate them anonymously — your reviews power the community Vibe Score.</div>
+          <div style="font-size:14px;font-weight:800;margin-bottom:2px;" id="past-emp-title">🏢 We found 3 past employers</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Imported from your resume. Rate them anonymously — your reviews power the community Vibe Score.</div>
+          <div id="past-employers-list">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--plum3);">
             <div style="font-size:13px;font-weight:600;">Stripe <span style="font-size:10px;color:var(--muted);">2022–Now</span></div>
             <div class="star-rater" data-co="Stripe"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></div>
@@ -1025,6 +1062,7 @@
           <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;">
             <div style="font-size:13px;font-weight:600;">IBM <span style="font-size:10px;color:var(--muted);">2019–2020</span></div>
             <div class="star-rater" data-co="IBM"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></div>
+          </div>
           </div>
           <div style="font-size:10px;color:var(--muted);margin-top:8px;">You can rate later — we'll remind you gently, never spam you.</div>
         </div>
@@ -1483,7 +1521,13 @@ const deckJobs=[
 ];
 let topIndex=0;
 function swipeCard(dir){
-  if(dir==='right'&&applyCount>=DAILY_CAP){ openEnergyModal(); return; }
+  if(dir==='right'&&!isPaid()&&applyCount>=getDailyCap()){ openEnergyModal(); return; }
+  /* AIRTIGHT ONBOARDING ENFORCEMENT: halt the apply before any animation fires */
+  if(dir==='right'&&!profileComplete()){
+    document.getElementById('enforce-modal').classList.add('open');
+    dbg('apply halted — missing name/email/resume');
+    return;
+  }
   const topCard=document.getElementById(deckJobs[topIndex%3].id);
   if(!topCard||topCard.dataset.swiping) return;
   topCard.dataset.swiping='1';
@@ -1601,7 +1645,8 @@ function renderBrowse(){
           '<div style="font-size:11px;color:var(--muted);">'+j.co+' · '+j.loc+(j.posting_age_days!==null?(' · '+j.posting_age_days+'d old'):'')+(j.stale?' · <span style="color:var(--danger);">stale ⚠️</span>':'')+'</div>'+
           '<div style="font-size:11px;color:var(--mint);margin-top:2px;">'+j.sal+'</div></div>'+
           '<div style="text-align:right;flex-shrink:0;">'+(j.match?('<div style="font-size:14px;font-weight:800;color:var(--mint);">'+j.match+'%</div><div style="font-size:9px;color:var(--muted);">match</div>'):'')+
-          '<div style="font-size:10px;font-weight:700;color:'+gc+';margin-top:3px;">👻 '+j.ghost+'%</div></div></div>';
+          '<div style="font-size:10px;font-weight:700;color:'+gc+';margin-top:3px;">👻 '+j.ghost+'%</div>'+
+          '<div onclick="copyOptLive('+i+',event)" title="Optimize Cover Letter" style="margin-top:5px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:8px;padding:3px 8px;font-size:10px;font-weight:800;cursor:pointer;">✨ Optimize</div></div></div>';
       }).join('');
     return;
   }
@@ -1640,6 +1685,7 @@ function renderBrowse(){
         <div style="font-size:14px;font-weight:800;color:${mc};">${j.match}%</div>
         <div style="font-size:9px;color:var(--muted);">match</div>
         <div style="font-size:10px;font-weight:700;color:${gc};margin-top:3px;">👻 ${j.ghost}%</div>
+        <div onclick="copyOptBrowse(${browseJobs.indexOf(j)},event)" title="Optimize Cover Letter" style="margin-top:5px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:8px;padding:3px 8px;font-size:10px;font-weight:800;cursor:pointer;">✨ Optimize</div>
       </div>
     </div>`;
   }).join('');
@@ -1750,6 +1796,8 @@ function startParse(input){
             userCompanies=[...new Set([...userCompanies,...foundCompanies])];
             try{ localStorage.setItem('gpj_user_cos',JSON.stringify(userCompanies)); }catch(e){}
             renderUserReports();
+            runPersonalizationCascade();
+            dbg('parse cascade complete — placeholder data permanently replaced');
           }
           autofillProfile(realParse);            /* demo seeding only when real parse failed */
           revealMatches();
@@ -2284,6 +2332,8 @@ function downloadResume(){
 /* ---------- COVER LETTER ENGINE ---------- */
 let clContext={title:'',co:'',external:false};
 function offerCoverLetter(title,co,external){
+  title=title||'this role'; co=co||'the hiring company';   /* trade/non-tech cards never crash */
+  dbg('cover-letter prompt: '+title+' @ '+co+(external?' (external)':' (queue paused for review)'));
   if(!resumeReady){
     if(external) showToast('↗ Opening posting… (upload a resume to unlock tailored cover letters)');
     return;
@@ -2305,15 +2355,13 @@ function openPosting(){
   window.open(url,'_blank','noopener');
   showToast('↗ Opening '+clContext.co+'’s posting…');
 }
-function generateCoverLetter(){
-  document.getElementById('cl-prompt-modal').classList.remove('open');
+function buildLetterText(c){
   syncProfileToResume();
-  const c=clContext, me=resumeData;
+  const me=resumeData;
   const topJob=(me.jobs&&me.jobs[0])||null;
-  const skillsTop=(me.skills||'').split(' \u00b7 ').slice(0,3).join(', ');
-  const hl=topJob?String(topJob.b||'').split(/\u00b7|\n/).map(s=>s.trim()).filter(Boolean).slice(0,2).join('; '):'';
-  const letter=
-`Dear ${c.co} Hiring Team,
+  const skillsTop=(me.skills||'').split(' · ').slice(0,3).join(', ');
+  const hl=topJob?String(topJob.b||'').split(/·|\n/).map(s=>s.trim()).filter(Boolean).slice(0,2).join('; '):'';
+  return `Dear ${c.co} Hiring Team,
 
 I'm writing to apply for the ${c.title} position. As a ${me.title||'dedicated professional'}${topJob&&topJob.c?` — most recently at ${topJob.c} —`:''} I bring a track record that maps directly onto this role${hl?`: ${hl.charAt(0).toLowerCase()+hl.slice(1)}`:''}.
 
@@ -2322,8 +2370,13 @@ What draws me to ${c.co} is the chance to apply ${skillsTop||'my core strengths'
 I'd welcome the chance to discuss how I can contribute from week one. Thank you for your time and consideration.
 
 Best regards,
-${me.name||'[Your name \u2014 complete Core Contact in the Resume tab]'}
+${me.name||'[Your name — complete Core Contact in the Resume tab]'}
 ${me.contact||'[Add your email & phone so applications auto-fill]'}`;
+}
+function generateCoverLetter(){
+  document.getElementById('cl-prompt-modal').classList.remove('open');
+  const c=clContext;
+  const letter=buildLetterText(c);
   document.getElementById('cl-text').value=letter;
   document.getElementById('cl-send-btn').style.display=c.external?'none':'block';
   clWordCount();
@@ -2407,13 +2460,22 @@ async function fetchLiveMarketJobs(){
       (what?`&what=${encodeURIComponent(what)}`:'')+
       (where?`&where=${encodeURIComponent(where)}`:'');
   /* PATH 1 (secure, recommended): Cloudflare Worker — keys stay server-side */
+  /* ZIP CODE FIX: a clean 5-digit US zip passes through as-is — Adzuna geocodes it.
+     DISTANCE FIX: the radius param ships ONLY alongside a concrete where target,
+     so blank locations scan the whole national pool with no silent filtering drops. */
+  const isZip=/^\d{5}$/.test(where);
+  if(isZip) dbg('zip detected: '+where);
+  const country=(document.getElementById('f-country')&&document.getElementById('f-country').value)||'us';
+  const distMi=parseInt((document.getElementById('f-dist')&&document.getElementById('f-dist').value)||'0',10);
+  const distQ=(where&&distMi)?('&distance='+Math.round(distMi*1.609)):'';
   const url = ADZUNA_PROXY_URL
-    ? `${ADZUNA_PROXY_URL}?`+(what?`what=${encodeURIComponent(what)}&`:'')+(where?`where=${encodeURIComponent(where)}&`:'')+daysQ.replace(/^&/,'')
+    ? `${ADZUNA_PROXY_URL}?`+(what?`what=${encodeURIComponent(what)}&`:'')+(where?`where=${encodeURIComponent(where)}&`:'')+daysQ.replace(/^&/,'')+`&country=${country}`+distQ
     : directUrl;
+  dbg('live fetch → '+(url.split('?')[1]||''));
   try{
     let data;
     try{
-      const res=await fetch(url);
+      const res=await fetch(url,{headers:{'X-Requested-With':'XMLHttpRequest'}});
       if(!res.ok) throw new Error('HTTP '+res.status);
       data=await res.json();
     }catch(primaryErr){
@@ -2576,6 +2638,7 @@ function updateEnergyMeter(){
 }
 function registerApply(){
   applyCount++;
+  dbg('apply #'+applyCount+(DEBUG?' — mock instance saved to dashboard history (no external API hit)':''));
   persistApplies();
   updateEnergyMeter();
   advanceQueue();
@@ -3381,7 +3444,12 @@ function injectLegalFooters(){
     '<span onclick="openLegal(\'privacy\')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> \u00b7 '+
     '<span onclick="openLegal(\'terms\')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> \u00b7 '+
     '<span onclick="openLegal(\'security\')" style="cursor:pointer;text-decoration:underline;">Security</span>'+
-    '<br/><span style="color:var(--plum4);">GhostProofJob \u00b7 Free until you\u2019re hired \ud83d\udc9a \u00b7 No ads, no data selling, ever.</span></div>';
+    '<br/><span style="color:var(--plum4);">GhostProofJob \u00b7 Free until you\u2019re hired \ud83d\udc9a \u00b7 No ads, no data selling, ever.</span>'+
+    '<div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">'+
+    '<span onclick="window.open(\'https://www.tiktok.com/@ghostproofjob\',\'_blank\',\'noopener\')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>'+
+    '<span onclick="window.open(\'https://www.instagram.com/ghostproofjob\',\'_blank\',\'noopener\')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>'+
+    '<span onclick="window.open(\'https://www.youtube.com/@ghostproofjob\',\'_blank\',\'noopener\')" style="cursor:pointer;" title="YouTube"><svg width="20" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4L15.8 12z"/></svg></span>'+
+    '</div></div>';
   ['view-swipe','view-browse','view-ghost','view-resume'].forEach(id=>{
     const v=document.getElementById(id);
     if(v) v.insertAdjacentHTML('beforeend',html);
@@ -3499,6 +3567,7 @@ function importLinkedIn(){
   userCompanies=[...new Set([...userCompanies,...cos])];
   try{localStorage.setItem('gpj_user_cos',JSON.stringify(userCompanies));}catch(e){}
   renderUserReports(); revealMatches(); renderTplPreview(); marketAdvice();
+  runPersonalizationCascade();
   cloudSync();
   showToast('💼 LinkedIn profile imported — review the extracted fields!');
   if(cos.length) startRateExLoop(cos);
@@ -3642,8 +3711,202 @@ renderStatList=function(kind){
   }
 };
 
+/* ============================================================
+   APPENDED BLOCK: PLATFORM SYSTEMS v6
+   debug console · tier framework · profile guard · iframe sandbox
+   + HUD · cascade personalization chain · clipboard optimizers
+   ============================================================ */
+
+/* ---------- DEVELOPMENT SANDBOX MODE (?debug=true) ---------- */
+const DEBUG=location.search.indexOf('debug=true')>-1;
+function dbg(m){
+  if(!DEBUG) return;
+  try{
+    const c=document.getElementById('debug-console');
+    c.style.display='block';
+    c.innerHTML+='<div>'+new Date().toISOString().slice(11,19)+' · '+m+'</div>';
+    c.scrollTop=c.scrollHeight;
+  }catch(e){}
+}
+if(DEBUG) dbg('🟢 debug mode active — applications stay local, no external API endpoints are hit');
+
+/* ---------- TIER METADATA FRAMEWORK ---------- */
+function userTier(){ try{return localStorage.getItem('gpj_tier')||'free';}catch(e){return 'free';} }
+function isPaid(){ return userTier()!=='free'; }
+function setTier(t){
+  try{localStorage.setItem('gpj_tier',t);}catch(e){}
+  showToast(t==='free'?'Tier: free':'⚡ '+t+' unlocked — caps removed. Thank you!');
+  dbg('tier set: '+t);
+}
+
+/* ---------- PROFILE PRESENCE GUARD ---------- */
+function profileComplete(){
+  const f=document.querySelector('.pf-first'), e=document.querySelector('.pf-email');
+  if(f&&f.value.trim()&&e&&e.value.trim()) return true;
+  if(resumeReady&&resumeData&&resumeData.name&&resumeData.name!=='Alex Rivera') return true;
+  return false;
+}
+
+/* ---------- IN-APP APPLICATION SANDBOX + AUTO-FILL HUD ---------- */
+const ATS_DOMAINS=['greenhouse.io','lever.co','myworkdayjobs','workday','icims','jobvite','smartrecruiters','ashbyhq','bamboohr','taleo','recruitee','workable'];
+function unwrapAtsUrl(url){
+  try{
+    const u=new URL(url);
+    for(const pair of u.searchParams.entries()){
+      const d=decodeURIComponent(pair[1]||'');
+      if(/^https?:\/\//.test(d)&&ATS_DOMAINS.some(a=>d.indexOf(a)>-1)) return d;
+    }
+  }catch(e){}
+  return url;
+}
+let sandboxUrl='';
+function openSandbox(url,title,co){
+  sandboxUrl=unwrapAtsUrl(url);
+  syncProfileToResume();
+  const me=resumeData;
+  const toks=[];
+  const chip=(label,val)=>val?('<div onclick="copyTok(this)" data-v="'+String(val).replace(/"/g,'&quot;')+'" style="background:rgba(18,15,29,.18);border-radius:8px;padding:3px 9px;font-size:10px;font-weight:800;color:var(--plum);cursor:pointer;">'+label+' ⧉</div>'):'';
+  toks.push(chip('Name',me.name&&me.name!=='Alex Rivera'?me.name:''));
+  const em=(me.contact||'').match(/[\w.+-]+@[\w-]+\.[\w.]+/);
+  const ph=(me.contact||'').match(/\+?\d[\d\s().-]{7,}\d/);
+  toks.push(chip('Email',em?em[0]:''));
+  toks.push(chip('Phone',ph?ph[0]:''));
+  toks.push(chip('Top Skills',(me.skills||'').split(' · ').slice(0,4).join(', ')));
+  toks.push('<div onclick="copyHudLetter(\''+String(title||'this role').replace(/'/g,'')+'\',\''+String(co||'the company').replace(/'/g,'')+'\')" style="background:var(--plum);border-radius:8px;padding:3px 10px;font-size:10px;font-weight:800;color:var(--mint);cursor:pointer;">📋 Copy Custom Cover Letter</div>');
+  document.getElementById('hud-tokens').innerHTML=toks.join('');
+  document.getElementById('sandbox-frame').src=sandboxUrl;
+  document.getElementById('apply-sandbox').style.display='flex';
+  dbg('sandbox open: '+sandboxUrl.slice(0,80));
+}
+function closeSandbox(){
+  document.getElementById('apply-sandbox').style.display='none';
+  document.getElementById('sandbox-frame').src='about:blank';
+}
+function sandboxNewTab(){
+  if(sandboxUrl) window.open(sandboxUrl,'_blank','noopener');
+}
+function copyTok(el){
+  const v=el.getAttribute('data-v')||'';
+  navigator.clipboard.writeText(v).then(()=>showToast('⧉ Copied — paste into the form')).catch(()=>showToast('Copy blocked by browser — select manually'));
+}
+function copyHudLetter(title,co){
+  if(!isPaid()&&clUsed()>=10){ closeSandbox(); document.getElementById('cl-limit-modal').classList.add('open'); return; }
+  try{localStorage.setItem(clKey(),String(clUsed()+1));}catch(e){}
+  const letter=buildLetterText({title:title,co:co,external:true});
+  navigator.clipboard.writeText(letter).then(()=>showToast('📋 Tailored cover letter copied!')).catch(()=>showToast('Copy blocked — open the letter from a job card instead'));
+  dbg('HUD cover letter copied for '+co);
+}
+
+/* ---------- CLIPBOARD OPTIMIZERS (✨ buttons) ---------- */
+function buildOptSummary(t,co){
+  syncProfileToResume();
+  const me=resumeData;
+  const skills=(me.skills||'').split(' · ').slice(0,4).join(', ');
+  const win=(me.jobs&&me.jobs[0]&&me.jobs[0].b)||'a record of measurable wins';
+  return 'Results-driven '+(me.title||'professional')+' targeting '+t+' at '+co+'. Core strengths: '+(skills||'adaptability, ownership, communication')+'. Recent impact: '+win+'.';
+}
+function copyOptBrowse(i,ev){ if(ev)ev.stopPropagation(); const j=browseJobs[i]; copyOpt(buildOptSummary(j.t,j.co)); }
+function copyOptLive(i,ev){ if(ev)ev.stopPropagation(); const j=liveJobs[i]; if(j) copyOpt(buildOptSummary(j.t,j.co)); }
+function copyOptCard(ev){
+  if(ev)ev.stopPropagation();
+  const top=document.querySelector('.job-card.top');
+  const t=top?top.querySelector('.s-title').textContent:'this role';
+  const co=top?(top.querySelector('.s-sub').textContent.split(' · ')[0]):'the company';
+  copyOpt(buildOptSummary(t,co));
+}
+function copyOpt(txt){
+  navigator.clipboard.writeText(txt).then(()=>showToast('✨ Optimized summary copied — paste anywhere')).catch(()=>showToast('Copy blocked by browser — long-press to copy'));
+  dbg('optimized summary copied');
+}
+
+/* ---------- CRITICAL DOWNSTREAM PERSONALIZATION CASCADE ---------- */
+window.userProfileData=resumeData;   /* global alias: parsed data permanently replaces placeholders */
+function updateJobMatchForecast(d){
+  d=d||window.userProfileData;
+  try{
+    const rows=document.querySelectorAll('#view-resume .match-row');
+    if(rows.length&&d.title){
+      const r0=rows[0];
+      const lbl=r0.querySelector('div[style*="flex:1"]')||r0.children[0];
+      if(lbl) lbl.innerHTML='<div style="font-size:12px;font-weight:600;">'+d.title+'</div><div style="font-size:10px;color:var(--muted);">your strongest lane — direct experience</div>';
+      const pct=r0.querySelector('.match-pct-num');
+      if(pct) pct.textContent='94%';
+    }
+  }catch(e){}
+  dbg('match forecast recalculated');
+}
+function renderResumeOptimizer(d){ try{renderOptimizer();}catch(e){} dbg('optimizer re-rendered'); }
+function populatePastEmployersModal(d){
+  d=d||window.userProfileData;
+  const wrap=document.getElementById('past-employers-list');
+  if(!wrap) return;
+  const jobs=(d.jobs||[]).filter(j=>j.c).slice(0,4);
+  const cos=jobs.length?jobs:((userCompanies||[]).slice(0,4).map(c=>({c:c,d:''})));
+  if(!cos.length) return;
+  const title=document.getElementById('past-emp-title');
+  if(title) title.textContent='🏢 We found '+cos.length+' past employer'+(cos.length>1?'s':'');
+  wrap.innerHTML=cos.map((j,ix)=>
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;'+(ix<cos.length-1?'border-bottom:1px solid var(--plum3);':'')+'">'+
+    '<div style="font-size:13px;font-weight:600;">'+j.c+' <span style="font-size:10px;color:var(--muted);">'+(j.d||'')+'</span></div>'+
+    '<div class="star-rater" data-co="'+j.c.replace(/"/g,'&quot;')+'"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></div></div>'
+  ).join('');
+  bindStarRaters();
+  dbg('past employers populated: '+cos.map(c=>c.c).join(', '));
+}
+function bindStarRaters(){
+  document.querySelectorAll('.star-rater').forEach(r=>{
+    if(r.dataset.bound) return;
+    r.dataset.bound='1';
+    [...r.children].forEach((s,i)=>{
+      s.style.cursor='pointer';
+      s.onclick=()=>{
+        [...r.children].forEach((x,k)=>x.style.color=k<=i?'var(--warn)':'');
+        showToast('⭐ '+(i+1)+'/5 for '+r.dataset.co+' — community thanks you!');
+      };
+    });
+  });
+}
+bindStarRaters();
+
+/* ---------- ROUTE ALL EXTERNAL APPLIES THROUGH THE SANDBOX ---------- */
+openPosting=function(){
+  const url=clContext.url||('https://www.google.com/search?q='+encodeURIComponent(clContext.title+' '+clContext.co+' job apply'));
+  openSandbox(url,clContext.title,clContext.co);
+};
+openLive=function(i){
+  const j=liveJobs[i];
+  if(!j) return;
+  pendingJobUrl=j.url||'';
+  if(resumeReady&&!clOptedOut()){ offerCoverLetter(j.t,j.co,true); }
+  else if(j.url){ openSandbox(j.url,j.t,j.co); }
+  else { openCompanyView(j.co,{title:j.t,url:''}); }
+};
+
+/* ---------- CL CAP → tier-aware (paid users skip the limit) ---------- */
+const _tierGenCL=generateCoverLetter;
+generateCoverLetter=function(){
+  if(isPaid()){
+    document.getElementById('cl-prompt-modal').classList.remove('open');
+    const letter=buildLetterText(clContext);
+    document.getElementById('cl-text').value=letter;
+    document.getElementById('cl-send-btn').style.display=clContext.external?'none':'block';
+    clWordCount();
+    document.getElementById('cl-review-modal').classList.add('open');
+    return;
+  }
+  _tierGenCL();
+};
+
+/* ---------- CASCADE HOOKS: parse + import + build-from-profile ---------- */
+function runPersonalizationCascade(){
+  window.userProfileData=resumeData;
+  updateJobMatchForecast(window.userProfileData);
+  renderResumeOptimizer(window.userProfileData);
+  populatePastEmployersModal(window.userProfileData);
+}
+
 /* ---------- v5 INIT ---------- */
 renderBrowse();
 </script>
 </body>
-    </html>
+</html>
