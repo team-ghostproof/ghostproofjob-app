@@ -315,6 +315,7 @@
       </div>
       <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
         <div class="desk-only" style="gap:6px;">
+          <span class="nav-pill" onclick="goHome()">🏠 Home</span>
           <span class="nav-pill" onclick="switchView('browse',null)">🔍 Browse</span>
           <span class="nav-pill" onclick="switchView('account',null)">⚙️ Settings</span>
         </div>
@@ -578,7 +579,7 @@
       <div style="font-size:15px;font-weight:800;margin-bottom:2px;">📨 Contact Support</div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">A human reads every message. We typically reply within 1 business day.</div>
       <div class="field-label">Your Name</div>
-      <input class="field-input" id="sup-name" placeholder="Alex Rivera" style="margin-bottom:8px;"/>
+      <input class="field-input" id="sup-name" placeholder="Your name" style="margin-bottom:8px;"/>
       <div class="field-label">Your Email *</div>
       <input class="field-input" id="sup-email" type="email" placeholder="you@email.com" style="margin-bottom:8px;"/>
       <div class="field-label">How can we help? *</div>
@@ -1163,43 +1164,8 @@
           <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.6;" id="lv-sub">Picked purely from salary & hiring data to raise <em>your</em> odds. These roadmaps exist for your growth — nothing else.</div>
         </div>
 
-        <div class="tier-card fade-in-up" style="border-color:rgba(0,245,160,.3);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <span class="tier-tag" style="background:rgba(0,245,160,.15);color:var(--mint);">Tier 1 · Free–$49</span>
-            <span style="font-size:12px;font-weight:800;color:var(--mint);">+$5–10K salary</span>
-          </div>
-          <div style="font-size:13px;font-weight:700;">Modern React + TypeScript Patterns</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;">freeCodeCamp (free) · The Odin Project (free) · Scrimba (~$30/mo). Closes the gap on 80% of "Senior Frontend" postings asking for advanced TS.</div>
-          <div class="roi-bar"><div style="width:35%;height:100%;background:var(--mint);"></div></div>
-          <div style="font-size:10px;color:var(--muted);margin-top:4px;">ROI strength · payback ≈ first paycheck</div>
-          <div onclick="enrollTier(0)" style="margin-top:10px;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">View Recommended Course ↗</div>
-        </div>
-
-        <div class="tier-card fade-in-up" style="border-color:rgba(181,95,230,.35);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <span class="tier-tag" style="background:rgba(181,95,230,.15);color:var(--cyber);">Tier 2 · $150–$500</span>
-            <span style="font-size:12px;font-weight:800;color:var(--cyber);">+$12–25K salary</span>
-          </div>
-          <div style="font-size:13px;font-weight:700;">AWS Certified Developer / Solutions Architect Associate</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;">Exam ~$150 + prep course ~$30–300. Unlocks your 58% DevOps match → est. 85%+, and cloud-skilled frontend roles pay measurably more.</div>
-          <div class="roi-bar"><div style="width:65%;height:100%;background:var(--cyber);"></div></div>
-          <div style="font-size:10px;color:var(--muted);margin-top:4px;">ROI strength · payback ≈ 1–2 weeks of the raise</div>
-          <div onclick="enrollTier(1)" style="margin-top:10px;background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">View Recommended Course ↗</div>
-        </div>
-
-        <div class="tier-card fade-in-up" style="border-color:rgba(255,179,71,.35);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <span class="tier-tag" style="background:rgba(255,179,71,.15);color:var(--warn);">Tier 3 · $1K–$8K</span>
-            <span style="font-size:12px;font-weight:800;color:var(--warn);">+$25–45K salary</span>
-          </div>
-          <div style="font-size:13px;font-weight:700;">Engineering Leadership Program / M.S. (employer-funded options first)</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;">Targets your 64% Eng Manager match. ⚠️ Honest note: only worth it if you want management — check if a future employer's L&D budget (like Stripe's $5K) covers it before paying yourself.</div>
-          <div class="roi-bar"><div style="width:90%;height:100%;background:var(--warn);"></div></div>
-          <div style="font-size:10px;color:var(--muted);margin-top:4px;">ROI strength · highest ceiling, highest cost — go employer-funded if possible</div>
-          <div onclick="enrollTier(2)" style="margin-top:10px;background:rgba(255,179,71,.12);border:1px solid rgba(255,179,71,.4);color:var(--warn);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">View Recommended Course ↗</div>
-        </div>
-
-        <div style="margin:0 16px 16px;padding:14px 16px;border:1px solid rgba(181,95,230,.4);border-radius:14px;background:rgba(240,238,248,.05);">
+        <div id="levelup-tracks"></div>
+<div style="margin:0 16px 16px;padding:14px 16px;border:1px solid rgba(181,95,230,.4);border-radius:14px;background:rgba(240,238,248,.05);">
           <div style="font-size:12px;color:var(--off);line-height:1.7;">🤝 People-First Notice: GhostProofJob will never charge you additional hidden fees or upcharges for these roadmaps. In the future, we may consider options to fund our server infrastructure, but our platform tools remain dedicated entirely to your career growth—no pressure, ever.</div>
         </div>
         </div>
@@ -1265,7 +1231,7 @@
               <div><div class="field-label">End</div><input class="field-input pf-end" placeholder="Present" style="font-size:12px;"/></div>
             </div>
             <div class="field-label">Key Duties</div>
-            <textarea class="field-input" rows="3" placeholder="• Led team of 6 engineers&#10;• Increased deploy speed by 40%" style="resize:none;line-height:1.5;"></textarea>
+            <textarea class="field-input" rows="3" placeholder="• Your real responsibilities, one per line&#10;• We auto-detect these from your uploaded resume" style="resize:none;line-height:1.5;"></textarea>
           </div>
           <div class="add-btn" onclick="addJobEntry()">+ Add Another Position</div>
         </div></div>
@@ -1357,11 +1323,11 @@
       <div style="padding:16px 16px 12px;"><div style="font-size:19px;font-weight:800;">⚙️ Settings</div></div>
 
       <div id="set-profile" style="margin:0 16px 16px;background:linear-gradient(135deg,rgba(0,245,160,.08),rgba(181,95,230,.08));border:1px solid rgba(181,95,230,.2);border-radius:18px;padding:16px;display:flex;align-items:center;gap:12px;">
-        <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--mint),var(--cyber));display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:var(--plum);">AR</div>
+        <div id="set-avatar" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--mint),var(--cyber));display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:var(--plum);">👻</div>
         <div>
-          <div style="font-weight:800;font-size:16px;">Alex Rivera</div>
-          <div style="font-size:12px;color:var(--muted);">alex@example.com</div>
-          <div style="margin-top:4px;display:inline-block;background:rgba(0,245,160,.15);border:1px solid rgba(0,245,160,.3);color:var(--mint);font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700;">Free until hired · Day 1 of 90</div>
+          <div style="font-weight:800;font-size:16px;" id="set-name">Your profile</div>
+          <div style="font-size:12px;color:var(--muted);" id="set-email">Sign in or build your resume to personalize</div>
+          <div style="margin-top:4px;display:inline-block;background:rgba(0,245,160,.15);border:1px solid rgba(0,245,160,.3);color:var(--mint);font-size:10px;padding:2px 8px;border-radius:8px;font-weight:700;" id="set-grace">Free until hired · Day 1 of 90</div>
         </div>
       </div>
 
@@ -2028,38 +1994,7 @@ function openLegal(key){
 function closeLegal(){ document.getElementById('legal-overlay').classList.remove('open'); }
 
 /* ===== RESUME OPTIMIZER ENGINE (market data simulated for prototype) ===== */
-const optPrompts=[
-  {
-    role:'Senior Frontend Engineer @ Stripe',
-    issue:'Missing measurable impact',
-    before:'"Responsible for improving site performance and user experience."',
-    question:'Roughly how much did performance improve under your work? A load-time %, Core Web Vitals score, or conversion lift all work.',
-    placeholder:'e.g. 40% faster load time',
-    chips:['~25% faster','~40% faster','~60% faster','Conversion +15%'],
-    build:v=>`"Cut page load time by ${v.replace(/^~/,'')} across checkout flows, directly lifting conversion for millions of daily users."`,
-    why:'📊 Why we ask: in our scan of 4,120 live frontend postings from high-volume hirers, 78% explicitly request "measurable performance impact." Bullets with a hard number get 3.2× more recruiter responses than duty-only bullets (aggregate ATS pass-through data).'
-  },
-  {
-    role:'Sales Development Rep @ Dell (2018–2019)',
-    issue:'Sales role with zero KPIs listed',
-    before:'"Handled outbound sales and managed client accounts."',
-    question:'Sales bullets without numbers get filtered first. What was your quota attainment, revenue closed, or pipeline generated? Even an estimate beats nothing.',
-    placeholder:'e.g. 118% of quota, $1.2M pipeline',
-    chips:['100%+ quota','110%+ quota','$500K+ closed','$1M+ pipeline'],
-    build:v=>`"Achieved ${v} via outbound prospecting, ranking in the top tier of a 40-rep team."`,
-    why:'📊 Why we ask: quota attainment is the #1 screened field in sales hiring — 91% of active sales postings from constantly-hiring companies (Dell, Salesforce, Oracle) list it as a hard requirement. Recruiters spend ~6 seconds per resume; a % sign stops the skim.'
-  },
-  {
-    role:'Skills section',
-    issue:'Team scale not mentioned anywhere',
-    before:'No mention of team size, mentorship, or cross-team work.',
-    question:'Did you mentor anyone, lead a project, or work across teams? How many people were involved?',
-    placeholder:'e.g. mentored 3 juniors, led squad of 5',
-    chips:['Mentored 2–3 devs','Led squad of 5','Cross-team project','Code review owner'],
-    build:v=>`"${v.charAt(0).toUpperCase()+v.slice(1)} — driving delivery across product and design partners."`,
-    why:'📊 Why we ask: this single line is what separates your 64% Engineering Manager match from 80%+. "Mentorship" appears in 67% of senior+ postings at top hirers and is the most common gap we detect in IC resumes.'
-  }
-];
+const optPrompts=[];  /* populated ONLY from the user's real parsed bullets via buildOptimizerFromResume() — never demo text */
 let optState=optPrompts.map(()=>({done:false,skipped:false,value:''}));
 let activeOpt=-1;
 
@@ -2213,8 +2148,8 @@ let resumeReady=false;
 /* ---------- TEMPLATE STUDIO ---------- */
 const tplState={tpl:'classic',clr:'#1D9E75',headshot:null};
 const resumeData={
-  name:'Alex Rivera',title:'Senior Frontend Engineer',
-  contact:'alex.rivera@email.com · (555) 000-0000 · Houston, TX',
+  name:'',title:'',
+  contact:'',
   summary:'Frontend engineer with 6 years building high-traffic web products. Cut checkout load time 40%, mentored 3 junior developers.',
   jobs:[
     {t:'Senior Frontend Engineer',c:'Stripe',d:'2022–Present',b:'Cut page load time 40% across checkout flows · Led accessibility overhaul to WCAG 2.2 · Mentored 3 junior engineers'},
@@ -2432,7 +2367,7 @@ function generateCoverLetter(){
   document.getElementById('cl-send-btn').style.display=c.external?'none':'block';
   clWordCount();
   document.getElementById('cl-review-modal').classList.add('open');
-  if(!me.name||!me.contact||me.name==='Alex Rivera'||String(me.contact).includes('alex.rivera')){
+  if(!me.name||!me.contact){
     showAdvice('\u270d\ufe0f Your letter is using placeholder contact details. Complete <strong>Core Contact</strong> in the \ud83d\udcc4 Resume tab and every letter + application auto-fills with YOUR info.');
   }
 }
@@ -3863,7 +3798,7 @@ function setTier(t){
 function profileComplete(){
   const f=document.querySelector('.pf-first'), e=document.querySelector('.pf-email');
   if(f&&f.value.trim()&&e&&e.value.trim()) return true;
-  if(resumeReady&&resumeData&&resumeData.name&&resumeData.name!=='Alex Rivera') return true;
+  if(resumeReady&&resumeData&&resumeData.name) return true;
   return false;
 }
 
@@ -3886,7 +3821,7 @@ function openSandbox(url,title,co){
   const me=resumeData;
   const toks=[];
   const chip=(label,val)=>val?('<div onclick="copyTok(this)" data-v="'+String(val).replace(/"/g,'&quot;')+'" style="background:rgba(18,15,29,.18);border-radius:8px;padding:3px 9px;font-size:10px;font-weight:800;color:var(--plum);cursor:pointer;">'+label+' ⧉</div>'):'';
-  toks.push(chip('Name',me.name&&me.name!=='Alex Rivera'?me.name:''));
+  toks.push(chip('Name',me.name||''));
   const em=(me.contact||'').match(/[\w.+-]+@[\w-]+\.[\w.]+/);
   const ph=(me.contact||'').match(/\+?\d[\d\s().-]{7,}\d/);
   toks.push(chip('Email',em?em[0]:''));
@@ -4529,6 +4464,138 @@ function realignCourses(){
 }
 const _v9Cascade=runPersonalizationCascade;
 runPersonalizationCascade=function(){ _v9Cascade(); updateTrendBadge(); realignCourses(); updateDeckLocPill(); };
+
+/* ============================================================
+   APPENDED BLOCK: PLATFORM SYSTEMS v10
+   dynamic settings header · cross-industry Level-Up engine ·
+   rate-ex cancel safety
+   ============================================================ */
+
+/* ---------- DYNAMIC SETTINGS HEADER (no Alex, ever) ---------- */
+function renderSettingsIdentity(){
+  syncProfileToResume();
+  let first=(document.querySelector('.pf-first')||{}).value||'';
+  let last=(document.querySelector('.pf-last')||{}).value||'';
+  let email=(document.querySelector('.pf-email')||{}).value||'';
+  if(!first && resumeData.name){ const p=resumeData.name.split(/\s+/); first=p[0]||''; last=p.slice(1).join(' '); }
+  if(!email && resumeData.contact){ const m=resumeData.contact.match(/[\w.+-]+@[\w-]+\.[\w.]+/); if(m) email=m[0]; }
+  let u=null; try{ u=window.fb&&fb.current&&fb.current(); }catch(e){}
+  if(!email && u&&u.email) email=u.email;
+  const full=[first,last].filter(Boolean).join(' ').trim();
+  const nameEl=document.getElementById('set-name'), emEl=document.getElementById('set-email'), av=document.getElementById('set-avatar'), gr=document.getElementById('set-grace');
+  if(nameEl) nameEl.textContent=full||'Your profile';
+  if(emEl) emEl.textContent=email||'Add your details in the Resume tab to personalize';
+  if(av) av.textContent=full?(full.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()):'👻';
+  if(gr) gr.textContent='Free until hired · Day '+accountAgeDays()+' of 90';
+  /* mirror city into Settings location fields if empty */
+  try{
+    const L=localStorage.getItem('gpj_loc')||'';
+    if(L){ const lc=document.getElementById('loc-city'), ls=document.getElementById('loc-state');
+      if(lc&&!lc.value){ const parts=L.split(', '); lc.value=parts[0]||''; if(ls) ls.value=parts[1]||''; } }
+  }catch(e){}
+}
+
+/* ---------- CROSS-INDUSTRY LEVEL-UP ENGINE ---------- */
+const COURSE_TRACKS={
+  tech:[
+    {tag:'Tier 1 · Free–$49',sal:'+$5–10K',title:'Modern React + TypeScript Patterns',desc:'freeCodeCamp (free) · The Odin Project (free) · Scrimba (~$30/mo). Closes the gap on most senior frontend postings asking for advanced TS.',roi:35,col:'mint',url:'https://www.freecodecamp.org/learn/front-end-development-libraries/'},
+    {tag:'Tier 2 · $150–$500',sal:'+$12–25K',title:'AWS Certified Developer Associate',desc:'Exam ~$150 + prep ~$30–300. Cloud-skilled engineers command measurably higher offers.',roi:65,col:'cyber',url:'https://aws.amazon.com/certification/certified-developer-associate/'},
+    {tag:'Tier 3 · $1K–$8K',sal:'+$25–45K',title:'Engineering Leadership / M.S. (employer-funded first)',desc:'⚠️ Honest note: only worth it if you want management — check your next employer’s L&D budget before paying yourself.',roi:90,col:'warn',url:'https://www.coursera.org/degrees/master-of-computer-science'}
+  ],
+  marketing:[
+    {tag:'Tier 1 · Free',sal:'+$4–9K',title:'HubSpot Inbound Marketing Certification',desc:'100% free, industry-recognized. Covers content, SEO, lead nurturing — named in a huge share of marketing postings.',roi:40,col:'mint',url:'https://academy.hubspot.com/courses/inbound-marketing'},
+    {tag:'Tier 2 · Free–$49/mo',sal:'+$8–18K',title:'Google Digital Marketing & E-commerce Certificate',desc:'Coursera, ~3–6 months. Built with Google hiring data; includes a hiring-consortium connection.',roi:65,col:'cyber',url:'https://www.coursera.org/professional-certificates/google-digital-marketing-ecommerce'},
+    {tag:'Tier 3 · $300–$2K',sal:'+$15–30K',title:'Meta Marketing Analytics Professional Certificate',desc:'Deepens paid-social + analytics. Strong ROI if you target growth/performance-marketing roles.',roi:88,col:'warn',url:'https://www.coursera.org/professional-certificates/facebook-marketing-analytics'}
+  ],
+  sales:[
+    {tag:'Tier 1 · Free',sal:'+$5–12K',title:'HubSpot Sales Software & Inbound Sales',desc:'Free certifications recruiters recognize. Pairs CRM fluency with modern consultative selling.',roi:42,col:'mint',url:'https://academy.hubspot.com/courses/inbound-sales'},
+    {tag:'Tier 2 · $49/mo',sal:'+$10–22K',title:'Salesforce Administrator Path (Trailhead)',desc:'Free to learn on Trailhead; cert exam ~$200. SF skills appear across a large share of sales-ops roles.',roi:68,col:'cyber',url:'https://trailhead.salesforce.com/'},
+    {tag:'Tier 3 · $1K–$4K',sal:'+$18–35K',title:'Sandler / Challenger Sales Methodology',desc:'Employer-funded where possible. Methodology training that lifts enterprise close rates and OTE.',roi:85,col:'warn',url:'https://www.sandler.com/'}
+  ],
+  trades:[
+    {tag:'Tier 1 · $0–$200',sal:'+$3–8K',title:'OSHA 10/30 Safety Certification',desc:'Required on many job sites and a fast resume differentiator. Online-proctored options widely available.',roi:38,col:'mint',url:'https://www.osha.com/courses/outreach-training'},
+    {tag:'Tier 2 · $500–$3K',sal:'+$8–20K',title:'State Journeyman / Trade License Prep',desc:'Electrician, HVAC, plumbing, welding. Licensing is the single biggest pay-band unlock in skilled trades.',roi:70,col:'cyber',url:'https://www.nccer.org/'},
+    {tag:'Tier 3 · $2K–$10K',sal:'+$20–40K',title:'Master License / Contractor Certification',desc:'⚠️ Check employer apprenticeship sponsorship first. Opens self-employment and supervisory pay tiers.',roi:90,col:'warn',url:'https://www.nccer.org/'}
+  ],
+  healthcare:[
+    {tag:'Tier 1 · $50–$200',sal:'+$3–7K',title:'BLS / CPR Certification (AHA)',desc:'Baseline requirement across clinical roles; quick to earn and frequently expiring — keep it current.',roi:36,col:'mint',url:'https://cpr.heart.org/'},
+    {tag:'Tier 2 · $300–$1.5K',sal:'+$8–18K',title:'Specialty Certification (CNA→LPN, ACLS, etc.)',desc:'Stackable credentials that move you up the clinical pay ladder. Many employers reimburse.',roi:68,col:'cyber',url:'https://www.redcross.org/take-a-class'},
+    {tag:'Tier 3 · $2K–$15K',sal:'+$20–45K',title:'RN Bridge / Advanced Practice Pathways',desc:'⚠️ Employer tuition programs first. Highest ceiling in healthcare career growth.',roi:90,col:'warn',url:'https://www.coursera.org/browse/health'}
+  ],
+  logistics:[
+    {tag:'Tier 1 · $0–$150',sal:'+$3–7K',title:'Forklift / OSHA Warehouse Safety',desc:'Certifications hirers ask for by name; rapid to complete and immediately resume-visible.',roi:38,col:'mint',url:'https://www.osha.com/courses/outreach-training'},
+    {tag:'Tier 2 · $1K–$6K',sal:'+$10–25K',title:'Commercial Driver’s License (CDL-A)',desc:'One of the fastest documented pay jumps in logistics. Many carriers sponsor training.',roi:72,col:'cyber',url:'https://www.fmcsa.dot.gov/registration/commercial-drivers-license'},
+    {tag:'Tier 3 · $500–$3K',sal:'+$15–30K',title:'APICS CSCP / Supply Chain Certification',desc:'Moves you from floor ops into planning & management pay bands.',roi:86,col:'warn',url:'https://www.ascm.org/learning-development/certifications-credentials/cscp/'}
+  ],
+  general:[
+    {tag:'Tier 1 · Free',sal:'+$3–8K',title:'Google Project Management Certificate',desc:'Coursera, ~3–6 months, beginner-friendly. PM fundamentals transfer across nearly every industry.',roi:42,col:'mint',url:'https://www.coursera.org/professional-certificates/google-project-management'},
+    {tag:'Tier 2 · Free–$49/mo',sal:'+$8–18K',title:'Google Data Analytics Certificate',desc:'High-demand analytical skills employers screen for across operations, ops, and admin roles.',roi:66,col:'cyber',url:'https://www.coursera.org/professional-certificates/google-data-analytics'},
+    {tag:'Tier 3 · $200–$2K',sal:'+$15–30K',title:'PMP / Six Sigma Green Belt',desc:'⚠️ Employer-sponsored where possible. Recognized leadership/process credentials with strong ROI.',roi:85,col:'warn',url:'https://www.pmi.org/certifications/project-management-pmp'}
+  ]
+};
+const FIELD_RX=[
+  [/develop|engineer|programmer|software|frontend|backend|full.?stack|devops|data scientist|machine learning/i,'tech'],
+  [/market|brand|content|seo|social media|growth|communications/i,'marketing'],
+  [/sales|account exec|business development|sdr|bdr|quota|revenue/i,'sales'],
+  [/electric|plumb|hvac|weld|carpent|construct|mechanic|technician|trade|machinist|fabricat/i,'trades'],
+  [/nurse|medical|clinical|patient|healthcare|caregiver|therapist|pharmac|dental/i,'healthcare'],
+  [/logistic|warehouse|supply chain|driver|fleet|forklift|shipping|distribution|operations manager/i,'logistics']
+];
+function detectField(){
+  const hay=((resumeData.title||'')+' '+(resumeData.summary||'')+' '+(resumeData.skills||'')+' '+((resumeData.jobs||[]).map(j=>j.t+' '+(j.b||'')).join(' '))).toLowerCase();
+  for(const [rx,key] of FIELD_RX){ if(rx.test(hay)) return key; }
+  return 'general';
+}
+function renderLevelUpCourses(){
+  const wrap=document.getElementById('levelup-tracks');
+  if(!wrap) return;
+  const field=detectField();
+  const tracks=COURSE_TRACKS[field]||COURSE_TRACKS.general;
+  window._lvTracks=tracks;
+  const colMap={mint:'var(--mint)',cyber:'var(--cyber)',warn:'var(--warn)'};
+  wrap.innerHTML=tracks.map((t,i)=>{
+    const c=colMap[t.col];
+    return '<div class="tier-card fade-in-up" style="border-color:'+c.replace('var(--','rgba(').replace(')','')+';border-color:'+c+';">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'+
+      '<span class="tier-tag" style="background:'+c+'22;color:'+c+';">'+t.tag+'</span>'+
+      '<span style="font-size:12px;font-weight:800;color:'+c+';">'+t.sal+' salary</span></div>'+
+      '<div style="font-size:13px;font-weight:700;">'+t.title+'</div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;">'+t.desc+'</div>'+
+      '<div class="roi-bar"><div style="width:'+t.roi+'%;height:100%;background:'+c+';"></div></div>'+
+      '<div style="font-size:10px;color:var(--muted);margin-top:4px;">ROI strength · verified external resource</div>'+
+      '<div onclick="enrollTier('+i+')" style="margin-top:10px;background:'+c+'1f;border:1px solid '+c+'66;color:'+c+';border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">View Recommended Course ↗</div>'+
+      '</div>';
+  }).join('')+
+  '<div style="margin:0 16px 16px;padding:14px 16px;border:1px solid rgba(181,95,230,.4);border-radius:14px;background:rgba(240,238,248,.05);">'+
+  '<div style="font-size:12px;color:var(--off);line-height:1.7;">🤝 People-First Notice: GhostProofJob will never charge you additional hidden fees or upcharges for these roadmaps. We earn nothing from these recommendations — they exist entirely for your growth.</div></div>';
+  const sub=document.getElementById('lv-sub');
+  const label={tech:'software & engineering',marketing:'marketing',sales:'sales',trades:'skilled trades',healthcare:'healthcare',logistics:'logistics & supply chain',general:'your'}[field];
+  if(sub) sub.innerHTML='Matched to <strong style="color:var(--mint);">'+label+'</strong> career paths from real salary & hiring data — verified external resources, nothing we profit from.';
+}
+/* enrollTier opens the matched verified link */
+enrollTier=function(i){
+  const t=(window._lvTracks||[])[i];
+  if(t&&t.url){ window.open(t.url,'_blank','noopener'); showToast('↗ Opening '+t.title); }
+};
+
+/* ---------- RATE-EX CANCEL SAFETY (never trapped) ---------- */
+(function rateExSafety(){
+  const m=document.getElementById('rate-ex-modal');
+  if(m) m.addEventListener('click',e=>{ if(e.target===m) closeRateEx(); });
+})();
+
+/* wire identity + courses into the personalization cascade */
+const _v10Cascade=runPersonalizationCascade;
+runPersonalizationCascade=function(){ _v10Cascade(); renderSettingsIdentity(); renderLevelUpCourses(); };
+/* refresh identity whenever Settings opens */
+const _v10Switch=switchView;
+switchView=function(v,el){ _v10Switch(v,el); if(v==='account'){ renderSettingsIdentity(); renderLevelUpCourses(); } };
+/* refresh identity on auth change */
+const _v10Auth=window.gpjAuthChanged;
+window.gpjAuthChanged=function(u){ _v10Auth(u); renderSettingsIdentity(); };
+
+renderSettingsIdentity();
+renderLevelUpCourses();
 
 /* ---------- v7 INIT ---------- */
 renderGhostCompanies();
