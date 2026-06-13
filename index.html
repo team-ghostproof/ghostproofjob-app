@@ -64,6 +64,14 @@
   .ghost-glow{filter:drop-shadow(0 0 6px var(--mint));}
   .brand-text{background:linear-gradient(90deg,var(--mint),var(--cyber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
   .grace-pill{background:linear-gradient(90deg,rgba(0,245,160,.15),rgba(181,95,230,.15));border:1px solid rgba(0,245,160,.3);font-size:10px;padding:2px 8px;border-radius:999px;color:var(--mint);white-space:nowrap;}
+  .desc-clamp{max-height:76px;overflow:hidden;position:relative;font-size:12px;color:var(--off);line-height:1.6;}
+  .desc-clamp::after{content:'';position:absolute;bottom:0;left:0;right:0;height:26px;background:linear-gradient(transparent,var(--plum2));pointer-events:none;}
+  #auth-chip,#upgrade-trigger{white-space:nowrap;}
+  @media(max-width:380px){
+    #auth-chip,#upgrade-trigger{font-size:10px;padding:5px 8px;letter-spacing:-.2px;}
+    .grace-pill{font-size:9px;}
+    .brand-text{font-size:16px!important;}
+  }
   #upgrade-menu{position:absolute;top:58px;right:8px;background:var(--plum3);border:1px solid var(--plum4);border-radius:14px;padding:12px;width:220px;z-index:200;display:none;}
   #upgrade-menu.open{display:block;}
   .upgrade-btn{background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:700;border-radius:10px;padding:10px;text-align:center;font-size:13px;cursor:pointer;margin-bottom:8px;}
@@ -363,6 +371,9 @@
       <div style="font-size:17px;font-weight:700;margin-bottom:6px;padding:0 24px;">Tap Card to Deep Dive</div>
       <div style="font-size:13px;color:var(--muted);padding:0 32px;line-height:1.6;">CEO approval, company news, verified social contacts. Know before you apply.</div>
     </div>
+    <div id="tut-hotkeys" style="display:none;margin-bottom:18px;background:linear-gradient(135deg,rgba(0,245,160,.12),rgba(181,95,230,.12));border:2px solid var(--mint);border-radius:16px;padding:14px 18px;max-width:420px;box-shadow:0 0 24px rgba(0,245,160,.2);">
+      <div style="font-size:14px;font-weight:800;color:var(--mint);line-height:1.6;">⌨️ Desktop Pro-Tip: Use your <span class="key-hint">←</span> Left Arrow Key to Skip, <span class="key-hint">→</span> Right Arrow Key to Auto-Apply, and <span class="key-hint">Space</span> Spacebar to flip for Company Intel instantly!</div>
+    </div>
     <div style="display:flex;gap:6px;margin-top:24px;">
       <div style="width:20px;height:6px;border-radius:999px;background:var(--mint);" id="dot0"></div>
       <div style="width:6px;height:6px;border-radius:999px;background:var(--plum4);" id="dot1"></div>
@@ -613,6 +624,11 @@
       <div style="display:flex;gap:16px;margin-bottom:12px;">
         <div style="text-align:center;"><div style="font-size:22px;font-weight:800;" id="cm-ghost">—</div><div style="font-size:10px;color:var(--muted);">👻 Ghost Risk</div></div>
         <div style="text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--cyber);" id="cm-count">0</div><div style="font-size:10px;color:var(--muted);">Reports</div></div>
+        <div style="flex:1;min-width:0;">
+          <div id="cm-vibe-stars" onclick="openCmReviews()" class="vibe-stars" style="cursor:pointer;font-size:16px;">★★★★☆</div>
+          <div class="report-bar-bg" style="margin:4px 0 2px;"><div id="cm-vibe-bar" class="report-bar-fill" style="width:0%;background:var(--mint);"></div></div>
+          <div style="font-size:9px;color:var(--muted);">Community Vibe · tap for reviews</div>
+        </div>
       </div>
       <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Community Ghost Reports</div>
       <div style="flex:1;overflow-y:auto;min-height:60px;margin-bottom:10px;" id="cm-reports"></div>
@@ -625,6 +641,7 @@
         <div style="font-size:11px;color:var(--muted);">Rate:</div>
         <div class="star-rater" id="cm-rate" style="display:flex;gap:2px;"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></div>
       </div>
+      <div id="cm-reviews" style="display:none;max-height:170px;overflow-y:auto;margin-bottom:10px;"></div>
       <div onclick="prefillGhostReport()" style="background:rgba(181,95,230,.12);border:1px dashed rgba(181,95,230,.4);color:var(--cyber);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:700;cursor:pointer;">👻 Report this company</div>
     </div>
   </div>
@@ -679,7 +696,33 @@
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;" id="hud-tokens"></div>
     </div>
     <iframe id="sandbox-frame" src="about:blank" style="flex:1;border:none;background:#fff;" sandbox="allow-scripts allow-forms allow-same-origin allow-popups"></iframe>
+    <div id="sandbox-warn" style="display:none;background:rgba(255,179,71,.95);padding:10px 12px;flex-shrink:0;align-items:center;gap:10px;">
+      <div style="flex:1;font-size:11px;font-weight:700;color:var(--plum);line-height:1.4;">⚠️ This employer blocks embedding (security challenge / cross-origin). Your tokens still work — finish in a real tab:</div>
+      <div onclick="sandboxNewTab()" style="background:var(--plum);color:var(--mint);font-size:11px;font-weight:800;border-radius:8px;padding:6px 12px;cursor:pointer;white-space:nowrap;">Open in New Tab ↗</div>
+      <div onclick="this.parentElement.style.display='none'" style="color:var(--plum);font-weight:800;cursor:pointer;padding:0 4px;">✕</div>
+    </div>
     <div id="sandbox-note" style="background:var(--plum2);padding:8px 12px;font-size:10px;color:var(--muted);flex-shrink:0;text-align:center;">If this page stays blank, the employer blocks embedding — use "Open in New Tab ↗" above. Your copy-tokens work either way.</div>
+  </div>
+
+  <!-- ===== MATCH INSIGHT MODAL ===== -->
+  <div class="modal-scrim" id="match-modal" style="z-index:335;">
+    <div class="modal-box" style="text-align:left;">
+      <div style="display:flex;align-items:center;margin-bottom:4px;"><div style="font-size:15px;font-weight:800;flex:1;" id="mi-title">🎯 Why this match</div><div onclick="document.getElementById('match-modal').classList.remove('open')" style="color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;">✕</div></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;" id="mi-sub"></div>
+      <div style="font-size:11px;font-weight:700;color:var(--mint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">✅ Your matching strengths</div>
+      <div id="mi-have" style="margin-bottom:12px;"></div>
+      <div style="font-size:11px;font-weight:700;color:var(--warn);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">🎯 Add these to raise it</div>
+      <div id="mi-miss" style="margin-bottom:6px;"></div>
+    </div>
+  </div>
+
+  <!-- ===== LOCATION MISMATCH RESOLVER CAPSULE ===== -->
+  <div id="loc-capsule" style="display:none;position:absolute;bottom:84px;left:12px;right:12px;z-index:250;background:var(--plum3);border:2px solid var(--mint);border-radius:16px;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,.55);">
+    <div style="font-size:12px;color:var(--off);line-height:1.5;margin-bottom:8px;" id="loc-capsule-text">📍 We see you're linked to two cities. Tap your target city to instantly focus your swipe deck!</div>
+    <div style="display:flex;gap:8px;">
+      <div id="loc-cap-a" onclick="pickDeckCity(this)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.45);color:var(--mint);border-radius:10px;padding:10px;text-align:center;font-size:13px;font-weight:800;cursor:pointer;"></div>
+      <div id="loc-cap-b" onclick="pickDeckCity(this)" style="flex:1;background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:10px;padding:10px;text-align:center;font-size:13px;font-weight:800;cursor:pointer;"></div>
+    </div>
   </div>
 
   <!-- ===== DEBUG CONSOLE (?debug=true) ===== -->
@@ -725,8 +768,14 @@
             <option value="az">Company A → Z</option>
           </select>
           <div id="sw-hide-ghost" onclick="this.classList.toggle('on');applySwipeFilters()" class="quick-chip" style="font-size:11px;font-weight:700;margin:0;">🚫👻 Hide Likely Ghosters</div>
+          <div id="deck-loc-pill" onclick="deckLocToggle()" class="quick-chip" style="font-size:11px;font-weight:700;margin:0;border-color:rgba(0,245,160,.45);color:var(--mint);">📍 Set location</div>
+        </div>
+        <div id="deck-loc-row" style="display:none;gap:8px;margin-top:8px;">
+          <input class="field-input" id="deck-loc-input" placeholder="City or 5-digit ZIP — rebuilds your deck" style="flex:1;font-size:12px;" onkeydown="if(event.key==='Enter')deckLocApply()"/>
+          <div onclick="deckLocApply()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:9px 14px;font-size:12px;cursor:pointer;flex-shrink:0;">Go</div>
         </div>
         <div style="font-size:10px;color:var(--muted);margin-top:6px;" id="sw-filter-count">Showing demo deck</div>
+        <div id="trend-badge" style="margin-top:8px;background:rgba(255,179,71,.1);border:1px solid rgba(255,179,71,.4);border-radius:10px;padding:8px 10px;font-size:11px;color:var(--warn);line-height:1.5;cursor:pointer;" onclick="switchView('resume',document.querySelector('[data-view=resume]'))">🔥 Trending positions active. Upload your resume in the next tab to instantly calibrate this deck to match your unique background and skill targets!</div>
       </div>
 
       <!-- ===== APPENDED: DAILY ENERGY METER (insert directly above #card-deck) ===== -->
@@ -747,14 +796,14 @@
             <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
               <span class="salary-badge s-salary">$145K – $175K</span><span class="location-badge s-loc">📍 Remote</span>
               <span class="location-badge s-ghost" style="display:none;">👻</span>
-              <span class="match-badge match-pct" style="display:none;">🎯 61% Match</span>
+              <span class="match-badge match-pct" onclick="cardMatchInsight(event)" style="display:none;cursor:pointer;">🎯 61% Match</span>
             </div>
           </div>
           <div class="card-body">
             <div class="green-flag">🟢 <strong>Green Flag</strong> — Actively hiring now</div>
             <div class="red-flag">🔴 <strong>Red Flag</strong> — Ghosting data loading…</div>
             <div onclick="copyOptCard(event)" style="margin-top:8px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Optimize Cover Letter</div>
-            <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;padding-bottom:4px;">👆 Tap to see company intel</div>
+            <div class="tap-hint" style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;padding-bottom:4px;">👆 Tap to see company intel</div>
           </div>
         </div>
         <div id="job-card-1" class="job-card mid">
@@ -767,14 +816,14 @@
             <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
               <span class="salary-badge s-salary">$190K – $240K</span><span class="location-badge s-loc">📍 Hybrid</span>
               <span class="location-badge s-ghost" style="display:none;">👻</span>
-              <span class="match-badge match-pct" style="display:none;">🎯 82% Match</span>
+              <span class="match-badge match-pct" onclick="cardMatchInsight(event)" style="display:none;cursor:pointer;">🎯 82% Match</span>
             </div>
           </div>
           <div class="card-body">
             <div class="green-flag">🟢 <strong>Green Flag</strong> — Actively hiring now</div>
             <div class="red-flag">🔴 <strong>Red Flag</strong> — Ghosting data loading…</div>
             <div onclick="copyOptCard(event)" style="margin-top:8px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Optimize Cover Letter</div>
-            <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;padding-bottom:4px;">👆 Tap to see company intel</div>
+            <div class="tap-hint" style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;padding-bottom:4px;">👆 Tap to see company intel</div>
           </div>
         </div>
         <div id="job-card-0" class="job-card top" onclick="toggleDrawer(event)">
@@ -787,17 +836,18 @@
             <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
               <span class="salary-badge s-salary">$185K – $225K ✓</span><span class="location-badge s-loc">📍 Remote / Hybrid</span>
               <span class="location-badge s-ghost" style="display:none;">👻</span>
-              <span class="match-badge match-pct" style="display:none;">🎯 91% Match</span>
+              <span class="match-badge match-pct" onclick="cardMatchInsight(event)" style="display:none;cursor:pointer;">🎯 91% Match</span>
             </div>
           </div>
           <div class="card-body">
             <div class="green-flag">🟢 <strong>Green Flag</strong> — 4-day work week · Unlimited PTO · $5K L&D budget</div>
             <div class="red-flag">🔴 <strong>Red Flag</strong> — 74% Ghosting Risk after Interview Round 2</div>
             <div onclick="copyOptCard(event)" style="margin-top:8px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Optimize Cover Letter</div>
-            <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;padding-bottom:4px;">👆 Tap to see company intel</div>
+            <div class="tap-hint" style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;padding-bottom:4px;">👆 Tap to see company intel</div>
           </div>
           <div class="card-drawer" id="card-drawer">
             <div class="drawer-inner">
+              <div id="drawer-summary" style="display:none;margin-bottom:12px;"></div>
               <div style="display:flex;gap:16px;margin-bottom:12px;">
                 <div style="text-align:center;"><div style="font-size:20px;font-weight:800;color:var(--mint);">78%</div><div style="font-size:10px;color:var(--muted);">CEO Approval</div></div>
                 <div style="text-align:center;"><div style="font-size:20px;font-weight:800;color:var(--cyber);">4.2★</div><div style="font-size:10px;color:var(--muted);">Indeed Rating</div></div>
@@ -839,7 +889,8 @@
         <input class="field-input" id="f-keyword" placeholder="e.g. Engineer, Designer…" oninput="renderBrowse();queueLiveFetch()" style="margin-bottom:10px;"/>
         <div class="field-label">📡 Region / Location <span style="text-transform:none;font-weight:400;color:var(--mint);">(city, state, or 5-digit ZIP — triggers live feed)</span></div>
         <div style="display:flex;gap:8px;margin-bottom:10px;">
-          <select class="field-input" id="f-country" onchange="queueLiveFetch()" style="width:96px;flex-shrink:0;font-size:13px;">
+          <img id="f-flag" src="https://flagcdn.com/24x18/us.png" alt="" style="width:24px;height:18px;border-radius:3px;flex-shrink:0;align-self:center;"/>
+          <select class="field-input" id="f-country" onchange="updateFlag();queueLiveFetch()" style="width:88px;flex-shrink:0;font-size:13px;">
             <option value="us" selected>🇺🇸 US</option><option value="ca">🇨🇦 CA</option><option value="mx">🇲🇽 MX</option><option value="gb">🇬🇧 GB</option><option value="au">🇦🇺 AU</option><option value="nz">🇳🇿 NZ</option><option value="in">🇮🇳 IN</option><option value="sg">🇸🇬 SG</option><option value="za">🇿🇦 ZA</option><option value="de">🇩🇪 DE</option><option value="fr">🇫🇷 FR</option><option value="it">🇮🇹 IT</option><option value="es">🇪🇸 ES</option><option value="nl">🇳🇱 NL</option><option value="be">🇧🇪 BE</option><option value="at">🇦🇹 AT</option><option value="pl">🇵🇱 PL</option><option value="ch">🇨🇭 CH</option><option value="br">🇧🇷 BR</option>
           </select>
           <input class="field-input" id="f-location" placeholder="Houston, 77002, London, Sydney…" oninput="queueLiveFetch()" style="flex:1;"/>
@@ -1109,7 +1160,7 @@
         <div id="sec-levelup" style="display:none;">
         <div style="padding:4px 16px 8px;">
           <div style="font-size:15px;font-weight:800;">🚀 Level Up Your Salary</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.6;">Picked purely from salary & hiring data to raise <em>your</em> odds. These roadmaps exist for your growth — nothing else.</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.6;" id="lv-sub">Picked purely from salary & hiring data to raise <em>your</em> odds. These roadmaps exist for your growth — nothing else.</div>
         </div>
 
         <div class="tier-card fade-in-up" style="border-color:rgba(0,245,160,.3);">
@@ -1432,10 +1483,17 @@ function closeOnboard(dest){
   try{localStorage.setItem('ngj_returning','1');}catch(e){}
   startTutorial();
 }
+function showAuthModal(mode){
+  const t=document.getElementById('auth-title');
+  if(t) t.textContent=mode==='login'?'Welcome back — log in':'Create your account';
+  document.getElementById('auth-modal').classList.add('open');
+}
 function skipToApp(){
   document.getElementById('onboard-modal').classList.remove('open');
   try{localStorage.setItem('ngj_returning','1');}catch(e){}
-  showToast('👻 Welcome back. Happy hunting!');
+  /* AUTH GATE: returning users authenticate before the dashboard initializes */
+  if(window.fb&&fb.current()){ showToast('👻 Welcome back. Happy hunting!'); return; }
+  showAuthModal('login');
 }
 /* Returning users skip the intro entirely */
 try{
@@ -1449,6 +1507,9 @@ let tutStep=0, tutTimers=[];
 const tutSteps=['tut1','tut2','tut3'], dots=['dot0','dot1','dot2'];
 function startTutorial(){
   document.getElementById('tutorial').style.display='flex';
+  /* desktop hotkey compliance card (≥1024px only) */
+  const hk=document.getElementById('tut-hotkeys');
+  if(hk&&window.innerWidth>=1024) hk.style.display='block';
   tutTimers=[setTimeout(advanceTut,2800),setTimeout(advanceTut,5600)];
 }
 function advanceTut(){
@@ -1639,7 +1700,7 @@ function renderBrowse(){
           '<div style="font-size:13px;font-weight:700;">'+j.t+'</div>'+
           '<div style="font-size:11px;color:var(--muted);">'+j.co+' · '+j.loc+(j.posting_age_days!==null?(' · '+j.posting_age_days+'d old'):'')+(j.stale?' · <span style="color:var(--danger);">stale ⚠️</span>':'')+'</div>'+
           '<div style="font-size:11px;color:var(--mint);margin-top:2px;">'+j.sal+'</div></div>'+
-          '<div style="text-align:right;flex-shrink:0;">'+(j.match?('<div style="font-size:14px;font-weight:800;color:var(--mint);">'+j.match+'%</div><div style="font-size:9px;color:var(--muted);">match</div>'):'')+
+          '<div style="text-align:right;flex-shrink:0;">'+(j.match?('<div onclick="liveMatchInsight('+i+',event)" style="font-size:14px;font-weight:800;color:var(--mint);cursor:pointer;text-decoration:underline;text-decoration-color:rgba(181,95,230,.35);">'+j.match+'%</div><div style="font-size:9px;color:var(--muted);">match</div>'):'')+
           '<div style="font-size:10px;font-weight:700;color:'+gc+';margin-top:3px;">👻 '+j.ghost+'%</div>'+
           '<div onclick="copyOptLive('+i+',event)" title="Optimize Cover Letter" style="margin-top:5px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:8px;padding:3px 8px;font-size:10px;font-weight:800;cursor:pointer;">✨ Optimize</div></div></div>';
       }).join('')+
@@ -1683,7 +1744,7 @@ function renderBrowse(){
         <div style="font-size:11px;color:var(--mint);margin-top:2px;">${j.wage?j.wage:'$'+j.min+'K–$'+j.max+'K'}</div>
       </div>
       <div style="text-align:right;flex-shrink:0;">
-        <div style="font-size:14px;font-weight:800;color:${mc};">${j.match}%</div>
+        <div onclick="openMatchInsight('${j.t.replace(/'/g,"\\'")}',${j.match},event)" style="font-size:14px;font-weight:800;color:${mc};cursor:pointer;text-decoration:underline;text-decoration-color:rgba(181,95,230,.35);">${j.match}%</div>
         <div style="font-size:9px;color:var(--muted);">match</div>
         <div style="font-size:10px;font-weight:700;color:${gc};margin-top:3px;">👻 ${j.ghost}%</div>
         <div onclick="copyOptBrowse(${browseJobs.indexOf(j)},event)" title="Optimize Cover Letter" style="margin-top:5px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:8px;padding:3px 8px;font-size:10px;font-weight:800;cursor:pointer;">✨ Optimize</div>
@@ -2437,9 +2498,16 @@ function queueLiveFetch(){
 }
 
 async function fetchLiveMarketJobs(){
-  const what=(document.getElementById('f-keyword')?document.getElementById('f-keyword').value:'').trim();
-  const where=(document.getElementById('f-location')?document.getElementById('f-location').value:'').trim();
-  if(!where && !what) return;
+  let what=(document.getElementById('f-keyword')?document.getElementById('f-keyword').value:'').trim();
+  let where=(document.getElementById('f-location')?document.getElementById('f-location').value:'').trim();
+  if(!where && !what){
+    /* REWRITE FOR THE PEOPLE: blank search -> industry category + home city feed */
+    const ind=(document.getElementById('f-industry')||{}).value||'';
+    let homeLoc=''; try{ homeLoc=localStorage.getItem('gpj_loc')||''; }catch(e){}
+    if(!ind && !homeLoc) return;
+    what=ind; where=homeLoc;
+    dbg('blank search -> industry/home feed: '+(ind||'all')+' @ '+(homeLoc||'nationwide'));
+  }
   const status=document.getElementById('desk-feed-status');
   if(status) status.textContent='📡 Fetching live openings'+(where?' near '+where:'')+'…';
   showToast('📡 Pulling live market jobs…');
@@ -2488,6 +2556,7 @@ async function fetchLiveMarketJobs(){
       salMax:r.salary_max||r.salary_min||0,
       loc:(typeof r.location==='string'?r.location:(r.location&&r.location.display_name))||where||'See posting',
       url:r.redirect_url||'',
+      desc:(r.description||'').replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,460),
       ghost:ghostRiskFor((typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'x'),
       match:resumeReady?60+(hashStr(r.title||'')%36):null,
       posting_age_days:r.created?Math.max(0,Math.floor((Date.now()-new Date(r.created).getTime())/86400000)):null,
@@ -2521,6 +2590,8 @@ function fillSlot(cardEl, job){
   set('s-sub',job.co+' · '+job.loc);
   set('s-salary',job.sal);
   set('s-loc','📍 '+(job.loc.length>22?job.loc.slice(0,20)+'…':job.loc));
+  cardEl.dataset.joburl=job.url||'';
+  cardEl.dataset.jobdesc=job.desc||'';
   /* at-a-glance ghost badge */
   const gb=cardEl.querySelector('.s-ghost');
   if(gb){
@@ -2574,7 +2645,7 @@ document.addEventListener('keydown',e=>{
   if(!document.getElementById('view-swipe').classList.contains('active')) return;
   if(e.key==='ArrowLeft'){ e.preventDefault(); swipeCard('left'); }
   else if(e.key==='ArrowRight'){ e.preventDefault(); swipeCard('right'); }
-  else if(e.key==='Enter'){ const d=document.getElementById('card-drawer'); if(d) d.classList.toggle('open'); }
+  else if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggleDrawer(); }
 });
 
 /* ---------- 120-DAY LIMIT CLAMP ---------- */
@@ -2755,7 +2826,14 @@ function applyRealParse(text){
   /* ZIP MATRIX: lift the candidate's own "City, ST" (or 5-digit zip) from the resume
      and pre-populate Browse + the live deck before they've ever searched */
   try{
-    if(!localStorage.getItem('gpj_loc')){
+    const _savedLoc=localStorage.getItem('gpj_loc')||'';
+    if(_savedLoc){
+      const cl2=lines.find(l=>/^[^,]{0,40}\b[A-Z][a-zA-Z]+(?:[ ][A-Z][a-zA-Z]+)?,[ ]?[A-Z]{2}\b/.test(l)&&l.length<70)||'';
+      const ch2=(cl2.match(/\b([A-Z][a-zA-Z]+(?:[ ][A-Z][a-zA-Z]+)?),[ ]?([A-Z]{2})\b/)||[]);
+      const resumeLoc=ch2[1]?(ch2[1]+', '+ch2[2]):'';
+      if(resumeLoc&&resumeLoc.toLowerCase()!==_savedLoc.toLowerCase()){ showLocCapsule(_savedLoc,resumeLoc); }
+    }
+    if(!_savedLoc){
       const cityLine=lines.find(l=>/^[^,]{0,40}\b[A-Z][a-zA-Z]+(?:[ ][A-Z][a-zA-Z]+)?,[ ]?[A-Z]{2}\b/.test(l)&&l.length<70)||'';
       const cityHit=(cityLine.match(/\b([A-Z][a-zA-Z]+(?:[ ][A-Z][a-zA-Z]+)?),[ ]?([A-Z]{2})\b/)||[]);
       const zipHit=(text.match(/\b\d{5}\b/)||[])[0];
@@ -2872,6 +2950,18 @@ function companyLinks(co){
 function hydrateDrawer(){
   const topCard=document.querySelector('.job-card.top');
   if(!topCard) return;
+  /* ENHANCED EXPANDED VIEW: Job Expectations & Summary + raw redirect link */
+  const sumBox=document.getElementById('drawer-summary');
+  if(sumBox){
+    const d=topCard.dataset.jobdesc||'', u=topCard.dataset.joburl||'';
+    if(d||u){
+      sumBox.innerHTML=
+        '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📋 Job Expectations & Summary</div>'+
+        (d?('<div class="desc-clamp">'+d.replace(/</g,'&lt;')+'</div>'):'<div style="font-size:11px;color:var(--muted);">Full details live on the original posting.</div>')+
+        (u?('<div onclick="event.stopPropagation();window.open(\''+u.replace(/'/g,'')+'\',\'_blank\',\'noopener\')" style="margin-top:10px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:10px;text-align:center;font-size:12px;cursor:pointer;">View Full Posting ↗</div>'):'');
+      sumBox.style.display='block';
+    } else sumBox.style.display='none';
+  }
   const co=(topCard.querySelector('.s-sub')?topCard.querySelector('.s-sub').textContent.split(' · ')[0]:'') || 'this company';
   const L=companyLinks(co);
   const news=document.getElementById('drawer-news');
@@ -3278,6 +3368,10 @@ toggleDrawer=function(e){
     top.appendChild(drawer);
   }
   _diagToggleDrawer(e);
+  if(top){
+    const hint=top.querySelector('.tap-hint');
+    if(hint&&drawer) hint.style.display=drawer.classList.contains('open')?'none':'';
+  }
 };
 
 /* FIX 3: cover-letter offer no longer stacks on top of the daily-cap modals */
@@ -3802,9 +3896,15 @@ function openSandbox(url,title,co){
   document.getElementById('hud-tokens').innerHTML=toks.join('');
   document.getElementById('sandbox-frame').src=sandboxUrl;
   document.getElementById('apply-sandbox').style.display='flex';
+  /* CHALLENGE INTERCEPTOR: cross-origin walls are invisible to JS, so after a
+     short grace period we surface the explicit fallback header automatically */
+  const warn=document.getElementById('sandbox-warn');
+  if(warn){ warn.style.display='none'; clearTimeout(window._sbWarnT); window._sbWarnT=setTimeout(()=>{ warn.style.display='flex'; },4000); }
   dbg('sandbox open: '+sandboxUrl.slice(0,80));
 }
 function closeSandbox(){
+  clearTimeout(window._sbWarnT);
+  const w=document.getElementById('sandbox-warn'); if(w) w.style.display='none';
   document.getElementById('apply-sandbox').style.display='none';
   document.getElementById('sandbox-frame').src='about:blank';
 }
@@ -3831,14 +3931,26 @@ function buildOptSummary(t,co){
   const win=(me.jobs&&me.jobs[0]&&me.jobs[0].b)||'a record of measurable wins';
   return 'Results-driven '+(me.title||'professional')+' targeting '+t+' at '+co+'. Core strengths: '+(skills||'adaptability, ownership, communication')+'. Recent impact: '+win+'.';
 }
-function copyOptBrowse(i,ev){ if(ev)ev.stopPropagation(); const j=browseJobs[i]; copyOpt(buildOptSummary(j.t,j.co)); }
-function copyOptLive(i,ev){ if(ev)ev.stopPropagation(); const j=liveJobs[i]; if(j) copyOpt(buildOptSummary(j.t,j.co)); }
+function copyTailoredLetter(t,co){
+  /* full letter when a resume exists (quota-aware); buzzword summary fallback otherwise */
+  if(resumeReady){
+    if(!isPaid()&&clUsed()>=10){ document.getElementById('cl-limit-modal').classList.add('open'); return; }
+    try{localStorage.setItem(clKey(),String(clUsed()+1));}catch(e){}
+    const letter=buildLetterText({title:t,co:co,external:true});
+    navigator.clipboard.writeText(letter).then(()=>showToast('📋 Tailored cover letter for '+co+' copied!')).catch(()=>showToast('Copy blocked by browser — long-press to copy'));
+    dbg('tailored letter copied: '+t+' @ '+co);
+  } else {
+    copyOpt(buildOptSummary(t,co));
+  }
+}
+function copyOptBrowse(i,ev){ if(ev)ev.stopPropagation(); const j=browseJobs[i]; copyTailoredLetter(j.t,j.co); }
+function copyOptLive(i,ev){ if(ev)ev.stopPropagation(); const j=liveJobs[i]; if(j) copyTailoredLetter(j.t,j.co); }
 function copyOptCard(ev){
   if(ev)ev.stopPropagation();
   const top=document.querySelector('.job-card.top');
   const t=top?top.querySelector('.s-title').textContent:'this role';
   const co=top?(top.querySelector('.s-sub').textContent.split(' · ')[0]):'the company';
-  copyOpt(buildOptSummary(t,co));
+  copyTailoredLetter(t,co);
 }
 function copyOpt(txt){
   navigator.clipboard.writeText(txt).then(()=>showToast('✨ Optimized summary copied — paste anywhere')).catch(()=>showToast('Copy blocked by browser — long-press to copy'));
@@ -4205,7 +4317,8 @@ renderGhostCompanies=function(){
    deep-links straight into each section. */
 let isAdmin=false;
 function adminCheck(user){
-  isAdmin=!!(user&&(user.email||'').toLowerCase()==='asosa@ghostproofjob.com');
+  const MASTER_EMAILS=['asosa@ghostproofjob.com','ksosa@ghostproofjob.com'];
+  isAdmin=!!(user&&MASTER_EMAILS.includes((user.email||'').toLowerCase()));
   if(isAdmin){ try{localStorage.setItem('gpj_owner','1');}catch(e){} renderAdminPanel(); }
 }
 function renderAdminPanel(){
@@ -4215,7 +4328,7 @@ function renderAdminPanel(){
   let bugs=[]; try{ bugs=consoleTrail.slice(-5); }catch(e){}
   const reps=Object.keys(ghostReports).map(co=>co+' ('+ghostReports[co].length+')').join(' · ')||'none filed on this device yet';
   host.insertAdjacentHTML('afterbegin',
-    '<div class="pref-section" id="admin-panel" style="margin-top:4px;"><div class="pref-section-title" style="color:var(--mint);">👑 Master Admin — asosa@ghostproofjob.com</div>'+
+    '<div class="pref-section" id="admin-panel" style="margin-top:4px;"><div class="pref-section-title" style="color:var(--mint);">👑 Master Admin Portal</div>'+
     '<div class="pref-row" style="flex-direction:column;align-items:stretch;gap:8px;">'+
     '<div style="font-size:12px;line-height:1.8;">This device — Applied: <strong style="color:var(--mint);">'+lists.applied.length+'</strong> · Responses: <strong style="color:var(--cyber);">'+(lists.responses||[]).length+'</strong> · Letters today: <strong>'+clUsed()+'</strong> · Tier: <strong>'+userTier()+'</strong></div>'+
     '<div style="font-size:11px;color:var(--muted);line-height:1.7;">👻 Ghost reports (this device): '+reps+'</div>'+
@@ -4231,6 +4344,191 @@ function renderAdminPanel(){
 }
 const _adminAuthChanged=window.gpjAuthChanged;
 window.gpjAuthChanged=function(u){ _adminAuthChanged(u); adminCheck(u); };
+
+/* ============================================================
+   APPENDED BLOCK: PLATFORM SYSTEMS v9
+   location capsules · match insights · drawer reviews ·
+   flag CDN · trending badge · course realignment
+   ============================================================ */
+
+/* ---------- SWIPE-PAGE LOCATION CAPSULE CONTROLLER ---------- */
+function deckLocToggle(){
+  const r=document.getElementById('deck-loc-row');
+  if(!r) return;
+  r.style.display=r.style.display==='none'?'flex':'none';
+  if(r.style.display==='flex'){ const i=document.getElementById('deck-loc-input'); if(i) i.focus(); }
+}
+function deckLocApply(){
+  const v=(document.getElementById('deck-loc-input')||{}).value||'';
+  if(!v.trim()){ showToast('Type a city or 5-digit ZIP first'); return; }
+  try{ localStorage.setItem('gpj_loc',v.trim()); }catch(e){}
+  const f=document.getElementById('f-location'); if(f) f.value=v.trim();
+  livePage=1;
+  fetchLiveMarketJobs();
+  document.getElementById('deck-loc-row').style.display='none';
+  updateDeckLocPill();
+  showToast('📍 Rebuilding your deck around '+v.trim()+'…');
+  dbg('deck location capsule → '+v.trim());
+}
+function updateDeckLocPill(){
+  const p=document.getElementById('deck-loc-pill');
+  if(!p) return;
+  let L=''; try{ L=localStorage.getItem('gpj_loc')||''; }catch(e){}
+  p.textContent='📍 '+(L?(L.length>16?L.slice(0,14)+'…':L):'Set location');
+}
+updateDeckLocPill();
+
+/* ---------- LOCATION MISMATCH RESOLVER ---------- */
+function showLocCapsule(cityA,cityB){
+  const cap=document.getElementById('loc-capsule');
+  if(!cap) return;
+  document.getElementById('loc-capsule-text').innerHTML='📍 We see you\u2019re linked to <strong style="color:var(--mint);">'+cityA+'</strong> & <strong style="color:var(--cyber);">'+cityB+'</strong>. Tap your target city to instantly focus your swipe deck!';
+  document.getElementById('loc-cap-a').textContent=cityA;
+  document.getElementById('loc-cap-b').textContent=cityB;
+  cap.style.display='block';
+  dbg('location mismatch: '+cityA+' vs '+cityB);
+}
+function pickDeckCity(el){
+  const v=el.textContent.trim();
+  try{ localStorage.setItem('gpj_loc',v); }catch(e){}
+  const f=document.getElementById('f-location'); if(f) f.value=v;
+  document.getElementById('loc-capsule').style.display='none';
+  livePage=1;
+  fetchLiveMarketJobs();
+  updateDeckLocPill();
+  showToast('📍 Deck focused on '+v);
+}
+
+/* ---------- MATCH INSIGHT DRAWER (why this %) ---------- */
+const MISS_MAP=[
+  [/senior|staff|lead|principal/i,'Leadership & mentorship examples with team size'],
+  [/engineer|developer/i,'System-design or architecture keywords'],
+  [/manager|director|supervisor/i,'Team size, budget, or P&L ownership numbers'],
+  [/sales|account/i,'Quota attainment % and revenue figures'],
+  [/market/i,'Campaign ROI, audience growth, or conversion metrics'],
+  [/nurse|medical|health/i,'Certifications (BLS/ACLS) and patient-volume context'],
+  [/teacher|instructor/i,'Class sizes, outcomes, and curriculum keywords'],
+  [/driver|warehouse|logistics/i,'Safety record, volume handled, certifications (CDL/forklift)'],
+  [/design/i,'Portfolio link and measurable design-impact metrics']
+];
+function openMatchInsight(title,pct,ev){
+  if(ev) ev.stopPropagation();
+  document.getElementById('mi-title').textContent='🎯 '+(pct?pct+'% match':'Match insight')+' — '+(title.length>26?title.slice(0,24)+'…':title);
+  const have=document.getElementById('mi-have'), miss=document.getElementById('mi-miss'), sub=document.getElementById('mi-sub');
+  if(!resumeReady){
+    sub.textContent='This score is a market estimate. Upload your resume and it recalibrates to your real skills.';
+    have.innerHTML='<div style="font-size:12px;color:var(--muted);">No resume on file yet — strengths appear here after upload.</div>';
+    miss.innerHTML='<div onclick="document.getElementById(\'match-modal\').classList.remove(\'open\');switchView(\'resume\',document.querySelector(\'[data-view=resume]\'))" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:11px;font-size:13px;cursor:pointer;text-align:center;">📤 Upload Resume to Calibrate</div>';
+  } else {
+    sub.textContent='Computed from your parsed skills vs. this posting\u2019s title & requirements profile.';
+    const skills=(resumeData.skills||'').split(' · ').filter(Boolean);
+    const tw=title.toLowerCase();
+    const ranked=skills.slice().sort((a,b)=>(tw.includes(b.toLowerCase().split(' ')[0])?1:0)-(tw.includes(a.toLowerCase().split(' ')[0])?1:0));
+    have.innerHTML=ranked.slice(0,6).map(s=>'<span class="skill-chip">'+s+'</span>').join('')||'<div style="font-size:12px;color:var(--muted);">Add skills in the Resume tab to see overlaps.</div>';
+    const gaps=MISS_MAP.filter(([rx])=>rx.test(title)).map(([,g])=>g);
+    if(!gaps.length) gaps.push('Quantified outcomes (%, $, headcount) on your top bullets');
+    miss.innerHTML=gaps.slice(0,3).map(g=>'<div style="font-size:12px;color:var(--off);background:rgba(255,179,71,.08);border-left:3px solid var(--warn);border-radius:0 8px 8px 0;padding:8px 10px;margin-bottom:6px;line-height:1.5;">'+g+'</div>').join('');
+  }
+  document.getElementById('match-modal').classList.add('open');
+  dbg('match insight: '+title);
+}
+function cardMatchInsight(ev){
+  if(ev) ev.stopPropagation();
+  const top=document.querySelector('.job-card.top');
+  const t=top?top.querySelector('.s-title').textContent:'this role';
+  const badge=ev&&ev.target?ev.target.textContent:'';
+  const pct=parseInt((badge.match(/(\d+)%/)||[])[1]||'0',10);
+  openMatchInsight(t,pct);
+}
+function liveMatchInsight(i,ev){
+  if(ev) ev.stopPropagation();
+  const j=liveJobs[i];
+  if(j) openMatchInsight(j.t,j.match||0);
+}
+
+/* ---------- DRAWER REVIEWS (community + public-sentiment samples) ---------- */
+const REVIEW_BANK={
+  'Amazon':[{s:'−',t:'4 interview loops then total silence — recruiter vanished post-Round 2.'},{s:'+',t:'Fast initial screen; recruiters respond quickly early in the funnel.'},{s:'−',t:'Automated rejections months after applying.'}],
+  'Meta':[{s:'−',t:'Verbal offer discussed, then three weeks of silence.'},{s:'+',t:'Interviewers were well-prepared and on time.'}],
+  'Stripe':[{s:'+',t:'Replied within 48h at every stage — rare and appreciated.'},{s:'+',t:'Clear timelines, human follow-ups even on rejection.'}],
+  'IBM':[{s:'+',t:'Structured process with clear stage expectations.'},{s:'−',t:'Slow between rounds — expect 2–3 week gaps.'},{s:'+',t:'Recruiters honest about timeline slips.'}],
+  'Google':[{s:'+',t:'Recruiters communicative through the whole loop.'},{s:'−',t:'Hiring-committee stage can stall for weeks unannounced.'}]
+};
+function fillCmReviews(co){
+  const box=document.getElementById('cm-reviews');
+  if(!box) return;
+  const mine=(ghostReports[co]||[]).slice(-5).map(r=>({s:'−',t:r.comment||r.stage,when:r.when}));
+  const bank=REVIEW_BANK[co]||[{s:'+',t:'No public sentiment collected yet — community reports will appear here as they\u2019re filed.'}];
+  const rows=[...mine,...bank].slice(0,10);
+  box.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">💬 Recent community & public sentiment</div>'+
+    rows.map(r=>'<div style="background:var(--plum3);border-left:3px solid '+(r.s==='+'?'var(--mint)':'var(--danger)')+';border-radius:0 10px 10px 0;padding:8px 10px;margin-bottom:6px;"><div style="font-size:12px;color:var(--off);line-height:1.5;">'+(r.s==='+'?'🟢 ':'🔴 ')+String(r.t).replace(/</g,'&lt;')+'</div>'+(r.when?('<div style="font-size:10px;color:var(--muted);margin-top:3px;">'+fmtAgo(r.when)+' · community report</div>'):'')+'</div>').join('');
+}
+function cmVibeScore(co){
+  let saved=0; try{ saved=(JSON.parse(localStorage.getItem('gpj_corate')||'{}'))[co]||0; }catch(e){}
+  if(saved) return saved;
+  return Math.max(2.4,Math.min(4.8,4.9-(ghostRiskFor(co)/30)));
+}
+function renderCmVibe(co){
+  const v=cmVibeScore(co);
+  const stars=document.getElementById('cm-vibe-stars');
+  const bar=document.getElementById('cm-vibe-bar');
+  if(stars){ const fl=Math.round(v); stars.textContent='★'.repeat(fl)+'☆'.repeat(5-fl); }
+  if(bar){ bar.style.width=Math.round((v/5)*100)+'%'; bar.style.background=v>=4?'var(--mint)':(v>=3?'var(--warn)':'var(--danger)'); }
+}
+function openCmReviews(){
+  const co=document.getElementById('cm-name').textContent;
+  const box=document.getElementById('cm-reviews');
+  if(!box) return;
+  if(box.style.display==='none'){ fillCmReviews(co); box.style.display='block'; }
+  else box.style.display='none';
+}
+/* tapping the drawer star cluster also opens reviews */
+const _v9BindCmRate=bindCmRate;
+bindCmRate=function(co){
+  _v9BindCmRate(co);
+  const r=document.getElementById('cm-rate');
+  if(r&&!r.dataset.revB){
+    r.dataset.revB='1';
+    [...r.children].forEach(s=>{
+      const orig=s.onclick;
+      s.onclick=function(e){ if(orig)orig.call(this,e); const b=document.getElementById('cm-reviews'); if(b&&b.style.display==='none') openCmReviews(); };
+    });
+  }
+  const links=document.getElementById('cm-links');
+  if(links&&!links.querySelector('.cm-rev-btn')){
+    links.insertAdjacentHTML('beforeend','<div class="buzz-add cm-rev-btn" onclick="openCmReviews()">Reviews</div>');
+  }
+  /* unified drawer: reviews matrix + vibe meter render expanded on open */
+  fillCmReviews(co);
+  const box=document.getElementById('cm-reviews');
+  if(box) box.style.display='block';
+  renderCmVibe(co);
+};
+
+/* ---------- CDN FLAG RENDERER ---------- */
+function updateFlag(){
+  const sel=document.getElementById('f-country');
+  const img=document.getElementById('f-flag');
+  if(sel&&img) img.src='https://flagcdn.com/24x18/'+sel.value+'.png';
+}
+updateFlag();
+
+/* ---------- TRENDING BADGE: hides once the deck is calibrated ---------- */
+function updateTrendBadge(){
+  const b=document.getElementById('trend-badge');
+  if(b) b.style.display=(resumeReady||profileComplete())?'none':'';
+}
+updateTrendBadge();
+
+/* ---------- COURSE REALIGNMENT: tiers speak to the parsed background ---------- */
+function realignCourses(){
+  const sub=document.getElementById('lv-sub');
+  if(sub&&resumeData.title){
+    sub.innerHTML='Picked purely from salary & hiring data to raise <em>your</em> odds — tuned for <strong style="color:var(--mint);">'+resumeData.title+'</strong> career paths.';
+  }
+}
+const _v9Cascade=runPersonalizationCascade;
+runPersonalizationCascade=function(){ _v9Cascade(); updateTrendBadge(); realignCourses(); updateDeckLocPill(); };
 
 /* ---------- v7 INIT ---------- */
 renderGhostCompanies();
