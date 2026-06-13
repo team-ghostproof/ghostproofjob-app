@@ -64,6 +64,8 @@
   .ghost-glow{filter:drop-shadow(0 0 6px var(--mint));}
   .brand-text{background:linear-gradient(90deg,var(--mint),var(--cyber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
   .grace-pill{background:linear-gradient(90deg,rgba(0,245,160,.15),rgba(181,95,230,.15));border:1px solid rgba(0,245,160,.3);font-size:10px;padding:2px 8px;border-radius:999px;color:var(--mint);white-space:nowrap;}
+  .pm-item:hover{background:var(--plum3);}
+  .pm-item:active{background:var(--plum4);}
   .desc-clamp{max-height:76px;overflow:hidden;position:relative;font-size:12px;color:var(--off);line-height:1.6;}
   .desc-clamp::after{content:'';position:absolute;bottom:0;left:0;right:0;height:26px;background:linear-gradient(transparent,var(--plum2));pointer-events:none;}
   #auth-chip,#upgrade-trigger{white-space:nowrap;}
@@ -319,7 +321,15 @@
           <span class="nav-pill" onclick="switchView('browse',null)">🔍 Browse</span>
           <span class="nav-pill" onclick="switchView('account',null)">⚙️ Settings</span>
         </div>
-        <div id="auth-chip" onclick="openAuth()" style="background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.35);color:var(--cyber);font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:pointer;">Sign In</div>
+        <div style="position:relative;">
+          <div id="auth-chip" onclick="toggleProfileMenu()" style="background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.35);color:var(--cyber);font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:pointer;">Sign In</div>
+          <div id="profile-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:300;background:var(--plum2);border:1px solid var(--plum4);border-radius:14px;padding:6px;min-width:190px;box-shadow:0 12px 34px rgba(0,0,0,.55);">
+            <div class="pm-item" onclick="pmGo('account')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">⚙️ Settings</div>
+            <div class="pm-item" onclick="openContactModal()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">📬 Contact Us</div>
+            <div style="height:1px;background:var(--plum4);margin:4px 8px;"></div>
+            <div class="pm-item" onclick="pmSignOut()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--danger);">🚪 Sign Out</div>
+          </div>
+        </div>
         <div id="upgrade-trigger" onclick="toggleUpgrade()" style="background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.3);color:var(--mint);font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:pointer;">Support Us ▾</div>
       </div>
     </div>
@@ -558,18 +568,56 @@
 
   <!-- ===== FIREBASE AUTH MODAL ===== -->
   <div class="modal-scrim" id="auth-modal" style="z-index:340;">
-    <div class="modal-box" style="text-align:left;">
+    <div class="modal-box" style="text-align:left;position:relative;">
       <div style="font-size:15px;font-weight:800;margin-bottom:2px;" id="auth-title">Create your account</div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Saves your profile & resume history securely to the cloud so you never lose progress.</div>
+      <div id="auth-signup-fields" style="display:none;">
+        <div class="field-row">
+          <div><div class="field-label">First Name</div><input class="field-input" id="auth-first" placeholder="First" style="margin-bottom:8px;"/></div>
+          <div><div class="field-label">Last Name</div><input class="field-input" id="auth-last" placeholder="Last" style="margin-bottom:8px;"/></div>
+        </div>
+        <div class="field-label">Phone (10-digit US)</div>
+        <input class="field-input" id="auth-phone" type="tel" inputmode="numeric" placeholder="(713) 555-0100" oninput="validatePhone(this)" style="margin-bottom:2px;"/>
+        <div id="auth-phone-err" style="display:none;font-size:10px;color:var(--danger);margin-bottom:6px;">Enter a complete 10-digit US number.</div>
+      </div>
       <div class="field-label">Email</div>
       <input class="field-input" id="auth-email" type="email" placeholder="you@email.com" style="margin-bottom:8px;"/>
       <div class="field-label">Password (6+ characters)</div>
       <input class="field-input" id="auth-pass" type="password" placeholder="••••••••" style="margin-bottom:12px;"/>
-      <div class="opt-actions" style="margin-top:0;">
-        <div class="opt-btn-skip" onclick="authSignIn()">Log In</div>
-        <div class="opt-btn-go" onclick="authSignUp()">Create Account</div>
+      <div id="auth-action" class="opt-actions" style="margin-top:0;">
+        <div class="opt-btn-go" id="auth-primary-btn" onclick="authPrimary()" style="flex:1;">Create Account</div>
+      </div>
+      <div style="text-align:center;font-size:12px;color:var(--muted);margin-top:10px;">
+        <span id="auth-toggle-text">Already have an account?</span>
+        <span id="auth-toggle-link" onclick="toggleAuthMode()" style="color:var(--cyber);font-weight:700;cursor:pointer;text-decoration:underline;">Log in instead</span>
       </div>
       <div onclick="document.getElementById('auth-modal').classList.remove('open')" style="color:var(--muted);font-size:12px;cursor:pointer;padding:8px;text-align:center;margin-top:4px;">Maybe later</div>
+      <div onclick="document.getElementById('auth-modal').classList.remove('open')" style="position:absolute;top:12px;right:14px;color:var(--muted);cursor:pointer;font-size:16px;">✕</div>
+    </div>
+  </div>
+
+  <!-- ===== CONTACT US MODAL (profile dropdown) ===== -->
+  <div class="modal-scrim" id="contact-modal" style="z-index:345;">
+    <div class="modal-box" style="text-align:left;position:relative;">
+      <div onclick="document.getElementById('contact-modal').classList.remove('open')" style="position:absolute;top:12px;right:14px;color:var(--muted);cursor:pointer;font-size:16px;">✕</div>
+      <div style="font-size:15px;font-weight:800;margin-bottom:2px;">📬 Contact Us</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Questions, feedback, or a bug? A human reads every message.</div>
+      <div id="contact-form">
+        <div class="field-row">
+          <div><div class="field-label">First Name</div><input class="field-input" id="ct-first" placeholder="First" style="margin-bottom:8px;"/></div>
+          <div><div class="field-label">Last Name</div><input class="field-input" id="ct-last" placeholder="Last" style="margin-bottom:8px;"/></div>
+        </div>
+        <div class="field-label">Email</div>
+        <input class="field-input" id="ct-email" type="email" placeholder="you@email.com" style="margin-bottom:8px;"/>
+        <div class="field-label">Message</div>
+        <textarea class="field-input" id="ct-msg" rows="4" placeholder="How can we help?" style="resize:none;margin-bottom:12px;"></textarea>
+        <div onclick="sendContactMessage()" id="ct-send" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:12px;text-align:center;font-size:14px;cursor:pointer;">Send Message</div>
+      </div>
+      <div id="contact-success" style="display:none;text-align:center;padding:10px 0;">
+        <div style="font-size:34px;margin-bottom:8px;">✅</div>
+        <div style="font-size:14px;font-weight:800;line-height:1.5;margin-bottom:14px;">We received your message and will review it as soon as possible!</div>
+        <div onclick="document.getElementById('contact-modal').classList.remove('open')" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:12px;font-size:14px;cursor:pointer;">Got it! ✕</div>
+      </div>
     </div>
   </div>
 
@@ -1422,7 +1470,6 @@
     <div class="nav-tab" data-view="browse" onclick="switchView('browse',this)"><div class="nav-icon">🔍</div><div class="nav-label">Browse</div></div>
     <div class="nav-tab" data-view="resume" onclick="switchView('resume',this)"><div class="nav-icon">📄</div><div class="nav-label">Resume</div></div>
     <div class="nav-tab" data-view="ghost" onclick="switchView('ghost',this)"><div class="nav-icon">👻</div><div class="nav-label">Ghosts</div></div>
-    <div class="nav-tab" data-view="account" onclick="switchView('account',this)"><div class="nav-icon">⚙️</div><div class="nav-label">Settings</div></div>
   </div>
 
 </div>
@@ -1449,10 +1496,31 @@ function closeOnboard(dest){
   try{localStorage.setItem('ngj_returning','1');}catch(e){}
   startTutorial();
 }
+let authMode='signup';
 function showAuthModal(mode){
+  authMode=(mode==='login')?'login':'signup';
   const t=document.getElementById('auth-title');
-  if(t) t.textContent=mode==='login'?'Welcome back — log in':'Create your account';
+  if(t) t.textContent=authMode==='login'?'Welcome back — log in':'Create your account';
+  const sf=document.getElementById('auth-signup-fields');
+  if(sf) sf.style.display=authMode==='login'?'none':'block';   /* LOG IN hides name+phone */
+  const pb=document.getElementById('auth-primary-btn');
+  if(pb) pb.textContent=authMode==='login'?'Log In':'Create Account';
+  const tt=document.getElementById('auth-toggle-text'), tl=document.getElementById('auth-toggle-link');
+  if(tt&&tl){
+    tt.textContent=authMode==='login'?'New here?':'Already have an account?';
+    tl.textContent=authMode==='login'?'Create an account':'Log in instead';
+  }
   document.getElementById('auth-modal').classList.add('open');
+}
+function toggleAuthMode(){ showAuthModal(authMode==='login'?'signup':'login'); }
+function authPrimary(){ if(authMode==='login') authSignIn(); else authSignUp(); }
+function validatePhone(el){
+  const digits=(el.value||'').replace(/\D/g,'');
+  const err=document.getElementById('auth-phone-err');
+  const ok=/^\d{10}$/.test(digits);
+  if(err) err.style.display=(digits.length>0&&!ok)?'block':'none';
+  el.dataset.valid=ok?'1':'';
+  return ok;
 }
 function skipToApp(){
   document.getElementById('onboard-modal').classList.remove('open');
@@ -1665,7 +1733,8 @@ function renderBrowse(){
           '<div style="flex:1;min-width:0;">'+
           '<div style="font-size:13px;font-weight:700;">'+j.t+'</div>'+
           '<div style="font-size:11px;color:var(--muted);">'+j.co+' · '+j.loc+(j.posting_age_days!==null?(' · '+j.posting_age_days+'d old'):'')+(j.stale?' · <span style="color:var(--danger);">stale ⚠️</span>':'')+'</div>'+
-          '<div style="font-size:11px;color:var(--mint);margin-top:2px;">'+j.sal+'</div></div>'+
+          '<div style="font-size:11px;color:var(--mint);margin-top:2px;">'+j.sal+'</div>'+
+          (j.desc?'<div style="font-size:10px;color:var(--muted);margin-top:4px;line-height:1.4;max-height:28px;overflow:hidden;">'+j.desc.slice(0,120).replace(/</g,'&lt;')+'…</div>':'')+'</div>'+
           '<div style="text-align:right;flex-shrink:0;">'+(j.match?('<div onclick="liveMatchInsight('+i+',event)" style="font-size:14px;font-weight:800;color:var(--mint);cursor:pointer;text-decoration:underline;text-decoration-color:rgba(181,95,230,.35);">'+j.match+'%</div><div style="font-size:9px;color:var(--muted);">match</div>'):'')+
           '<div style="font-size:10px;font-weight:700;color:'+gc+';margin-top:3px;">👻 '+j.ghost+'%</div>'+
           '<div onclick="copyOptLive('+i+',event)" title="Optimize Cover Letter" style="margin-top:5px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:8px;padding:3px 8px;font-size:10px;font-weight:800;cursor:pointer;">✨ Optimize</div></div></div>';
@@ -2397,13 +2466,11 @@ function downloadCoverLetter(){
 }
 let pendingJobUrl='';
 function externalApply(i){
+  /* Browse click ALWAYS opens the Deep Company Drawer first — never a blind apply.
+     The drawer's own Apply / Get Cover Letter actions take it from there. */
   const j=browseJobs[i];
   pendingJobUrl=j.url||'';
-  if(!resumeReady||clOptedOut()){
-    openCompanyView(j.co,{title:j.t,url:pendingJobUrl});
-    return;
-  }
-  offerCoverLetter(j.t,j.co,true);
+  openCompanyView(j.co,{title:j.t,url:pendingJobUrl});
 }
 
 /* ============================================================
@@ -2435,14 +2502,16 @@ function queueLiveFetch(){
 async function fetchLiveMarketJobs(){
   let what=(document.getElementById('f-keyword')?document.getElementById('f-keyword').value:'').trim();
   let where=(document.getElementById('f-location')?document.getElementById('f-location').value:'').trim();
-  if(!where && !what){
-    /* REWRITE FOR THE PEOPLE: blank search -> industry category + home city feed */
-    const ind=(document.getElementById('f-industry')||{}).value||'';
-    let homeLoc=''; try{ homeLoc=localStorage.getItem('gpj_loc')||''; }catch(e){}
-    if(!ind && !homeLoc) return;
-    what=ind; where=homeLoc;
-    dbg('blank search -> industry/home feed: '+(ind||'all')+' @ '+(homeLoc||'nationwide'));
+  /* STRICT FILTER ALIGNMENT: an empty keyword is forbidden from hitting the proxy.
+     The active Industry dropdown becomes the mandatory 'what' so Adzuna returns
+     strictly that sector — no medical/logistics leakage when filtering Marketing. */
+  if(!what){
+    const indSel=document.getElementById('f-industry');
+    const ind=(indSel && indSel.value && indSel.value!=='All')?indSel.value:'';
+    if(ind){ what=ind; dbg('empty keyword -> industry lock: &what='+ind); }
   }
+  if(!where){ try{ where=localStorage.getItem('gpj_loc')||''; }catch(e){} }
+  if(!what && !where) return;   /* nothing to anchor on yet */
   const status=document.getElementById('desk-feed-status');
   if(status) status.textContent='📡 Fetching live openings'+(where?' near '+where:'')+'…';
   showToast('📡 Pulling live market jobs…');
@@ -2499,12 +2568,46 @@ async function fetchLiveMarketJobs(){
     }));
     /* DATA METADATA: stale postings (90+ days) get high-risk ghost flags */
     jobsQueue.forEach(j=>{ if(j.posting_age_days!==null&&j.posting_age_days>90){ j.ghost=Math.max(j.ghost,55); j.stale=true; } });
+    /* SYSTEM FAILOVER: thin results (<5) auto-retry with a widened query —
+       first dropping the distance radius, then broadening to country-wide —
+       and dedupe by company+title. No fabricated listings, ever. */
+    if(jobsQueue.length<5 && !window._failoverPass && ADZUNA_PROXY_URL){
+      window._failoverPass=true;
+      try{
+        const seen=new Set(jobsQueue.map(j=>(j.co+'|'+j.t).toLowerCase()));
+        const country=(document.getElementById('f-country')&&document.getElementById('f-country').value)||'us';
+        const wide=ADZUNA_PROXY_URL+'?'+(what?('what='+encodeURIComponent(what)+'&'):'')+'country='+country+'&page=1';
+        const r2=await fetch(wide,{headers:{'X-Requested-With':'XMLHttpRequest'}});
+        if(r2.ok){
+          const d2=await r2.json();
+          (d2.results||[]).forEach(r=>{
+            const co=(typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'Hiring Company';
+            const key=(co+'|'+(r.title||'')).toLowerCase();
+            if(seen.has(key)) return; seen.add(key);
+            jobsQueue.push({
+              t:(r.title||'Open Role').replace(/<[^>]+>/g,''),co:co,
+              sal:r.salary_min?('$'+Math.round(r.salary_min/1000)+'K'+(r.salary_max?(' – $'+Math.round(r.salary_max/1000)+'K'):'')):'Salary on request',
+              salMax:r.salary_max||r.salary_min||0,
+              loc:(typeof r.location==='string'?r.location:(r.location&&r.location.display_name))||'See posting',
+              url:r.redirect_url||'',
+              desc:(r.description||'').replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,460),
+              ghost:ghostRiskFor(co),match:resumeReady?60+(hashStr(r.title||'')%36):null,
+              posting_age_days:r.created?Math.max(0,Math.floor((Date.now()-new Date(r.created).getTime())/86400000)):null,
+              last_ping_status:'ok',widened:true
+            });
+          });
+          dbg('failover widened: +'+(jobsQueue.length)+' total after dedupe');
+        }
+      }catch(e){ dbg('failover unavailable'); }
+      window._failoverPass=false;
+    }
     liveJobs=jobsQueue.slice();   /* page-replace mode: Prev/Next swap clean 20-job pages */
     renderBrowse();
     rawQueue=jobsQueue.slice();   /* canonical unfiltered live source */
     queuePtr=0;
     applySwipeFilters();
-    if(status) status.textContent='✅ Live: '+jobsQueue.length+' fresh openings loaded into your deck.';
+    const widened=jobsQueue.some(j=>j.widened);
+    if(status) status.textContent='✅ Live: '+jobsQueue.length+' openings'+(widened?' (broadened to fill your deck)':'')+'.';
     showToast('✅ '+jobsQueue.length+' live jobs loaded — start swiping!');
   }catch(err){
     if(status) status.textContent='Showing curated picks · live feed reconnects automatically.';
@@ -3092,7 +3195,10 @@ function renderStatList(kind){
              <span class="status-pill" style="background:rgba(0,245,160,.15);color:var(--mint);cursor:pointer;" onclick="logResponse(${i},'interview')">Interview Scheduled</span>
              <span class="status-pill" style="background:rgba(255,77,106,.15);color:var(--danger);cursor:pointer;" onclick="logResponse(${i},'rejection')">Received Rejection</span>
            </div>`
-        : `<span class="status-pill" style="background:rgba(181,95,230,.15);color:var(--cyber);cursor:pointer;" onclick="lists.applied[${i}]._logging=true;renderStatList('applied')">Log Response</span>`;
+        : `<div style="display:flex;gap:6px;">
+             <span class="status-pill" style="background:rgba(181,95,230,.15);color:var(--cyber);cursor:pointer;" onclick="lists.applied[${i}]._logging=true;renderStatList('applied')">Log Response</span>
+             <span class="status-pill" style="background:rgba(0,245,160,.12);color:var(--mint);cursor:pointer;" onclick="unApply(${i})" title="Move back to deck (5/day)">↩</span>
+           </div>`;
     } else if(kind==='responses'){
       right=r.status==='interview'
         ? '<span class="status-pill" style="background:rgba(0,245,160,.18);color:var(--mint);">🟢 Interview Active</span>'
@@ -3116,12 +3222,30 @@ function logResponse(i,status){
   renderStatList('applied');
   showToast(status==='interview'?'🟢 Interview logged — go get it!':'Logged. Their loss — onward 👻');
 }
-function unSkip(i){
-  const rec=lists.skipped.splice(i,1)[0];
-  rawQueue.unshift({t:rec.t,co:rec.co,sal:'See posting',salMax:0,loc:'Back in deck',ghost:rec.ghost,match:70});
+function recoveryUsedToday(){
+  try{
+    const d=JSON.parse(localStorage.getItem('gpj_recovery')||'{}');
+    return d.day===new Date().toDateString()?(d.n||0):0;
+  }catch(e){ return 0; }
+}
+function bumpRecovery(){
+  try{ localStorage.setItem('gpj_recovery',JSON.stringify({day:new Date().toDateString(),n:recoveryUsedToday()+1})); }catch(e){}
+}
+function recoverToDeck(rec){
+  if(recoveryUsedToday()>=5){ showToast('↩ Daily recovery limit reached (5/day) — resets tomorrow'); return false; }
+  rawQueue.unshift({t:rec.t,co:rec.co,sal:'See posting',salMax:0,loc:'Back in deck',ghost:rec.ghost,match:70,url:rec.url||''});
+  bumpRecovery();
   saveLists(); updateStatCounters(); applySwipeFilters();
-  renderStatList('skipped');
-  showToast('↩ '+rec.co+' is back in your deck');
+  showToast('↩ '+rec.co+' is back in your deck ('+recoveryUsedToday()+'/5 today)');
+  return true;
+}
+function unSkip(i){
+  const rec=lists.skipped[i];
+  if(recoverToDeck(rec)){ lists.skipped.splice(i,1); saveLists(); renderStatList('skipped'); }
+}
+function unApply(i){
+  const rec=lists.applied[i];
+  if(recoverToDeck(rec)){ lists.applied.splice(i,1); saveLists(); renderStatList('applied'); }
 }
 
 /* ---------- JOB FRESHNESS PILLS ---------- */
@@ -3161,7 +3285,7 @@ async function askHR(){
 }
 
 /* ---------- FIREBASE AUTH + CLOUD SYNC ---------- */
-function openAuth(){ document.getElementById('auth-modal').classList.add('open'); }
+function openAuth(){ showAuthModal('signup'); }
 function authErrMsg(e){
   const c=(e&&e.code)||'';
   if(c.includes('email-already')) return 'That email already has an account — try Log In.';
@@ -3173,8 +3297,27 @@ function authErrMsg(e){
 async function authSignUp(){
   if(!window.fb){ showToast('⚠️ Cloud accounts unavailable offline'); return; }
   const e=document.getElementById('auth-email').value.trim(), p=document.getElementById('auth-pass').value;
+  const first=(document.getElementById('auth-first')||{}).value||'';
+  const last=(document.getElementById('auth-last')||{}).value||'';
+  const phoneEl=document.getElementById('auth-phone');
+  const phoneDigits=((phoneEl||{}).value||'').replace(/\D/g,'');
   if(!e||p.length<6){ showToast('Enter email + 6-char password'); return; }
-  try{ await fb.signUp(e,p); document.getElementById('auth-modal').classList.remove('open'); showToast('🎉 Account created — profile now auto-saves to the cloud'); cloudSync(); }
+  if(!first.trim()){ showToast('Please add your first name'); return; }
+  if(phoneDigits && !/^\d{10}$/.test(phoneDigits)){ showToast('Phone must be a complete 10-digit US number'); validatePhone(phoneEl); return; }
+  try{
+    await fb.signUp(e,p);
+    /* mirror into the Auto-Apply Profile + persist locally so it displays on return */
+    const setF=(cls,v)=>{const el=document.querySelector(cls); if(el&&v){el.value=v; el.classList.add('autofilled');}};
+    setF('.pf-first',first.trim()); setF('.pf-last',last.trim());
+    if(phoneDigits) setF('.pf-phone',phoneDigits.replace(/(\d{3})(\d{3})(\d{4})/,'($1) $2-$3'));
+    try{ localStorage.setItem('gpj_signup',JSON.stringify({first:first.trim(),last:last.trim(),phone:phoneDigits,email:e})); }catch(e2){}
+    resumeData.name=[first.trim(),last.trim()].filter(Boolean).join(' ')||resumeData.name;
+    document.getElementById('auth-modal').classList.remove('open');
+    showToast('🎉 Welcome, '+(first.trim()||'friend')+' — your profile auto-saves to the cloud');
+    if(typeof updateProgress==='function') updateProgress();
+    if(typeof runPersonalizationCascade==='function') runPersonalizationCascade();
+    cloudSync();
+  }
   catch(err){ showToast('⚠️ '+authErrMsg(err)); }
 }
 async function authSignIn(){
@@ -3187,9 +3330,73 @@ async function authSignOut(){ if(window.fb){ try{await fb.signOut();}catch(e){} 
 window.gpjAuthChanged=function(user){
   const chip=document.getElementById('auth-chip');
   if(!chip) return;
-  if(user){ chip.textContent='👤 '+(user.email||'').split('@')[0]; chip.onclick=authSignOut; chip.title='Tap to sign out'; }
-  else { chip.textContent='Sign In'; chip.onclick=openAuth; chip.title=''; }
+  if(user){
+    chip.textContent='👤 '+profileDisplayName(user);
+    chip.onclick=toggleProfileMenu;     /* opens dropdown — never an instant logout */
+    chip.title='Account menu';
+  } else {
+    chip.textContent='Sign In';
+    chip.onclick=openAuth;
+    chip.title='';
+    const pm=document.getElementById('profile-menu'); if(pm) pm.style.display='none';
+  }
 };
+/* friendly name: typed/parsed First Last → resume name → email prefix as last resort */
+function profileDisplayName(user){
+  let first=(document.querySelector('.pf-first')||{}).value||'';
+  let last=(document.querySelector('.pf-last')||{}).value||'';
+  if(!first && resumeData.name){ const p=resumeData.name.split(/\s+/); first=p[0]||''; last=last||p.slice(1).join(' '); }
+  let stored=''; try{ stored=JSON.parse(localStorage.getItem('gpj_signup')||'{}').first||''; }catch(e){}
+  if(!first) first=stored;
+  const full=[first,last].filter(Boolean).join(' ').trim();
+  if(full) return full;
+  return ((user&&user.email)||'').split('@')[0]||'Account';
+}
+/* ---------- PROFILE DROPDOWN MENU ---------- */
+function toggleProfileMenu(){
+  if(!(window.fb&&fb.current())){ openAuth(); return; }
+  const pm=document.getElementById('profile-menu');
+  if(pm) pm.style.display=pm.style.display==='none'?'block':'none';
+}
+function pmGo(view){
+  const pm=document.getElementById('profile-menu'); if(pm) pm.style.display='none';
+  switchView(view,null);
+}
+function pmSignOut(){
+  const pm=document.getElementById('profile-menu'); if(pm) pm.style.display='none';
+  authSignOut();
+}
+function openContactModal(){
+  const pm=document.getElementById('profile-menu'); if(pm) pm.style.display='none';
+  document.getElementById('contact-form').style.display='block';
+  document.getElementById('contact-success').style.display='none';
+  let u=null; try{ u=window.fb&&fb.current&&fb.current(); }catch(e){}
+  if(u&&u.email&&!document.getElementById('ct-email').value) document.getElementById('ct-email').value=u.email;
+  const fn=document.querySelector('.pf-first'), ln=document.querySelector('.pf-last');
+  if(fn&&fn.value&&!document.getElementById('ct-first').value) document.getElementById('ct-first').value=fn.value;
+  if(ln&&ln.value&&!document.getElementById('ct-last').value) document.getElementById('ct-last').value=ln.value;
+  document.getElementById('contact-modal').classList.add('open');
+}
+async function sendContactMessage(){
+  const first=document.getElementById('ct-first').value.trim();
+  const last=document.getElementById('ct-last').value.trim();
+  const email=document.getElementById('ct-email').value.trim();
+  const msg=document.getElementById('ct-msg').value.trim();
+  if(!first||!email||!msg){ showToast('First name, email, and message are required'); return; }
+  const payload={ collection:'contact_messages', name:(first+' '+last).trim(), email:email, message:msg, when:Date.now() };
+  /* log to Firestore admin collection (best-effort) + Worker email */
+  if(window.fb&&fb.current()){ try{ await fb.saveProfile(fb.current().uid+'_contact_'+Date.now(),payload); }catch(e){} }
+  if(WORKER_URL){ try{ await fetch(WORKER_URL.replace(/\/jobs.*$/,'')+'/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:payload.name,email:email,message:'[CONTACT] '+msg})}); }catch(e){} }
+  dbg('contact message queued: '+payload.name);
+  document.getElementById('contact-form').style.display='none';
+  document.getElementById('contact-success').style.display='block';
+  document.getElementById('ct-msg').value='';
+}
+/* close dropdown on outside click */
+document.addEventListener('click',e=>{
+  const pm=document.getElementById('profile-menu');
+  if(pm&&pm.style.display==='block'&&!e.target.closest('#auth-chip')&&!e.target.closest('#profile-menu')) pm.style.display='none';
+});
 /* auto-save resume/profile history documents to Firestore */
 function cloudSync(){
   if(!window.fb||!fb.current()) return;
@@ -4035,16 +4242,36 @@ async function loadCompanyJobs(co){
     const data=await res.json();
     const rows=(data.results||[]).filter(r=>{
       const rc=(typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'';
-      return rc.toLowerCase().includes(co.toLowerCase().split(' ')[0]);
+      return ciMatch(co.split(' ')[0],rc);
     }).slice(0,5);
-    cmJobsCache=rows.map(r=>({t:(r.title||'Open role').replace(/<[^>]+>/g,''),url:r.redirect_url||'',loc:(typeof r.location==='string'?r.location:(r.location&&r.location.display_name))||''}));
+    cmJobsCache=rows.map(r=>({
+      t:(r.title||'Open role').replace(/<[^>]+>/g,''),
+      url:r.redirect_url||'',
+      loc:(typeof r.location==='string'?r.location:(r.location&&r.location.display_name))||'',
+      desc:(r.description||'').replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,460)
+    }));
     if(!cmJobsCache.length){ if(st) st.textContent='none found in the live feed right now'; return; }
     if(st) st.textContent=cmJobsCache.length+' live';
     box.innerHTML=cmJobsCache.map((j,i)=>
-      '<div onclick="openCompanyJob('+i+')" style="background:var(--plum3);border-radius:10px;padding:9px 10px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:8px;">'+
-      '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;">'+j.t+'</div><div style="font-size:10px;color:var(--muted);">'+j.loc+'</div></div>'+
-      '<div style="color:var(--mint);font-size:11px;font-weight:800;">Apply ↗</div></div>').join('');
+      '<div style="background:var(--plum3);border-radius:10px;padding:9px 10px;margin-bottom:6px;">'+
+      '<div onclick="toggleCmJobDesc('+i+')" style="cursor:pointer;display:flex;align-items:center;gap:8px;">'+
+      '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;">'+j.t+'</div><div style="font-size:10px;color:var(--muted);">'+(j.loc||'See posting')+' · tap for summary</div></div>'+
+      '<div style="color:var(--cyber);font-size:14px;font-weight:800;" id="cmjt-'+i+'">⌄</div></div>'+
+      '<div id="cmjd-'+i+'" style="display:none;margin-top:8px;">'+
+        (j.desc?('<div class="desc-clamp" style="max-height:120px;">'+j.desc.replace(/</g,'&lt;')+'</div>'):'<div style="font-size:11px;color:var(--muted);">Full details on the posting.</div>')+
+        '<div style="display:flex;gap:8px;margin-top:8px;">'+
+        (j.url?('<div onclick="event.stopPropagation();window.open(\''+j.url.replace(/'/g,'')+'\',\'_blank\',\'noopener\')" style="flex:1;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">View Full Posting ↗</div>'):'')+
+        '<div onclick="event.stopPropagation();openCompanyJob('+i+')" style="flex:1;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">Apply with GhostProof</div>'+
+        '</div>'+
+      '</div></div>').join('');
   }catch(e){ if(st) st.textContent='live feed unavailable'; }
+}
+function toggleCmJobDesc(i){
+  const d=document.getElementById('cmjd-'+i), t=document.getElementById('cmjt-'+i);
+  if(!d) return;
+  const open=d.style.display==='none';
+  d.style.display=open?'block':'none';
+  if(t) t.textContent=open?'⌃':'⌄';
 }
 function openCompanyJob(i){
   const j=cmJobsCache[i];
@@ -4151,6 +4378,11 @@ function prevLivePage(){ if(livePage>1){ livePage--; fetchLiveMarketJobs(); docu
 function loadMoreLive(){ nextLivePage(); } /* legacy alias */
 
 /* ---------- GHOST TAB AUTOCOMPLETE ---------- */
+function ciMatch(needle,hay){
+  /* case-insensitive, punctuation-tolerant: "wal-mart" matches "Walmart" */
+  const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  return norm(hay).includes(norm(needle));
+}
 function allKnownCompanies(){
   const s=new Set();
   Object.keys(ghostReports).forEach(c=>s.add(c));
@@ -4166,7 +4398,7 @@ function ghostSuggest(q){
   if(!box) return;
   q=(q||'').trim().toLowerCase();
   if(q.length<2){ box.style.display='none'; box.innerHTML=''; return; }
-  const hits=allKnownCompanies().filter(c=>c.toLowerCase().includes(q)).slice(0,6);
+  const hits=allKnownCompanies().filter(c=>ciMatch(q,c)).slice(0,6);
   if(!hits.length){
     box.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--muted);">No matches in your hunt yet — file a report to add <strong style="color:var(--off);">'+q.replace(/</g,'&lt;')+'</strong></div>';
   } else {
@@ -4392,11 +4624,19 @@ const REVIEW_BANK={
 function fillCmReviews(co){
   const box=document.getElementById('cm-reviews');
   if(!box) return;
-  const mine=(ghostReports[co]||[]).slice(-5).map(r=>({s:'−',t:r.comment||r.stage,when:r.when}));
-  const bank=REVIEW_BANK[co]||[{s:'+',t:'No public sentiment collected yet — community reports will appear here as they\u2019re filed.'}];
-  const rows=[...mine,...bank].slice(0,10);
-  box.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">💬 Recent community & public sentiment</div>'+
-    rows.map(r=>'<div style="background:var(--plum3);border-left:3px solid '+(r.s==='+'?'var(--mint)':'var(--danger)')+';border-radius:0 10px 10px 0;padding:8px 10px;margin-bottom:6px;"><div style="font-size:12px;color:var(--off);line-height:1.5;">'+(r.s==='+'?'🟢 ':'🔴 ')+String(r.t).replace(/</g,'&lt;')+'</div>'+(r.when?('<div style="font-size:10px;color:var(--muted);margin-top:3px;">'+fmtAgo(r.when)+' · community report</div>'):'')+'</div>').join('');
+  /* SPLIT LAYOUT: up to 5 positive + 5 negative, community reports first */
+  const mine=(ghostReports[co]||[]).map(r=>({s:'−',t:r.comment||r.stage,when:r.when}));
+  const bank=REVIEW_BANK[co]||[];
+  const all=[...mine,...bank];
+  const pos=all.filter(r=>r.s==='+').slice(0,5);
+  const neg=all.filter(r=>r.s==='−').slice(0,5);
+  const cell=r=>'<div style="background:var(--plum3);border-left:3px solid '+(r.s==='+'?'var(--mint)':'var(--danger)')+';border-radius:0 10px 10px 0;padding:8px 10px;margin-bottom:6px;"><div style="font-size:12px;color:var(--off);line-height:1.5;">'+String(r.t).replace(/</g,'&lt;')+'</div>'+(r.when?('<div style="font-size:10px;color:var(--muted);margin-top:3px;">'+fmtAgo(r.when)+' · community report</div>'):'')+'</div>';
+  const empty='<div style="font-size:11px;color:var(--muted);padding:6px 0;">None yet — be the first to report.</div>';
+  box.innerHTML='<div style="display:flex;gap:10px;">'+
+    '<div style="flex:1;min-width:0;"><div style="font-size:11px;font-weight:800;color:var(--mint);margin-bottom:6px;">🟢 Positive ('+pos.length+')</div>'+(pos.map(cell).join('')||empty)+'</div>'+
+    '<div style="flex:1;min-width:0;"><div style="font-size:11px;font-weight:800;color:var(--danger);margin-bottom:6px;">🔴 Negative ('+neg.length+')</div>'+(neg.map(cell).join('')||empty)+'</div>'+
+    '</div>'+
+    (all.length?'':'<div style="font-size:11px;color:var(--muted);text-align:center;padding:8px 0;">No sentiment collected yet — community reports populate here as they\u2019re filed.</div>');
 }
 function cmVibeScore(co){
   let saved=0; try{ saved=(JSON.parse(localStorage.getItem('gpj_corate')||'{}'))[co]||0; }catch(e){}
