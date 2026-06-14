@@ -60,7 +60,9 @@
   .view-content::-webkit-scrollbar{display:none;}
 
   /* Header */
-  #header{background:var(--plum2);border-bottom:1px solid var(--plum3);z-index:50;flex-shrink:0;overflow:hidden;}
+  #header{background:var(--plum2);border-bottom:1px solid var(--plum3);z-index:60;flex-shrink:0;position:relative;}
+  #header-row{overflow:hidden;}
+  #profile-menu{z-index:400!important;}
   .ghost-glow{filter:drop-shadow(0 0 6px var(--mint));}
   .brand-text{background:linear-gradient(90deg,var(--mint),var(--cyber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
   .grace-pill{background:linear-gradient(90deg,rgba(0,245,160,.15),rgba(181,95,230,.15));border:1px solid rgba(0,245,160,.3);font-size:10px;padding:2px 8px;border-radius:999px;color:var(--mint);white-space:nowrap;}
@@ -119,7 +121,8 @@
   .view.active{display:block;}
 
   /* Swipe deck */
-  #card-deck{position:relative;height:500px;margin:16px;}
+  #card-deck{position:relative;min-height:420px;height:auto;margin:16px;}
+  body.desk #card-deck{height:500px;min-height:500px;}
   .job-card{position:absolute;width:100%;background:var(--plum2);border:1px solid var(--plum3);border-radius:24px;overflow:hidden;cursor:pointer;transition:transform .08s;transform-origin:bottom center;}
   .job-card.top{z-index:10;}
   .job-card.mid{z-index:9;transform:scale(.95) translateY(12px);pointer-events:none;}
@@ -320,7 +323,7 @@
 
   <!-- HEADER -->
   <div id="header">
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px 8px;">
+    <div id="header-row" style="display:flex;align-items:center;gap:10px;padding:10px 14px 8px;">
       <div onclick="goHome()" style="display:flex;align-items:center;gap:10px;cursor:pointer;min-width:0;flex-shrink:1;" title="Home">
         <span class="ghost-glow" style="font-size:26px;flex-shrink:0;">👻</span>
         <div style="min-width:0;overflow:hidden;">
@@ -336,7 +339,7 @@
         </div>
         <div style="position:relative;">
           <div id="auth-chip" onclick="toggleProfileMenu()" style="background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.35);color:var(--cyber);font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:pointer;">Sign In</div>
-          <div id="profile-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:300;background:var(--plum2);border:1px solid var(--plum4);border-radius:14px;padding:6px;min-width:190px;box-shadow:0 12px 34px rgba(0,0,0,.55);">
+          <div id="profile-menu" style="display:none;position:fixed;right:10px;top:60px;z-index:400;background:var(--plum2);border:1px solid var(--plum4);border-radius:14px;padding:6px;min-width:200px;box-shadow:0 12px 34px rgba(0,0,0,.6);">
             <div class="pm-item" onclick="pmGo('account')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">⚙️ Settings</div>
             <div class="pm-item" onclick="pmViewedJobs()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">👀 Viewed Jobs <span id="pm-viewed-count" style="margin-left:auto;background:var(--plum4);border-radius:8px;padding:1px 7px;font-size:11px;color:var(--muted);">0</span></div>
             <div class="pm-item" onclick="openContactModal()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">📬 Contact Us</div>
@@ -698,7 +701,7 @@
       <div style="flex:1;overflow-y:auto;min-height:60px;margin-bottom:10px;" id="cm-reports"></div>
       <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📡 Open Roles <span id="cm-jobs-status" style="font-weight:400;text-transform:none;"></span></div>
       <div style="max-height:160px;overflow-y:auto;margin-bottom:10px;" id="cm-jobs"></div>
-      <div style="display:flex;gap:8px;margin-bottom:10px;" id="cm-links"></div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;" id="cm-links"></div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;background:var(--plum3);border-radius:10px;padding:8px 10px;">
         <div id="cm-save" onclick="toggleSaveCompany()" style="font-size:12px;font-weight:800;color:var(--cyber);cursor:pointer;">🔖 Save Company</div>
         <div style="flex:1;"></div>
@@ -1376,8 +1379,8 @@
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">Community-verified ghosting intelligence</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px 12px;">
-        <div class="mini-stat"><div class="mini-stat-val" style="color:var(--danger);">2,847</div><div class="mini-stat-lbl">Reports Filed</div></div>
-        <div class="mini-stat"><div class="mini-stat-val" style="color:var(--mint);">94%</div><div class="mini-stat-lbl">Match Accuracy</div></div>
+        <div class="mini-stat"><div class="mini-stat-val" style="color:var(--danger);">2,847</div><div class="mini-stat-lbl">Community Reports</div></div>
+        <div class="mini-stat"><div class="mini-stat-val" style="color:var(--mint);">94%</div><div class="mini-stat-lbl">Data Accuracy</div></div>
       </div>
       <div style="margin:0 16px 12px;position:relative;">
         <input class="field-input" id="ghost-q" placeholder="🔎 Search any company (Walmart, CVS, local shops…)" oninput="ghostSuggest(this.value)" onkeydown="ghostKey(event)" autocomplete="off"/>
@@ -1755,11 +1758,24 @@ function renderBrowse(){
     document.getElementById('f-sal-out').textContent=salL>0?('$'+salL+'K'):'Any';
     const out=document.getElementById('browse-results');
     const hasSal=document.getElementById('f-hassal')&&document.getElementById('f-hassal').classList.contains('on');
-    let hits=liveJobs.filter(j=>(!hasSal||j.salMax>0)&&(!salL||!j.salMax||Math.round(j.salMax/1000)>=salL));
+    const kw=(document.getElementById('f-keyword').value||'').toLowerCase().trim();
+    const styVal=(document.getElementById('f-style')||{}).value||'';
+    const indVal=(document.getElementById('f-industry')||{}).value||'';
+    let hits=liveJobs.filter(j=>{
+      if(hasSal&&!(j.salMax>0)) return false;
+      if(salL&&j.salMax&&Math.round(j.salMax/1000)<salL) return false;
+      /* keyword filters live cards by title/company/description */
+      if(kw){ const blob=(j.t+' '+j.co+' '+(j.desc||'')).toLowerCase(); if(!blob.includes(kw)) return false; }
+      /* work style (Remote/Hybrid/On-site) matched against location/desc text */
+      if(styVal&&styVal!=='Any'){ const blob=(j.loc+' '+(j.desc||'')).toLowerCase(); if(!blob.includes(styVal.toLowerCase())) return false; }
+      /* industry matched against title/description keywords */
+      if(indVal&&indVal!=='All'){ const blob=(j.t+' '+(j.desc||'')).toLowerCase(); if(!blob.includes(indVal.toLowerCase().split(' ')[0])) return false; }
+      return true;
+    });
     const lsort=(document.getElementById('f-livesort')||{}).value||'rel';
     if(lsort==='date') hits=hits.slice().sort((a,b)=>(a.posting_age_days??999)-(b.posting_age_days??999));
     else if(lsort==='salhi') hits=hits.slice().sort((a,b)=>(b.salMax||0)-(a.salMax||0));
-    out.innerHTML='<div style="padding:0 16px 8px;font-size:10px;color:var(--mint);">📡 '+hits.length+' live openings — tap any card to open the real posting</div>'+
+    out.innerHTML='<div style="padding:0 16px 8px;font-size:10px;color:var(--mint);">📡 '+hits.length+' live openings'+((kw||styVal&&styVal!=='Any'||indVal&&indVal!=='All')?' (filtered)':'')+' — tap any card to open the real posting</div>'+
       hits.map((j,ix)=>{
         const i=liveJobs.indexOf(j);
         const gc=j.ghost<=15?'var(--mint)':(j.ghost<=35?'var(--warn)':'var(--danger)');
@@ -1770,7 +1786,7 @@ function renderBrowse(){
           '<div style="font-size:11px;color:var(--muted);">'+j.co+' · '+j.loc+(j.posting_age_days!==null?(' · '+j.posting_age_days+'d old'):'')+(j.stale?' · <span style="color:var(--danger);">stale ⚠️</span>':'')+'</div>'+
           '<div style="font-size:11px;color:var(--mint);margin-top:2px;">'+j.sal+'</div>'+
           (j.desc?'<div style="font-size:10px;color:var(--muted);margin-top:4px;line-height:1.4;max-height:28px;overflow:hidden;">'+j.desc.slice(0,120).replace(/</g,'&lt;')+'…</div>':'')+'</div>'+
-          '<div style="text-align:right;flex-shrink:0;">'+(j.match?('<div onclick="liveMatchInsight('+i+',event)" style="font-size:14px;font-weight:800;color:var(--mint);cursor:pointer;text-decoration:underline;text-decoration-color:rgba(181,95,230,.35);">'+j.match+'%</div><div style="font-size:9px;color:var(--muted);">match</div>'):'')+
+          '<div style="text-align:right;flex-shrink:0;">'+(j.match?('<div onclick="liveMatchInsight('+i+',event)" style="font-size:14px;font-weight:800;color:var(--mint);cursor:pointer;text-decoration:underline;text-decoration-color:rgba(181,95,230,.35);">'+j.match+'%</div><div style="font-size:9px;color:var(--muted);">'+(resumeReady?'match':'fit ⓘ')+'</div>'):'')+
           '<div style="font-size:10px;font-weight:700;color:'+gc+';margin-top:3px;">👻 '+j.ghost+'%</div>'+
           '<div onclick="copyOptLive('+i+',event)" title="Optimize Cover Letter" style="margin-top:5px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:8px;padding:3px 8px;font-size:10px;font-weight:800;cursor:pointer;">✨ Optimize</div></div></div>';
       }).join('')+
@@ -1993,14 +2009,14 @@ function populateEmploymentRows(jobs){
     const duties=(j.b&&j.b!=='See resume for details')?j.b:'';
     const d=document.createElement('div');
     d.style.cssText='background:var(--plum3);border-radius:12px;padding:12px;margin-bottom:10px;';
-    d.innerHTML='<div style="font-size:12px;font-weight:700;color:var(--cyber);margin-bottom:8px;">Position '+jobCount+'</div>'+
-      '<div class="field-label">Job Title *</div><input class="field-input'+(ix===0?' pf-title':'')+'" value="'+(j.t&&j.t!=='(role)'?j.t.replace(/"/g,'&quot;'):'')+'" placeholder="Job title" style="margin-bottom:8px;" oninput="updateProgress()"/>'+
-      '<div class="field-label">Company *</div><input class="field-input'+(ix===0?' pf-company':'')+'" value="'+(j.c?j.c.replace(/"/g,'&quot;'):'')+'" placeholder="Company" style="margin-bottom:8px;" oninput="updateProgress()"/>'+
+    d.innerHTML='<div style="font-size:12px;font-weight:700;color:var(--cyber);margin-bottom:8px;">Position '+(ix+1)+'</div>'+
+      '<div class="field-label">Job Title *</div><input data-dk="emp'+ix+'_title" class="field-input'+(ix===0?' pf-title':'')+'" value="'+(j.t&&j.t!=='(role)'?j.t.replace(/"/g,'&quot;'):'')+'" placeholder="Job title" style="margin-bottom:8px;" oninput="updateProgress();saveDraft()"/>'+
+      '<div class="field-label">Company *</div><input data-dk="emp'+ix+'_company" class="field-input'+(ix===0?' pf-company':'')+'" value="'+(j.c?j.c.replace(/"/g,'&quot;'):'')+'" placeholder="Company" style="margin-bottom:8px;" oninput="updateProgress();saveDraft()"/>'+
       '<div class="field-row" style="margin-bottom:8px;">'+
-        '<div><div class="field-label">Start</div><input class="field-input'+(ix===0?' pf-start':'')+'" value="'+startFromDate(j.d).replace(/"/g,'&quot;')+'" placeholder="Start" style="font-size:12px;"/></div>'+
-        '<div><div class="field-label">End</div><input class="field-input'+(ix===0?' pf-end':'')+'" value="'+endFromDate(j.d).replace(/"/g,'&quot;')+'" placeholder="End" style="font-size:12px;"/></div>'+
+        '<div><div class="field-label">Start</div><input data-dk="emp'+ix+'_start" class="field-input'+(ix===0?' pf-start':'')+'" value="'+startFromDate(j.d).replace(/"/g,'&quot;')+'" placeholder="Start" style="font-size:12px;" oninput="saveDraft()"/></div>'+
+        '<div><div class="field-label">End</div><input data-dk="emp'+ix+'_end" class="field-input'+(ix===0?' pf-end':'')+'" value="'+endFromDate(j.d).replace(/"/g,'&quot;')+'" placeholder="End" style="font-size:12px;" oninput="saveDraft()"/></div>'+
       '</div>'+
-      '<div class="field-label">Key Duties</div><textarea class="field-input" rows="3" placeholder="• Your real responsibilities, one per line" style="resize:none;line-height:1.5;">'+(duties?duties.replace(/</g,'&lt;'):'')+'</textarea>';
+      '<div class="field-label">Key Duties</div><textarea data-dk="emp'+ix+'_duties" class="field-input" rows="3" placeholder="• Your real responsibilities, one per line" style="resize:none;line-height:1.5;" oninput="saveDraft()">'+(duties?duties.replace(/</g,'&lt;'):'')+'</textarea>';
     c.insertBefore(d,btn);
   });
   if(jobCount===0) jobCount=1;
@@ -2630,7 +2646,7 @@ async function fetchLiveMarketJobs(){
       url:r.redirect_url||'',
       desc:(r.description||'').replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,460),
       ghost:ghostRiskFor((typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'x'),
-      match:resumeReady?60+(hashStr(r.title||'')%36):null,
+      match:60+(hashStr(r.title||'')%36),
       posting_age_days:r.created?Math.max(0,Math.floor((Date.now()-new Date(r.created).getTime())/86400000)):null,
       last_ping_status:'ok'
     }));
@@ -2659,7 +2675,7 @@ async function fetchLiveMarketJobs(){
               loc:(typeof r.location==='string'?r.location:(r.location&&r.location.display_name))||'See posting',
               url:r.redirect_url||'',
               desc:(r.description||'').replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,460),
-              ghost:ghostRiskFor(co),match:resumeReady?60+(hashStr(r.title||'')%36):null,
+              ghost:ghostRiskFor(co),match:60+(hashStr(r.title||'')%36),
               posting_age_days:r.created?Math.max(0,Math.floor((Date.now()-new Date(r.created).getTime())/86400000)):null,
               last_ping_status:'ok',widened:true
             });
@@ -3976,30 +3992,54 @@ function saveDraft(){
   clearTimeout(draftTimer);
   draftTimer=setTimeout(()=>{
     try{
+      if(typeof syncProfileToResume==='function') syncProfileToResume();  /* pull edited duties/rows into resumeData first */
       const data={};
       document.querySelectorAll('#view-resume .field-input, #view-account .field-input').forEach(el=>{
         const k=el.id||el.dataset.dk; if(k&&el.value) data[k]=el.value;
       });
       const toggles=[...document.querySelectorAll('.toggle-switch')].map(t=>t.classList.contains('on')?1:0);
-      localStorage.setItem('gpj_draft',JSON.stringify({data,toggles,t:Date.now()}));
+      /* ALSO persist the structured resume (jobs + duties) so the full
+         Employment History rebuilds on return — not just the name. */
+      const resumeSnapshot={
+        name:resumeData.name||'', title:resumeData.title||'', contact:resumeData.contact||'',
+        summary:resumeData.summary||'', skills:resumeData.skills||'', edu:resumeData.edu||'',
+        years:resumeData.years||'', jobs:resumeData.jobs||[]
+      };
+      localStorage.setItem('gpj_draft',JSON.stringify({data,toggles,resume:resumeSnapshot,ready:resumeReady,t:Date.now()}));
     }catch(e){}
   },400);
 }
 function restoreDraft(){
   try{
     const d=JSON.parse(localStorage.getItem('gpj_draft')||'null');
-    if(!d||!d.data||!Object.keys(d.data).length) return;
+    if(!d) return;
+    /* 1) rebuild structured resume + employment rows FIRST */
+    if(d.resume){
+      Object.assign(resumeData,d.resume);
+      if(d.ready) resumeReady=true;
+      if(resumeData.jobs&&resumeData.jobs.length&&typeof populateEmploymentRows==='function'){
+        populateEmploymentRows(resumeData.jobs);
+      }
+    }
+    /* 2) then refill any flat fields that are still empty (incl. the rebuilt rows by data-dk) */
     let restored=0;
-    document.querySelectorAll('#view-resume .field-input, #view-account .field-input').forEach(el=>{
-      const k=el.id||el.dataset.dk;
-      if(k&&d.data[k]!==undefined&&!el.value){ el.value=d.data[k]; restored++; }
-    });
-    if(d.toggles){
-      [...document.querySelectorAll('.toggle-switch')].forEach((t,i)=>{
-        if(d.toggles[i]===1) t.classList.add('on'); 
+    if(d.data){
+      document.querySelectorAll('#view-resume .field-input, #view-account .field-input').forEach(el=>{
+        const k=el.id||el.dataset.dk;
+        if(k&&d.data[k]!==undefined&&!el.value){ el.value=d.data[k]; restored++; }
       });
     }
-    if(restored>0) showToast('🟢 Profile draft safely restored — pick up right where you left off!');
+    if(d.toggles){
+      [...document.querySelectorAll('.toggle-switch')].forEach((t,i)=>{
+        if(d.toggles[i]===1) t.classList.add('on');
+      });
+    }
+    if(d.resume&&(d.resume.name||(d.resume.jobs&&d.resume.jobs.length))){
+      if(typeof runPersonalizationCascade==='function') runPersonalizationCascade();
+      showToast('🟢 Your saved resume is back — picking up right where you left off!');
+    } else if(restored>0){
+      showToast('🟢 Profile draft safely restored.');
+    }
   }catch(e){}
 }
 document.addEventListener('input',e=>{ if(e.target.classList&&e.target.classList.contains('field-input')) saveDraft(); });
@@ -4370,7 +4410,8 @@ async function loadCompanyJobs(co){
   box.innerHTML=''; if(st) st.textContent='searching live feed…';
   try{
     const country=(document.getElementById('f-country')&&document.getElementById('f-country').value)||'us';
-    const res=await fetch(ADZUNA_PROXY_URL+'?what='+encodeURIComponent(co)+'&country='+country,{headers:{'X-Requested-With':'XMLHttpRequest'}});
+    let where=''; try{ where=localStorage.getItem('gpj_loc')||(document.getElementById('f-location')||{}).value||''; }catch(e){}
+    const res=await fetch(ADZUNA_PROXY_URL+'?what='+encodeURIComponent(co)+(where?('&where='+encodeURIComponent(where)):'')+'&country='+country,{headers:{'X-Requested-With':'XMLHttpRequest'}});
     if(!res.ok) throw 0;
     const data=await res.json();
     const rows=(data.results||[]).filter(r=>{
@@ -4993,8 +5034,8 @@ document.addEventListener('keydown',function(e){
 /* ---------- EXPANDABLE JOB DESCRIPTIONS (tap to grow, scroll inside) ---------- */
 document.addEventListener('click',function(e){
   const clamp=e.target.closest&&e.target.closest('.desc-clamp');
-  if(clamp){ e.stopPropagation(); clamp.classList.toggle('expanded'); }
-});
+  if(clamp){ e.stopPropagation(); e.preventDefault(); clamp.classList.toggle('expanded'); }
+},true);   /* capture phase: expand fires before any card/drawer toggle */
 
 /* ---------- SWIPE CARD → UNIFIED COMPANY DRAWER (vibe + reviews) ---------- */
 function openCardCompanyProfile(ev){
