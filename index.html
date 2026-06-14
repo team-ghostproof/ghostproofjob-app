@@ -325,6 +325,7 @@
           <div id="auth-chip" onclick="toggleProfileMenu()" style="background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.35);color:var(--cyber);font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:pointer;">Sign In</div>
           <div id="profile-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:300;background:var(--plum2);border:1px solid var(--plum4);border-radius:14px;padding:6px;min-width:190px;box-shadow:0 12px 34px rgba(0,0,0,.55);">
             <div class="pm-item" onclick="pmGo('account')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">⚙️ Settings</div>
+            <div class="pm-item" onclick="pmViewedJobs()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">👀 Viewed Jobs <span id="pm-viewed-count" style="margin-left:auto;background:var(--plum4);border-radius:8px;padding:1px 7px;font-size:11px;color:var(--muted);">0</span></div>
             <div class="pm-item" onclick="openContactModal()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">📬 Contact Us</div>
             <div style="height:1px;background:var(--plum4);margin:4px 8px;"></div>
             <div class="pm-item" onclick="pmSignOut()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--danger);">🚪 Sign Out</div>
@@ -753,6 +754,16 @@
     <div id="sandbox-note" style="background:var(--plum2);padding:8px 12px;font-size:10px;color:var(--muted);flex-shrink:0;text-align:center;">If this page stays blank, the employer blocks embedding — use "Open in New Tab ↗" above. Your copy-tokens work either way.</div>
   </div>
 
+  <!-- ===== EDUCATION BLANK CONFIRM ===== -->
+  <div class="modal-scrim" id="edu-confirm-modal" style="z-index:336;">
+    <div class="modal-box" style="text-align:center;position:relative;">
+      <div style="font-size:30px;margin-bottom:8px;">🟢</div>
+      <div style="font-size:14px;font-weight:700;line-height:1.5;margin-bottom:16px;">We noticed your education section is blank and just wanted to make sure that's intentional! 🟢</div>
+      <div onclick="eduConfirmProceed()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:12px;font-size:14px;cursor:pointer;margin-bottom:8px;">That's intentional — continue</div>
+      <div onclick="document.getElementById('edu-confirm-modal').classList.remove('open');switchView('resume',document.querySelector('[data-view=resume]'))" style="color:var(--muted);font-size:13px;cursor:pointer;padding:6px;">Let me add it</div>
+    </div>
+  </div>
+
   <!-- ===== MATCH INSIGHT MODAL ===== -->
   <div class="modal-scrim" id="match-modal" style="z-index:335;">
     <div class="modal-box" style="text-align:left;">
@@ -767,7 +778,8 @@
 
   <!-- ===== LOCATION MISMATCH RESOLVER CAPSULE ===== -->
   <div id="loc-capsule" style="display:none;position:absolute;bottom:84px;left:12px;right:12px;z-index:250;background:var(--plum3);border:2px solid var(--mint);border-radius:16px;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,.55);">
-    <div style="font-size:12px;color:var(--off);line-height:1.5;margin-bottom:8px;" id="loc-capsule-text">📍 We see you're linked to two cities. Tap your target city to instantly focus your swipe deck!</div>
+    <div onclick="document.getElementById('loc-capsule').style.display='none'" style="position:absolute;top:8px;right:12px;color:var(--muted);cursor:pointer;font-size:15px;">✕</div>
+    <div style="font-size:12px;color:var(--off);line-height:1.5;margin-bottom:8px;padding-right:18px;" id="loc-capsule-text">📍 We see you're linked to two cities. Tap your target city to instantly focus your swipe deck!</div>
     <div style="display:flex;gap:8px;">
       <div id="loc-cap-a" onclick="pickDeckCity(this)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.45);color:var(--mint);border-radius:10px;padding:10px;text-align:center;font-size:13px;font-weight:800;cursor:pointer;"></div>
       <div id="loc-cap-b" onclick="pickDeckCity(this)" style="flex:1;background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:10px;padding:10px;text-align:center;font-size:13px;font-weight:800;cursor:pointer;"></div>
@@ -912,6 +924,7 @@
               <div style="display:flex;gap:8px;" id="drawer-social">
                 <div class="social-icon" data-net="linkedin" title="LinkedIn">💼</div><div class="social-icon" data-net="x" title="X / Twitter">🐦</div><div class="social-icon" data-net="glassdoor" title="Glassdoor">🏢</div><div class="social-icon" data-net="web" title="Website">🌐</div>
               </div>
+              <div onclick="openCardCompanyProfile(event)" style="margin-top:12px;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">⭐ Full company profile, vibe & reviews →</div>
             </div>
           </div>
         </div>
@@ -1214,7 +1227,6 @@
 
         <div id="levelup-tracks"></div>
 <div style="margin:0 16px 16px;padding:14px 16px;border:1px solid rgba(181,95,230,.4);border-radius:14px;background:rgba(240,238,248,.05);">
-          <div style="font-size:12px;color:var(--off);line-height:1.7;">🤝 People-First Notice: GhostProofJob will never charge you additional hidden fees or upcharges for these roadmaps. In the future, we may consider options to fund our server infrastructure, but our platform tools remain dedicated entirely to your career growth—no pressure, ever.</div>
         </div>
         </div>
       </div>
@@ -1411,7 +1423,7 @@
         <div class="pref-section-title">Match Preferences <span style="text-transform:none;font-weight:400;">(tap to edit — we'll advise as you go)</span></div>
         <div class="pref-row" onclick="editPref('titles')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(0,245,160,.12);">🎯</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Job Titles</div><div style="font-size:11px;color:var(--mint);" id="pref-titles">Engineer, Developer, Tech Lead</div></div><div style="color:var(--muted);">✎</div></div>
         <div class="pref-row" onclick="editPref('salary')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(181,95,230,.12);">💰</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Minimum Salary</div><div style="font-size:11px;color:var(--cyber);" id="pref-salary">$120,000 / year</div></div><div style="color:var(--muted);">✎</div></div>
-        <div class="pref-row" onclick="editPref('industries')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(255,179,71,.12);">🏭</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Industries</div><div style="font-size:11px;color:var(--warn);" id="pref-industries">Tech, Fintech, Healthcare IT</div></div><div style="color:var(--muted);">✎</div></div>
+        <div class="pref-row" onclick="editPref('industries')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(255,179,71,.12);">🏭</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Industries</div><div style="font-size:11px;color:var(--warn);" id="pref-industries">Tap to set your industries</div></div><div style="color:var(--muted);">✎</div></div>
       </div>
 
       <div class="pref-section" id="sec-notif">
@@ -1710,6 +1722,7 @@ const browseJobs=[
 let liveJobs=[];
 function openLive(i){
   const j=liveJobs[i];
+  if(j){ try{ recordView({t:j.t,co:j.co,url:j.url||'',ghost:j.ghost,desc:j.desc||''}); }catch(e){} }
   if(j&&j.url){ window.open(j.url,'_blank','noopener'); showToast('↗ Opening '+j.co+'’s posting…'); }
   else if(j){ openCompanyView(j.co,{title:j.t,url:''}); }
 }
@@ -2378,7 +2391,9 @@ function downloadResume(){
   const blob=new Blob([html],{type:'text/html'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='Resume_AlexRivera_'+tplState.tpl+'.html';
+  const fn=(resumeData.name||'').trim().replace(/\s+/g,'_').replace(/[^A-Za-z0-9_]/g,'')||'My';
+  const tplLabel=(tplState.tpl||'classic').charAt(0).toUpperCase()+(tplState.tpl||'classic').slice(1);
+  a.download='Resume_'+fn+'_'+tplLabel+'.html';
   a.click();
   URL.revokeObjectURL(a.href);
   showToast('📥 Exported! Open the file → Ctrl/Cmd+P → Save as PDF');
@@ -2556,7 +2571,7 @@ async function fetchLiveMarketJobs(){
     jobsQueue=data.results.map(r=>({
       t:(r.title||'Open Role').replace(/<[^>]+>/g,''),
       co:(typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'Hiring Company',
-      sal:r.salary_min?('$'+Math.round(r.salary_min/1000)+'K'+(r.salary_max?(' – $'+Math.round(r.salary_max/1000)+'K'):'')):'Salary on request',
+      sal:r.salary_min?('$'+Math.round(r.salary_min/1000)+'K'+(r.salary_max?(' – $'+Math.round(r.salary_max/1000)+'K'):'')):(r.salary_text||'Salary on request'),
       salMax:r.salary_max||r.salary_min||0,
       loc:(typeof r.location==='string'?r.location:(r.location&&r.location.display_name))||where||'See posting',
       url:r.redirect_url||'',
@@ -2823,7 +2838,7 @@ function applyRealParse(text){
     if(company&&!okCompany(company)) company='';
     if(title||company){
       if(company) comps.add(company);
-      if(parsedJobs.length<5) parsedJobs.push({t:title||'(role)',c:company||'',d:date||'',b:'See resume for details'});
+      if(parsedJobs.length<12) parsedJobs.push({t:title||'(role)',c:company||'',d:date||'',b:'See resume for details'});
     }
   });
   /* attach the first following bullet/verb line to each job as its duty summary */
@@ -3153,14 +3168,16 @@ applySwipeFilters();
    ============================================================ */
 
 /* ---------- STAT TRACKER LISTS ---------- */
-let lists={applied:[],responses:[],skipped:[]};
+let lists={applied:[],responses:[],skipped:[],viewed:[]};
 function loadLists(){ try{const s=JSON.parse(localStorage.getItem('gpj_lists')||'null'); if(s) lists=s;}catch(e){} updateStatCounters(); }
 function saveLists(){ try{localStorage.setItem('gpj_lists',JSON.stringify(lists));}catch(e){} }
 function updateStatCounters(){
   const set=(id,n)=>{const e=document.getElementById(id);if(e)e.textContent=n;};
+  if(!lists.viewed) lists.viewed=[];
   set('stat-applied',lists.applied.length);
   set('stat-responses',lists.responses.length);
   set('stat-skipped',lists.skipped.length);
+  set('pm-viewed-count',lists.viewed.length);
 }
 function recordSwipe(dir,job){
   const rec={t:job.t,co:job.co,ghost:ghostRiskFor(job.co),when:Date.now(),status:null};
@@ -3170,11 +3187,12 @@ function recordSwipe(dir,job){
 function fmtAgo(ts){const d=Math.floor((Date.now()-ts)/86400000);return d===0?'today':(d===1?'1d ago':d+'d ago');}
 
 function openStatModal(kind){
-  const titles={applied:'❤️ Applied',responses:'📞 Responses',skipped:'🚫 Skipped'};
+  const titles={applied:'❤️ Applied',responses:'📞 Responses',skipped:'🚫 Skipped',viewed:'👀 Viewed'};
   const subs={
     applied:'Every job you swiped right on. Heard back? Log it.',
     responses:'Your active callbacks — green means interview in motion.',
-    skipped:'Left-swiped listings. Changed your mind? Put one back.'};
+    skipped:'Left-swiped listings. Changed your mind? Put one back.',
+    viewed:'Jobs you opened but didn\u2019t apply to yet — revisit or apply anytime.'};
   document.getElementById('stat-modal-title').textContent=titles[kind];
   document.getElementById('stat-modal-sub').textContent=subs[kind];
   renderStatList(kind);
@@ -3203,6 +3221,11 @@ function renderStatList(kind){
       right=r.status==='interview'
         ? '<span class="status-pill" style="background:rgba(0,245,160,.18);color:var(--mint);">🟢 Interview Active</span>'
         : '<span class="status-pill" style="background:rgba(255,77,106,.15);color:var(--danger);">Rejected</span>';
+    } else if(kind==='viewed'){
+      right=`<div style="display:flex;gap:6px;">
+               <span class="status-pill" style="background:rgba(181,95,230,.15);color:var(--cyber);cursor:pointer;" onclick="reopenViewed(${i})">Open</span>
+               <span class="status-pill" style="background:rgba(0,245,160,.12);color:var(--mint);cursor:pointer;" onclick="applyFromViewed(${i})">Apply</span>
+             </div>`;
     } else {
       right=`<span class="status-pill" style="background:rgba(0,245,160,.12);color:var(--mint);cursor:pointer;" onclick="unSkip(${i})">↩ Put Back in Deck</span>`;
     }
@@ -3222,6 +3245,32 @@ function logResponse(i,status){
   renderStatList('applied');
   showToast(status==='interview'?'🟢 Interview logged — go get it!':'Logged. Their loss — onward 👻');
 }
+/* ---------- VIEWED JOBS: recall anything you opened but didn't apply to ---------- */
+function recordView(job){
+  if(!job||!job.co) return;
+  if(!lists.viewed) lists.viewed=[];
+  const key=(job.t||'')+'|'+(job.co||'');
+  /* de-dupe: move existing to top instead of stacking */
+  lists.viewed=lists.viewed.filter(v=>((v.t||'')+'|'+(v.co||''))!==key);
+  lists.viewed.unshift({t:job.t||'Role',co:job.co,ghost:job.ghost!==undefined?job.ghost:ghostRiskFor(job.co),when:Date.now(),url:job.url||'',desc:job.desc||''});
+  if(lists.viewed.length>60) lists.viewed=lists.viewed.slice(0,60);
+  saveLists(); updateStatCounters(); cloudSync();
+}
+function reopenViewed(i){
+  const r=lists.viewed[i];
+  if(!r) return;
+  document.getElementById('stat-modal').classList.remove('open');
+  openCompanyView(r.co,{title:r.t,url:r.url||''});
+}
+function applyFromViewed(i){
+  const r=lists.viewed[i];
+  if(!r) return;
+  document.getElementById('stat-modal').classList.remove('open');
+  pendingJobUrl=r.url||'';
+  if(resumeReady&&!clOptedOut()){ offerCoverLetter(r.t,r.co,true); }
+  else if(r.url){ openSandbox(r.url,r.t,r.co); }
+  else { openCompanyView(r.co,{title:r.t,url:''}); }
+}
 function recoveryUsedToday(){
   try{
     const d=JSON.parse(localStorage.getItem('gpj_recovery')||'{}');
@@ -3235,17 +3284,25 @@ function recoverToDeck(rec){
   if(recoveryUsedToday()>=5){ showToast('↩ Daily recovery limit reached (5/day) — resets tomorrow'); return false; }
   rawQueue.unshift({t:rec.t,co:rec.co,sal:'See posting',salMax:0,loc:'Back in deck',ghost:rec.ghost,match:70,url:rec.url||''});
   bumpRecovery();
-  saveLists(); updateStatCounters(); applySwipeFilters();
-  showToast('↩ '+rec.co+' is back in your deck ('+recoveryUsedToday()+'/5 today)');
   return true;
 }
 function unSkip(i){
   const rec=lists.skipped[i];
-  if(recoverToDeck(rec)){ lists.skipped.splice(i,1); saveLists(); renderStatList('skipped'); }
+  if(!recoverToDeck(rec)) return;
+  lists.skipped.splice(i,1);                 /* remove FIRST so the count is accurate */
+  updateStatCounters();                      /* instant numeric repaint */
+  renderStatList('skipped');                 /* repaint the open list */
+  applySwipeFilters(); saveLists(); cloudSync();
+  showToast('↩ '+rec.co+' is back in your deck ('+recoveryUsedToday()+'/5 today)');
 }
 function unApply(i){
   const rec=lists.applied[i];
-  if(recoverToDeck(rec)){ lists.applied.splice(i,1); saveLists(); renderStatList('applied'); }
+  if(!recoverToDeck(rec)) return;
+  lists.applied.splice(i,1);
+  updateStatCounters();
+  renderStatList('applied');
+  applySwipeFilters(); saveLists(); cloudSync();
+  showToast('↩ '+rec.co+' is back in your deck ('+recoveryUsedToday()+'/5 today)');
 }
 
 /* ---------- JOB FRESHNESS PILLS ---------- */
@@ -3361,6 +3418,10 @@ function toggleProfileMenu(){
 function pmGo(view){
   const pm=document.getElementById('profile-menu'); if(pm) pm.style.display='none';
   switchView(view,null);
+}
+function pmViewedJobs(){
+  const pm=document.getElementById('profile-menu'); if(pm) pm.style.display='none';
+  openStatModal('viewed');
 }
 function pmSignOut(){
   const pm=document.getElementById('profile-menu'); if(pm) pm.style.display='none';
@@ -3655,6 +3716,8 @@ function renderUserReports(){
 
 /* ---------- COMPANY DETAIL VIEW ---------- */
 function openCompanyView(co,job){
+  /* track as a viewed job (recall later) when opened against a specific role */
+  if(job&&job.title){ try{ recordView({t:job.title,co:co,url:job.url||'',ghost:ghostRiskFor(co)}); }catch(e){} }
   document.getElementById('cm-name').textContent=co;
   const g=ghostRiskFor(co);
   const gv=document.getElementById('cm-ghost');
@@ -4654,8 +4717,13 @@ function openCmReviews(){
   const co=document.getElementById('cm-name').textContent;
   const box=document.getElementById('cm-reviews');
   if(!box) return;
-  if(box.style.display==='none'){ fillCmReviews(co); box.style.display='block'; }
-  else box.style.display='none';
+  if(box.style.display==='none'){
+    fillCmReviews(co);
+    box.style.display='block';
+    try{ box.scrollIntoView({behavior:'smooth',block:'nearest'}); }catch(e){}
+  } else {
+    box.style.display='none';
+  }
 }
 /* tapping the drawer star cluster also opens reviews */
 const _v9BindCmRate=bindCmRate;
@@ -4673,12 +4741,52 @@ bindCmRate=function(co){
   if(links&&!links.querySelector('.cm-rev-btn')){
     links.insertAdjacentHTML('beforeend','<div class="buzz-add cm-rev-btn" onclick="openCmReviews()">Reviews</div>');
   }
-  /* unified drawer: reviews matrix + vibe meter render expanded on open */
+  /* reviews start COLLAPSED — tapping the vibe stars / rate cluster / Reviews button opens them.
+     (Pre-fill the content so the first tap is instant, but keep the panel hidden.) */
   fillCmReviews(co);
   const box=document.getElementById('cm-reviews');
-  if(box) box.style.display='block';
+  if(box) box.style.display='none';
   renderCmVibe(co);
 };
+
+/* ---------- UNIVERSAL ESCAPE HATCH: nobody ever gets trapped ----------
+   1) Tapping the dark backdrop of any modal closes it.
+   2) The Escape key closes the top-most open overlay (modals, sandbox,
+      capsule, dropdown, suggestions). Pure safety net — every modal also
+      keeps its own explicit ✕ / dismiss button. */
+document.addEventListener('click',function(e){
+  if(e.target&&e.target.classList&&e.target.classList.contains('modal-scrim')){
+    e.target.classList.remove('open');
+  }
+});
+function closeTopOverlay(){
+  /* sandbox first (full-screen), then any open modal, then lightweight overlays */
+  const sb=document.getElementById('apply-sandbox');
+  if(sb&&sb.style.display!=='none'){ if(typeof closeSandbox==='function') closeSandbox(); else sb.style.display='none'; return true; }
+  const openModal=document.querySelector('.modal-scrim.open');
+  if(openModal){ openModal.classList.remove('open'); return true; }
+  const cap=document.getElementById('loc-capsule');
+  if(cap&&cap.style.display!=='none'){ cap.style.display='none'; return true; }
+  const pm=document.getElementById('profile-menu');
+  if(pm&&pm.style.display==='block'){ pm.style.display='none'; return true; }
+  const sug=document.getElementById('ghost-sug');
+  if(sug&&sug.style.display!=='none'){ sug.style.display='none'; return true; }
+  return false;
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape') closeTopOverlay();
+});
+
+/* ---------- SWIPE CARD → UNIFIED COMPANY DRAWER (vibe + reviews) ---------- */
+function openCardCompanyProfile(ev){
+  if(ev) ev.stopPropagation();
+  const top=document.querySelector('.job-card.top');
+  if(!top) return;
+  const sub=top.querySelector('.s-sub');
+  const co=(sub?sub.textContent.split(' · ')[0]:'').trim()||'this company';
+  const title=top.querySelector('.s-title')?top.querySelector('.s-title').textContent:'';
+  openCompanyView(co,{title:title,url:top.dataset.joburl||''});
+}
 
 /* ---------- CDN FLAG RENDERER ---------- */
 function updateFlag(){
@@ -4836,6 +4944,39 @@ window.gpjAuthChanged=function(u){ _v10Auth(u); renderSettingsIdentity(); };
 
 renderSettingsIdentity();
 renderLevelUpCourses();
+
+/* ============================================================
+   APPENDED BLOCK: PLATFORM SYSTEMS v11
+   match-unlock hide · education blank-confirm · export name
+   ============================================================ */
+
+/* ---------- HIDE "unlock Match %" NUDGE ONCE A RESUME EXISTS ---------- */
+function refreshResumeNudge(){
+  const n=document.getElementById('resume-nudge');
+  if(n) n.style.display=(resumeReady||profileComplete())?'none':'flex';
+}
+refreshResumeNudge();
+
+/* ---------- EDUCATION BLANK-CONFIRM (non-penalizing) ---------- */
+let _eduConfirmed=false;
+function eduIsBlank(){
+  const e=document.getElementById('pr-edu');
+  return !(e&&e.value.trim());
+}
+function maybeConfirmEducation(proceedFn){
+  if(_eduConfirmed||!eduIsBlank()){ proceedFn(); return; }
+  window._eduProceed=proceedFn;
+  document.getElementById('edu-confirm-modal').classList.add('open');
+}
+function eduConfirmProceed(){
+  _eduConfirmed=true;
+  document.getElementById('edu-confirm-modal').classList.remove('open');
+  if(typeof window._eduProceed==='function') window._eduProceed();
+}
+
+/* wire nudge refresh into the personalization cascade */
+const _v11Cascade=runPersonalizationCascade;
+runPersonalizationCascade=function(){ _v11Cascade(); refreshResumeNudge(); };
 
 /* ---------- v7 INIT ---------- */
 renderGhostCompanies();
