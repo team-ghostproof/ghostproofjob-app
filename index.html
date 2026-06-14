@@ -123,10 +123,10 @@
   /* Swipe deck */
   #card-deck{position:relative;min-height:420px;height:auto;margin:16px;}
   body.desk #card-deck{height:500px;min-height:500px;}
-  .job-card{position:absolute;width:100%;background:var(--plum2);border:1px solid var(--plum3);border-radius:24px;overflow:hidden;cursor:pointer;transition:transform .08s;transform-origin:bottom center;}
-  .job-card.top{z-index:10;}
-  .job-card.mid{z-index:9;transform:scale(.95) translateY(12px);pointer-events:none;}
-  .job-card.bot{z-index:8;transform:scale(.90) translateY(24px);pointer-events:none;}
+  .job-card{position:absolute;width:100%;background:var(--plum2);border:1px solid var(--plum3);border-radius:24px;overflow:hidden;cursor:pointer;transition:transform .08s,opacity .15s;transform-origin:bottom center;}
+  .job-card.top{z-index:10;opacity:1;}
+  .job-card.mid{z-index:9;transform:scale(.95) translateY(12px);pointer-events:none;opacity:.45;filter:brightness(.7);}
+  .job-card.bot{z-index:8;transform:scale(.90) translateY(24px);pointer-events:none;opacity:.2;filter:brightness(.5);}
   .card-header{padding:16px 16px 12px;border-bottom:1px solid var(--plum3);}
   .logo-circle{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
   .salary-badge{background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.3);color:var(--mint);font-size:11px;padding:3px 8px;border-radius:8px;}
@@ -335,7 +335,6 @@
         <div class="desk-only" style="gap:6px;">
           <span class="nav-pill" onclick="goHome()">🏠 Home</span>
           <span class="nav-pill" onclick="switchView('browse',null)">🔍 Browse</span>
-          <span class="nav-pill" onclick="switchView('account',null)">⚙️ Settings</span>
         </div>
         <div style="position:relative;">
           <div id="auth-chip" onclick="toggleProfileMenu()" style="background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.35);color:var(--cyber);font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:pointer;">Sign In</div>
@@ -693,7 +692,7 @@
         <div style="flex:1;min-width:0;">
           <div id="cm-vibe-stars" onclick="openCmReviews()" class="vibe-stars" style="cursor:pointer;font-size:16px;">★★★★☆</div>
           <div class="report-bar-bg" style="margin:4px 0 2px;"><div id="cm-vibe-bar" class="report-bar-fill" style="width:0%;background:var(--mint);"></div></div>
-          <div style="font-size:9px;color:var(--muted);">Community Vibe · tap for reviews</div>
+          <div id="cm-vibe-label" style="font-size:9px;color:var(--muted);">Community Vibe · tap for reviews</div>
         </div>
       </div>
       <div id="cm-jobsummary" style="display:none;margin-bottom:12px;"></div>
@@ -761,6 +760,8 @@
         <div onclick="closeSandbox()" style="font-size:14px;font-weight:800;color:var(--plum);padding:2px 8px;cursor:pointer;">✕</div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;" id="hud-tokens"></div>
+      <div onclick="sandboxDone()" style="margin-top:8px;background:var(--plum);color:var(--mint);font-weight:800;border-radius:10px;padding:10px;text-align:center;font-size:13px;cursor:pointer;">✓ Done — I Applied</div>
+      <div style="font-size:9px;color:rgba(18,15,29,.7);text-align:center;margin-top:4px;line-height:1.4;">Some employers block their site from opening here — if it stays blank, use "Open in New Tab ↗". Either way, tap Done when you've submitted.</div>
     </div>
     <iframe id="sandbox-frame" src="about:blank" style="flex:1;border:none;background:#fff;" sandbox="allow-scripts allow-forms allow-same-origin allow-popups"></iframe>
     <div id="sandbox-warn" style="display:none;background:rgba(255,179,71,.95);padding:10px 12px;flex-shrink:0;align-items:center;gap:10px;">
@@ -769,6 +770,17 @@
       <div onclick="this.parentElement.style.display='none'" style="color:var(--plum);font-weight:800;cursor:pointer;padding:0 4px;">✕</div>
     </div>
     <div id="sandbox-note" style="background:var(--plum2);padding:8px 12px;font-size:10px;color:var(--muted);flex-shrink:0;text-align:center;">If this page stays blank, the employer blocks embedding — use "Open in New Tab ↗" above. Your copy-tokens work either way.</div>
+  </div>
+
+  <!-- ===== MONTHLY GHOST-CHECK (recall applied jobs to update status) ===== -->
+  <div class="modal-scrim" id="ghostcheck-modal" style="z-index:337;">
+    <div class="modal-box" style="text-align:left;position:relative;max-height:80vh;overflow-y:auto;">
+      <div onclick="document.getElementById('ghostcheck-modal').classList.remove('open')" style="position:absolute;top:12px;right:14px;color:var(--muted);cursor:pointer;font-size:16px;">✕</div>
+      <div style="font-size:15px;font-weight:800;margin-bottom:2px;">👻 Quick ghost-check</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">You applied to these a while back. Heard anything? Your answers power the community Ghost Score — and take 5 seconds.</div>
+      <div id="ghostcheck-list"></div>
+      <div onclick="document.getElementById('ghostcheck-modal').classList.remove('open')" style="margin-top:8px;color:var(--muted);font-size:12px;text-align:center;cursor:pointer;padding:8px;">Maybe later</div>
+    </div>
   </div>
 
   <!-- ===== EDUCATION BLANK CONFIRM ===== -->
@@ -1242,7 +1254,7 @@
             <div class="match-ring" style="color:var(--warn);">58%</div>
             <div style="flex:1;"><div style="font-size:13px;font-weight:600;">DevOps Engineer</div><div style="font-size:11px;color:var(--muted);">Missing: AWS/cloud certs · see Tier 2 below</div></div>
           </div>
-          <div onclick="switchView('swipe',document.querySelector('[data-view=swipe]'))" style="margin-top:10px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:11px;font-size:13px;cursor:pointer;text-align:center;">🎴 Start Swiping Matched Jobs</div>
+          <div onclick="startSwipingMatched()" style="margin-top:10px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:11px;font-size:13px;cursor:pointer;text-align:center;">🎴 Start Swiping Matched Jobs</div>
         </div>
 
         <!-- Level Up: 3-tier courses -->
@@ -1329,13 +1341,13 @@
           <div class="acc-chevron">▾</div>
         </div>
         <div class="accordion-body"><div class="acc-inner">
-          <div class="field-label">Highest Degree *</div>
+          <div class="field-label">Highest Degree</div>
           <select class="field-input pf-degree" style="margin-bottom:10px;" onchange="updateProgress()">
             <option value="">Select degree…</option><option>High School / GED</option><option>Associate's</option><option>Bachelor's Degree</option><option>Master's</option><option>Doctorate / PhD</option><option>Bootcamp Certificate</option>
           </select>
-          <div class="field-label">Major *</div><input class="field-input pf-major" placeholder="Computer Science" style="margin-bottom:10px;" oninput="updateProgress()"/>
-          <div class="field-label">Institution *</div><input class="field-input pf-school" placeholder="University of Texas" style="margin-bottom:10px;" oninput="updateProgress()"/>
-          <div class="field-label">Graduation Year *</div><input class="field-input pf-gradyr" placeholder="2019" type="number" oninput="updateProgress()"/>
+          <div class="field-label">Major</div><input class="field-input pf-major" placeholder="Computer Science" style="margin-bottom:10px;" oninput="updateProgress()"/>
+          <div class="field-label">Institution</div><input class="field-input pf-school" placeholder="University of Texas" style="margin-bottom:10px;" oninput="updateProgress()"/>
+          <div class="field-label">Graduation Year</div><input class="field-input pf-gradyr" placeholder="2019" type="number" oninput="updateProgress()"/>
         </div></div>
       </div>
 
@@ -1678,7 +1690,7 @@ function swipeCard(dir){
       registerApply();
       offerCoverLetter(deckJobs[(topIndex-1)%3].t, deckJobs[(topIndex-1)%3].co, false);
     }
-    showToast(dir==='right'?('❤️ Auto-Applying to '+deckJobs[(topIndex-1)%3].co+'…'):'🚫 Skipped · Algorithm updated');
+    showToast(dir==='right'?('❤️ '+deckJobs[(topIndex-1)%3].co+' — opening to apply…'):'🚫 Skipped · Algorithm updated');
   },480);
 }
 let startX=0,startY=0,isDragging=false;
@@ -1775,8 +1787,19 @@ function renderBrowse(){
     const lsort=(document.getElementById('f-livesort')||{}).value||'rel';
     if(lsort==='date') hits=hits.slice().sort((a,b)=>(a.posting_age_days??999)-(b.posting_age_days??999));
     else if(lsort==='salhi') hits=hits.slice().sort((a,b)=>(b.salMax||0)-(a.salMax||0));
-    out.innerHTML='<div style="padding:0 16px 8px;font-size:10px;color:var(--mint);">📡 '+hits.length+' live openings'+((kw||styVal&&styVal!=='Any'||indVal&&indVal!=='All')?' (filtered)':'')+' — tap any card to open the real posting</div>'+
-      hits.map((j,ix)=>{
+    /* SAFETY NET: a filter must never blank the screen. If it would, show all
+       live jobs with an honest note instead of an empty list. Live feeds rarely
+       tag remote/salary, so strict filtering would otherwise wipe everything. */
+    const filtersActive=(hasSal||salL||kw||(styVal&&styVal!=='Any')||(indVal&&indVal!=='All'));
+    let noteText, showJobs=hits;
+    if(filtersActive && hits.length===0){
+      showJobs=liveJobs;
+      noteText='📡 No live openings exactly match those filters — showing all '+liveJobs.length+' instead. Try widening your search.';
+    } else {
+      noteText='📡 '+hits.length+' live openings'+(filtersActive?' (filtered)':'')+' — tap any card to open the real posting';
+    }
+    out.innerHTML='<div style="padding:0 16px 8px;font-size:10px;color:var(--mint);">'+noteText+'</div>'+
+      showJobs.map((j,ix)=>{
         const i=liveJobs.indexOf(j);
         const gc=j.ghost<=15?'var(--mint)':(j.ghost<=35?'var(--warn)':'var(--danger)');
         return '<div class="browse-row" onclick="openLive('+i+')">'+
@@ -3470,19 +3493,28 @@ window.gpjAuthChanged=function(user){
 /* friendly name: typed/parsed First Last → resume name → email prefix as last resort */
 function profileDisplayName(user){
   let first=(document.querySelector('.pf-first')||{}).value||'';
-  let last=(document.querySelector('.pf-last')||{}).value||'';
-  if(!first && resumeData.name){ const p=resumeData.name.split(/\s+/); first=p[0]||''; last=last||p.slice(1).join(' '); }
+  if(!first && resumeData.name){ first=resumeData.name.split(/\s+/)[0]||''; }
   let stored=''; try{ stored=JSON.parse(localStorage.getItem('gpj_signup')||'{}').first||''; }catch(e){}
   if(!first) first=stored;
-  const full=[first,last].filter(Boolean).join(' ').trim();
-  if(full) return full;
+  /* first name only on the header chip — full name would clip on mobile */
+  if(first) return first.trim();
   return ((user&&user.email)||'').split('@')[0]||'Account';
 }
 /* ---------- PROFILE DROPDOWN MENU ---------- */
 function toggleProfileMenu(){
   if(!(window.fb&&fb.current())){ openAuth(); return; }
   const pm=document.getElementById('profile-menu');
-  if(pm) pm.style.display=pm.style.display==='none'?'block':'none';
+  const chip=document.getElementById('auth-chip');
+  if(pm){
+    const opening=pm.style.display==='none';
+    pm.style.display=opening?'block':'none';
+    /* anchor the menu just under the profile chip (works despite header clip) */
+    if(opening&&chip){
+      const r=chip.getBoundingClientRect();
+      pm.style.top=(r.bottom+6)+'px';
+      pm.style.right=Math.max(8,(window.innerWidth-r.right))+'px';
+    }
+  }
 }
 function pmGo(view){
   const pm=document.getElementById('profile-menu'); if(pm) pm.style.display='none';
@@ -4046,6 +4078,8 @@ document.addEventListener('input',e=>{ if(e.target.classList&&e.target.classList
 document.addEventListener('change',e=>{ if(e.target.classList&&e.target.classList.contains('field-input')) saveDraft(); });
 draftKeyInit();
 restoreDraft();
+/* monthly ghost-check prompt, after the app settles */
+setTimeout(()=>{ try{ maybeGhostCheck(); }catch(e){} },3500);
 
 /* ---------- LIVE PALETTE REPAINT (no refresh ever needed) ---------- */
 (function liveRepaint(){
@@ -4194,8 +4228,13 @@ function unwrapAtsUrl(url){
   return url;
 }
 let sandboxUrl='';
+let sandboxReturnView='swipe';
 function openSandbox(url,title,co){
   sandboxUrl=unwrapAtsUrl(url);
+  /* remember where they came from so "Done" returns them there */
+  try{ const av=document.querySelector('.view.active'); sandboxReturnView=av?av.id.replace('view-',''):'swipe'; }catch(e){ sandboxReturnView='swipe'; }
+  /* log the apply-intent for the monthly ghost-check (timestamp + company + title) */
+  try{ logApplyIntent(title,co,sandboxUrl); }catch(e){}
   syncProfileToResume();
   const me=resumeData;
   const toks=[];
@@ -4210,11 +4249,79 @@ function openSandbox(url,title,co){
   document.getElementById('hud-tokens').innerHTML=toks.join('');
   document.getElementById('sandbox-frame').src=sandboxUrl;
   document.getElementById('apply-sandbox').style.display='flex';
+  window._sbJob={title:title||'',co:co||''};
   /* CHALLENGE INTERCEPTOR: cross-origin walls are invisible to JS, so after a
      short grace period we surface the explicit fallback header automatically */
   const warn=document.getElementById('sandbox-warn');
   if(warn){ warn.style.display='none'; clearTimeout(window._sbWarnT); window._sbWarnT=setTimeout(()=>{ warn.style.display='flex'; },4000); }
   dbg('sandbox open: '+sandboxUrl.slice(0,80));
+}
+/* records that the user opened a posting to apply — powers the monthly ghost-check */
+function logApplyIntent(title,co,url){
+  try{
+    const log=JSON.parse(localStorage.getItem('gpj_apply_log')||'[]');
+    log.unshift({title:title||'',co:co||'',url:url||'',when:Date.now(),confirmed:false,status:''});
+    localStorage.setItem('gpj_apply_log',JSON.stringify(log.slice(0,200)));
+  }catch(e){}
+}
+/* MONTHLY GHOST-CHECK: recall applied jobs >21 days old with no status yet */
+function maybeGhostCheck(){
+  try{
+    const last=parseInt(localStorage.getItem('gpj_ghostcheck_seen')||'0',10);
+    if(Date.now()-last < 30*86400000) return;             // at most once a month
+    const log=JSON.parse(localStorage.getItem('gpj_apply_log')||'[]');
+    const stale=log.filter(e=>!e.status && (Date.now()-e.when)>21*86400000).slice(0,6);
+    if(stale.length<2) return;                             // need a couple to be worth asking
+    renderGhostCheck(stale);
+    document.getElementById('ghostcheck-modal').classList.add('open');
+    localStorage.setItem('gpj_ghostcheck_seen',String(Date.now()));
+  }catch(e){}
+}
+function renderGhostCheck(items){
+  const box=document.getElementById('ghostcheck-list');
+  if(!box) return;
+  box.innerHTML=items.map((e,i)=>
+    '<div style="background:var(--plum3);border-radius:12px;padding:12px;margin-bottom:8px;">'+
+    '<div style="font-size:13px;font-weight:700;">'+String(e.title||'A role').replace(/</g,'&lt;')+'</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">'+String(e.co||'').replace(/</g,'&lt;')+' · applied '+fmtAgo(e.when)+'</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+
+      '<div onclick="ghostCheckAnswer('+i+',\'response\')" style="flex:1;min-width:90px;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✅ Heard back</div>'+
+      '<div onclick="ghostCheckAnswer('+i+',\'ghosted\')" style="flex:1;min-width:90px;background:rgba(255,90,90,.12);border:1px solid rgba(255,90,90,.4);color:var(--danger);border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">👻 Ghosted</div>'+
+      '<div onclick="ghostCheckAnswer('+i+',\'waiting\')" style="flex:1;min-width:90px;background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">⏳ Still waiting</div>'+
+    '</div></div>').join('');
+  window._ghostCheckItems=items;
+}
+function ghostCheckAnswer(i,status){
+  const items=window._ghostCheckItems||[];
+  const e=items[i]; if(!e) return;
+  try{
+    const log=JSON.parse(localStorage.getItem('gpj_apply_log')||'[]');
+    const hit=log.find(x=>x.co===e.co&&x.title===e.title);
+    if(hit) hit.status=status;
+    localStorage.setItem('gpj_apply_log',JSON.stringify(log));
+  }catch(err){}
+  /* a ghosting answer feeds the community report for that company */
+  if(status==='ghosted'&&e.co){ try{ if(typeof fileGhostReport==='function') fileGhostReport(e.co,'No response after applying'); }catch(err){} }
+  if(status==='response'&&e.co){ try{ if(!lists.responses) lists.responses=[]; lists.responses.push({t:e.title,co:e.co,when:Date.now()}); saveLists(); updateStatCounters(); }catch(err){} }
+  /* remove the answered card from the modal */
+  const box=document.getElementById('ghostcheck-list');
+  if(box&&box.children[i]) box.children[i].style.display='none';
+  showToast('Thanks — that helps the whole community 💚');
+}
+/* "✓ Done — I Applied" — confirm the submission and return to prior view */
+function sandboxDone(){
+  const j=window._sbJob||{};
+  /* mark the most recent matching apply-log entry confirmed */
+  try{
+    const log=JSON.parse(localStorage.getItem('gpj_apply_log')||'[]');
+    const hit=log.find(e=>e.co===j.co&&e.title===j.title&&!e.confirmed);
+    if(hit) hit.confirmed=true;
+    localStorage.setItem('gpj_apply_log',JSON.stringify(log));
+  }catch(e){}
+  closeSandbox();
+  showToast('✓ Marked applied'+(j.co?(' — '+j.co):'')+'. Good luck! 🍀');
+  /* return them to where they were */
+  try{ if(sandboxReturnView&&sandboxReturnView!=='swipe'){ switchView(sandboxReturnView,document.querySelector('[data-view='+sandboxReturnView+']')); } }catch(e){}
 }
 function closeSandbox(){
   clearTimeout(window._sbWarnT);
@@ -4406,35 +4513,67 @@ async function loadCompanyJobs(co){
   const box=document.getElementById('cm-jobs');
   const st=document.getElementById('cm-jobs-status');
   if(!box) return;
-  if(!ADZUNA_PROXY_URL){ box.innerHTML=''; if(st) st.textContent=''; return; }
   box.innerHTML=''; if(st) st.textContent='searching live feed…';
+  cmJobsCache=[];
+  /* ---- 1) ATS DIRECT (free public JSON) — links straight to the employer's
+     own application page, ZERO ad/redirect layer. Tried first because it's the
+     cleanest path. Greenhouse + Lever publish open boards per company slug. ---- */
   try{
-    const country=(document.getElementById('f-country')&&document.getElementById('f-country').value)||'us';
-    let where=''; try{ where=localStorage.getItem('gpj_loc')||(document.getElementById('f-location')||{}).value||''; }catch(e){}
-    const res=await fetch(ADZUNA_PROXY_URL+'?what='+encodeURIComponent(co)+(where?('&where='+encodeURIComponent(where)):'')+'&country='+country,{headers:{'X-Requested-With':'XMLHttpRequest'}});
-    if(!res.ok) throw 0;
-    const data=await res.json();
-    const rows=(data.results||[]).filter(r=>{
-      const rc=(typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'';
-      return ciMatch(co.split(' ')[0],rc);
-    }).slice(0,5);
-    cmJobsCache=rows.map(r=>({
-      t:(r.title||'Open role').replace(/<[^>]+>/g,''),
-      url:r.redirect_url||'',
-      loc:(typeof r.location==='string'?r.location:(r.location&&r.location.display_name))||'',
-      desc:(r.description||'').replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,460)
-    }));
+    const slug=co.toLowerCase().replace(/[^a-z0-9]/g,'');
+    const atsTry=[
+      {src:'greenhouse',url:'https://boards-api.greenhouse.io/v1/boards/'+slug+'/jobs'},
+      {src:'lever',url:'https://api.lever.co/v0/postings/'+slug+'?mode=json'}
+    ];
+    for(const a of atsTry){
+      try{
+        const r=await fetch(a.url);
+        if(!r.ok) continue;
+        const d=await r.json();
+        let rows=[];
+        if(a.src==='greenhouse'&&d.jobs){
+          rows=d.jobs.slice(0,8).map(j=>({t:j.title||'Open role',url:j.absolute_url||'',loc:(j.location&&j.location.name)||'',desc:'',ats:'Greenhouse ✓ direct'}));
+        } else if(a.src==='lever'&&Array.isArray(d)){
+          rows=d.slice(0,8).map(j=>({t:j.text||'Open role',url:j.hostedUrl||j.applyUrl||'',loc:(j.categories&&j.categories.location)||'',desc:(j.descriptionPlain||'').slice(0,460),ats:'Lever ✓ direct'}));
+        }
+        if(rows.length){ cmJobsCache=rows; break; }
+      }catch(e){ /* this ATS slug doesn't exist for this company — fine */ }
+    }
+  }catch(e){}
+  /* ---- 2) Fall back to the live aggregator feed (Jooble/Adzuna via Worker) ---- */
+  if(!cmJobsCache.length && ADZUNA_PROXY_URL){
+    try{
+      const country=(document.getElementById('f-country')&&document.getElementById('f-country').value)||'us';
+      let where=''; try{ where=localStorage.getItem('gpj_loc')||(document.getElementById('f-location')||{}).value||''; }catch(e){}
+      const res=await fetch(ADZUNA_PROXY_URL+'?what='+encodeURIComponent(co)+(where?('&where='+encodeURIComponent(where)):'')+'&country='+country,{headers:{'X-Requested-With':'XMLHttpRequest'}});
+      if(res.ok){
+        const data=await res.json();
+        const rows=(data.results||[]).filter(r=>{
+          const rc=(typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'';
+          return ciMatch(co.split(' ')[0],rc);
+        }).slice(0,5);
+        cmJobsCache=rows.map(r=>({
+          t:(r.title||'Open role').replace(/<[^>]+>/g,''),
+          url:r.redirect_url||'',
+          loc:(typeof r.location==='string'?r.location:(r.location&&r.location.display_name))||'',
+          desc:(r.description||'').replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,460),
+          ats:''
+        }));
+      }
+    }catch(e){}
+  }
+  try{
     if(!cmJobsCache.length){ if(st) st.textContent='none found in the live feed right now'; return; }
-    if(st) st.textContent=cmJobsCache.length+' live';
+    const direct=cmJobsCache.some(j=>j.ats);
+    if(st) st.textContent=cmJobsCache.length+' live'+(direct?' · direct apply ✓':'');
     box.innerHTML=cmJobsCache.map((j,i)=>
       '<div style="background:var(--plum3);border-radius:10px;padding:9px 10px;margin-bottom:6px;">'+
       '<div onclick="toggleCmJobDesc('+i+')" style="cursor:pointer;display:flex;align-items:center;gap:8px;">'+
-      '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;">'+j.t+'</div><div style="font-size:10px;color:var(--muted);">'+(j.loc||'See posting')+' · tap for summary</div></div>'+
+      '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;">'+j.t+'</div><div style="font-size:10px;color:var(--muted);">'+(j.loc||'See posting')+(j.ats?(' · <span style=\"color:var(--mint);font-weight:700;\">'+j.ats+'</span>'):' · tap for summary')+'</div></div>'+
       '<div style="color:var(--cyber);font-size:14px;font-weight:800;" id="cmjt-'+i+'">⌄</div></div>'+
       '<div id="cmjd-'+i+'" style="display:none;margin-top:8px;">'+
         (j.desc?('<div class="desc-clamp" style="max-height:120px;">'+j.desc.replace(/</g,'&lt;')+'</div>'):'<div style="font-size:11px;color:var(--muted);">Full details on the posting.</div>')+
         '<div style="display:flex;gap:8px;margin-top:8px;">'+
-        (j.url?('<div onclick="event.stopPropagation();window.open(\''+j.url.replace(/'/g,'')+'\',\'_blank\',\'noopener\')" style="flex:1;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">View Full Posting ↗</div>'):'')+
+        (j.url?('<div onclick="event.stopPropagation();window.open(\''+j.url.replace(/'/g,'')+'\',\'_blank\',\'noopener\')" style="flex:1;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">'+(j.ats?'Apply Direct ↗':'View Full Posting ↗')+'</div>'):'')+
         '<div onclick="event.stopPropagation();openCompanyJob('+i+')" style="flex:1;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">Apply with GhostProof</div>'+
         '</div>'+
       '</div></div>').join('');
@@ -4960,12 +5099,22 @@ function cmVibeScore(co){
   if(saved) return saved;
   return Math.max(2.4,Math.min(4.8,4.9-(ghostRiskFor(co)/30)));
 }
+function cmVibeHasReviews(co){
+  let userRated=0; try{ userRated=(JSON.parse(localStorage.getItem('gpj_corate')||'{}'))[co]||0; }catch(e){}
+  const reports=(ghostReports[co]||[]).length;
+  const bank=(REVIEW_BANK[co]||[]).length;
+  return userRated>0||reports>0||bank>0;
+}
 function renderCmVibe(co){
   const v=cmVibeScore(co);
   const stars=document.getElementById('cm-vibe-stars');
   const bar=document.getElementById('cm-vibe-bar');
-  if(stars){ const fl=Math.round(v); stars.textContent='★'.repeat(fl)+'☆'.repeat(5-fl); }
+  const has=cmVibeHasReviews(co);
+  if(stars){ const fl=Math.round(v); stars.textContent='★'.repeat(fl)+'☆'.repeat(5-fl); stars.style.opacity=has?'1':'.45'; }
   if(bar){ bar.style.width=Math.round((v/5)*100)+'%'; bar.style.background=v>=4?'var(--mint)':(v>=3?'var(--warn)':'var(--danger)'); }
+  /* honest label: real community vibe vs. an estimate from ghost-risk data */
+  const lbl=document.getElementById('cm-vibe-label');
+  if(lbl) lbl.textContent=has?'Community Vibe · tap for reviews':'Estimated from ghost-risk data · no reviews yet';
 }
 function openCmReviews(){
   const co=document.getElementById('cm-name').textContent;
@@ -5038,6 +5187,16 @@ document.addEventListener('click',function(e){
 },true);   /* capture phase: expand fires before any card/drawer toggle */
 
 /* ---------- SWIPE CARD → UNIFIED COMPANY DRAWER (vibe + reviews) ---------- */
+function startSwipingMatched(){
+  switchView('swipe',document.querySelector('[data-view=swipe]'));
+  /* rebuild the deck around the user's real profile location + refetch live */
+  try{
+    livePage=1;
+    if(typeof fetchLiveMarketJobs==='function') fetchLiveMarketJobs();
+    if(typeof applySwipeFilters==='function') applySwipeFilters();
+    showToast('🎴 Refreshing your matched deck…');
+  }catch(e){}
+}
 function openCardCompanyProfile(ev){
   if(ev) ev.stopPropagation();
   const top=document.querySelector('.job-card.top');
