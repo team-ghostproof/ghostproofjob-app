@@ -60,19 +60,32 @@
   .view-content::-webkit-scrollbar{display:none;}
 
   /* Header */
-  #header{background:var(--plum2);border-bottom:1px solid var(--plum3);z-index:50;flex-shrink:0;}
+  #header{background:var(--plum2);border-bottom:1px solid var(--plum3);z-index:50;flex-shrink:0;overflow:hidden;}
   .ghost-glow{filter:drop-shadow(0 0 6px var(--mint));}
   .brand-text{background:linear-gradient(90deg,var(--mint),var(--cyber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
   .grace-pill{background:linear-gradient(90deg,rgba(0,245,160,.15),rgba(181,95,230,.15));border:1px solid rgba(0,245,160,.3);font-size:10px;padding:2px 8px;border-radius:999px;color:var(--mint);white-space:nowrap;}
   .pm-item:hover{background:var(--plum3);}
   .pm-item:active{background:var(--plum4);}
-  .desc-clamp{max-height:76px;overflow:hidden;position:relative;font-size:12px;color:var(--off);line-height:1.6;}
-  .desc-clamp::after{content:'';position:absolute;bottom:0;left:0;right:0;height:26px;background:linear-gradient(transparent,var(--plum2));pointer-events:none;}
-  #auth-chip,#upgrade-trigger{white-space:nowrap;}
+  .desc-clamp{max-height:76px;overflow:hidden;position:relative;font-size:12px;color:var(--off);line-height:1.6;cursor:pointer;transition:max-height .3s ease;}
+  .desc-clamp::after{content:'▾ tap to expand';position:absolute;bottom:0;left:0;right:0;height:26px;padding-top:12px;text-align:center;font-size:10px;font-weight:700;color:var(--cyber);background:linear-gradient(transparent,var(--plum2) 60%);pointer-events:none;}
+  .desc-clamp.expanded{max-height:240px;overflow-y:auto;}
+  .desc-clamp.expanded::after{display:none;}
+  #auth-chip,#upgrade-trigger{white-space:nowrap;flex-shrink:0;}
+  /* profile chip: never let a long name push the header off-screen */
+  #auth-chip{max-width:120px;overflow:hidden;text-overflow:ellipsis;}
+  body.desk #auth-chip{max-width:200px;}
+  @media(max-width:480px){
+    #auth-chip{max-width:84px;}
+  }
   @media(max-width:380px){
-    #auth-chip,#upgrade-trigger{font-size:10px;padding:5px 8px;letter-spacing:-.2px;}
+    #auth-chip,#upgrade-trigger{font-size:10px;padding:5px 7px;letter-spacing:-.2px;}
+    #auth-chip{max-width:68px;}
     .grace-pill{font-size:9px;}
-    .brand-text{font-size:16px!important;}
+    .brand-text{font-size:15px!important;}
+    #header > div:first-child{gap:6px!important;padding:10px 10px 8px!important;}
+  }
+  @media(max-width:340px){
+    .grace-pill{display:none;}
   }
   #upgrade-menu{position:absolute;top:58px;right:8px;background:var(--plum3);border:1px solid var(--plum4);border-radius:14px;padding:12px;width:220px;z-index:200;display:none;}
   #upgrade-menu.open{display:block;}
@@ -308,14 +321,14 @@
   <!-- HEADER -->
   <div id="header">
     <div style="display:flex;align-items:center;gap:10px;padding:10px 14px 8px;">
-      <div onclick="goHome()" style="display:flex;align-items:center;gap:10px;cursor:pointer;" title="Home">
-        <span class="ghost-glow" style="font-size:26px;">👻</span>
-        <div>
+      <div onclick="goHome()" style="display:flex;align-items:center;gap:10px;cursor:pointer;min-width:0;flex-shrink:1;" title="Home">
+        <span class="ghost-glow" style="font-size:26px;flex-shrink:0;">👻</span>
+        <div style="min-width:0;overflow:hidden;">
           <div class="brand-text" style="font-size:18px;font-weight:800;letter-spacing:-.3px;">GhostProofJob</div>
           <div class="grace-pill">Free until you're hired · Day 1 of 90</div>
         </div>
       </div>
-      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0;">
         <div class="desk-only" style="gap:6px;">
           <span class="nav-pill" onclick="goHome()">🏠 Home</span>
           <span class="nav-pill" onclick="switchView('browse',null)">🔍 Browse</span>
@@ -680,6 +693,7 @@
           <div style="font-size:9px;color:var(--muted);">Community Vibe · tap for reviews</div>
         </div>
       </div>
+      <div id="cm-jobsummary" style="display:none;margin-bottom:12px;"></div>
       <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Community Ghost Reports</div>
       <div style="flex:1;overflow-y:auto;min-height:60px;margin-bottom:10px;" id="cm-reports"></div>
       <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📡 Open Roles <span id="cm-jobs-status" style="font-weight:400;text-transform:none;"></span></div>
@@ -947,6 +961,11 @@
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">Filter & layer your search — no swiping required</div>
       </div>
       <div class="filter-bar">
+        <div class="field-label">🏢 Company Lookup <span style="text-transform:none;font-weight:400;color:var(--mint);">(jump to any employer's profile)</span></div>
+        <div style="position:relative;margin-bottom:10px;">
+          <input class="field-input" id="browse-co-q" placeholder="Search a company — Walmart, CVS, local shops…" oninput="browseCoSuggest(this.value)" onkeydown="browseCoKey(event)" autocomplete="off"/>
+          <div id="browse-co-sug" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--plum3);border:1px solid var(--plum4);border-radius:0 0 12px 12px;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.5);"></div>
+        </div>
         <div class="field-label">Keyword / Title</div>
         <input class="field-input" id="f-keyword" placeholder="e.g. Engineer, Designer…" oninput="renderBrowse();queueLiveFetch()" style="margin-bottom:10px;"/>
         <div class="field-label">📡 Region / Location <span style="text-transform:none;font-weight:400;color:var(--mint);">(city, state, or 5-digit ZIP — triggers live feed)</span></div>
@@ -1161,10 +1180,15 @@
 
           <div class="field-label">Target Market <span style="text-transform:none;font-weight:400;">(drives suggestions)</span></div>
           <select class="field-input" id="tpl-market" onchange="marketAdvice()" style="margin-bottom:8px;font-size:13px;">
-            <option value="us" selected>US / Canada — Tech</option>
-            <option value="uk">United Kingdom</option>
-            <option value="eu">Germany / France / EU</option>
-            <option value="creative">Creative / On-camera roles</option>
+            <option value="us" selected>🇺🇸 US / Canada</option>
+            <option value="uk">🇬🇧 United Kingdom / Ireland</option>
+            <option value="eu">🇪🇺 Germany / France / EU</option>
+            <option value="anz">🇦🇺 Australia / New Zealand</option>
+            <option value="latam">🌎 Latin America</option>
+            <option value="mena">🌍 Middle East / Gulf</option>
+            <option value="asia">🌏 Asia / Singapore / India</option>
+            <option value="creative">🎬 Creative / On-camera roles</option>
+            <option value="trades">🔧 Skilled trades (US format)</option>
           </select>
           <div id="market-advice" style="font-size:11px;color:var(--cyber);background:rgba(181,95,230,.08);border-radius:8px;padding:8px 10px;line-height:1.6;margin-bottom:12px;"></div>
 
@@ -1226,8 +1250,6 @@
         </div>
 
         <div id="levelup-tracks"></div>
-<div style="margin:0 16px 16px;padding:14px 16px;border:1px solid rgba(181,95,230,.4);border-radius:14px;background:rgba(240,238,248,.05);">
-        </div>
         </div>
       </div>
 
@@ -1358,7 +1380,7 @@
         <div class="mini-stat"><div class="mini-stat-val" style="color:var(--mint);">94%</div><div class="mini-stat-lbl">Match Accuracy</div></div>
       </div>
       <div style="margin:0 16px 12px;position:relative;">
-        <input class="field-input" id="ghost-q" placeholder="🔎 Search any company's ghost intel…" oninput="ghostSuggest(this.value)" autocomplete="off"/>
+        <input class="field-input" id="ghost-q" placeholder="🔎 Search any company (Walmart, CVS, local shops…)" oninput="ghostSuggest(this.value)" onkeydown="ghostKey(event)" autocomplete="off"/>
         <div id="ghost-sug" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--plum3);border:1px solid var(--plum4);border-radius:0 0 12px 12px;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.5);"></div>
       </div>
       <div id="user-reports"></div>
@@ -1835,7 +1857,7 @@ function repairExtractedText(t){
     ['con gura','configura'],['sta ng','staffing'],['quan ta ve','quantitative']
   ];
   FIX.forEach(([b,g])=>{
-    const rx=new RegExp('\\b'+b.replace(/ /g,'\\s?'),'gi');
+    const rx=new RegExp('\\b'+b.replace(/ /g,'\\s{0,2}'),'gi');
     t=t.replace(rx,m=>m[0]===m[0].toUpperCase()?g[0].toUpperCase()+g.slice(1):g);
   });
   /* word-start 'fi' vanished: " nance" → finance, " rst" → first */
@@ -1957,6 +1979,37 @@ function updateProgress(){
   document.getElementById('progress-pct').textContent=pct+'%';
 }
 let jobCount=1;
+function populateEmploymentRows(jobs){
+  /* Rebuild the Employment History accordion from EVERY parsed job, not just #1.
+     Each becomes a fully editable Position card with title/company/dates/duties. */
+  const c=document.getElementById('jobs-container');
+  if(!c||!jobs||!jobs.length) return;
+  const btn=c.querySelector('.add-btn');
+  /* clear existing position cards (keep the + button) */
+  [...c.children].forEach(ch=>{ if(ch!==btn) c.removeChild(ch); });
+  jobCount=0;
+  jobs.forEach((j,ix)=>{
+    jobCount++;
+    const duties=(j.b&&j.b!=='See resume for details')?j.b:'';
+    const d=document.createElement('div');
+    d.style.cssText='background:var(--plum3);border-radius:12px;padding:12px;margin-bottom:10px;';
+    d.innerHTML='<div style="font-size:12px;font-weight:700;color:var(--cyber);margin-bottom:8px;">Position '+jobCount+'</div>'+
+      '<div class="field-label">Job Title *</div><input class="field-input'+(ix===0?' pf-title':'')+'" value="'+(j.t&&j.t!=='(role)'?j.t.replace(/"/g,'&quot;'):'')+'" placeholder="Job title" style="margin-bottom:8px;" oninput="updateProgress()"/>'+
+      '<div class="field-label">Company *</div><input class="field-input'+(ix===0?' pf-company':'')+'" value="'+(j.c?j.c.replace(/"/g,'&quot;'):'')+'" placeholder="Company" style="margin-bottom:8px;" oninput="updateProgress()"/>'+
+      '<div class="field-row" style="margin-bottom:8px;">'+
+        '<div><div class="field-label">Start</div><input class="field-input'+(ix===0?' pf-start':'')+'" value="'+startFromDate(j.d).replace(/"/g,'&quot;')+'" placeholder="Start" style="font-size:12px;"/></div>'+
+        '<div><div class="field-label">End</div><input class="field-input'+(ix===0?' pf-end':'')+'" value="'+endFromDate(j.d).replace(/"/g,'&quot;')+'" placeholder="End" style="font-size:12px;"/></div>'+
+      '</div>'+
+      '<div class="field-label">Key Duties</div><textarea class="field-input" rows="3" placeholder="• Your real responsibilities, one per line" style="resize:none;line-height:1.5;">'+(duties?duties.replace(/</g,'&lt;'):'')+'</textarea>';
+    c.insertBefore(d,btn);
+  });
+  if(jobCount===0) jobCount=1;
+  updateProgress();
+  dbg('employment rows populated: '+jobs.length+' positions');
+}
+/* split a parsed "2021 - Present" / "Jan 2022" date string into start/end halves */
+function startFromDate(d){ if(!d) return ''; const m=String(d).split(/\s*(?:[-–—]|to)\s*/i); return (m[0]||'').trim(); }
+function endFromDate(d){ if(!d) return ''; const m=String(d).split(/\s*(?:[-–—]|to)\s*/i); return (m[1]||'').trim(); }
 function addJobEntry(){
   jobCount++;
   const c=document.getElementById('jobs-container');
@@ -2838,7 +2891,7 @@ function applyRealParse(text){
     if(company&&!okCompany(company)) company='';
     if(title||company){
       if(company) comps.add(company);
-      if(parsedJobs.length<12) parsedJobs.push({t:title||'(role)',c:company||'',d:date||'',b:'See resume for details'});
+      if(parsedJobs.length<12) parsedJobs.push({t:repairExtractedText(title||'(role)'),c:repairExtractedText(company||''),d:date||'',b:'See resume for details'});
     }
   });
   /* attach the first following bullet/verb line to each job as its duty summary */
@@ -2848,7 +2901,7 @@ function applyRealParse(text){
       if(BULLET_START.test(lines[k])||VERB_START.test(lines[k])){ j.b=lines[k].replace(/^[-•*▪○·>]\s*/,''); break; }
     }
   });
-  if(parsedJobs.length){ resumeData.jobs=parsedJobs; }
+  if(parsedJobs.length){ resumeData.jobs=parsedJobs; populateEmploymentRows(parsedJobs); }
   /* skills: scan against a broad cross-industry keyword bank */
   const SKILL_BANK=['JavaScript','TypeScript','Python','Java','C#','C++','SQL','React','Angular','Vue','Node.js','Next.js','HTML','CSS','Tailwind','REST','GraphQL','AWS','Azure','GCP','Docker','Kubernetes','CI/CD','Git','Agile','Scrum','Figma','Photoshop','Excel','PowerPoint','Salesforce','HubSpot','SEO','Google Analytics','Project Management','Customer Service','Sales','Negotiation','CRM','QuickBooks','Tableau','Power BI','Machine Learning','Data Analysis','Nursing','Phlebotomy','Forklift','OSHA','CDL','Welding','AutoCAD','Spanish','French'];
   const foundSkills=SKILL_BANK.filter(s=>new RegExp('\\b'+s.replace(/[+.]/g,'\\$&')+'\\b','i').test(text));
@@ -3717,7 +3770,23 @@ function renderUserReports(){
 /* ---------- COMPANY DETAIL VIEW ---------- */
 function openCompanyView(co,job){
   /* track as a viewed job (recall later) when opened against a specific role */
-  if(job&&job.title){ try{ recordView({t:job.title,co:co,url:job.url||'',ghost:ghostRiskFor(co)}); }catch(e){} }
+  if(job&&job.title){ try{ recordView({t:job.title,co:co,url:job.url||'',ghost:ghostRiskFor(co),desc:job.desc||''}); }catch(e){} }
+  /* show the clicked job's expandable summary at the top of the drawer */
+  const js=document.getElementById('cm-jobsummary');
+  if(js){
+    if(job&&(job.desc||job.title)){
+      const jt=(job.title||'Role').replace(/'/g,"\\'").replace(/</g,'&lt;');
+      js.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📋 '+((job.title||'Role').replace(/</g,'&lt;'))+' — Summary</div>'+
+        (job.desc?('<div class="desc-clamp">'+job.desc.replace(/</g,'&lt;')+'</div>'):'<div style="font-size:11px;color:var(--muted);">Open the role below for full details.</div>')+
+        '<div style="display:flex;gap:8px;margin-top:10px;">'+
+        '<div onclick="applyFromDrawer(\''+jt+'\')" style="flex:1;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);border-radius:9px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">⚡ Apply</div>'+
+        '<div onclick="coverFromDrawer(\''+jt+'\')" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>'+
+        '</div>'+
+        (job.url?('<div onclick="event.stopPropagation();window.open(\''+job.url.replace(/'/g,'')+'\',\'_blank\',\'noopener\')" style="margin-top:8px;background:rgba(0,245,160,.08);border:1px solid rgba(0,245,160,.3);color:var(--mint);border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:700;cursor:pointer;">View Full Posting ↗</div>'):'');
+      js.dataset.joburl=job.url||'';
+      js.style.display='block';
+    } else js.style.display='none';
+  }
   document.getElementById('cm-name').textContent=co;
   const g=ghostRiskFor(co);
   const gv=document.getElementById('cm-ghost');
@@ -4220,9 +4289,10 @@ openLive=function(i){
   const j=liveJobs[i];
   if(!j) return;
   pendingJobUrl=j.url||'';
-  if(resumeReady&&!clOptedOut()){ offerCoverLetter(j.t,j.co,true); }
-  else if(j.url){ openSandbox(j.url,j.t,j.co); }
-  else { openCompanyView(j.co,{title:j.t,url:''}); }
+  /* ALWAYS open the in-depth company drawer first — same as Ghost/Browse-demo.
+     The drawer's own Apply / Get Cover Letter buttons take it from there. */
+  try{ recordView({t:j.t,co:j.co,url:j.url||'',ghost:j.ghost,desc:j.desc||''}); }catch(e){}
+  openCompanyView(j.co,{title:j.t,url:j.url||'',desc:j.desc||''});
 };
 
 /* ---------- CL CAP → tier-aware (paid users skip the limit) ---------- */
@@ -4446,6 +4516,96 @@ function ciMatch(needle,hay){
   const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
   return norm(hay).includes(norm(needle));
 }
+/* ---------- APPLY / COVER LETTER straight from the company drawer ---------- */
+function applyFromDrawer(title){
+  const co=document.getElementById('cm-name').textContent;
+  const url=(document.getElementById('cm-jobsummary')||{}).dataset?document.getElementById('cm-jobsummary').dataset.joburl:'';
+  pendingJobUrl=url||'';
+  document.getElementById('company-modal').classList.remove('open');
+  /* same flow as everywhere: resume → cover-letter prompt; else sandbox; else search */
+  if(resumeReady&&!clOptedOut()){ offerCoverLetter(title||'',co,true); }
+  else if(url){ openSandbox(url,title||'',co); }
+  else { offerCoverLetter(title||'',co,true); }
+}
+function coverFromDrawer(title){
+  const co=document.getElementById('cm-name').textContent;
+  const url=(document.getElementById('cm-jobsummary')||{}).dataset?document.getElementById('cm-jobsummary').dataset.joburl:'';
+  pendingJobUrl=url||'';
+  document.getElementById('company-modal').classList.remove('open');
+  offerCoverLetter(title||'',co,true);   /* always opens the cover-letter prompt modal */
+}
+
+/* ---------- BROWSE TAB COMPANY LOOKUP (mirrors ghost search) ---------- */
+let _browseCoQ='';
+function browseCoSuggest(q){
+  const box=document.getElementById('browse-co-sug');
+  if(!box) return;
+  _browseCoQ=(q||'').trim();
+  const ql=_browseCoQ.toLowerCase();
+  if(ql.length<2){ box.style.display='none'; box.innerHTML=''; return; }
+  const hits=allKnownCompanies().filter(c=>ciMatch(ql,c)).slice(0,6);
+  let html='';
+  if(hits.length){
+    html+=hits.map(c=>{
+      const g=ghostRiskFor(c);
+      const col=g<=15?'var(--mint)':(g<=35?'var(--warn)':'var(--danger)');
+      return '<div onclick="browseCoPick(this)" data-co="'+c.replace(/"/g,'&quot;')+'" style="padding:10px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;border-bottom:1px solid var(--plum4);"><span>'+c+'</span><span style="font-weight:800;color:'+col+';">👻 '+g+'%</span></div>';
+    }).join('');
+    html+='<div onclick="browseCoExact()" style="padding:10px 12px;font-size:12px;cursor:pointer;color:var(--cyber);font-weight:700;border-top:1px solid var(--plum4);">🔎 Open \u201c'+_browseCoQ.replace(/</g,'&lt;')+'\u201d profile + live roles →</div>';
+  } else {
+    const near=closestCompany(ql);
+    if(near) html+='<div onclick="browseCoPick(this)" data-co="'+near.replace(/"/g,'&quot;')+'" style="padding:10px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--plum4);">Did you mean <strong style="color:var(--mint);">'+near+'</strong>?</div>';
+    html+='<div onclick="browseCoExact()" style="padding:11px 12px;font-size:13px;cursor:pointer;color:var(--cyber);font-weight:700;border-bottom:1px solid var(--plum4);">🔎 Open \u201c'+_browseCoQ.replace(/</g,'&lt;')+'\u201d profile + live roles →</div>';
+    html+='<div onclick="browseCoSubmit()" style="padding:11px 12px;font-size:12px;cursor:pointer;color:var(--muted);">➕ Not listed? Submit \u201c'+_browseCoQ.replace(/</g,'&lt;')+'\u201d for review</div>';
+  }
+  box.innerHTML=html; box.style.display='block';
+}
+function browseCoKey(e){
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const exact=allKnownCompanies().find(c=>c.toLowerCase()===_browseCoQ.toLowerCase());
+    if(exact) browseCoOpen(exact); else browseCoExact();
+  }
+}
+function browseCoOpen(co){
+  document.getElementById('browse-co-sug').style.display='none';
+  document.getElementById('browse-co-q').value='';
+  openCompanyView(co,{title:''});
+}
+function browseCoPick(el){ browseCoOpen(el.getAttribute('data-co')); }
+function browseCoExact(){
+  const co=(_browseCoQ||'').trim(); if(!co) return;
+  browseCoOpen(co.replace(/\b\w/g,m=>m.toUpperCase()));
+}
+function browseCoSubmit(){
+  const co=(_browseCoQ||'').trim();
+  document.getElementById('browse-co-sug').style.display='none';
+  openContactModal();
+  setTimeout(()=>{ const m=document.getElementById('ct-msg'); if(m) m.value='New company suggestion for the database: "'+co+'"'; },60);
+}
+document.addEventListener('click',e=>{
+  const box=document.getElementById('browse-co-sug');
+  if(box&&!e.target.closest('#browse-co-q')&&!e.target.closest('#browse-co-sug')) box.style.display='none';
+});
+
+/* curated national/known employers so big names always resolve even before
+   they appear in the user's live feed (Walmart, CVS, etc.) */
+const NATIONAL_COMPANIES=[
+  /* ===== Global tech / multinational ===== */
+  'Amazon','Apple','Google','Microsoft','Meta','Tesla','Netflix','Nvidia','Intel','IBM','Oracle','Salesforce','Dell','HP','Cisco','Adobe','Uber','Lyft','DoorDash','Airbnb','Spotify','Shopify','Stripe','PayPal','Visa','Mastercard','SAP','Siemens','Samsung','Sony','LG','Huawei','Lenovo','TSMC','Accenture','Deloitte','PwC','EY','KPMG','Capgemini','Infosys','Tata Consultancy Services','Wipro','HCLTech','Cognizant',
+  /* ===== USA / Canada ===== */
+  'Walmart','CVS Health','Target','Costco','Home Depot','Lowe\u2019s','Kroger','Walgreens','UnitedHealth Group','McDonald\u2019s','Starbucks','FedEx','UPS','Bank of America','Wells Fargo','JPMorgan Chase','Verizon','AT&T','T-Mobile','Comcast','Disney','Nike','PepsiCo','Coca-Cola','Procter & Gamble','Johnson & Johnson','Pfizer','Best Buy','Macy\u2019s','Nordstrom','TJ Maxx','Publix','Whole Foods','Chipotle','Chick-fil-A','Taco Bell','Wendy\u2019s','Burger King','Domino\u2019s','Marriott','Hilton','Delta Air Lines','American Airlines','United Airlines','Southwest Airlines','Ford','General Motors','Boeing','Lockheed Martin','Raytheon','Caterpillar','John Deere','3M','General Electric','Honeywell','Capital One','American Express','Citi','Goldman Sachs','Morgan Stanley','BlackRock','HCA Healthcare','Kaiser Permanente','Cigna','Humana','Shopify','TD Bank','RBC','Scotiabank','Loblaw','Shopify','Bombardier','Telus','Rogers',
+  /* ===== UK / Ireland ===== */
+  'Tesco','Sainsbury\u2019s','Asda','Morrisons','Marks & Spencer','John Lewis','Boots','Barclays','HSBC','Lloyds Banking Group','NatWest','BT Group','Vodafone','Sky','BBC','Rolls-Royce','BAE Systems','GSK','AstraZeneca','Unilever','Diageo','BP','Shell','Aviva','Greggs','Primark','Ryanair','Aer Lingus',
+  /* ===== Germany / France / EU ===== */
+  'Volkswagen','BMW','Mercedes-Benz','Audi','Bosch','Bayer','BASF','Allianz','Deutsche Bank','Adidas','Puma','Lufthansa','DHL','Deutsche Telekom','LVMH','L\u2019Or\u00e9al','Airbus','TotalEnergies','Renault','Peugeot','Danone','Carrefour','Schneider Electric','Orange','BNP Paribas','AXA','Nestl\u00e9','Novartis','Roche','UBS','Credit Suisse','Zurich Insurance','ABB','IKEA','Spotify','Philips','ING','Heineken','Shell','ASML','Inditex','Zara','Santander','BBVA','Telef\u00f3nica','Ferrari','Fiat','Enel','UniCredit',
+  /* ===== Australia / New Zealand ===== */
+  'Woolworths','Coles','Telstra','Qantas','Commonwealth Bank','Westpac','NAB','ANZ','BHP','Rio Tinto','Wesfarmers','Atlassian','Canva','Fonterra','Air New Zealand','Spark',
+  /* ===== India / Singapore / Asia ===== */
+  'Reliance Industries','Tata Group','Mahindra','Flipkart','Paytm','Zomato','Swiggy','HDFC Bank','ICICI Bank','Airtel','DBS Bank','Singapore Airlines','Grab','Sea Group','Shopee',
+  /* ===== South Africa / Brazil / LatAm ===== */
+  'Naspers','Standard Bank','MTN','Shoprite','Petrobras','Ita\u00fa','Ambev','Magazine Luiza','Mercado Libre','Nubank','Vale','Bradesco'
+];
 function allKnownCompanies(){
   const s=new Set();
   Object.keys(ghostReports).forEach(c=>s.add(c));
@@ -4454,24 +4614,77 @@ function allKnownCompanies(){
   lists.applied.forEach(r=>s.add(r.co)); lists.skipped.forEach(r=>s.add(r.co)); (lists.responses||[]).forEach(r=>s.add(r.co));
   liveJobs.forEach(j=>s.add(j.co)); browseJobs.forEach(j=>s.add(j.co));
   (savedCompanies()||[]).forEach(c=>s.add(c));
+  NATIONAL_COMPANIES.forEach(c=>s.add(c));
   return [...s].filter(Boolean);
 }
+let _ghostQ='';
 function ghostSuggest(q){
   const box=document.getElementById('ghost-sug');
   if(!box) return;
-  q=(q||'').trim().toLowerCase();
-  if(q.length<2){ box.style.display='none'; box.innerHTML=''; return; }
-  const hits=allKnownCompanies().filter(c=>ciMatch(q,c)).slice(0,6);
-  if(!hits.length){
-    box.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--muted);">No matches in your hunt yet — file a report to add <strong style="color:var(--off);">'+q.replace(/</g,'&lt;')+'</strong></div>';
-  } else {
-    box.innerHTML=hits.map(c=>{
+  _ghostQ=(q||'').trim();
+  const ql=_ghostQ.toLowerCase();
+  if(ql.length<2){ box.style.display='none'; box.innerHTML=''; return; }
+  const hits=allKnownCompanies().filter(c=>ciMatch(ql,c)).slice(0,6);
+  let html='';
+  if(hits.length){
+    html+=hits.map(c=>{
       const g=ghostRiskFor(c);
       const col=g<=15?'var(--mint)':(g<=35?'var(--warn)':'var(--danger)');
       return '<div onclick="pickGhostCo(this)" data-co="'+c.replace(/"/g,'&quot;')+'" style="padding:10px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;border-bottom:1px solid var(--plum4);"><span>'+c+'</span><span style="font-weight:800;color:'+col+';">👻 '+g+'%</span></div>';
     }).join('');
+    /* did-you-mean footer: search the exact typed text live */
+    html+='<div onclick="ghostSearchExact()" style="padding:10px 12px;font-size:12px;cursor:pointer;color:var(--cyber);font-weight:700;border-top:1px solid var(--plum4);">🔎 Search \u201c'+_ghostQ.replace(/</g,'&lt;')+'\u201d for live openings →</div>';
+  } else {
+    /* nothing matched: did-you-mean (closest) + live search + submit */
+    const near=closestCompany(ql);
+    if(near) html+='<div onclick="pickGhostCo(this)" data-co="'+near.replace(/"/g,'&quot;')+'" style="padding:10px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--plum4);">Did you mean <strong style="color:var(--mint);">'+near+'</strong>?</div>';
+    html+='<div onclick="ghostSearchExact()" style="padding:11px 12px;font-size:13px;cursor:pointer;color:var(--cyber);font-weight:700;border-bottom:1px solid var(--plum4);">🔎 Search \u201c'+_ghostQ.replace(/</g,'&lt;')+'\u201d for live openings →</div>';
+    html+='<div onclick="submitNewCompany()" style="padding:11px 12px;font-size:12px;cursor:pointer;color:var(--muted);">➕ Not listed? Submit \u201c'+_ghostQ.replace(/</g,'&lt;')+'\u201d for review</div>';
   }
+  box.innerHTML=html;
   box.style.display='block';
+}
+/* Enter key in the search box → open exact match or live-search the typed text */
+function ghostKey(e){
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const exact=allKnownCompanies().find(c=>c.toLowerCase()===_ghostQ.toLowerCase());
+    if(exact){ document.getElementById('ghost-sug').style.display='none'; document.getElementById('ghost-q').value=''; openCompanyView(exact); }
+    else ghostSearchExact();
+  }
+}
+/* lightweight fuzzy: nearest national company by substring/first-letters */
+function closestCompany(ql){
+  const all=allKnownCompanies();
+  let best=null,bestScore=0;
+  all.forEach(c=>{
+    const cl=c.toLowerCase();
+    let score=0;
+    if(cl.startsWith(ql.slice(0,3))) score+=3;
+    if(cl.includes(ql.slice(0,4))) score+=2;
+    if(cl[0]===ql[0]) score+=1;
+    if(score>bestScore){ bestScore=score; best=c; }
+  });
+  return bestScore>=3?best:null;
+}
+/* open the company drawer for whatever was typed (drawer's Open Roles fires a live lookup) */
+function ghostSearchExact(){
+  const co=(_ghostQ||'').trim();
+  if(!co) return;
+  document.getElementById('ghost-sug').style.display='none';
+  document.getElementById('ghost-q').value='';
+  const proper=co.replace(/\b\w/g,m=>m.toUpperCase());
+  openCompanyView(proper,{title:''});
+}
+function submitNewCompany(){
+  const co=(_ghostQ||'').trim();
+  document.getElementById('ghost-sug').style.display='none';
+  openContactModal();
+  /* prefill the contact message with the suggestion for admin review */
+  setTimeout(()=>{
+    const msg=document.getElementById('ct-msg');
+    if(msg) msg.value='New company suggestion for the ghost database: "'+co+'"';
+  },60);
 }
 function pickGhostCo(el){
   const co=el.getAttribute('data-co');
@@ -4775,6 +4988,12 @@ function closeTopOverlay(){
 }
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape') closeTopOverlay();
+});
+
+/* ---------- EXPANDABLE JOB DESCRIPTIONS (tap to grow, scroll inside) ---------- */
+document.addEventListener('click',function(e){
+  const clamp=e.target.closest&&e.target.closest('.desc-clamp');
+  if(clamp){ e.stopPropagation(); clamp.classList.toggle('expanded'); }
 });
 
 /* ---------- SWIPE CARD → UNIFIED COMPANY DRAWER (vibe + reviews) ---------- */
