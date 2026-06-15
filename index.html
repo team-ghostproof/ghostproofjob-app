@@ -342,6 +342,7 @@
         <div style="position:relative;">
           <div id="auth-chip" onclick="toggleProfileMenu()" style="background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.35);color:var(--cyber);font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:pointer;">Sign In</div>
           <div id="profile-menu" style="display:none;position:fixed;right:10px;top:60px;z-index:400;background:var(--plum2);border:1px solid var(--plum4);border-radius:14px;padding:6px;min-width:200px;box-shadow:0 12px 34px rgba(0,0,0,.6);">
+            <div class="pm-item" onclick="pmGo('profile')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">👤 Account / Profile</div>
             <div class="pm-item" onclick="pmGo('account')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">⚙️ Settings</div>
             <div class="pm-item" onclick="pmViewedJobs()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">👀 Viewed Jobs <span id="pm-viewed-count" style="margin-left:auto;background:var(--plum4);border-radius:8px;padding:1px 7px;font-size:11px;color:var(--muted);">0</span></div>
             <div class="pm-item" onclick="openContactModal()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">📬 Contact Us</div>
@@ -873,7 +874,7 @@
 
       <!-- ===== APPENDED: DAILY ENERGY METER (insert directly above #card-deck) ===== -->
       <div id="energy-meter" style="margin:10px 16px 0;display:flex;align-items:center;gap:8px;">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;">⚡ Daily Energy Meter: <span id="energy-count" style="color:var(--mint);">0</span> / <span id="energy-cap">30</span> Applications Sent Today</div>
+        <div id="energy-label" style="font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;">⚡ Daily Energy Meter: <span id="energy-count" style="color:var(--mint);">0</span> / <span id="energy-cap">30</span> Applications Sent Today</div>
         <div style="flex:1;height:4px;background:var(--plum3);border-radius:999px;overflow:hidden;"><div id="energy-fill" style="width:0%;height:100%;background:linear-gradient(90deg,var(--mint),var(--cyber));border-radius:999px;transition:width .4s ease;"></div></div>
       </div>
 
@@ -1445,6 +1446,39 @@
     </div>
 
     <!-- VIEW: SETTINGS -->
+    <div class="view" id="view-profile">
+      <div style="padding:16px 16px 12px;"><div style="font-size:19px;font-weight:800;">👤 Account / Profile</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">Your details — edit anytime. These fill your applications & matches.</div></div>
+
+      <!-- logged-out CTA -->
+      <div id="prof-auth-cta" style="display:none;margin:0 16px 16px;background:linear-gradient(135deg,rgba(0,245,160,.08),rgba(181,95,230,.08));border:1px solid rgba(0,245,160,.25);border-radius:18px;padding:18px;text-align:center;">
+        <div style="font-size:30px;margin-bottom:6px;">👻</div>
+        <div style="font-size:15px;font-weight:800;">Create a free account to save your profile</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;margin:6px 0 12px;">Your name, contact info, location and match preferences sync to your account so they're there on every device.</div>
+        <div onclick="openAuth()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:12px;font-size:14px;cursor:pointer;">Create Account / Log In</div>
+      </div>
+
+      <!-- ACCOUNT INFO -->
+      <div class="pref-section" id="prof-info">
+        <div class="pref-section-title">Account Information</div>
+        <div class="field-row" style="margin-bottom:8px;">
+          <div><div class="field-label">First Name</div><input class="field-input" id="acc-first" placeholder="First" style="font-size:13px;" oninput="saveAccount()"/></div>
+          <div><div class="field-label">Last Name</div><input class="field-input" id="acc-last" placeholder="Last" style="font-size:13px;" oninput="saveAccount()"/></div>
+        </div>
+        <div class="field-label">Email</div>
+        <input class="field-input" id="acc-email" placeholder="you@email.com" type="email" style="margin-bottom:8px;font-size:13px;" oninput="saveAccount()"/>
+        <div class="field-label">Phone</div>
+        <input class="field-input" id="acc-phone" placeholder="(555) 555-5555" type="tel" style="margin-bottom:8px;font-size:13px;" oninput="saveAccount()"/>
+        <div class="field-label">Address</div>
+        <input class="field-input" id="acc-address" placeholder="Street, City, State, ZIP" style="margin-bottom:4px;font-size:13px;" oninput="saveAccount()"/>
+        <div style="font-size:10px;color:var(--muted);">Used to pre-fill applications. Never sold or shared.</div>
+        <div onclick="saveAccountManual()" style="margin-top:12px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:11px;font-size:13px;cursor:pointer;text-align:center;">💾 Save Account Info</div>
+      </div>
+
+      <!-- placeholder anchors: location & match prefs get moved here at runtime -->
+      <div id="prof-location-host"></div>
+      <div id="prof-match-host"></div>
+    </div>
+
     <div class="view" id="view-account">
       <div style="padding:16px 16px 12px;"><div style="font-size:19px;font-weight:800;">⚙️ Settings</div></div>
 
@@ -2950,6 +2984,7 @@ function hardshipActive(){
   try{ const u=localStorage.getItem('gpj_hardship_until'); return u&&Date.now()<parseInt(u,10); }catch(e){ return false; }
 }
 function getDailyCap(){
+  if(isPaid()) return Infinity;                   /* paid = no daily cap, anywhere */
   if(hardshipActive()) return 30;                 /* hardship extension restores full pacing */
   return accountAgeDays()>120 ? 5 : 30;           /* clamp long-tenure free accounts to 5/day */
 }
@@ -2971,7 +3006,8 @@ function restoreApplies(){
     if(s&&s.d===new Date().toDateString()) applyCount=s.n||0;
   }catch(e){}
   updateEnergyMeter();
-  if(applyCount>=getDailyCap()) setApplyDisabled(true);
+  if(!isPaid() && applyCount>=getDailyCap()) setApplyDisabled(true);
+  else setApplyDisabled(false);
 }
 
 /* meter respects the dynamic cap */
@@ -2982,6 +3018,15 @@ function updateEnergyMeter(){
   const fill=document.getElementById('energy-fill');
   if(!count||!fill) return;
   count.textContent=applyCount;
+  if(cap===Infinity){
+    if(capEl) capEl.textContent='∞';
+    count.style.color='var(--mint)';
+    fill.style.width='100%';
+    /* relabel the meter for paid users */
+    const lbl=document.getElementById('energy-label');
+    if(lbl) lbl.textContent='Unlimited applications · thank you for supporting GhostProof 💚';
+    return;
+  }
   if(capEl) capEl.textContent=cap;
   count.style.color = applyCount>=cap ? 'var(--danger)' : (applyCount>=cap*0.8 ? 'var(--warn)' : 'var(--mint)');
   fill.style.width=Math.min(100,Math.round((applyCount/cap)*100))+'%';
@@ -3676,6 +3721,54 @@ function toggleProfileMenu(){
 function pmGo(view){
   const pm=document.getElementById('profile-menu'); if(pm) pm.style.display='none';
   switchView(view,null);
+}
+/* ---- ACCOUNT / PROFILE PAGE ---- */
+/* relocate Location + Match Preferences from Settings into the Account page once */
+function buildProfilePage(){
+  try{
+    const loc=document.getElementById('sec-location');
+    const match=document.getElementById('sec-match');
+    const locHost=document.getElementById('prof-location-host');
+    const matchHost=document.getElementById('prof-match-host');
+    if(loc&&locHost&&loc.parentElement!==locHost) locHost.appendChild(loc);
+    if(match&&matchHost&&match.parentElement!==matchHost) matchHost.appendChild(match);
+  }catch(e){}
+}
+function saveAccount(){
+  const acc={
+    first:(document.getElementById('acc-first')||{}).value||'',
+    last:(document.getElementById('acc-last')||{}).value||'',
+    email:(document.getElementById('acc-email')||{}).value||'',
+    phone:(document.getElementById('acc-phone')||{}).value||'',
+    address:(document.getElementById('acc-address')||{}).value||''
+  };
+  try{ localStorage.setItem('gpj_account',JSON.stringify(acc)); }catch(e){}
+  /* keep resumeData.contact in sync so applications/auto-fill use fresh info */
+  resumeData.contact=[acc.email,acc.phone,acc.address].filter(Boolean).join(' · ');
+  if(acc.first||acc.last) resumeData.name=[acc.first,acc.last].filter(Boolean).join(' ');
+  return acc;
+}
+function saveAccountManual(){
+  const acc=saveAccount();
+  try{ if(window.fb&&fb.current()){ fb.saveProfile(fb.current().uid,{account:acc,savedAt:Date.now()}); } }catch(e){}
+  try{ if(typeof refreshProfileChip==='function') refreshProfileChip(); }catch(e){}
+  showToast('💾 Account info saved'+((window.fb&&fb.current())?' to your account':' on this device')+'!');
+}
+function loadAccount(){
+  try{
+    const acc=JSON.parse(localStorage.getItem('gpj_account')||'null');
+    if(!acc) return;
+    const set=(id,v)=>{ const el=document.getElementById(id); if(el&&v) el.value=v; };
+    set('acc-first',acc.first); set('acc-last',acc.last); set('acc-email',acc.email);
+    set('acc-phone',acc.phone); set('acc-address',acc.address);
+  }catch(e){}
+}
+function gateProfilePage(u){
+  const cta=document.getElementById('prof-auth-cta');
+  const info=document.getElementById('prof-info');
+  const signedIn=!!u;
+  if(cta) cta.style.display=signedIn?'none':'block';
+  /* info always visible so they can fill it pre-signup (saved locally) */
 }
 function pmViewedJobs(){
   const pm=document.getElementById('profile-menu'); if(pm) pm.style.display='none';
@@ -4376,8 +4469,17 @@ function setTier(t){
   try{localStorage.setItem('gpj_tier',t);}catch(e){}
   /* mirror to the signed-in user's profile so it persists across devices */
   try{ if(window.fb&&fb.current()&&adminTargetUid){ fb.setTierFor(adminTargetUid,t); } }catch(e){}
+  /* apply the unlock immediately — no refresh needed */
+  try{ applyTierState(); }catch(e){}
   showToast(t==='free'?'Tier set: free':'⚡ '+t+' set — paywalled caps removed.');
   dbg('tier set (admin): '+t);
+}
+/* re-evaluate everything gated by tier and update the UI right now */
+function applyTierState(){
+  try{ updateEnergyMeter(); }catch(e){}
+  try{ if(!isPaid() && applyCount>=getDailyCap()) setApplyDisabled(true); else setApplyDisabled(false); }catch(e){}
+  /* hide any paywall nudges if now paid */
+  if(isPaid()){ document.querySelectorAll('.paywall-nudge').forEach(el=>el.style.display='none'); }
 }
 let adminTargetUid='';
 
@@ -5513,10 +5615,56 @@ const _v10Cascade=runPersonalizationCascade;
 runPersonalizationCascade=function(){ _v10Cascade(); renderSettingsIdentity(); renderLevelUpCourses(); };
 /* refresh identity whenever Settings opens */
 const _v10Switch=switchView;
-switchView=function(v,el){ _v10Switch(v,el); if(v==='account'){ renderSettingsIdentity(); renderLevelUpCourses(); } };
+switchView=function(v,el){ _v10Switch(v,el); if(v==='account'){ renderSettingsIdentity(); renderLevelUpCourses(); } if(v==='profile'){ buildProfilePage(); loadAccount(); } };
 /* refresh identity on auth change */
 const _v10Auth=window.gpjAuthChanged;
-window.gpjAuthChanged=function(u){ _v10Auth(u); renderSettingsIdentity(); };
+window.gpjAuthChanged=function(u){ _v10Auth(u); renderSettingsIdentity(); loadTierFromProfile(u); gateProfilePage(u); };
+/* On sign-in, pull the user's saved tier from their Firestore profile so a paid
+   user gets paywall access automatically — on any device, no admin action.
+   This is how a real payment unlock should propagate once your payment flow
+   writes the tier to the profile (Stripe webhook → Firestore, or admin grant). */
+async function loadTierFromProfile(u){
+  try{
+    if(!u||!(window.fb&&fb.loadProfile)) return;
+    const p=await fb.loadProfile(u.uid);
+    if(!p) return;
+    /* TIER */
+    if(p.tier){
+      localStorage.setItem('gpj_tier',p.tier);
+      try{ applyTierState(); }catch(e){}
+      if(p.tier!=='free') dbg('tier loaded from profile: '+p.tier);
+    }
+    /* RESUME — pull the cloud copy back so it survives new devices / cleared cache.
+       Only overwrite if the cloud copy is richer than what's on this device. */
+    if(p.resume && (p.resume.name || (p.resume.jobs&&p.resume.jobs.length))){
+      const localHasMore=(resumeData.jobs&&resumeData.jobs.length)>( (p.resume.jobs&&p.resume.jobs.length)||0 );
+      if(!localHasMore){
+        Object.assign(resumeData,p.resume);
+        resumeReady=true;
+        try{ if(typeof populateEmploymentRows==='function'&&resumeData.jobs&&resumeData.jobs.length) populateEmploymentRows(resumeData.jobs); }catch(e){}
+        try{ hydrateResumeFields(); }catch(e){}
+        try{ if(typeof runPersonalizationCascade==='function') runPersonalizationCascade(); }catch(e){}
+        /* show it collapsed since it's a saved resume */
+        try{
+          const reveal=()=>{ const ps=document.getElementById('parsed-sections'); if(ps) ps.style.display='block'; const ed=document.getElementById('studio-editor'); if(ed) ed.style.display='none'; const col=document.getElementById('studio-collapsed'); if(col) col.style.display='block'; const uz=document.getElementById('upload-zone'); if(uz) uz.style.display='none'; const bn=document.getElementById('studio-badge-name'); if(bn) bn.textContent=(resumeData.name||'').split(/\s+/)[0]||'your profile'; };
+          reveal();
+        }catch(e){}
+        dbg('resume loaded from cloud profile');
+        showToast('🟢 Your saved resume loaded from your account.');
+      }
+    }
+    /* ACCOUNT INFO */
+    if(p.account){
+      try{ localStorage.setItem('gpj_account',JSON.stringify(p.account)); loadAccount(); }catch(e){}
+    }
+  }catch(e){}
+}
+/* push current resumeData values into the visible parsed-resume fields */
+function hydrateResumeFields(){
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el&&v) el.value=v; };
+  set('pr-name',resumeData.name); set('pr-title',resumeData.title);
+  set('pr-years',resumeData.years); set('pr-edu',resumeData.edu);
+}
 
 renderSettingsIdentity();
 renderLevelUpCourses();
@@ -5557,6 +5705,8 @@ runPersonalizationCascade=function(){ _v11Cascade(); refreshResumeNudge(); };
 /* ---------- v7 INIT ---------- */
 renderGhostCompanies();
 gatePersonalized();
+/* build the Account/Profile page once (relocates Location + Match into it) */
+try{ buildProfilePage(); loadAccount(); }catch(e){}
 
 /* ---------- v5 INIT ---------- */
 renderBrowse();
