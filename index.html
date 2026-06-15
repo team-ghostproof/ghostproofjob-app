@@ -11,7 +11,7 @@
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, deleteUser } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-  import { getFirestore, doc, setDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  import { getFirestore, doc, setDoc, getDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
   /* Owner-provided config. NOTE: authDomain in the spec was malformed
      ("://firebaseapp.com") — corrected to the standard <projectId>.firebaseapp.com.
      Firebase web apiKeys are public identifiers by design; real security
@@ -34,6 +34,8 @@
       signIn: (e,p)=>signInWithEmailAndPassword(auth,e,p),
       signOut: ()=>signOut(auth),
       saveProfile: (uid,data)=>setDoc(doc(db,'profiles',uid),data,{merge:true}),
+      loadProfile: async (uid)=>{ try{ const s=await getDoc(doc(db,'profiles',uid)); return s.exists()?s.data():null; }catch(e){ return null; } },
+      setTierFor: (uid,tier)=>setDoc(doc(db,'profiles',uid),{tier,tierSetAt:Date.now()},{merge:true}),
       wipeProfile: async (uid)=>{ try{await deleteDoc(doc(db,'profiles',uid));}catch(e){} try{if(auth.currentUser)await deleteUser(auth.currentUser);}catch(e){} },
       current: ()=>auth.currentUser
     };
@@ -125,8 +127,8 @@
   body.desk #card-deck{height:500px;min-height:500px;}
   .job-card{position:absolute;width:100%;background:var(--plum2);border:1px solid var(--plum3);border-radius:24px;overflow:hidden;cursor:pointer;transition:transform .08s,opacity .15s;transform-origin:bottom center;}
   .job-card.top{z-index:10;opacity:1;}
-  .job-card.mid{z-index:9;transform:scale(.95) translateY(12px);pointer-events:none;opacity:.45;filter:brightness(.7);}
-  .job-card.bot{z-index:8;transform:scale(.90) translateY(24px);pointer-events:none;opacity:.2;filter:brightness(.5);}
+  .job-card.mid{z-index:9;transform:scale(.96) translateY(10px);pointer-events:none;opacity:.18;filter:brightness(.5);}
+  .job-card.bot{z-index:8;transform:scale(.92) translateY(20px);pointer-events:none;opacity:0;}
   .card-header{padding:16px 16px 12px;border-bottom:1px solid var(--plum3);}
   .logo-circle{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
   .salary-badge{background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.3);color:var(--mint);font-size:11px;padding:3px 8px;border-radius:8px;}
@@ -181,7 +183,8 @@
   .acc-chevron{margin-left:auto;font-size:18px;color:var(--muted);transition:transform .3s;}
   .accordion-item.open .acc-chevron{transform:rotate(180deg);}
   .accordion-body{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1);}
-  .accordion-item.open .accordion-body{max-height:900px;}
+  .accordion-item.open .accordion-body{max-height:4000px;}
+  #jobs-container{max-height:560px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
   .acc-inner{padding:0 16px 16px;}
   .field-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
   .field-input{width:100%;background:var(--plum3);border:1px solid var(--plum4);border-radius:10px;padding:10px 12px;color:var(--off);font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s;}
@@ -1082,6 +1085,30 @@
       <!-- Parsed result (hidden until parse completes) -->
       <div id="parsed-sections" style="display:none;">
 
+        <!-- PINNED COMPLETENESS BAR (visible while editing) -->
+        <div id="resume-progress-bar" style="display:none;background:var(--plum2);border:1px solid var(--plum3);border-radius:14px;padding:12px 14px;margin:0 16px 12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <div style="font-size:12px;font-weight:800;">Resume completeness</div>
+            <div style="font-size:13px;font-weight:800;color:var(--mint);" id="resume-pct">0%</div>
+          </div>
+          <div style="height:7px;background:var(--plum4);border-radius:6px;overflow:hidden;"><div id="resume-pct-fill" style="height:100%;width:0%;background:linear-gradient(90deg,var(--mint),var(--mint2));transition:width .35s;"></div></div>
+          <div id="resume-missing" style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5;"></div>
+        </div>
+
+        <!-- COLLAPSED BADGE (shown after Save) -->
+        <div id="studio-collapsed" style="display:none;margin:0 16px 12px;">
+          <div class="section-card" style="display:flex;align-items:center;gap:10px;">
+            <div style="font-size:22px;">✅</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:800;">Resume saved</div>
+              <div style="font-size:11px;color:var(--muted);"><span id="studio-badge-pct">100%</span> complete · <span id="studio-badge-name"></span></div>
+            </div>
+            <div onclick="openStudioEditor()" style="background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:9px 14px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;">✏️ Update Resume</div>
+          </div>
+        </div>
+
+        <!-- EDITOR (collapses on Save) -->
+        <div id="studio-editor">
         <div class="section-card fade-in-up">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
             <div style="font-size:16px;">✅</div>
@@ -1101,6 +1128,8 @@
           </div>
           <div style="font-size:11px;color:var(--mint);margin-top:8px;">✨ Auto-Apply Profile filled from these fields — review it below.</div>
         </div>
+        <div onclick="saveResumeStudio()" style="margin:0 16px 14px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;text-align:center;">💾 Save Resume</div>
+        </div><!-- /#studio-editor -->
 
         <!-- LIVE MARKET SYNC -->
         <div class="sync-bar fade-in-up">
@@ -1318,7 +1347,7 @@
           <div><div style="font-weight:700;font-size:14px;">Employment History</div><div style="font-size:11px;color:var(--muted);">Past roles & duties</div></div>
           <div class="acc-chevron">▾</div>
         </div>
-        <div class="accordion-body"><div class="acc-inner" id="jobs-container">
+        <div class="accordion-body"><div class="acc-inner" id="jobs-container" style="max-height:none;">
           <div style="background:var(--plum3);border-radius:12px;padding:12px;margin-bottom:10px;">
             <div style="font-size:12px;font-weight:700;color:var(--cyber);margin-bottom:8px;">Position 1</div>
             <div class="field-label">Job Title *</div><input class="field-input pf-title" placeholder="Senior Engineer" style="margin-bottom:8px;" oninput="updateProgress()"/>
@@ -1893,12 +1922,35 @@ function repairExtractedText(t){
     ['speci c','specific'],['signi cant','significant'],['bene ts','benefits'],
     ['pro ts','profits'],['pro t','profit'],['certi cate','certificate'],
     ['identi ed','identified'],['veri ed','verified'],['con dent','confident'],
-    ['con gura','configura'],['sta ng','staffing'],['quan ta ve','quantitative']
+    ['con gura','configura'],['sta ng','staffing'],['quan ta ve','quantitative'],
+    ['na onal','national'],['execu ve','executive'],['execu ves','executives'],
+    ['reten on','retention'],['proac ve','proactive'],['escala ons','escalations'],
+    ['escala on','escalation'],['implemen ng','implementing'],['resolu ons','resolutions'],
+    ['resolu on','resolution'],['ac on','action'],['ac ons','actions'],['func on','function'],
+    ['produc on','production'],['descrip on','description'],['atten on','attention'],
+    ['posi ve','positive'],['nega ve','negative'],['rela ng','relating'],
+    ['nego a ng','negotiating'],['par cipa on','participation'],['dedica on','dedication'],
+    ['evalua on','evaluation'],['integra on','integration'],['transi on','transition'],
+    ['comple on','completion'],['distribu on','distribution'],['produc vity','productivity'],
+    ['exper se','expertise'],['strateg c','strategic'],['logis cs','logistics'],
+    ['authen ca on','authentication'],['no fica on','notification'],['reduc on','reduction']
   ];
   FIX.forEach(([b,g])=>{
     const rx=new RegExp('\\b'+b.replace(/ /g,'\\s{0,2}'),'gi');
     t=t.replace(rx,m=>m[0]===m[0].toUpperCase()?g[0].toUpperCase()+g.slice(1):g);
   });
+  /* GENERAL ti/tt-drop repair: PDF ligature loss leaves a gap where "ti" was,
+     producing patterns like "a on"→"ation", "en on"→"ention", "ec ve"→"ective".
+     Apply common suffix reconstructions that are safe (won't corrupt real words). */
+  const SUFFIX=[
+    [/([a-z])a\s?on\b/gi,'$1ation'],   // educ-a-on → education (only after the dict misses)
+    [/([a-z])en\s?on\b/gi,'$1ention'], // ret-en-on → retention
+    [/([a-z])ec\s?ve\b/gi,'$1ective'], // eff-ec-ve → effective
+    [/([a-z])ac\s?ve\b/gi,'$1active']  // pro-ac-ve → proactive
+  ];
+  /* NOTE: suffix rules run only on tokens still containing a tell-tale gap,
+     to avoid touching correctly-spelled words. */
+  SUFFIX.forEach(([rx,rep])=>{ t=t.replace(rx,(m)=>{ return /\s/.test(m)?m.replace(rx,rep):m; }); });
   /* word-start 'fi' vanished: " nance" → finance, " rst" → first */
   t=t.replace(/\b(nance|nancial|rst|eld|elds|gure|gures|lter|lters|nish|nished|tness)\b/g,'fi$1');
   return t.replace(/[ \t]{2,}/g,' ');
@@ -1958,6 +2010,7 @@ function startParse(input){
         extraction.then(rawText=>{
           card.style.display='none';
           document.getElementById('parsed-sections').style.display='block';
+  {const _pb=document.getElementById('resume-progress-bar');if(_pb)_pb.style.display='block';const _ed=document.getElementById('studio-editor');if(_ed)_ed.style.display='block';const _col=document.getElementById('studio-collapsed');if(_col)_col.style.display='none';}
           resumeReady=true;
           let foundCompanies=[];
           const realParse=!!(rawText&&rawText.trim().length>40);
@@ -2014,8 +2067,53 @@ function updateProgress(){
   const required=inputs.filter(i=>i.closest('.acc-inner'));
   const filled=required.filter(i=>i.value&&i.value.trim()).length;
   const pct=Math.min(100,Math.round((filled/Math.max(1,required.length))*100));
-  document.getElementById('profile-progress').style.width=pct+'%';
-  document.getElementById('progress-pct').textContent=pct+'%';
+  const pp=document.getElementById('profile-progress'); if(pp) pp.style.width=pct+'%';
+  const pt=document.getElementById('progress-pct'); if(pt) pt.textContent=pct+'%';
+
+  /* ---- pinned completeness bar + what's-missing hint ---- */
+  const checks=[
+    {label:'Name',ok:!!(document.getElementById('pr-name')||{}).value},
+    {label:'Recent title',ok:!!(document.getElementById('pr-title')||{}).value},
+    {label:'Years experience',ok:!!(document.getElementById('pr-years')||{}).value},
+    {label:'Education',ok:!!(document.getElementById('pr-edu')||{}).value},
+    {label:'At least one past job',ok:(resumeData.jobs||[]).some(j=>j.t&&j.c)},
+    {label:'Skills',ok:!!(resumeData.skills&&resumeData.skills.length)}
+  ];
+  const done=checks.filter(c=>c.ok).length;
+  const wpct=Math.round((done/checks.length)*100);
+  const fill=document.getElementById('resume-pct-fill'); if(fill) fill.style.width=wpct+'%';
+  const pctEl=document.getElementById('resume-pct'); if(pctEl) pctEl.textContent=wpct+'%';
+  const missEl=document.getElementById('resume-missing');
+  if(missEl){
+    const missing=checks.filter(c=>!c.ok).map(c=>c.label);
+    missEl.textContent=missing.length?('Still add: '+missing.join(', ')):'All set — looking great! Tap Save when ready.';
+    missEl.style.color=missing.length?'var(--muted)':'var(--mint)';
+  }
+  const bPct=document.getElementById('studio-badge-pct'); if(bPct) bPct.textContent=wpct+'%';
+  return wpct;
+}
+/* Save the resume → persist + collapse the editor, keep the helpful sections */
+function saveResumeStudio(){
+  if(typeof syncProfileToResume==='function') syncProfileToResume();
+  if(typeof saveDraft==='function') saveDraft();
+  /* cloud save if signed in */
+  try{ if(window.fb&&fb.current()){ fb.saveProfile(fb.current().uid,{resume:resumeData,savedAt:Date.now()}); } }catch(e){}
+  updateProgress();
+  const ed=document.getElementById('studio-editor'); if(ed) ed.style.display='none';
+  const bar=document.getElementById('resume-progress-bar'); if(bar) bar.style.display='none';
+  const col=document.getElementById('studio-collapsed'); if(col) col.style.display='block';
+  const bn=document.getElementById('studio-badge-name'); if(bn) bn.textContent=(resumeData.name||'').split(/\s+/)[0]||'your profile';
+  const uz=document.getElementById('upload-zone'); if(uz) uz.style.display='none';
+  showToast('💾 Resume saved'+((window.fb&&fb.current())?' to your account':' on this device')+'!');
+  try{ if(typeof runPersonalizationCascade==='function') runPersonalizationCascade(); }catch(e){}
+}
+/* Reopen the editor from the collapsed badge */
+function openStudioEditor(){
+  const ed=document.getElementById('studio-editor'); if(ed) ed.style.display='block';
+  const bar=document.getElementById('resume-progress-bar'); if(bar) bar.style.display='block';
+  const col=document.getElementById('studio-collapsed'); if(col) col.style.display='none';
+  updateProgress();
+  if(ed) ed.scrollIntoView({behavior:'smooth',block:'start'});
 }
 let jobCount=1;
 function populateEmploymentRows(jobs){
@@ -2046,9 +2144,19 @@ function populateEmploymentRows(jobs){
   updateProgress();
   dbg('employment rows populated: '+jobs.length+' positions');
 }
-/* split a parsed "2021 - Present" / "Jan 2022" date string into start/end halves */
-function startFromDate(d){ if(!d) return ''; const m=String(d).split(/\s*(?:[-–—]|to)\s*/i); return (m[0]||'').trim(); }
-function endFromDate(d){ if(!d) return ''; const m=String(d).split(/\s*(?:[-–—]|to)\s*/i); return (m[1]||'').trim(); }
+/* split a parsed date string into start/end halves — handles "2021 - Present",
+   "2021–2023", "05/2021 - 12/2023", "Jan 2022", and bare years. */
+function splitDates(d){
+  if(!d) return ['',''];
+  const s=String(d).replace(/[–—]/g,'-').trim();
+  const parts=s.split(/\s*(?:-|to|\u2013|\u2014)\s*/i);
+  if(parts.length>=2) return [(parts[0]||'').trim(),(parts.slice(1).join(' ')||'').trim()];
+  /* single token: if it's "Present"/current treat as end, else as start */
+  if(/present|current|now/i.test(s)) return ['',s];
+  return [s,''];
+}
+function startFromDate(d){ return splitDates(d)[0]; }
+function endFromDate(d){ return splitDates(d)[1]; }
 function addJobEntry(){
   jobCount++;
   const c=document.getElementById('jobs-container');
@@ -2255,9 +2363,21 @@ function renderBuzz(){
 }
 function addBuzz(i){
   const btn=document.getElementById('buzz-'+i);
-  if(btn.classList.contains('added')) return;
+  if(!btn||btn.classList.contains('added')) return;
+  const kw=buzzwords[i].w;
+  /* genuinely add to the user's skills (resumeData + the Skills chips) */
+  const cur=(resumeData.skills||'').split(' · ').map(s=>s.trim()).filter(Boolean);
+  if(!cur.some(s=>s.toLowerCase()===kw.toLowerCase())){
+    cur.push(kw);
+    resumeData.skills=cur.join(' · ');
+    /* reflect in the detected-skills chip row */
+    const chips=document.getElementById('skill-chips');
+    if(chips) chips.insertAdjacentHTML('beforeend','<span class="skill-chip" style="border-color:var(--mint);color:var(--mint);">'+kw.replace(/</g,'&lt;')+'</span>');
+  }
   btn.classList.add('added'); btn.textContent='✓ Added';
-  showToast('🔑 "'+buzzwords[i].w+'" added to resume & profile');
+  if(typeof saveDraft==='function') saveDraft();
+  if(typeof updateProgress==='function') updateProgress();
+  showToast('🔑 "'+kw+'" added to your skills & profile');
 }
 function resyncMarket(){
   const btn=document.getElementById('sync-btn');
@@ -2669,7 +2789,7 @@ async function fetchLiveMarketJobs(){
       url:r.redirect_url||'',
       desc:(r.description||'').replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,460),
       ghost:ghostRiskFor((typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'x'),
-      match:60+(hashStr(r.title||'')%36),
+      match:computeMatch(r.title||'',r.description||r.desc||''),
       posting_age_days:r.created?Math.max(0,Math.floor((Date.now()-new Date(r.created).getTime())/86400000)):null,
       last_ping_status:'ok'
     }));
@@ -2698,7 +2818,7 @@ async function fetchLiveMarketJobs(){
               loc:(typeof r.location==='string'?r.location:(r.location&&r.location.display_name))||'See posting',
               url:r.redirect_url||'',
               desc:(r.description||'').replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,460),
-              ghost:ghostRiskFor(co),match:60+(hashStr(r.title||'')%36),
+              ghost:ghostRiskFor(co),match:computeMatch(r.title||'',r.description||r.desc||''),
               posting_age_days:r.created?Math.max(0,Math.floor((Date.now()-new Date(r.created).getTime())/86400000)):null,
               last_ping_status:'ok',widened:true
             });
@@ -2722,6 +2842,29 @@ async function fetchLiveMarketJobs(){
 }
 /* stable pseudo ghost-risk per company until real community data exists */
 function hashStr(s){let h=0;for(let i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0;}return h;}
+/* REAL match score: compare a job's title/description against the user's resume
+   (their title + skills + recent role). Falls back to a stable hash only when
+   there's no resume yet, so the number means something once they've filled it in. */
+function computeMatch(jobTitle,jobDesc){
+  const jt=(jobTitle||'').toLowerCase();
+  const jd=(jobDesc||'').toLowerCase();
+  if(!resumeReady || !(resumeData&&(resumeData.title||resumeData.skills))){
+    /* no resume → market-fit estimate (stable, labelled "fit" not "match") */
+    return 52+(hashStr(jobTitle||'')%34);
+  }
+  const myTitle=(resumeData.title||'').toLowerCase();
+  const mySkills=(resumeData.skills||'').toLowerCase().split(/[·,]/).map(s=>s.trim()).filter(Boolean);
+  const myWords=new Set((myTitle+' '+(resumeData.jobs||[]).map(j=>j.t).join(' ')).toLowerCase().split(/\s+/).filter(w=>w.length>3));
+  let score=30;
+  /* title word overlap is the strongest signal */
+  const jtWords=jt.split(/\s+/).filter(w=>w.length>3);
+  let titleHits=0; jtWords.forEach(w=>{ if(myWords.has(w)) titleHits++; });
+  if(jtWords.length) score+=Math.round((titleHits/jtWords.length)*45);
+  /* skill mentions in the job blob */
+  let skillHits=0; mySkills.forEach(s=>{ if(s&&(jt.includes(s)||jd.includes(s))) skillHits++; });
+  if(mySkills.length) score+=Math.round((skillHits/mySkills.length)*25);
+  return Math.max(18,Math.min(98,score));
+}
 function ghostRiskFor(co){
   if(communityGhost[co]!==undefined) return communityGhost[co];
   return 8+(hashStr(co)%70);
@@ -2933,12 +3076,25 @@ function applyRealParse(text){
       if(parsedJobs.length<12) parsedJobs.push({t:repairExtractedText(title||'(role)'),c:repairExtractedText(company||''),d:date||'',b:'See resume for details'});
     }
   });
-  /* attach the first following bullet/verb line to each job as its duty summary */
+  /* attach the first following bullet/verb line to each job as its duty summary.
+     Match against a NORMALIZED line (ligatures/spacing stripped) because j.t/j.c
+     were repaired but `lines` are still raw — otherwise findIndex never matches. */
+  const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
   parsedJobs.forEach(j=>{
-    const idx=lines.findIndex(l=>l.includes(j.t)||(j.c&&l.includes(j.c)));
-    for(let k=idx+1;k<Math.min(idx+5,lines.length);k++){
-      if(BULLET_START.test(lines[k])||VERB_START.test(lines[k])){ j.b=lines[k].replace(/^[-•*▪○·>]\s*/,''); break; }
+    const tNorm=norm(j.t), cNorm=norm(j.c);
+    const idx=lines.findIndex(l=>{ const ln=norm(l); return (tNorm&&ln.includes(tNorm.slice(0,12)))||(cNorm&&ln.includes(cNorm.slice(0,10))); });
+    if(idx<0) return;
+    const duties=[];
+    for(let k=idx+1;k<Math.min(idx+8,lines.length);k++){
+      const ln=lines[k].trim();
+      if(!ln) continue;
+      if(DATE_HIT.test(ln)&&ln.length<14) continue;             // skip a stray date line
+      if(BULLET_START.test(ln)||VERB_START.test(ln)){
+        duties.push(ln.replace(/^[-•*▪○·>]\s*/,''));
+        if(duties.length>=4) break;
+      } else if(duties.length){ break; }                         // stop at first non-bullet after we've started
     }
+    if(duties.length) j.b=duties.join('\n');
   });
   if(parsedJobs.length){ resumeData.jobs=parsedJobs; populateEmploymentRows(parsedJobs); }
   /* skills: scan against a broad cross-industry keyword bank */
@@ -3237,6 +3393,7 @@ function buildFromProfile(){
   resumeReady=true;
   document.getElementById('upload-zone').style.display='none';
   document.getElementById('parsed-sections').style.display='block';
+  {const _pb=document.getElementById('resume-progress-bar');if(_pb)_pb.style.display='block';const _ed=document.getElementById('studio-editor');if(_ed)_ed.style.display='block';const _col=document.getElementById('studio-collapsed');if(_col)_col.style.display='none';}
   syncProfileToResume();
   renderTplPreview();
   marketAdvice();
@@ -4004,6 +4161,7 @@ function importLinkedIn(){
   resumeReady=true;
   document.getElementById('upload-zone').style.display='none';
   document.getElementById('parsed-sections').style.display='block';
+  {const _pb=document.getElementById('resume-progress-bar');if(_pb)_pb.style.display='block';const _ed=document.getElementById('studio-editor');if(_ed)_ed.style.display='block';const _col=document.getElementById('studio-collapsed');if(_col)_col.style.display='none';}
   const cos=applyRealParse(text);
   buildOptimizerFromResume(text,cos[0]||'');
   userCompanies=[...new Set([...userCompanies,...cos])];
@@ -4069,6 +4227,15 @@ function restoreDraft(){
     if(d.resume&&(d.resume.name||(d.resume.jobs&&d.resume.jobs.length))){
       if(typeof runPersonalizationCascade==='function') runPersonalizationCascade();
       showToast('🟢 Your saved resume is back — picking up right where you left off!');
+      /* if they'd saved before, bring it back collapsed (not the full editor) */
+      try{
+        const ed=document.getElementById('studio-editor'); if(ed) ed.style.display='none';
+        const bar=document.getElementById('resume-progress-bar'); if(bar) bar.style.display='none';
+        const col=document.getElementById('studio-collapsed'); if(col) col.style.display='block';
+        const bn=document.getElementById('studio-badge-name'); if(bn) bn.textContent=(resumeData.name||'').split(/\s+/)[0]||'your profile';
+        const uz=document.getElementById('upload-zone'); if(uz) uz.style.display='none';
+        updateProgress();
+      }catch(e){}
     } else if(restored>0){
       showToast('🟢 Profile draft safely restored.');
     }
@@ -4202,10 +4369,17 @@ if(DEBUG) dbg('🟢 debug mode active — applications stay local, no external A
 function userTier(){ try{return localStorage.getItem('gpj_tier')||'free';}catch(e){return 'free';} }
 function isPaid(){ return userTier()!=='free'; }
 function setTier(t){
+  /* SECURITY: only a verified admin (signed in with a master email through
+     Firebase) can change tier. A normal user calling this does nothing. Real
+     enforcement also lives in your Firestore rules — never trust the client. */
+  if(!isAdmin){ showToast('Only an admin can change account tier.'); return; }
   try{localStorage.setItem('gpj_tier',t);}catch(e){}
-  showToast(t==='free'?'Tier: free':'⚡ '+t+' unlocked — caps removed. Thank you!');
-  dbg('tier set: '+t);
+  /* mirror to the signed-in user's profile so it persists across devices */
+  try{ if(window.fb&&fb.current()&&adminTargetUid){ fb.setTierFor(adminTargetUid,t); } }catch(e){}
+  showToast(t==='free'?'Tier set: free':'⚡ '+t+' set — paywalled caps removed.');
+  dbg('tier set (admin): '+t);
 }
+let adminTargetUid='';
 
 /* ---------- PROFILE PRESENCE GUARD ---------- */
 function profileComplete(){
@@ -4657,28 +4831,11 @@ const _gateBuildFromProfile=buildFromProfile;
 buildFromProfile=function(){ _gateBuildFromProfile(); runPersonalizationCascade(); };
 
 /* ---------- OWNER / MASTER ACCESS ---------- */
-/* Open the site with ?owner=GPJ-MASTER-2026 once on your own device to unlock.
-   Real cross-user data lives ONLY in your Firebase Console (Firestore → profiles)
-   — no frontend can see other users' devices. This panel shows this device's
-   metrics + tier controls for testing. */
-(function ownerInit(){
-  try{
-    if(location.search.indexOf('owner=GPJ-MASTER-2026')>-1) localStorage.setItem('gpj_owner','1');
-    if(localStorage.getItem('gpj_owner')!=='1') return;
-    const host=document.getElementById('view-account');
-    if(!host) return;
-    const m={
-      applies:(JSON.parse(localStorage.getItem('gpj_lists')||'{}').applied||[]).length,
-      letters:clUsed(), reports:Object.keys(ghostReports).length,
-      tier:userTier(), day:accountAgeDays()
-    };
-    host.insertAdjacentHTML('afterbegin',
-      '<div class="pref-section" style="margin-top:4px;"><div class="pref-section-title" style="color:var(--mint);">👑 Owner Dashboard (this device)</div>'+
-      '<div class="pref-row" style="flex-wrap:wrap;font-size:12px;line-height:1.8;">Applied: <strong style="color:var(--mint);">&nbsp;'+m.applies+'&nbsp;</strong> · Letters today: <strong style="color:var(--cyber);">&nbsp;'+m.letters+'&nbsp;</strong> · Reports: <strong style="color:var(--warn);">&nbsp;'+m.reports+'&nbsp;</strong> · Tier: <strong>&nbsp;'+m.tier+'&nbsp;</strong> · Day '+m.day+'</div>'+
-      '<div class="pref-row" style="gap:8px;"><div class="buzz-add" onclick="setTier(\'lifetime\')">Set Lifetime</div><div class="buzz-add" onclick="setTier(\'monthly\')">Set Monthly</div><div class="buzz-add" onclick="setTier(\'free\')">Set Free</div><div class="buzz-add" onclick="window.open(\'https://console.firebase.google.com/project/ghostproofjob-app/firestore\',\'_blank\',\'noopener\')">Firestore Console ↗</div></div>'+
-      '<div style="font-size:10px;color:var(--muted);padding:0 4px 6px;">All real user accounts & profiles: Firebase Console → Authentication + Firestore. Bug reports land in Firestore + bugs@ email.</div></div>');
-  }catch(e){}
-})();
+/* The owner/admin panel is rendered ONLY by renderAdminPanel(), which fires
+   solely after adminCheck() verifies a master email through Firebase auth.
+   The old localStorage-flag panel was removed — it could be unlocked by any
+   user and let them self-assign a paid tier. Tier changes now require a real
+   admin session and are enforced server-side by Firestore rules. */
 
 /* ============================================================
    APPENDED BLOCK: PLATFORM SYSTEMS v8
@@ -4942,7 +5099,7 @@ let isAdmin=false;
 function adminCheck(user){
   const MASTER_EMAILS=['asosa@ghostproofjob.com','ksosa@ghostproofjob.com'];
   isAdmin=!!(user&&MASTER_EMAILS.includes((user.email||'').toLowerCase()));
-  if(isAdmin){ try{localStorage.setItem('gpj_owner','1');}catch(e){} renderAdminPanel(); }
+  if(isAdmin){ adminTargetUid=(user&&user.uid)||''; renderAdminPanel(); }
 }
 function renderAdminPanel(){
   if(document.getElementById('admin-panel')) return;
