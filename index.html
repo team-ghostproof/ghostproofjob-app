@@ -593,17 +593,17 @@
       <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Saves your profile & resume history securely to the cloud so you never lose progress.</div>
       <div id="auth-signup-fields" style="display:none;">
         <div class="field-row">
-          <div><div class="field-label">First Name</div><input class="field-input" id="auth-first" placeholder="First" style="margin-bottom:8px;"/></div>
-          <div><div class="field-label">Last Name</div><input class="field-input" id="auth-last" placeholder="Last" style="margin-bottom:8px;"/></div>
+          <div><div class="field-label">First Name</div><input class="field-input" id="auth-first" name="given-name" autocomplete="given-name" placeholder="First" style="margin-bottom:8px;"/></div>
+          <div><div class="field-label">Last Name</div><input class="field-input" id="auth-last" name="family-name" autocomplete="family-name" placeholder="Last" style="margin-bottom:8px;"/></div>
         </div>
         <div class="field-label">Phone (10-digit US)</div>
-        <input class="field-input" id="auth-phone" type="tel" inputmode="numeric" placeholder="(713) 555-0100" oninput="validatePhone(this)" style="margin-bottom:2px;"/>
+        <input class="field-input" id="auth-phone" name="tel" autocomplete="tel" type="tel" inputmode="numeric" placeholder="(713) 555-0100" oninput="validatePhone(this)" style="margin-bottom:2px;"/>
         <div id="auth-phone-err" style="display:none;font-size:10px;color:var(--danger);margin-bottom:6px;">Enter a complete 10-digit US number.</div>
       </div>
       <div class="field-label">Email</div>
-      <input class="field-input" id="auth-email" type="email" placeholder="you@email.com" style="margin-bottom:8px;"/>
+      <input class="field-input" id="auth-email" name="email" autocomplete="email" type="email" placeholder="you@email.com" style="margin-bottom:8px;"/>
       <div class="field-label">Password (6+ characters)</div>
-      <input class="field-input" id="auth-pass" type="password" placeholder="••••••••" style="margin-bottom:12px;"/>
+      <input class="field-input" id="auth-pass" name="password" autocomplete="current-password" type="password" placeholder="••••••••" style="margin-bottom:12px;"/>
       <div id="auth-action" class="opt-actions" style="margin-top:0;">
         <div class="opt-btn-go" id="auth-primary-btn" onclick="authPrimary()" style="flex:1;">Create Account</div>
       </div>
@@ -4526,7 +4526,7 @@ function openSandbox(url,title,co){
   /* CHALLENGE INTERCEPTOR: cross-origin walls are invisible to JS, so after a
      short grace period we surface the explicit fallback header automatically */
   const warn=document.getElementById('sandbox-warn');
-  if(warn){ warn.style.display='none'; clearTimeout(window._sbWarnT); window._sbWarnT=setTimeout(()=>{ warn.style.display='flex'; },4000); }
+  if(warn){ warn.style.display='none'; clearTimeout(window._sbWarnT); window._sbWarnT=setTimeout(()=>{ warn.style.display='flex'; },2500); }
   dbg('sandbox open: '+sandboxUrl.slice(0,80));
 }
 /* records that the user opened a posting to apply — powers the monthly ghost-check */
@@ -5761,5 +5761,14 @@ try{ buildProfilePage(); loadAccount(); }catch(e){}
 /* ---------- v5 INIT ---------- */
 renderBrowse();
 </script>
+  <script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+<script>
+  <script>
+  window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/speed-insights/script.js"></script>
 </body>
 </html>
