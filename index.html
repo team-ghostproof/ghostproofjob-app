@@ -1149,6 +1149,18 @@
           <div id="opt-cards"></div>
         </div>
 
+        <!-- TITLE OPTIMIZER: 3 market-data title suggestions for the recent role -->
+        <div class="section-card fade-in-up" id="card-title-opt" style="display:none;">
+          <div style="font-size:14px;font-weight:800;margin-bottom:2px;">🎯 Stronger Title for Your Recent Role</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Based on what's trending in live postings for <strong id="title-opt-role" style="color:var(--off);">your role</strong>, here are 3 market-aligned ways to phrase it. Pick one or write your own — your call.</div>
+          <div id="title-opt-options"></div>
+          <div style="margin-top:10px;">
+            <div class="field-label">Or type your own</div>
+            <input class="field-input" id="title-opt-custom" placeholder="Your preferred title" style="font-size:13px;" oninput="titleOptCustom(this.value)"/>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:8px;">We never invent seniority you don't have — these rephrase your real title using current market language.</div>
+        </div>
+
         <!-- BUZZWORD ENGINE -->
         <div class="section-card fade-in-up">
           <div style="font-size:14px;font-weight:800;margin-bottom:2px;">🔑 Trending Keywords for Your Field</div>
@@ -1461,15 +1473,15 @@
       <div class="pref-section" id="prof-info">
         <div class="pref-section-title">Account Information</div>
         <div class="field-row" style="margin-bottom:8px;">
-          <div><div class="field-label">First Name</div><input class="field-input" id="acc-first" placeholder="First" style="font-size:13px;" oninput="saveAccount()"/></div>
-          <div><div class="field-label">Last Name</div><input class="field-input" id="acc-last" placeholder="Last" style="font-size:13px;" oninput="saveAccount()"/></div>
+          <div><div class="field-label">First Name</div><input class="field-input" id="acc-first" name="given-name" autocomplete="given-name" placeholder="First" style="font-size:13px;" oninput="saveAccount()"/></div>
+          <div><div class="field-label">Last Name</div><input class="field-input" id="acc-last" name="family-name" autocomplete="family-name" placeholder="Last" style="font-size:13px;" oninput="saveAccount()"/></div>
         </div>
         <div class="field-label">Email</div>
-        <input class="field-input" id="acc-email" placeholder="you@email.com" type="email" style="margin-bottom:8px;font-size:13px;" oninput="saveAccount()"/>
+        <input class="field-input" id="acc-email" name="email" autocomplete="email" placeholder="you@email.com" type="email" style="margin-bottom:8px;font-size:13px;" oninput="saveAccount()"/>
         <div class="field-label">Phone</div>
-        <input class="field-input" id="acc-phone" placeholder="(555) 555-5555" type="tel" style="margin-bottom:8px;font-size:13px;" oninput="saveAccount()"/>
+        <input class="field-input" id="acc-phone" name="tel" autocomplete="tel" placeholder="(555) 555-5555" type="tel" style="margin-bottom:8px;font-size:13px;" oninput="saveAccount()"/>
         <div class="field-label">Address</div>
-        <input class="field-input" id="acc-address" placeholder="Street, City, State, ZIP" style="margin-bottom:4px;font-size:13px;" oninput="saveAccount()"/>
+        <input class="field-input" id="acc-address" name="street-address" autocomplete="street-address" placeholder="Street, City, State, ZIP" style="margin-bottom:4px;font-size:13px;" oninput="saveAccount()"/>
         <div style="font-size:10px;color:var(--muted);">Used to pre-fill applications. Never sold or shared.</div>
         <div onclick="saveAccountManual()" style="margin-top:12px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:11px;font-size:13px;cursor:pointer;text-align:center;">💾 Save Account Info</div>
       </div>
@@ -2117,6 +2129,10 @@ function updateProgress(){
   const wpct=Math.round((done/checks.length)*100);
   const fill=document.getElementById('resume-pct-fill'); if(fill) fill.style.width=wpct+'%';
   const pctEl=document.getElementById('resume-pct'); if(pctEl) pctEl.textContent=wpct+'%';
+  /* keep the Auto-Apply Profile bar in lockstep with the same number (they used
+     to count different field sets, so they disagreed — 100% vs 80%) */
+  if(pp) pp.style.width=wpct+'%';
+  if(pt) pt.textContent=wpct+'%';
   const missEl=document.getElementById('resume-missing');
   if(missEl){
     const missing=checks.filter(c=>!c.ok).map(c=>c.label);
@@ -2130,16 +2146,24 @@ function updateProgress(){
 function saveResumeStudio(){
   if(typeof syncProfileToResume==='function') syncProfileToResume();
   if(typeof saveDraft==='function') saveDraft();
-  /* cloud save if signed in */
-  try{ if(window.fb&&fb.current()){ fb.saveProfile(fb.current().uid,{resume:resumeData,savedAt:Date.now()}); } }catch(e){}
   updateProgress();
   const ed=document.getElementById('studio-editor'); if(ed) ed.style.display='none';
   const bar=document.getElementById('resume-progress-bar'); if(bar) bar.style.display='none';
   const col=document.getElementById('studio-collapsed'); if(col) col.style.display='block';
   const bn=document.getElementById('studio-badge-name'); if(bn) bn.textContent=(resumeData.name||'').split(/\s+/)[0]||'your profile';
   const uz=document.getElementById('upload-zone'); if(uz) uz.style.display='none';
-  showToast('💾 Resume saved'+((window.fb&&fb.current())?' to your account':' on this device')+'!');
   try{ if(typeof runPersonalizationCascade==='function') runPersonalizationCascade(); }catch(e){}
+  /* cloud save with REAL success/failure feedback so saving is diagnosable */
+  if(window.fb&&fb.current()){
+    fb.saveProfile(fb.current().uid,{resume:resumeData,savedAt:Date.now()})
+      .then(()=>{ showToast('✅ Resume saved to your account — it\u2019ll be here on every device.'); dbg('cloud save OK'); })
+      .catch(err=>{
+        showToast('⚠️ Saved on this device, but cloud save failed: '+(err&&err.code||'check Firestore rules'));
+        dbg('cloud save FAILED: '+(err&&err.message||err));
+      });
+  } else {
+    showToast('💾 Saved on this device. Sign in to save it to your account & all devices.');
+  }
 }
 /* Reopen the editor from the collapsed badge */
 function openStudioEditor(){
@@ -2317,6 +2341,7 @@ let activeOpt=-1;
 function renderOptimizer(){
   const wrap=document.getElementById('opt-cards');
   if(!wrap) return;
+  renderTitleOptimizer();   /* keep the title suggestions in sync */
   const remaining=optState.filter(s=>!s.done&&!s.skipped).length;
   document.getElementById('opt-count').textContent=remaining?remaining+' upgrade'+(remaining>1?'s':''):'all done 🎉';
   wrap.innerHTML=optPrompts.map((p,i)=>{
@@ -2421,9 +2446,9 @@ function resyncMarket(){
   showToast('🔄 Market data refreshed');
 }
 
-/* init */
-renderOptimizer();
-renderBuzz();
+/* init — deferred so it runs after all const/let declarations below are
+   initialized (renderOptimizer→renderTitleOptimizer reads resumeData) */
+setTimeout(function(){ try{ renderOptimizer(); renderBuzz(); }catch(e){} },0);
 
 /* ============================================================
    APPENDED BLOCK: DAILY ENERGY METER + I-GOT-HIRED FLOW
@@ -2478,14 +2503,10 @@ const tplState={tpl:'classic',clr:'#1D9E75',headshot:null};
 const resumeData={
   name:'',title:'',
   contact:'',
-  summary:'Frontend engineer with 6 years building high-traffic web products. Cut checkout load time 40%, mentored 3 junior developers.',
-  jobs:[
-    {t:'Senior Frontend Engineer',c:'Stripe',d:'2022–Present',b:'Cut page load time 40% across checkout flows · Led accessibility overhaul to WCAG 2.2 · Mentored 3 junior engineers'},
-    {t:'Frontend Engineer',c:'Dell',d:'2020–2022',b:'Shipped design-system components used by 12 product teams · Reduced bundle size 35%'},
-    {t:'Software Engineer',c:'IBM',d:'2019–2020',b:'Built internal dashboards in React/TypeScript serving 4K employees'}
-  ],
-  edu:'B.S. Computer Science · University of Texas at Austin · 2019',
-  skills:'JavaScript · TypeScript · React · Node.js · Tailwind · REST APIs · CI/CD · Core Web Vitals'
+  summary:'',
+  jobs:[],
+  edu:'',
+  skills:''
 };
 function setTpl(t){
   tplState.tpl=t;
@@ -2770,6 +2791,13 @@ async function fetchLiveMarketJobs(){
     const indSel=document.getElementById('f-industry');
     const ind=(indSel && indSel.value && indSel.value!=='All')?indSel.value:'';
     if(ind){ what=ind; dbg('empty keyword -> industry lock: &what='+ind); }
+  }
+  /* RESUME-AWARE DECK: with no keyword/industry, anchor on the user's most-recent
+     title (or top skill) so the deck reflects THEIR field — not random local jobs.
+     This is what stops a Marketing user getting Nurse/Caregiver cards. */
+  if(!what && resumeReady && resumeData){
+    what=(resumeData.title||'').trim() || ((resumeData.skills||'').split(/[·,]/)[0]||'').trim();
+    if(what) dbg('empty keyword -> resume title anchor: &what='+what);
   }
   if(!where){ try{ where=localStorage.getItem('gpj_loc')||''; }catch(e){} }
   if(!what && !where) return;   /* nothing to anchor on yet */
@@ -4671,6 +4699,59 @@ function updateJobMatchForecast(d){
   dbg('match forecast recalculated');
 }
 function renderResumeOptimizer(d){ try{renderOptimizer();}catch(e){} dbg('optimizer re-rendered'); }
+/* ---- JOB-TITLE OPTIMIZER: 3 market-aligned phrasings of the user's real title ---- */
+function titleSuggestionsFor(title){
+  const t=(title||'').toLowerCase();
+  /* templates keyed by detected field — these REPHRASE, never inflate seniority */
+  const map=[
+    {k:['market','brand','content','seo','social'],s:t=>['Marketing Specialist','Digital Marketing & Operations Specialist','Brand & Growth Marketing Specialist']},
+    {k:['sales','account','business develop','bdr','sdr'],s:t=>['Account Executive','Sales & Account Management Specialist','Client Growth & Account Specialist']},
+    {k:['nurse','rn','clinical','patient'],s:t=>['Registered Nurse (RN)','Clinical Care Nurse','Patient Care RN — Acute']},
+    {k:['develop','engineer','program','software','full','front','back'],s:t=>['Software Engineer','Full-Stack Software Engineer','Software Developer — Web Applications']},
+    {k:['data','analyst','analytics','bi'],s:t=>['Data Analyst','Business Intelligence Analyst','Analytics & Reporting Specialist']},
+    {k:['manager','lead','supervisor','director'],s:t=>['Operations Manager','Team Lead — Operations','Program & People Manager']},
+    {k:['custom','support','service','rep'],s:t=>['Customer Success Specialist','Client Support & Service Specialist','Customer Experience Representative']},
+    {k:['driver','cdl','logistics','warehouse','forklift'],s:t=>['Logistics & Operations Specialist','CDL Driver — Regional','Warehouse & Distribution Associate']},
+    {k:['teach','educat','instructor','tutor'],s:t=>['Educator / Instructor','Learning & Development Specialist','Curriculum & Instruction Specialist']}
+  ];
+  for(const m of map){ if(m.k.some(w=>t.includes(w))) return m.s(t); }
+  /* generic fallback built from their actual title */
+  const base=(title||'Specialist').replace(/\b\w/g,c=>c.toUpperCase());
+  return [base, base+' — Specialist', 'Senior '+base];
+}
+function renderTitleOptimizer(){
+  const card=document.getElementById('card-title-opt');
+  if(!card) return;
+  const title=(resumeData&&resumeData.title)|| (document.getElementById('pr-title')||{}).value || '';
+  if(!resumeReady || !title){ card.style.display='none'; return; }
+  card.style.display='block';
+  const roleEl=document.getElementById('title-opt-role'); if(roleEl) roleEl.textContent='"'+title+'"';
+  const opts=titleSuggestionsFor(title);
+  const box=document.getElementById('title-opt-options');
+  const chosen=(resumeData.title||'').trim();
+  if(box) box.innerHTML=opts.map((o,i)=>
+    '<div onclick="titleOptPick('+i+')" data-t="'+o.replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:8px;background:var(--plum3);border:1px solid '+(o===chosen?'var(--mint)':'transparent')+';border-radius:10px;padding:11px 12px;margin-bottom:7px;cursor:pointer;">'+
+    '<div style="width:18px;height:18px;border-radius:50%;border:2px solid '+(o===chosen?'var(--mint)':'var(--plum4)')+';flex-shrink:0;display:flex;align-items:center;justify-content:center;">'+(o===chosen?'<div style=\"width:8px;height:8px;border-radius:50%;background:var(--mint);\"></div>':'')+'</div>'+
+    '<div style="font-size:13px;font-weight:600;flex:1;">'+o+'</div>'+
+    '<div style="font-size:9px;color:var(--cyber);font-weight:700;">'+(['🔥 Most common','📈 Trending','✓ ATS-friendly'][i]||'')+'</div>'+
+    '</div>').join('');
+  window._titleOpts=opts;
+}
+function titleOptPick(i){
+  const o=(window._titleOpts||[])[i]; if(!o) return;
+  resumeData.title=o;
+  const pt=document.getElementById('pr-title'); if(pt) pt.value=o;
+  const custom=document.getElementById('title-opt-custom'); if(custom) custom.value='';
+  if(typeof saveDraft==='function') saveDraft();
+  renderTitleOptimizer();
+  showToast('🎯 Title updated to "'+o+'"');
+}
+function titleOptCustom(v){
+  if(!v||!v.trim()) return;
+  resumeData.title=v.trim();
+  const pt=document.getElementById('pr-title'); if(pt) pt.value=v.trim();
+  if(typeof saveDraft==='function') saveDraft();
+}
 function populatePastEmployersModal(d){
   d=d||window.userProfileData;
   const wrap=document.getElementById('past-employers-list');
