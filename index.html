@@ -1724,11 +1724,7 @@ function showToast(msg){
 }
 
 /* ===== SWIPE DECK ===== */
-const deckJobs=[
-  {id:'job-card-0',co:'Stripe',t:'Senior Frontend Engineer'},
-  {id:'job-card-1',co:'Linear',t:'Staff Engineer'},
-  {id:'job-card-2',co:'Figma',t:'Product Designer'}
-];
+const deckJobs=[];  /* no demo data — deck fills from live matched jobs only */
 let topIndex=0;
 function swipeCard(dir){
   if(dir==='right'&&!isPaid()&&applyCount>=getDailyCap()){ openEnergyModal(); return; }
@@ -1738,6 +1734,7 @@ function swipeCard(dir){
     dbg('apply halted — missing name/email/resume');
     return;
   }
+  if(!deckJobs.length){ showToast('🔍 Loading live jobs — set your location or search to fill your deck.'); return; }
   const topCard=document.getElementById(deckJobs[topIndex%3].id);
   if(!topCard||topCard.dataset.swiping) return;
   topCard.dataset.swiping='1';
@@ -1800,37 +1797,7 @@ function toggleDrawer(e){
 }
 
 /* ===== BROWSE ===== */
-const browseJobs=[
-  {t:'Senior Frontend Engineer',co:'Stripe',e:'🦓',min:185,max:225,style:'Remote',ind:'Tech',dist:0,match:91,ghost:12,lvl:'Senior',type:'Full-time'},
-  {t:'Staff Engineer',co:'Linear',e:'🔷',min:190,max:240,style:'Hybrid',ind:'Tech',dist:8,match:82,ghost:9,lvl:'Senior',type:'Full-time'},
-  {t:'Full-Stack Engineer',co:'Chime',e:'💳',min:160,max:195,style:'Remote',ind:'Finance',dist:0,match:82,ghost:18,lvl:'Mid',type:'Full-time'},
-  {t:'Product Designer',co:'Figma',e:'🏢',min:145,max:175,style:'Remote',ind:'Design',dist:0,match:61,ghost:15,lvl:'Mid',type:'Full-time'},
-  {t:'Junior Web Developer',co:'Accenture',e:'💻',min:55,max:70,style:'Hybrid',ind:'Tech',dist:12,match:70,ghost:16,lvl:'Entry',type:'Full-time'},
-  {t:'Marketing Manager',co:'HubSpot',e:'📣',min:95,max:130,style:'Remote',ind:'Marketing',dist:0,match:74,ghost:14,lvl:'Mid',type:'Full-time'},
-  {t:'Digital Marketing Specialist',co:'Visit Houston',e:'🌆',min:58,max:78,style:'Hybrid',ind:'Marketing',dist:6,match:81,ghost:19,lvl:'Entry',type:'Full-time'},
-  {t:'Social Media Coordinator (PT)',co:'Local Foods',e:'📱',min:24,max:32,style:'Hybrid',ind:'Marketing',dist:4,match:68,ghost:18,lvl:'Entry',type:'Part-time'},
-  {t:'Registered Nurse (ICU)',co:'Houston Methodist',e:'🏥',min:75,max:98,style:'On-site',ind:'Healthcare',dist:9,match:69,ghost:8,lvl:'Mid',type:'Full-time'},
-  {t:'Medical Assistant',co:'Kelsey-Seybold',e:'🩺',min:36,max:44,style:'On-site',ind:'Healthcare',dist:8,match:64,ghost:12,lvl:'Entry',type:'Full-time'},
-  {t:'Sales Account Executive',co:'ADP',e:'💼',min:65,max:120,style:'Hybrid',ind:'Sales',dist:14,match:77,ghost:26,lvl:'Mid',type:'Full-time'},
-  {t:'Retail Sales Associate (PT)',co:'Target',e:'🎯',min:25,max:31,style:'On-site',ind:'Retail',dist:5,match:62,ghost:11,lvl:'Entry',type:'Part-time'},
-  {t:'Barista (PT, mornings)',co:'Starbucks',e:'☕',min:24,max:30,style:'On-site',ind:'Hospitality',dist:3,match:58,ghost:9,lvl:'Entry',type:'Part-time'},
-  {t:'High School Math Teacher',co:'Houston ISD',e:'🎓',min:62,max:78,style:'On-site',ind:'Education',dist:11,match:55,ghost:7,lvl:'Mid',type:'Full-time'},
-  {t:'Customer Support Lead',co:'Favor',e:'🎧',min:55,max:72,style:'Remote',ind:'Customer Service',dist:0,match:72,ghost:31,lvl:'Mid',type:'Full-time'},
-  {t:'Customer Service Rep (Entry, Remote)',co:'Alorica',e:'📞',min:33,max:41,style:'Remote',ind:'Customer Service',dist:0,match:75,ghost:23,lvl:'Entry',type:'Full-time'},
-  {t:'Administrative Assistant',co:'MD Anderson',e:'🗂️',min:38,max:48,style:'On-site',ind:'Healthcare',dist:10,match:66,ghost:10,lvl:'Entry',type:'Full-time'},
-  {t:'HR Generalist',co:'Sysco',e:'🤝',min:60,max:85,style:'Hybrid',ind:'HR',dist:16,match:66,ghost:13,lvl:'Mid',type:'Full-time'},
-  {t:'Staff Accountant',co:'Deloitte',e:'🧾',min:68,max:92,style:'Hybrid',ind:'Finance',dist:10,match:63,ghost:24,lvl:'Mid',type:'Full-time'},
-  {t:'Warehouse Associate (Entry)',co:'HEB',e:'📦',min:33,max:41,style:'On-site',ind:'Logistics',dist:13,match:61,ghost:10,lvl:'Entry',type:'Full-time'},
-  {t:'Server (PT, evenings)',co:"Pappadeaux",e:'🍽️',min:22,max:30,style:'On-site',ind:'Hospitality',dist:6,match:57,ghost:8,lvl:'Entry',type:'Part-time'},
-  {t:'Paralegal',co:'Baker Botts',e:'⚖️',min:65,max:90,style:'On-site',ind:'Legal',dist:7,match:58,ghost:17,lvl:'Mid',type:'Full-time'},
-  {t:'Electrician (Journeyman)',co:'Bechtel',e:'⚡',min:70,max:95,style:'On-site',ind:'Construction & Trades',dist:19,match:54,ghost:9,lvl:'Mid',type:'Full-time'},
-  {t:'Frontend Engineer II',co:'Tenet Health',e:'🏥',min:120,max:150,style:'On-site',ind:'Healthcare',dist:12,match:78,ghost:22,lvl:'Mid',type:'Full-time'},
-  {t:'Delivery Driver (Gig, set your hours)',co:'Favor',e:'🛵',min:18,max:28,style:'On-site',ind:'Logistics',dist:2,match:60,ghost:6,lvl:'Entry',type:'Gig',wage:'$14–$22/hr est. + tips'},
-  {t:'Paid Marketing Intern (Summer)',co:'Visit Houston',e:'🎒',min:31,max:35,style:'Hybrid',ind:'Marketing',dist:6,match:71,ghost:13,lvl:'Entry',type:'Internship',wage:'$15–$17/hr'},
-  {t:'Bartender (PT, weekends)',co:'Hilton Americas',e:'🍸',min:25,max:38,style:'On-site',ind:'Hospitality',dist:5,match:56,ghost:10,lvl:'Entry',type:'Part-time',wage:'$12/hr + tips'},
-  {t:'Apprentice Plumber',co:'John Moore Services',e:'🔧',min:38,max:50,style:'On-site',ind:'Construction & Trades',dist:9,match:59,ghost:7,lvl:'Entry',type:'Full-time',wage:'$18–$24/hr, paid training'},
-  {t:'Restaurant General Manager',co:'Pappadeaux',e:'🍽️',min:62,max:85,style:'On-site',ind:'Hospitality',dist:6,match:63,ghost:12,lvl:'Mid',type:'Full-time'},
-];
+const browseJobs=[];  /* no demo data — Browse fills from the live feed only */
 let liveJobs=[];
 function openLive(i){
   const j=liveJobs[i];
@@ -1913,7 +1880,9 @@ function renderBrowse(){
     j.max>=sal&&(j.style==='Remote'||j.dist<=dist)
   );
   if(!hits.length){
-    out.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">👻 No jobs match these filters.<br/>Try widening salary or distance.</div>';
+    out.innerHTML=browseJobs.length
+      ? '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">👻 No jobs match these filters.<br/>Try widening salary or distance.</div>'
+      : '<div style="text-align:center;padding:36px 24px;color:var(--muted);font-size:13px;line-height:1.7;">🔍 <strong style="color:var(--off);">Search to see live openings.</strong><br/>Enter a keyword or location above (or set your location) and we\'ll pull real, current jobs — no sample data here.</div>';
     return;
   }
   out.innerHTML=hits.map(j=>{
@@ -5792,14 +5761,5 @@ try{ buildProfilePage(); loadAccount(); }catch(e){}
 /* ---------- v5 INIT ---------- */
 renderBrowse();
 </script>
-  <script>
-  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-</script>
-<script defer src="/_vercel/insights/script.js"></script>
-<script>
-  <script>
-  window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
-</script>
-<script defer src="/_vercel/speed-insights/script.js"></script>
 </body>
 </html>
