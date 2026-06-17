@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "api/jobs/*.js": {
+      "memory": 2048,
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/jobs/index",
+      "schedule": "0 5 * * *"
+    }
+  ]
+}
