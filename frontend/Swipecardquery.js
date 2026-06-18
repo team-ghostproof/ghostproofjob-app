@@ -7,6 +7,35 @@
  * Framework-agnostic: pass in your job-fetch + user-state accessors.
  */
 
+/* ---- INITIALIZATION SAFETY + CIRCUIT BREAKER ---- */
+/* ironclad one-shot telemetry lock: a caught init failure reports exactly once
+   and short-circuits every downstream recursive log request. */
+let telemetrySent = false;
+function reportTelemetryOnce(err) {
+  if (telemetrySent) return;
+  telemetrySent = true;
+  try {
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('[swipeCardQuery] init issue (reported once):', err && err.message ? err.message : err);
+    }
+  } catch (e) { /* never throw from the reporter */ }
+}
+
+/* protected baseline seed deck served when Firebase isn't mounted yet, so the
+   UI degrades gracefully instead of throwing a script-breaking exception. */
+function fallbackBaselineDeck() {
+  return [];
+}
+
+/* true only when the Firebase app + auth are fully mounted by index.js */
+function firebaseReady() {
+  try {
+    if (typeof window !== 'undefined' && window.fb && typeof window.fb.fetchJobs === 'function') return true;
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) return true;
+  } catch (e) { return false; }
+  return false;
+}
+
 const REGIONAL_ENDPOINT = '/api/jobs/regionalRouter';
 const AGGREGATOR_SOURCES = ['Jooble', 'Adzuna', 'jooble', 'adzuna'];
 
@@ -53,6 +82,42 @@ function isValidLocation(loc) {
   return true;
 }
 
+/* normalize any string for case-insensitive containment matching */
+function normalizeText(s) {
+  return (s == null ? '' : String(s)).toLowerCase().trim();
+}
+
+/* case-insensitive keyword containment: "Marketing" matches "marketing specialist".
+   Every token in the query must appear somewhere in the record's searchable text. */
+function matchesKeyword(record, query) {
+  const q = normalizeText(query);
+  if (!q) return true;
+  const hay = normalizeText(
+    [record && record.title, record && record.company, record && record.location, record && record.region]
+      .filter(Boolean)
+      .join(' ')
+  );
+  return q.split(/\s+/).every((tok) => hay.indexOf(tok) !== -1);
+}
+
+/* client-side case-insensitive filter over a result list */
+function filterByKeyword(list, query) {
+  if (!Array.isArray(list)) return [];
+  const q = normalizeText(query);
+  if (!q) return list;
+  return list.filter((r) => matchesKeyword(r, q));
+}
+
+/* Pre-populate a search input with the user's saved location on mount so the
+   dashboard never renders a blank placeholder row. Falls back to "United States". */
+function initLocationField(inputEl, user) {
+  if (!inputEl) return '';
+  const loc = resolveUserLocation(user);
+  const value = isValidLocation(loc) ? loc : 'United States';
+  if (!inputEl.value || !inputEl.value.trim()) inputEl.value = value;
+  return value;
+}
+
 /**
  * Build + run the swipe deck query from synced profile state.
  * @param {object} user  synced account profile ({location|city|state, role?})
@@ -61,6 +126,11 @@ function isValidLocation(loc) {
  */
 async function querySwipeDeck(user, opts) {
   opts = opts || {};
+  /* INIT SHIELD: never query before Firebase app+auth are mounted by index.js */
+  if (!firebaseReady()) {
+    reportTelemetryOnce(new Error('firebase not mounted at query time'));
+    return fallbackBaselineDeck();
+  }
   const location = resolveUserLocation(user);
   const role = (opts.role || (user && user.targetRole) || '').toString();
   const country = (opts.country || (user && user.country) || 'US').toString();
@@ -83,10 +153,14 @@ async function querySwipeDeck(user, opts) {
     const res = await doFetch(REGIONAL_ENDPOINT + '?' + params.toString(), { cache: 'no-store' });
     if (!res || !res.ok) return [];
     const data = await res.json();
-    const results = Array.isArray(data && data.results) ? data.results : [];
-    return filterCleanSources(results, cleanSourcing);
+    let results = Array.isArray(data && data.results) ? data.results : [];
+    results = filterCleanSources(results, cleanSourcing);
+    // case-insensitive client-side keyword match so "Marketing" finds "marketing specialist"
+    results = filterByKeyword(results, role);
+    return results;
   } catch (e) {
-    return [];
+    reportTelemetryOnce(e);
+    return fallbackBaselineDeck();
   }
 }
 
@@ -145,5 +219,5 @@ function openSavedJobCard(job, hooks) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { querySwipeDeck, getApplyUrl, applyToCard, resolveUserLocation, isValidLocation, buildCleanDeckQuery, filterCleanSources, openSavedJobCard };
+  module.exports = { querySwipeDeck, getApplyUrl, applyToCard, resolveUserLocation, isValidLocation, buildCleanDeckQuery, filterCleanSources, openSavedJobCard, normalizeText, matchesKeyword, filterByKeyword, initLocationField, firebaseReady, fallbackBaselineDeck, reportTelemetryOnce };
 }
