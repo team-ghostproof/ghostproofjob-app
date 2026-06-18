@@ -514,7 +514,7 @@
   </div>
 
   <!-- OPTIMIZER METRIC PROMPT MODAL -->
-  <div class="modal-scrim" id="opt-modal">
+  <div class="modal-scrim" id="opt-modal" style="display:none;">
     <div class="modal-box" style="text-align:left;">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--cyber);margin-bottom:6px;">Recommended · Not Required</div>
       <div style="font-size:15px;font-weight:800;margin-bottom:6px;" id="opt-q-title">Quick question</div>
@@ -529,7 +529,7 @@
   </div>
 
   <!-- ===== APPENDED: ENERGY CAP MODAL ===== -->
-  <div class="modal-scrim" id="energy-modal" style="z-index:330;">
+  <div class="modal-scrim" id="energy-modal" style="z-index:330; display:none;">
     <div class="modal-box">
       <div style="font-size:34px;margin-bottom:8px;">🧘</div>
       <div style="font-size:13px;color:var(--off);line-height:1.7;margin-bottom:16px;">🧘 Time to decompress. You've sent 30 optimized applications today! Research shows pacing your search leads to better interview response rates. Come back tomorrow when your energy resets \u2014 still completely free, no strings. (If you ever want unlimited swipes, a one-time $12 lifetime pass exists. Zero pressure.)</div>
@@ -539,7 +539,7 @@
   </div>
 
   <!-- ===== APPENDED: I GOT HIRED MODAL ===== -->
-  <div class="modal-scrim" id="hired-modal" style="z-index:330;">
+  <div class="modal-scrim" id="hired-modal" style="z-index:330; display:none;">
     <div class="modal-box" id="hired-step1">
       <div style="font-size:38px;margin-bottom:8px;">🎉👻🎉</div>
       <div style="font-size:18px;font-weight:800;margin-bottom:6px;">YOU DID IT!</div>
@@ -560,6 +560,7 @@
       <div onclick="closeHired()" style="color:var(--mint);font-size:14px;font-weight:700;cursor:pointer;padding:8px;">Go Celebrate 🎊</div>
     </div>
   </div>
+
 
   <!-- ===== COVER LETTER PROMPT MODAL ===== -->
   <div class="modal-scrim" id="cl-prompt-modal" style="z-index:330;">
