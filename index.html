@@ -401,8 +401,8 @@
   <div class="desk-card">
     <div style="font-size:30px;margin-bottom:8px;" class="ghost-glow">👻</div>
     <div class="brand-text" style="font-size:24px;font-weight:800;">GhostProofJob</div>
-    <div style="font-size:13px;color:var(--off);line-height:1.7;margin-top:12px;">Job hunting is broken — you apply into the void and never hear back. <strong style="color:var(--mint);">GhostProofJob fixes it:</strong> swipe real verified openings, jump straight to apply, and see every company's community-sourced <strong style="color:var(--cyber);">ghosting risk</strong> before you invest a single interview.</div>
-    <div style="font-size:13px;color:var(--mint);font-weight:800;margin-top:10px;">Free until you're hired. Because the only metric we care about is you, employed. 💚</div>
+       <div style="font-size:13px;color:var(--off);line-height:1.7;margin-top:12px;">Your permanent career hub. Swipe real verified openings, match your resume in real time, and inspect community-sourced ghosting risk before you invest a single interview.</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:10px;font-style:italic;">Empowering your job search 100% free until you're hired. 💚</div>
   </div>
 </aside>
 <aside class="desk-pane" id="desk-right">
@@ -419,7 +419,7 @@
 
   <!-- HEADER -->
   <div id="header">
-    <div id="header-row" style="display:flex;align-items:center;gap:10px;padding:10px 14px 8px;">
+    <div id="header-row" style="display:flex;align-items:center;gap:10px;padding:10px 14px 8px;position:relative;z-index:100;">
       <div onclick="goHome()" style="display:flex;align-items:center;gap:10px;cursor:pointer;min-width:0;flex-shrink:1;" title="Home">
         <span class="ghost-glow" style="font-size:26px;flex-shrink:0;">👻</span>
         <div style="min-width:0;overflow:hidden;">
@@ -428,19 +428,10 @@
         </div>
       </div>
       <div style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0;">
-        <div class="desk-only" style="gap:6px;">
+        <div class="desk-only" style="display:flex;gap:6px;position:relative;z-index:101;">
           <span class="nav-pill" onclick="goHome()">🏠 Home</span>
           <span class="nav-pill" onclick="switchView('browse',null)">🔍 Browse</span>
-        </div>
-        <div style="position:relative;">
-          <div id="auth-chip" onclick="toggleProfileMenu()" style="background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.35);color:var(--cyber);font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:pointer;">Sign In</div>
-          <div id="profile-menu" style="display:none;position:fixed;right:10px;top:60px;z-index:400;background:var(--plum2);border:1px solid var(--plum4);border-radius:14px;padding:6px;min-width:200px;box-shadow:0 12px 34px rgba(0,0,0,.6);">
-            <div class="pm-item" onclick="pmGo('profile')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">👤 Account / Profile</div>
-            <div class="pm-item" onclick="pmGo('account')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">⚙️ Settings</div>
-            <div class="pm-item" onclick="pmViewedJobs()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">👀 Viewed Jobs <span id="pm-viewed-count" style="margin-left:auto;background:var(--plum4);border-radius:8px;padding:1px 7px;font-size:11px;color:var(--muted);">0</span></div>
-            <div class="pm-item" onclick="openContactModal()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">📬 Contact Us</div>
-            <div class="pm-item" onclick="document.getElementById('profile-menu').style.display='none';openSelfTest()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">🧪 Run Self-Test</div>
-            <div style="height:1px;background:var(--plum4);margin:4px 8px;"></div>
+
             <div class="pm-item" onclick="pmSignOut()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--danger);">🚪 Sign Out</div>
           </div>
         </div>
