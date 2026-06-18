@@ -8,6 +8,31 @@
  */
 
 const REGIONAL_ENDPOINT = '/api/jobs/regionalRouter';
+const AGGREGATOR_SOURCES = ['Jooble', 'Adzuna', 'jooble', 'adzuna'];
+
+/* Build a clean-sourcing Firestore query: when the routing context specifies
+   clean mode, exclude aggregator sources directly in the query builder so the
+   client never even receives Jooble/Adzuna items (which trigger Cloudflare
+   verification walls). Firestore allows multiple inequality filters on the SAME
+   field, so chained '!=' on `source` is valid. */
+function buildCleanDeckQuery(collectionRef, opts) {
+  opts = opts || {};
+  let q = collectionRef;
+  if (opts.region) q = q.where('region', '==', opts.region);
+  if (opts.cleanSourcing) {
+    q = q.where('source', '!=', 'Jooble').where('source', '!=', 'Adzuna');
+  }
+  // cache-bypass: order by an ingestion field to force a fresh server read path
+  if (q.orderBy) { try { q = q.orderBy('source').orderBy('ingestedAt', 'desc'); } catch (e) {} }
+  return q;
+}
+
+/* strip aggregator items defensively in clean mode (covers API path too) */
+function filterCleanSources(list, cleanSourcing) {
+  if (!Array.isArray(list)) return [];
+  if (!cleanSourcing) return list;
+  return list.filter((r) => r && AGGREGATOR_SOURCES.indexOf(String(r.source || '')) === -1);
+}
 
 /* derive the active location strictly from synced profile state, with safe
    fallbacks; never from a hardcoded default. */
@@ -48,12 +73,18 @@ async function querySwipeDeck(user, opts) {
   if (role) params.set('role', role);
   params.set('country', country);
   params.set('page', String(page));
+  const cleanSourcing = opts.cleanSourcing === true || opts.clean === true;
+  if (cleanSourcing) params.set('clean', '1');
+  // cache-bust: unique token + no-store so a clean lookup never serves a cached
+  // response that still contains aggregator items
+  params.set('_cb', String(Date.now()));
 
   try {
-    const res = await doFetch(REGIONAL_ENDPOINT + '?' + params.toString());
+    const res = await doFetch(REGIONAL_ENDPOINT + '?' + params.toString(), { cache: 'no-store' });
     if (!res || !res.ok) return [];
     const data = await res.json();
-    return Array.isArray(data && data.results) ? data.results : [];
+    const results = Array.isArray(data && data.results) ? data.results : [];
+    return filterCleanSources(results, cleanSourcing);
   } catch (e) {
     return [];
   }
@@ -87,6 +118,32 @@ function applyToCard(card, opener) {
   return true;
 }
 
+/**
+ * Open a saved job into the full interactive overlay (Match / Cover Letter /
+ * Company Intel) rather than a raw tracking link. Re-instantiates the rich card
+ * view in the viewport via the host app's overlay renderer.
+ * @param {object} job   saved job record
+ * @param {object} hooks { openCompanyView?, renderCardOverlay? } host renderers
+ */
+function openSavedJobCard(job, hooks) {
+  if (!job) return false;
+  hooks = hooks || {};
+  const co = job.company || job.co || '';
+  const title = job.title || job.t || '';
+  const url = getApplyUrl(job) || job.url || '';
+  // prefer the rich overlay so the user keeps Match/Cover Letter/Company Intel
+  if (typeof hooks.renderCardOverlay === 'function') {
+    hooks.renderCardOverlay({ title: title, company: co, direct_apply_url: url });
+    return true;
+  }
+  if (typeof hooks.openCompanyView === 'function' && co) {
+    hooks.openCompanyView(co, { title: title, url: url });
+    return true;
+  }
+  // last resort only — never the default path
+  return applyToCard({ direct_apply_url: url });
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { querySwipeDeck, getApplyUrl, applyToCard, resolveUserLocation, isValidLocation };
+  module.exports = { querySwipeDeck, getApplyUrl, applyToCard, resolveUserLocation, isValidLocation, buildCleanDeckQuery, filterCleanSources, openSavedJobCard };
 }
