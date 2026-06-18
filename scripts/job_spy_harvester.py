@@ -26,39 +26,42 @@ except ImportError:
     from python_jobspy import scrape_jobs  # fallback import name
 
 COLLECTION = "jobs"
-RESULTS_PER_QUERY = 100
-SITES = ["linkedin", "indeed", "zip_recruiter"]
+RESULTS_PER_QUERY = 50  
+
+# REMOVED ZIP_RECRUITER TO BYPASS THE CLOUDFLARE WAF 403 ERRORS AND PREVENT TIMEOUTS
+SITES = ["linkedin", "indeed"]
 
 # country -> (region label, [locations], [roles])
+# FIXED: Explicitly maps valid JobSpy lowercase country strings to protect runtime state from crashing
 TARGETS = [
     # 🇺🇸 NORTH AMERICA (US, CA, MX)
-    {"country": "USA", "region": "United States", "locations": ["United States", "Remote"], "roles": ["operations", "sales", "retail", "hospitality", "trades", "internship", "marketing", "data entry", "executive", "animation"]},
-    {"country": "Canada", "region": "Canada", "locations": ["Canada", "Remote"], "roles": ["operations", "sales", "retail", "trades", "internship", "data entry"]},
-    {"country": "Mexico", "region": "Mexico", "locations": ["Mexico"], "roles": ["operaciones", "ventas", "retail", "practicante"]},
+    {"country": "usa", "region": "United States", "locations": ["United States", "Remote"], "roles": ["operations", "sales", "retail", "hospitality", "trades", "internship", "marketing", "data entry", "executive", "animation"]},
+    {"country": "canada", "region": "Canada", "locations": ["Canada", "Remote"], "roles": ["operations", "sales", "retail", "trades", "internship", "data entry"]},
+    {"country": "mexico", "region": "Mexico", "locations": ["Mexico"], "roles": ["operaciones", "ventas", "retail", "practicante"]},
 
     # 🇬🇧/🇪🇺 EUROPE & UK (GB, DE, FR, IT, ES, NL, BE, AT, PL, CH)
-    {"country": "UK", "region": "United Kingdom", "locations": ["United Kingdom", "London", "Remote"], "roles": ["operations", "sales", "retail", "hospitality", "trades", "internship", "data entry", "creative"]},
-    {"country": "Germany", "region": "Germany", "locations": ["Deutschland"], "roles": ["betrieb", "verkauf", "einzelhandel", "praktikum"]},
-    {"country": "France", "region": "France", "locations": ["France"], "roles": ["operations", "vente", "commerce", "stage"]},
-    {"country": "Italy", "region": "Italy", "locations": ["Italia"], "roles": ["operazioni", "vendite", "retail", "stage"]},
-    {"country": "Spain", "region": "Spain", "locations": ["España"], "roles": ["operaciones", "ventas", "retail", "practicas"]},
-    {"country": "Netherlands", "region": "Netherlands", "locations": ["Nederland"], "roles": ["operations", "sales", "retail", "internship"]},
-    {"country": "Belgium", "region": "Belgium", "locations": ["Belgique", "België"], "roles": ["operations", "sales", "retail"]},
-    {"country": "Austria", "region": "Austria", "locations": ["Österreich"], "roles": ["operations", "sales", "retail"]},
-    {"country": "Poland", "region": "Poland", "locations": ["Polska"], "roles": ["operacje", "sprzedaz", "retail", "staz"]},
-    {"country": "Switzerland", "region": "Switzerland", "locations": ["Schweiz", "Suisse"], "roles": ["operations", "sales", "retail"]},
+    {"country": "uk", "region": "United Kingdom", "locations": ["United Kingdom", "London", "Remote"], "roles": ["operations", "sales", "retail", "hospitality", "trades", "internship", "data entry", "creative"]},
+    {"country": "germany", "region": "Germany", "locations": ["Deutschland"], "roles": ["betrieb", "verkauf", "einzelhandel", "praktikum"]},
+    {"country": "france", "region": "France", "locations": ["France"], "roles": ["operations", "vente", "commerce", "stage"]},
+    {"country": "italy", "region": "Italy", "locations": ["Italia"], "roles": ["operazioni", "vendite", "retail", "stage"]},
+    {"country": "spain", "region": "Spain", "locations": ["España"], "roles": ["operaciones", "ventas", "retail", "practicas"]},
+    {"country": "netherlands", "region": "Netherlands", "locations": ["Nederland"], "roles": ["operations", "sales", "retail", "internship"]},
+    {"country": "belgium", "region": "Belgium", "locations": ["Belgique", "België"], "roles": ["operations", "sales", "retail"]},
+    {"country": "austria", "region": "Austria", "locations": ["Österreich"], "roles": ["operations", "sales", "retail"]},
+    {"country": "poland", "region": "Poland", "locations": ["Polska"], "roles": ["operacje", "sprzedaz", "retail", "staz"]},
+    {"country": "switzerland", "region": "Switzerland", "locations": ["Schweiz", "Suisse"], "roles": ["operations", "sales", "retail"]},
 
     # 🇦🇺/🇳🇿 OCEANIA (AU, NZ)
-    {"country": "Australia", "region": "Australia", "locations": ["Australia", "Remote"], "roles": ["operations", "sales", "retail", "trades", "internship", "hospitality"]},
-    {"country": "New Zealand", "region": "New Zealand", "locations": ["New Zealand"], "roles": ["operations", "sales", "retail", "trades"]},
+    {"country": "australia", "region": "Australia", "locations": ["Australia", "Remote"], "roles": ["operations", "sales", "retail", "trades", "internship", "hospitality"]},
+    {"country": "new zealand", "region": "New Zealand", "locations": ["New Zealand"], "roles": ["operations", "sales", "retail", "trades"]},
 
     # 🌏 ASIA (IN, SG)
-    {"country": "India", "region": "India", "locations": ["India", "Remote"], "roles": ["operations", "sales", "marketing", "data entry", "internship", "tech"]},
-    {"country": "Singapore", "region": "Singapore", "locations": ["Singapore"], "roles": ["operations", "sales", "retail", "internship"]},
+    {"country": "india", "region": "India", "locations": ["India", "Remote"], "roles": ["operations", "sales", "marketing", "data entry", "internship", "tech"]},
+    {"country": "singapore", "region": "Singapore", "locations": ["Singapore"], "roles": ["operations", "sales", "retail", "internship"]},
 
     # 🇿🇦/🇧🇷 AFRICA & SOUTH AMERICA (ZA, BR)
-    {"country": "South Africa", "region": "South Africa", "locations": ["South Africa"], "roles": ["operations", "sales", "retail", "trades", "internship"]},
-    {"country": "Brazil", "region": "Brazil", "locations": ["Brasil"], "roles": ["operacoes", "vendas", "retail", "estagio"]}
+    {"country": "south africa", "region": "South Africa", "locations": ["South Africa"], "roles": ["operations", "sales", "retail", "trades", "internship"]},
+    {"country": "brazil", "region": "Brazil", "locations": ["Brasil"], "roles": ["operacoes", "vendas", "retail", "estagio"]}
 ]
 
 
@@ -66,6 +69,7 @@ def init_firestore():
     raw = os.environ.get("FIREBASE_SERVICE_ACCOUNT")
     if not raw:
         print("ERROR: FIREBASE_SERVICE_ACCOUNT not set", file=sys.stderr)
+
         sys.exit(1)
     try:
         cred_dict = json.loads(raw)
