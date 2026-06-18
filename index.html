@@ -3253,6 +3253,15 @@ function generateResumePDF(baseName, labelExtra){
   /* accent color from the same template state the preview renders with */
   const accent=(typeof tplState==='object'&&tplState.clr)?tplState.clr:'#00c88c';
   const hexToRgb=(hx)=>{ const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hx||''); return m?[parseInt(m[1],16),parseInt(m[2],16),parseInt(m[3],16)]:[0,200,140]; };
+    // --- START OF CLAUDE'S CREATIVE ACCENT DRAWING PATCH ---
+  if (typeof tplState === 'object' && tplState.templateName === "Creative Accent") {
+    const rgb = hexToRgb(accent);
+    if(rgb) doc.setFillColor(rgb.r, rgb.g, rgb.b);
+    doc.rect(0, 0, 12, H, 'F'); // Draws a crisp decorative vertical accent band
+    M = Math.max(M, 24); // Automatically widens your padding so text never overlaps it
+  }
+  // --- END OF CLAUDE'S CREATIVE ACCENT DRAWING PATCH ---
+
   const line=(txt,size,style,color,gap)=>{
     doc.setFont('helvetica',style||'normal'); doc.setFontSize(size||10);
     doc.setTextColor(color||'#1a1a2e');
@@ -4346,7 +4355,7 @@ function applyRealParse(text){
   const MONTHS_G=new RegExp(MON,'ig');
   const stripDates=s=>s.replace(DATE_RX_G,'').replace(/\d{1,2}\/\d{1,2}\/\d{2,4}/g,'').replace(/\d{1,2}\/\d{2,4}/g,'').replace(/\b(?:19|20)\d{2}\b/g,'').replace(MONTHS_G,'').replace(/\b(present|current|now)\b/ig,'').replace(/\u00b7.*$/,'').replace(/\s*[\u2013\u2014(),]+\s*$/,'').replace(/^\s*[\u2013\u2014(),]+/,'').replace(/\s+-\s*$/,'').trim();
   const stripLoc=s=>s.replace(/\s{2,}.*$/,'').replace(/,?\s*[A-Z][a-zA-Z.]+,\s*[A-Z]{2}\b.*$/,'').replace(/,\s*[A-Z]{2}\b.*$/,'').replace(US_LOC,'').replace(/,\s*[A-Z][a-zA-Z]+\s*$/,'').trim();
-  const okTitle=s=>{ s=(s||'').trim(); return s.length>1&&s.length<60&&TITLE_RX.test(s); };
+  const okTitle=s=>{ s=(s||'').trim(); return s.length>1&&s.length<80&&TITLE_RX.test(s); };
   const comps=new Set();
   const parsedJobs=[];
   const usedLn=new Set();
@@ -4411,16 +4420,32 @@ function applyRealParse(text){
       const ln=lines[k].trim();
       if(!ln) continue;
       const lnNorm=norm(ln);
-      if(SECTION_RX.test(ln)) break;                              // hit EDUCATION/SKILLS etc → stop
-      if(DATE_HIT.test(ln)) break;                                // next job's date line → stop this job
-      if(cNorm&&lnNorm.includes(cNorm.slice(0,10))) continue;     // company name repeat → skip
-      /* skip short sub-headings like "Campaign Execution & Digital Strategy" (no verb,
-         few words, title-case-ish) but keep real sentences */
+      if(SECTION_RX.test(ln)) break;                              
+      if(DATE_HIT.test(ln)) break;                                
+      if(cNorm&&lnNorm.includes(cNorm.slice(0,10))) continue;     
+      
       const words=ln.split(/\s+/).length;
       const looksLikeSubheading = words<=5 && !/[.,;]/.test(ln) && !/\d/.test(ln) && /^[A-Z]/.test(ln);
       if(looksLikeSubheading) continue;
-      if(ln.length<18) continue;                                  // too short to be a real duty
-      duties.push(ln.replace(/^[-•*▪○·>◦‣⁃]\s*/,'').trim());      // strip any bullet glyph if present
+      if(ln.length<18) continue;                                  
+
+      let cleanLine = ln.replace(/^[-•*▪○·>◦‣⁃]\s*/,'').trim();   
+
+      // Stitch lines together if they continue the same sentence
+      if(duties.length > 0 && (
+        cleanLine.match(/^[a-z]/) ||
+        cleanLine.match(/^(and|or|but|ensuring|including|with|for|to)\b/i) ||
+        duties[duties.length - 1].endsWith(',') ||
+        !duties[duties.length - 1].match(/[.!?]$/)
+      )){
+        const lastIdx = duties.length - 1;
+        const endsWithComma = duties[lastIdx].endsWith(',');
+        const separator = endsWithComma ? ' ' : ' ';
+        duties[lastIdx] = duties[lastIdx] + separator + cleanLine;
+      } else {
+        duties.push(cleanLine);
+      }
+      
       if(duties.length>=5) break;
     }
     if(duties.length) j.b=duties.join('\n');
