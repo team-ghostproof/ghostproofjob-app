@@ -9,6 +9,7 @@ const REQUEST_TIMEOUT_MS = 10000;
 const CHUNK_SIZE = 5;            // bounded concurrency for Vercel 2GB ceiling
 const MAX_PER_BOARD = 50;
 const SOURCE = 'PublicATS';
+const { parseSalary } = require('./salaryParser');
 
 /* parent multi-industry staffing networks + SMB/retail/trades boards (all public, key-less) */
 const GREENHOUSE_BOARDS = [
@@ -43,6 +44,13 @@ function stripHtml(s) {
 }
 function norm(s) { return (s || '').toString().toLowerCase(); }
 
+/* pull the first salary-looking phrase out of free text for the parser */
+function extractSalaryText(text) {
+  if (!text) return '';
+  var m = String(text).match(/\$\s*\d[\d,]*(\.\d+)?\s*k?(\s*(-|to|–)\s*\$?\s*\d[\d,]*(\.\d+)?\s*k?)?(\s*(\/|per)\s*(hour|hr|year|yr|annum))?/i);
+  return m ? m[0] : '';
+}
+
 /* normalize a messy multi-location string into a clean region token:
    "Main Street Office - Dayton Area" -> "Dayton" ; falls back to caller region */
 function normalizeRegion(rawLoc, fallback) {
@@ -74,6 +82,7 @@ function matches(text, role, region) {
 }
 
 function toRecord(p, region) {
+  var sal = parseSalary(p.salaryText || '');
   return {
     title: (p.title || '').toString().trim(),
     company: (p.company || '').toString().trim(),
@@ -81,6 +90,8 @@ function toRecord(p, region) {
     direct_apply_url: (p.direct_apply_url || '').toString().trim(),
     source: SOURCE,
     region: (region || '').toString().trim(),
+    salary_min: sal.salary_min,
+    salary_max: sal.salary_max,
   };
 }
 
@@ -101,6 +112,7 @@ async function pullGreenhouse(token, role, region) {
         company: subEmployer || token,
         location: cleanLoc,
         direct_apply_url: j.absolute_url,
+        salaryText: extractSalaryText(stripHtml(j.content)),
       }, cleanLoc));
     }
   } catch (e) {
@@ -123,11 +135,15 @@ async function pullLever(token, role, region) {
       const hay = (j.text || '') + ' ' + loc + ' ' + stripHtml(j.descriptionPlain || j.description).slice(0, 400);
       if (!matches(hay, role, region)) continue;
       const cleanLoc = normalizeRegion(loc, region);
+      var leverSalRaw = (j.salaryRange && (j.salaryRange.min || j.salaryRange.max))
+        ? ((j.salaryRange.min || '') + ' - ' + (j.salaryRange.max || '') + ' ' + (j.salaryRange.interval || ''))
+        : extractSalaryText(stripHtml(j.descriptionPlain || j.description));
       out.push(toRecord({
         title: j.text,
         company: token,
         location: cleanLoc,
         direct_apply_url: j.hostedUrl || j.applyUrl,
+        salaryText: leverSalRaw,
       }, cleanLoc));
     }
   } catch (e) {
