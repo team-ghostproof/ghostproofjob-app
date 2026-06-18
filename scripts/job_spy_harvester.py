@@ -26,11 +26,10 @@ except ImportError:
     from python_jobspy import scrape_jobs  # fallback import name
 
 COLLECTION = "jobs"
-RESULTS_PER_QUERY = 25
+RESULTS_PER_QUERY = 100
 SITES = ["linkedin", "indeed", "zip_recruiter"]
 
 # country -> (region label, [locations], [roles])
-# Universal Multi-Country Sourcing Matrix (All 18 Active Regions)
 TARGETS = [
     # 🇺🇸 NORTH AMERICA (US, CA, MX)
     {"country": "USA", "region": "United States", "locations": ["United States", "Remote"], "roles": ["operations", "sales", "retail", "hospitality", "trades", "internship", "marketing", "data entry", "executive", "animation"]},
@@ -151,7 +150,7 @@ def harvest_one(db, country, region, location, role):
             search_term=role,
             location=location,
             results_wanted=RESULTS_PER_QUERY,
-            country_indeed=country,
+            country_indeed=(country or "usa").strip().lower(),
         )
     except Exception as e:
         print("scrape failed [{} / {}]: {}".format(role, location, e), file=sys.stderr)
