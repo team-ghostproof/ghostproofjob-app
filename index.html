@@ -1435,19 +1435,32 @@
         </div>
 
         <!-- TITLE OPTIMIZER: 3 market-data title suggestions for the recent role -->
-        <div class="section-card fade-in-up" id="card-title-opt" style="display:none;">
-          <div style="font-size:14px;font-weight:800;margin-bottom:2px;">🎯 Stronger Title for Your Recent Role</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Based on what's trending in live postings for <strong id="title-opt-role" style="color:var(--off);">your role</strong>, here are 3 market-aligned ways to phrase it. Pick one or write your own — your call.</div>
-          <div id="title-typo-fix" style="display:none;font-size:11px;color:var(--warn);background:rgba(255,179,71,.1);border-radius:8px;padding:8px 10px;margin-bottom:10px;"></div>
-          <div id="title-opt-options"></div>
-          <div style="margin-top:10px;">
-            <div class="field-label">Or type your own</div>
-            <input class="field-input" id="title-opt-custom" placeholder="Your preferred title" style="font-size:13px;" oninput="titleOptCustomTyping(this.value)"/>
-            <div onclick="titleOptCustomSave()" style="margin-top:8px;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">💾 Use This Title</div>
-          </div>
-          <div style="font-size:10px;color:var(--muted);margin-top:8px;">We never invent seniority you don't have — these rephrase your real title using current market language.</div>
-        </div>
-
+        <!-- TITLE OPTIMIZER: 3 market-data title suggestions for the recent role -->
+<div class="section-card fade-in-up" style="margin-bottom:12px; background:var(--bg-card);">
+  <div 
+    onclick="(function(s){s.style.display=s.style.display==='none'?'block':'none';this.querySelector('.sec-caret').textContent=s.style.display==='none'?'▼':'▲';}).call(this,this.nextElementSibling)" 
+    style="display:flex; align-items:center; cursor:pointer; padding:4px 0;"
+  >
+    <div style="flex:1;">
+      <div style="font-size:14px; font-weight:800;">✨ Stronger Title For Your Recent Role</div>
+      <div style="font-size:10px; color:var(--muted);">Click to optimize your headline with current market language</div>
+    </div>
+    <div class="sec-caret" style="color:var(--muted); font-size:14px;">▼</div>
+  </div>
+  
+  <div id="card-title-opt" style="display:none; margin-top:12px; border-t:1px solid var(--border); padding-top:12px;">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Based on what's trending in live postings for <strong id="title-opt-role" style="color:var(--off);">your role</strong>, here are alternate market-tested targets:</div>
+    <div id="title-typo-fix" style="display:none;font-size:11px;color:var(--warn);background:rgba(255,179,71,.1);border-radius:8px;padding:8px 10px;margin-bottom:10px;"></div>
+    <div id="title-opt-options"></div>
+    <div style="margin-top:10px;">
+      <div class="field-label">Or type your own</div>
+      <input class="field-input" id="title-opt-custom" placeholder="Your preferred title" style="font-size:13px;" oninput="titleOptCustomTyping(this.value)"/>
+      <div onclick="titleOptCustomSave()" style="margin-top:8px;background:rgba(0,245,168,.12);border:1px solid rgba(0,245,168,.4);color:var(--mint);border-radius:9px;padding:9px;text-align:center;font-size:12px;cursor:pointer;">Save Custom Headline Target</div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-top:8px;">We never invent seniority you don't have - these rephrase your real title using current market language.</div>
+  </div>
+</div>
+        
         <!-- TRENDING KEYWORDS — collapsible -->
         <div onclick="(function(s){s.style.display=s.style.display==='none'?'block':'none';this.querySelector('.sec-caret').textContent=s.style.display==='none'?'▾':'▴';}).call(this,this.nextElementSibling)" style="display:flex;align-items:center;gap:10px;background:var(--plum2);border:1px solid var(--plum3);border-radius:14px;margin:0 16px 6px;padding:12px 14px;cursor:pointer;">
           <div style="font-size:18px;">🔑</div>
@@ -3252,6 +3265,21 @@ function generateResumePDF(baseName, labelExtra){
   let y=M; const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight();
   /* accent color from the same template state the preview renders with */
   const accent=(typeof tplState==='object'&&tplState.clr)?tplState.clr:'#00c88c';
+    // --- START OF CLAUDE'S CREATIVE ACCENT DRAWING PATCH ---
+  if (typeof tplState === 'object' && tplState.templateName === "Creative Accent") {
+    // Convert hex accent color format securely to RGB numbers for jsPDF
+    const rgb = hexToRgb(accent) ||;
+    doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+    
+    // Draw a sharp 12-point wide structural border down the left edge of the page canvas
+    // Syntax matrix: rect(x, y, width, height, 'F' style to force a solid background fill)
+    doc.rect(0, 0, 12, H, 'F');
+    
+    // Offset the starting horizontal margin padding slightly so text doesn't overlap our bar
+    M = Math.max(M, 24);
+  }
+  // --- END OF CLAUDE'S CREATIVE ACCENT DRAWING PATCH ---
+
   const hexToRgb=(hx)=>{ const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hx||''); return m?[parseInt(m[1],16),parseInt(m[2],16),parseInt(m[3],16)]:[0,200,140]; };
   const line=(txt,size,style,color,gap)=>{
     doc.setFont('helvetica',style||'normal'); doc.setFontSize(size||10);
@@ -4307,16 +4335,24 @@ function applyRealParse(text){
   const HEADLINE_TITLE_RX=/(engineer|developer|designer|manager|analyst|specialist|consultant|director|coordinator|representative|technician|nurse|teacher|accountant|administrator|associate|supervisor|lead|officer|executive)/i;
   const CERT_RX=/\b(tsbp|ptcb|pmp|cpht|rn\b|lpn|cna|license|licensed|registered|certified|certification|certificate|credential)\b/i;
   const isBulleted=l=>/^\s*[•\-\u2022\u25CF\u25AA\u2023\*]/.test(l);
-  const titleLineRaw=lines.find(l=>
-    HEADLINE_TITLE_RX.test(l) && l.length<60 &&
-    !isBulleted(l) &&
-    !CERT_RX.test(l) &&
-    !/@|\bphone\b|\d{3}[).\- ]\d{3}/i.test(l)
-  );
-  /* strip any stray leading bullet/punctuation defensively */
-  const titleLine=titleLineRaw?titleLineRaw.replace(/^\s*[•\-\u2022\u25CF\u25AA\u2023\*]+\s*/,'').trim():'';
-  /* education: word-bounded keywords; prefer lines just under the EDUCATION header
-     (the old pattern had no boundaries — "ba" matched inside "brand") */
+// EXTENDED TITLE RANGE & PIPE FILTER (Allows clean matching up to 80 chars)
+  const titleLineRaw = lines.find(l =>
+  HEADLINE_TITLE_RX.test(l) && l.length < 80 &&
+  !isBulleted(l) &&
+  !CERT_RX.test(l) &&
+  !/@|\bphone\b|\d{3}[).\- ]\d{3}/i.test(l)
+);
+
+/* strip any stray leading bullet/punctuation and grab first part of a pipe-split title */
+let titleLine = titleLineRaw ? titleLineRaw.replace(/^\s*[•\-\u2022\u25CF\u25AA\u2023\*]+\s*/, '').trim() : '';
+if (titleLine.includes('|')) {
+  titleLine = titleLine.split('|')[0].trim();
+}
+
+  if (titleLine.includes('|')) {
+    titleLine = titleLine.split('|')[0].trim();
+  }
+
   const EDU_RX=/\b(b\.?s\.?c?|b\.?a\.?|m\.?s\.?c?|m\.?b\.?a\.?|ph\.?d|bachelor'?s?|master'?s?|associate'?s?|diploma|degree|university|college)\b/i;
   const eduIdx=lines.findIndex(l=>/^education\b/i.test(l));
   const eduPool=eduIdx>=0?lines.slice(eduIdx+1,eduIdx+7):[];
@@ -4346,7 +4382,7 @@ function applyRealParse(text){
   const MONTHS_G=new RegExp(MON,'ig');
   const stripDates=s=>s.replace(DATE_RX_G,'').replace(/\d{1,2}\/\d{1,2}\/\d{2,4}/g,'').replace(/\d{1,2}\/\d{2,4}/g,'').replace(/\b(?:19|20)\d{2}\b/g,'').replace(MONTHS_G,'').replace(/\b(present|current|now)\b/ig,'').replace(/\u00b7.*$/,'').replace(/\s*[\u2013\u2014(),]+\s*$/,'').replace(/^\s*[\u2013\u2014(),]+/,'').replace(/\s+-\s*$/,'').trim();
   const stripLoc=s=>s.replace(/\s{2,}.*$/,'').replace(/,?\s*[A-Z][a-zA-Z.]+,\s*[A-Z]{2}\b.*$/,'').replace(/,\s*[A-Z]{2}\b.*$/,'').replace(US_LOC,'').replace(/,\s*[A-Z][a-zA-Z]+\s*$/,'').trim();
-  const okTitle=s=>{ s=(s||'').trim(); return s.length>1&&s.length<60&&TITLE_RX.test(s); };
+  const okTitle=s=>{ s=(s||'').trim(); return s.length>1&&s.length<80&&TITLE_RX.test(s); };
   const comps=new Set();
   const parsedJobs=[];
   const usedLn=new Set();
@@ -4407,6 +4443,7 @@ function applyRealParse(text){
        use endless verb variety). Instead we take any line that READS like a duty:
        reasonably long, not a date, not a section header, not the next job header,
        not the company name, not a short sub-heading. */
+        // --- START OF CLAUDE'S BULLET MERGING PATCH ---
     for(let k=idx+1;k<Math.min(idx+14,lines.length);k++){
       const ln=lines[k].trim();
       if(!ln) continue;
@@ -4414,16 +4451,35 @@ function applyRealParse(text){
       if(SECTION_RX.test(ln)) break;                              // hit EDUCATION/SKILLS etc → stop
       if(DATE_HIT.test(ln)) break;                                // next job's date line → stop this job
       if(cNorm&&lnNorm.includes(cNorm.slice(0,10))) continue;     // company name repeat → skip
+      
       /* skip short sub-headings like "Campaign Execution & Digital Strategy" (no verb,
          few words, title-case-ish) but keep real sentences */
       const words=ln.split(/\s+/).length;
       const looksLikeSubheading = words<=5 && !/[.,;]/.test(ln) && !/\d/.test(ln) && /^[A-Z]/.test(ln);
       if(looksLikeSubheading) continue;
       if(ln.length<18) continue;                                  // too short to be a real duty
-      duties.push(ln.replace(/^[-•*▪○·>◦‣⁃]\s*/,'').trim());      // strip any bullet glyph if present
+
+      let cleanLine = ln.replace(/^[-•*▪○·>◦‣⁃]\s*/,'').trim();   // strip any bullet glyph if present
+
+      // FIX: Merge split continuation lines that start lowercase, follow a comma, or start with a conjunction
+      if(duties.length > 0 && (
+        cleanLine.match(/^[a-z]/) ||
+        cleanLine.match(/^(and|or|but|ensuring|including|with|for|to)\b/i) ||
+        duties[duties.length - 1].endsWith(',') ||
+        !duties[duties.length - 1].match(/[.!?]$/)
+      )){
+        const lastIdx = duties.length - 1;
+        const endsWithComma = duties[lastIdx].endsWith(',');
+        const separator = endsWithComma ? ' ' : ' ';
+        duties[lastIdx] = duties[lastIdx] + separator + cleanLine;
+      } else {
+        duties.push(cleanLine);
+      }
+      
       if(duties.length>=5) break;
     }
     if(duties.length) j.b=duties.join('\n');
+    // --- END OF CLAUDE'S BULLET MERGING PATCH ---
   });
   /* tidy: strip any trailing date fragments left on titles, drop the _ln helper */
   parsedJobs.forEach(j=>{
