@@ -189,7 +189,10 @@ async function handler(req, res) {
 
   /* ---- COUNT GUARD ---- */
   let usedGapFill = false;
-  if (primaryJobs.length < PRIMARY_THRESHOLD) {
+  // LOCAL TESTING ISOLATION GUARD: when DISABLE_AGGREGATORS==="true", skip all
+  // Jooble/Adzuna gap-fill and rely 100% on Layer 1 + Layer 4.
+  const aggregatorsDisabled = process.env.DISABLE_AGGREGATORS === 'true';
+  if (!aggregatorsDisabled && primaryJobs.length < PRIMARY_THRESHOLD) {
     usedGapFill = true;
     let gap = await fetchJooble(region, role).catch(() => []);
     if (!gap.length) {
