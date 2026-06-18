@@ -63,7 +63,6 @@ TARGETS = [
 ]
 
 
-
 def init_firestore():
     raw = os.environ.get("FIREBASE_SERVICE_ACCOUNT")
     if not raw:
@@ -101,6 +100,29 @@ def safe_str(v):
     return str(v).strip()
 
 
+def parse_salary(row):
+    """Normalize JobSpy salary fields into numeric annual (salary_min, salary_max)."""
+    def to_num(v):
+        if v is None:
+            return 0
+        try:
+            if isinstance(v, float) and v != v:  # NaN
+                return 0
+            n = float(v)
+        except (TypeError, ValueError):
+            return 0
+        return int(round(n))
+    lo = to_num(row.get("min_amount"))
+    hi = to_num(row.get("max_amount"))
+    interval = safe_str(row.get("interval")).lower()
+    if interval in ("hourly", "hour"):
+        lo = lo * 2080
+        hi = hi * 2080
+    if lo and hi and lo > hi:
+        lo, hi = hi, lo
+    return lo, hi
+
+
 def normalize_row(row, region, source_hint):
     title = safe_str(row.get("title"))
     company = safe_str(row.get("company"))
@@ -109,6 +131,7 @@ def normalize_row(row, region, source_hint):
     source = safe_str(row.get("site")) or source_hint or "jobspy"
     if not title or not url:
         return None
+    smin, smax = parse_salary(row)
     return {
         "title": title,
         "company": company,
@@ -116,6 +139,8 @@ def normalize_row(row, region, source_hint):
         "direct_apply_url": url,
         "source": source,
         "region": region,
+        "salary_min": smin,
+        "salary_max": smax,
     }
 
 
@@ -126,7 +151,7 @@ def harvest_one(db, country, region, location, role):
             search_term=role,
             location=location,
             results_wanted=RESULTS_PER_QUERY,
-            country_indeed=country.lower(),
+            country_indeed=country,
         )
     except Exception as e:
         print("scrape failed [{} / {}]: {}".format(role, location, e), file=sys.stderr)
