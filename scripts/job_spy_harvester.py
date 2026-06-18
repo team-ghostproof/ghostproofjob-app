@@ -30,20 +30,38 @@ RESULTS_PER_QUERY = 25
 SITES = ["linkedin", "indeed", "zip_recruiter"]
 
 # country -> (region label, [locations], [roles])
+# Universal Multi-Country Sourcing Matrix (All 18 Active Regions)
 TARGETS = [
-    {
-        "country": "USA",
-        "region": "Houston, TX",
-        "locations": ["Houston, TX"],
-        "roles": ["marketing specialist", "operations manager", "pharmacy technician"],
-    },
-    {
-        "country": "USA",
-        "region": "Dallas, TX",
-        "locations": ["Dallas, TX"],
-        "roles": ["marketing specialist", "operations manager"],
-    },
+    # 🇺🇸 NORTH AMERICA (US, CA, MX)
+    {"country": "USA", "region": "United States", "locations": ["United States", "Remote"], "roles": ["operations", "sales", "retail", "hospitality", "trades", "internship", "marketing", "data entry", "executive", "animation"]},
+    {"country": "Canada", "region": "Canada", "locations": ["Canada", "Remote"], "roles": ["operations", "sales", "retail", "trades", "internship", "data entry"]},
+    {"country": "Mexico", "region": "Mexico", "locations": ["Mexico"], "roles": ["operaciones", "ventas", "retail", "practicante"]},
+
+    # 🇬🇧/🇪🇺 EUROPE & UK (GB, DE, FR, IT, ES, NL, BE, AT, PL, CH)
+    {"country": "UK", "region": "United Kingdom", "locations": ["United Kingdom", "London", "Remote"], "roles": ["operations", "sales", "retail", "hospitality", "trades", "internship", "data entry", "creative"]},
+    {"country": "Germany", "region": "Germany", "locations": ["Deutschland"], "roles": ["betrieb", "verkauf", "einzelhandel", "praktikum"]},
+    {"country": "France", "region": "France", "locations": ["France"], "roles": ["operations", "vente", "commerce", "stage"]},
+    {"country": "Italy", "region": "Italy", "locations": ["Italia"], "roles": ["operazioni", "vendite", "retail", "stage"]},
+    {"country": "Spain", "region": "Spain", "locations": ["España"], "roles": ["operaciones", "ventas", "retail", "practicas"]},
+    {"country": "Netherlands", "region": "Netherlands", "locations": ["Nederland"], "roles": ["operations", "sales", "retail", "internship"]},
+    {"country": "Belgium", "region": "Belgium", "locations": ["Belgique", "België"], "roles": ["operations", "sales", "retail"]},
+    {"country": "Austria", "region": "Austria", "locations": ["Österreich"], "roles": ["operations", "sales", "retail"]},
+    {"country": "Poland", "region": "Poland", "locations": ["Polska"], "roles": ["operacje", "sprzedaz", "retail", "staz"]},
+    {"country": "Switzerland", "region": "Switzerland", "locations": ["Schweiz", "Suisse"], "roles": ["operations", "sales", "retail"]},
+
+    # 🇦🇺/🇳🇿 OCEANIA (AU, NZ)
+    {"country": "Australia", "region": "Australia", "locations": ["Australia", "Remote"], "roles": ["operations", "sales", "retail", "trades", "internship", "hospitality"]},
+    {"country": "New Zealand", "region": "New Zealand", "locations": ["New Zealand"], "roles": ["operations", "sales", "retail", "trades"]},
+
+    # 🌏 ASIA (IN, SG)
+    {"country": "India", "region": "India", "locations": ["India", "Remote"], "roles": ["operations", "sales", "marketing", "data entry", "internship", "tech"]},
+    {"country": "Singapore", "region": "Singapore", "locations": ["Singapore"], "roles": ["operations", "sales", "retail", "internship"]},
+
+    # 🇿🇦/🇧🇷 AFRICA & SOUTH AMERICA (ZA, BR)
+    {"country": "South Africa", "region": "South Africa", "locations": ["South Africa"], "roles": ["operations", "sales", "retail", "trades", "internship"]},
+    {"country": "Brazil", "region": "Brazil", "locations": ["Brasil"], "roles": ["operacoes", "vendas", "retail", "estagio"]}
 ]
+
 
 
 def init_firestore():
@@ -108,7 +126,7 @@ def harvest_one(db, country, region, location, role):
             search_term=role,
             location=location,
             results_wanted=RESULTS_PER_QUERY,
-            country_indeed=country,
+            country_indeed=country.lower(),
         )
     except Exception as e:
         print("scrape failed [{} / {}]: {}".format(role, location, e), file=sys.stderr)
