@@ -1,75 +1,125 @@
-'use strict';
 /**
- * CLOUD FUNCTIONS ENTRY POINT
- * ----------------------------
- * Wires the three ingestion layers + Firestore writer into deployable functions.
+ * index.js — GhostProofJob Cloudflare Worker
  *
- *   ingestRegionAndAts  — scheduled: pull regional API + ATS boards, write to Firestore.
- *   resolveJobLink      — callable/HTTP: resolve one aggregator link on demand.
+ * Routing rules (in order):
+ *   1. POST /contact            -> Resend email submission (unchanged).
+ *   2. Aggregator isolation     -> when env.DISABLE_AGGREGATORS === "true",
+ *                                  intercept ONLY jooble.org / adzuna.com (and
+ *                                  their scraper variants). Return clean [] with
+ *                                  hard no-store headers to smash edge caches.
+ *   3. Everything else          -> pass straight through to Vercel/Firestore.
  *
- * Uses firebase-functions v2 (region/memory configurable). Admin SDK is
- * initialized once per cold start.
+ * Schema untouched: title, company, location, direct_apply_url, source, region.
  */
 
-const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const admin = require('firebase-admin');
-
-if (!admin.apps.length) admin.initializeApp();
-const db = admin.firestore();
-const FieldValue = admin.firestore.FieldValue;
-
-const { routeRegionalSearch } = require('./sources/regionalRouter');
-const { ingestAtsBatch } = require('./sources/atsIngest');
-const { resolveLink } = require('./sources/redirectResolver');
-const { writeJobs } = require('./sources/firestoreWriter');
-
-// Boards to poll each run. In production, read this from a Firestore config doc
-// or env so you can add employers without redeploying.
-const ATS_BOARDS = [
-  { type: 'greenhouse', token: 'stripe' },
-  { type: 'lever', token: 'netflix' },
-];
-const REGIONS = [
-  { country: 'US', what: 'engineer' },
-  { country: 'GB', what: 'engineer' },
-  { country: 'FR', what: 'developer' },
+const AGGREGATOR_HOSTS = [
+  'jooble.org',
+  'adzuna.com',
+  'api.adzuna.com',
+  'www.adzuna.com',
+  'jooble.com',
+  'www.jooble.org',
 ];
 
-/** Scheduled ingestion: regional APIs + ATS boards → Firestore. */
-exports.ingestRegionAndAts = onSchedule(
-  { schedule: 'every 6 hours', timeoutSeconds: 300, memory: '512MiB', region: 'us-central1' },
-  async () => {
-    const collected = [];
+const NO_STORE_HEADERS = {
+  'Content-Type': 'application/json',
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+  'CDN-Cache-Control': 'no-store',
+  'Cloudflare-CDN-Cache-Control': 'no-store',
+  Pragma: 'no-cache',
+  Expires: '0',
+  'Access-Control-Allow-Origin': '*',
+};
 
-    // Regional providers (sequential to bound concurrency/memory).
-    for (const r of REGIONS) {
-      const jobs = await routeRegionalSearch(r, process.env);
-      for (const j of jobs) collected.push(j);
+function isAggregatorTarget(url) {
+  // direct host hit
+  const host = (url.hostname || '').toLowerCase();
+  if (AGGREGATOR_HOSTS.some((h) => host === h || host.endsWith('.' + h))) return true;
+  // wrapped target inside a query param (?url=, ?to=, ?dest=, ?link=, ?resolve=)
+  const probe = (url.search || '').toLowerCase();
+  if (/jooble\.org|adzuna\.com/.test(probe)) return true;
+  // path-encoded references to aggregator scrapers
+  const path = (url.pathname || '').toLowerCase();
+  if (/jooble|adzuna/.test(path)) return true;
+  return false;
+}
+
+async function handleContact(request, env) {
+  // Preserve existing Resend /contact POST behavior.
+  let payload;
+  try {
+    payload = await request.json();
+  } catch (e) {
+    return new Response(JSON.stringify({ ok: false, error: 'invalid_json' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const name = (payload && payload.name) || '';
+  const email = (payload && payload.email) || '';
+  const message = (payload && payload.message) || '';
+  if (!email || !message) {
+    return new Response(JSON.stringify({ ok: false, error: 'missing_fields' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + (env.RESEND_API_KEY || ''),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: env.EMAIL_FROM || 'GhostProofJob <noreply@ghostproofjob.com>',
+        to: [env.CONTACT_TO || 'support@ghostproofjob.com'],
+        reply_to: email,
+        subject: 'GhostProofJob contact — ' + (name || email),
+        text: 'From: ' + name + ' <' + email + '>\n\n' + message,
+      }),
+    });
+    const ok = res.ok;
+    return new Response(JSON.stringify({ ok: ok }), {
+      status: ok ? 200 : 502,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ ok: false, error: 'send_failed' }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+
+    // CORS preflight
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
+      });
     }
 
-    // ATS boards (bounded concurrency inside the helper).
-    const atsJobs = await ingestAtsBatch(ATS_BOARDS, 4);
-    for (const j of atsJobs) collected.push(j);
-
-    const result = await writeJobs(db, FieldValue, collected);
-    console.log(`[ingest] collected=${collected.length} written=${result.written} batches=${result.batches}`);
-    return null;
-  }
-);
-
-/**
- * On-demand link resolution (called from the app when a user taps a job).
- * Resolving lazily keeps the heavy Chromium work off the bulk ingestion path.
- */
-exports.resolveJobLink = onCall(
-  { timeoutSeconds: 30, memory: '1GiB', region: 'us-central1' },
-  async (request) => {
-    const url = request && request.data && request.data.url;
-    if (!url || typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
-      throw new HttpsError('invalid-argument', 'A valid http(s) url is required.');
+    // 1. Contact email submission — unchanged.
+    if (request.method === 'POST' && url.pathname === '/contact') {
+      return handleContact(request, env);
     }
-    const out = await resolveLink(url);
-    return out; // { url, resolved }
-  }
-);
+
+    // 2. Aggregator isolation — only when explicitly enabled, and only for
+    //    aggregator targets. Returns a clean empty list with no-store headers.
+    if (env.DISABLE_AGGREGATORS === 'true' && isAggregatorTarget(url)) {
+      return new Response('[]', { status: 200, headers: NO_STORE_HEADERS });
+    }
+
+    // 3. Clean passthrough for all in-app data pathways (Vercel/Firestore/etc).
+    return fetch(request);
+  },
+};
