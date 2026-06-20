@@ -133,6 +133,19 @@ def normalize_row(row, region, source_hint):
         return None
     smin, smax = parse_salary(row)
     description = safe_str(row.get("description"))[:2000]
+
+    # Build a human-readable salary string so Browse cards display it correctly.
+    # Without this field the frontend shows "Salary on request" even when
+    # salary_min / salary_max exist in Firestore.
+    if smin and smax:
+        salary_display = "${:,}K – ${:,}K / yr".format(smin // 1000, smax // 1000)
+    elif smin:
+        salary_display = "${:,}K+ / yr".format(smin // 1000)
+    elif smax:
+        salary_display = "Up to ${:,}K / yr".format(smax // 1000)
+    else:
+        salary_display = ""
+
     return {
         "title": title,
         "company": company,
@@ -140,8 +153,9 @@ def normalize_row(row, region, source_hint):
         "direct_apply_url": url,
         "source": source,
         "region": region,
-        "salary_min": smin,
-        "salary_max": smax,
+        "salary_min": smin if smin else None,
+        "salary_max": smax if smax else None,
+        "salary": salary_display,        # display string for Browse cards
         "description": description,
     }
 
