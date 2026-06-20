@@ -16,6 +16,7 @@ import os
 import sys
 import json
 import hashlib
+import datetime
 
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -26,13 +27,10 @@ except ImportError:
     from python_jobspy import scrape_jobs  # fallback import name
 
 COLLECTION = "jobs"
-RESULTS_PER_QUERY = 50  
-
-# REMOVED ZIP_RECRUITER TO BYPASS THE CLOUDFLARE WAF 403 ERRORS AND PREVENT TIMEOUTS
-SITES = ["linkedin", "indeed"]
+RESULTS_PER_QUERY = 100
+SITES = ["linkedin", "indeed", "zip_recruiter"]
 
 # country -> (region label, [locations], [roles])
-# FIXED: Explicitly maps valid JobSpy lowercase country strings to protect runtime state from crashing
 TARGETS = [
     # 🇺🇸 NORTH AMERICA (US, CA, MX)
     {"country": "usa", "region": "United States", "locations": ["United States", "Remote"], "roles": ["operations", "sales", "retail", "hospitality", "trades", "internship", "marketing", "data entry", "executive", "animation"]},
@@ -69,7 +67,6 @@ def init_firestore():
     raw = os.environ.get("FIREBASE_SERVICE_ACCOUNT")
     if not raw:
         print("ERROR: FIREBASE_SERVICE_ACCOUNT not set", file=sys.stderr)
-
         sys.exit(1)
     try:
         cred_dict = json.loads(raw)
@@ -135,6 +132,7 @@ def normalize_row(row, region, source_hint):
     if not title or not url:
         return None
     smin, smax = parse_salary(row)
+    description = safe_str(row.get("description"))[:2000]
     return {
         "title": title,
         "company": company,
@@ -144,6 +142,7 @@ def normalize_row(row, region, source_hint):
         "region": region,
         "salary_min": smin,
         "salary_max": smax,
+        "description": description,
     }
 
 
@@ -155,6 +154,8 @@ def harvest_one(db, country, region, location, role):
             location=location,
             results_wanted=RESULTS_PER_QUERY,
             country_indeed=(country or "usa").strip().lower(),
+            linkedin_fetch_description=True,
+            description_format="markdown",
         )
     except Exception as e:
         print("scrape failed [{} / {}]: {}".format(role, location, e), file=sys.stderr)
@@ -192,13 +193,35 @@ def harvest_one(db, country, region, location, role):
 def main():
     db = init_firestore()
     total = 0
-    for t in TARGETS:
+    # rotate through TARGETS so each cron run handles a slice — avoids the 30-min cap
+    slice_size = int(os.environ.get("TARGETS_PER_RUN", "3"))
+    max_scrapes = int(os.environ.get("MAX_SCRAPES_PER_RUN", "30"))
+    budget_secs = int(os.environ.get("RUN_BUDGET_SECS", "1500"))  # 25 min < GitHub 30-min cap
+    start_ts = datetime.datetime.utcnow()
+    day_index = datetime.datetime.utcnow().timetuple().tm_yday
+    start = (day_index * slice_size) % max(1, len(TARGETS))
+    todays = (TARGETS + TARGETS)[start:start + slice_size]
+    scrapes = 0
+    stopped = False
+    for t in todays:
+        if stopped:
+            break
         for loc in t["locations"]:
+            if stopped:
+                break
             for role in t["roles"]:
+                # stop cleanly before the wall-clock budget or scrape cap is hit;
+                # everything already harvested is safely written (merge=True)
+                elapsed = (datetime.datetime.utcnow() - start_ts).total_seconds()
+                if elapsed > budget_secs or scrapes >= max_scrapes:
+                    print("BUDGET REACHED — stopping cleanly (elapsed {:.0f}s, scrapes {})".format(elapsed, scrapes))
+                    stopped = True
+                    break
                 n = harvest_one(db, t["country"], t["region"], loc, role)
+                scrapes += 1
                 print("harvested {:>3}  {} | {} | {}".format(n, t["region"], loc, role))
                 total += n
-    print("DONE. total upserts: {}".format(total))
+    print("DONE. slice start={} size={} scrapes={} total upserts: {}".format(start, slice_size, scrapes, total))
 
 
 if __name__ == "__main__":
