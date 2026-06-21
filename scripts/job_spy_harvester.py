@@ -169,17 +169,27 @@ def harvest_one(db, country, region, location, role):
     # way is the is_remote flag with a real country location string.
     is_remote = (str(location).strip().lower() == "remote")
     real_loc = region if is_remote else location
+    # METRO RADIUS: a city search ("Houston, TX") should cover the surrounding
+    # area (Missouri City, Katy, Stafford, Sugar Land...), not just the city
+    # proper. JobSpy's `distance` is in miles. Only apply it to a specific
+    # city/region search — national ("United States") and remote searches don't
+    # use a radius. A city is detected by the presence of a comma (e.g. "City, ST").
+    is_city = ("," in str(location)) and not is_remote
+    radius_mi = int(os.environ.get("METRO_RADIUS_MI", "50"))
+    scrape_kwargs = dict(
+        site_name=SITES,
+        search_term=role,
+        location=real_loc,
+        is_remote=is_remote,
+        results_wanted=RESULTS_PER_QUERY,
+        country_indeed=(country or "usa").strip().lower(),
+        linkedin_fetch_description=True,
+        description_format="markdown",
+    )
+    if is_city:
+        scrape_kwargs["distance"] = radius_mi
     try:
-        df = scrape_jobs(
-            site_name=SITES,
-            search_term=role,
-            location=real_loc,
-            is_remote=is_remote,
-            results_wanted=RESULTS_PER_QUERY,
-            country_indeed=(country or "usa").strip().lower(),
-            linkedin_fetch_description=True,
-            description_format="markdown",
-        )
+        df = scrape_jobs(**scrape_kwargs)
     except Exception as e:
         print("scrape failed [{} / {}]: {}".format(role, location, e), file=sys.stderr)
         return 0
@@ -251,6 +261,23 @@ def prune_stale_jobs(db, max_delete, stale_days):
     return removed
 
 
+# US METROS for deep local coverage (Option A). Each is searched with a 50mi
+# radius so surrounding towns are included (Houston pulls Missouri City, Katy,
+# Stafford, Sugar Land, etc.). These ROTATE a few per day on top of the always-on
+# national "United States" + "Houston, TX" search. The rotation is sized so the
+# whole list cycles in well under STALE_DAYS (8) — every metro is re-harvested
+# before its jobs could age out and be pruned, so NO location or data is lost.
+US_METROS = [
+    "Houston, TX", "Dallas, TX", "Austin, TX", "San Antonio, TX",
+    "New York, NY", "Los Angeles, CA", "Chicago, IL", "Phoenix, AZ",
+    "Philadelphia, PA", "Atlanta, GA", "Miami, FL", "Seattle, WA",
+    "Denver, CO", "Boston, MA", "Charlotte, NC", "Detroit, MI",
+    "Minneapolis, MN", "Portland, OR", "Las Vegas, NV", "Nashville, TN",
+]
+# how many metros to deep-search per run (cycles the full list in ceil(len/N) days)
+US_METROS_PER_RUN = int(os.environ.get("US_METROS_PER_RUN", "5"))
+
+
 def main():
     db = init_firestore()
     total = 0
@@ -276,9 +303,23 @@ def main():
     # rotate the rest of the world a slice at a time.
     us_targets = [t for t in TARGETS if t["country"] == "usa"]
     intl_targets = [t for t in TARGETS if t["country"] != "usa"]
+
+    # OPTION A — rotating deep metro coverage. Pick today's slice of US metros and
+    # build a US target whose locations are those metros (each gets the 50mi radius
+    # in harvest_one because they contain a comma). The base US target above
+    # already covers national + Houston + Remote every run, so we DROP Houston from
+    # the rotation slice to avoid harvesting it twice.
+    m_total = max(1, len(US_METROS))
+    m_start = (day_index * US_METROS_PER_RUN) % m_total
+    todays_metros = [m for m in (US_METROS + US_METROS)[m_start:m_start + US_METROS_PER_RUN] if m != "Houston, TX"]
+    us_roles = us_targets[0]["roles"] if us_targets else ["operations", "sales", "marketing"]
+    metro_target = {"country": "usa", "region": "United States", "locations": todays_metros, "roles": us_roles} if todays_metros else None
+
     start = (day_index * slice_size) % max(1, len(intl_targets))
     rotated_intl = (intl_targets + intl_targets)[start:start + slice_size]
-    todays = us_targets + rotated_intl
+    todays = us_targets + ([metro_target] if metro_target else []) + rotated_intl
+    print("US metros this run ({}-day full cycle): {}".format(
+        -(-m_total // max(1, US_METROS_PER_RUN)), ", ".join(todays_metros) or "(base only)"))
     scrapes = 0
     stopped = False
     for t in todays:
