@@ -126,6 +126,53 @@ def parse_salary(row):
     return lo, hi
 
 
+import re as _re
+
+# headers that typically introduce a requirements/qualifications block in a posting
+_REQ_HEADERS = _re.compile(
+    r"(?im)^[\s>*#-]*\b("
+    r"requirements?|qualifications?|required skills?|required qualifications?|"
+    r"what you(?:'| a)?ll need|what we(?:'| a)?re looking for|who you are|"
+    r"minimum qualifications?|basic qualifications?|skills? (?:&|and) experience|"
+    r"must[- ]haves?|you have|your profile|experience required"
+    r")\b[:\s]*$"
+)
+# headers that usually END the requirements block (next section)
+_REQ_END = _re.compile(
+    r"(?im)^[\s>*#-]*\b("
+    r"responsibilities|benefits?|perks?|what we offer|about (?:us|the|our)|"
+    r"compensation|salary|how to apply|equal opportunity|why join|nice[- ]to[- ]haves?|"
+    r"preferred qualifications?|duties|day[- ]to[- ]day|the role|overview"
+    r")\b"
+)
+
+
+def extract_requirements(description):
+    """Pull a requirements/qualifications block out of the description markdown.
+    JobSpy provides no dedicated requirements field — it's embedded in the text.
+    Returns a trimmed string (bullets/lines) or '' if no clear section is found."""
+    if not description:
+        return ""
+    lines = description.split("\n")
+    out, capturing = [], False
+    for ln in lines:
+        if not capturing:
+            if _REQ_HEADERS.search(ln):
+                capturing = True
+            continue
+        # we're inside the block — stop at the next major section header
+        if _REQ_END.search(ln) or _REQ_HEADERS.search(ln):
+            break
+        out.append(ln)
+        # cap the block so a runaway description doesn't fill it
+        if len("\n".join(out)) > 1200:
+            break
+    text = "\n".join(out).strip()
+    # tidy: collapse blank runs, strip leading/trailing empties
+    text = _re.sub(r"\n{3,}", "\n\n", text).strip()
+    return text[:1200]
+
+
 def normalize_row(row, region, source_hint):
     title = safe_str(row.get("title"))
     company = safe_str(row.get("company"))
@@ -135,7 +182,9 @@ def normalize_row(row, region, source_hint):
     if not title or not url:
         return None
     smin, smax = parse_salary(row)
-    description = safe_str(row.get("description"))[:2000]
+    full_desc = safe_str(row.get("description"))
+    description = full_desc[:2000]
+    requirements = extract_requirements(full_desc)
 
     # Build a human-readable salary string so Browse cards display it correctly.
     # Without this field the frontend shows "Salary on request" even when
@@ -160,6 +209,7 @@ def normalize_row(row, region, source_hint):
         "salary_max": smax if smax else None,
         "salary": salary_display,        # display string for Browse cards
         "description": description,
+        "requirements": requirements,    # extracted req/qualifications block
     }
 
 
