@@ -130,47 +130,129 @@ import re as _re
 
 # headers that typically introduce a requirements/qualifications block in a posting
 _REQ_HEADERS = _re.compile(
-    r"(?im)^[\s>*#-]*\b("
+    r"(?im)\b("
     r"requirements?|qualifications?|required skills?|required qualifications?|"
     r"what you(?:'| a)?ll need|what we(?:'| a)?re looking for|who you are|"
     r"minimum qualifications?|basic qualifications?|skills? (?:&|and) experience|"
-    r"must[- ]haves?|you have|your profile|experience required"
-    r")\b[:\s]*$"
+    r"must[- ]haves?|you have|your profile|experience required|what you bring|"
+    r"job responsibilities|responsibilities|role requirements|key requirements|"
+    r"about you|the ideal candidate|we(?:'| a)?re looking for|you(?:'| a)?ll bring"
+    r")\b[:\s]*"
 )
 # headers that usually END the requirements block (next section)
 _REQ_END = _re.compile(
-    r"(?im)^[\s>*#-]*\b("
-    r"responsibilities|benefits?|perks?|what we offer|about (?:us|the|our)|"
-    r"compensation|salary|how to apply|equal opportunity|why join|nice[- ]to[- ]haves?|"
-    r"preferred qualifications?|duties|day[- ]to[- ]day|the role|overview"
+    r"(?im)\b("
+    r"benefits?|perks?|what we offer|about (?:us|the company|our)|"
+    r"compensation|salary range|how to apply|equal opportunity|why join|"
+    r"nice[- ]to[- ]haves?|our culture|what we provide|pay range|to apply"
     r")\b"
+)
+# specific section headers (responsibilities vs experience/qualifications)
+_RESP_HEADER = _re.compile(
+    r"(?im)\b(job responsibilities|responsibilities|what you(?:'| a)?ll do|"
+    r"key responsibilities|duties|the role|role overview|day[- ]to[- ]day)\b[:\s]*"
+)
+_EXP_HEADER = _re.compile(
+    r"(?im)\b(skills?\s*/?\s*(?:&|and)?\s*competenc(?:y|ies)|"
+    r"qualifications?|required qualifications?|minimum qualifications?|"
+    r"basic qualifications?|what you(?:'| a)?ll need|what you bring|"
+    r"skills? (?:&|and) experience|who you are|the ideal candidate|"
+    r"about you|required skills?|experience required|requirements?|experience)\b[:\s]*"
+)
+# any major next-section boundary, so a captured block stops cleanly
+_SECTION_NEXT = _re.compile(
+    r"(?im)\b(experience|qualifications?|requirements?|responsibilities|benefits?|"
+    r"compensation|the compensation|what we offer|about (?:us|the company)|"
+    r"equal opportunity|pay range|salary range|how to apply|to apply|our culture|"
+    r"perks?|why join)\b"
 )
 
 
 def extract_requirements(description):
-    """Pull a requirements/qualifications block out of the description markdown.
-    JobSpy provides no dedicated requirements field — it's embedded in the text.
-    Returns a trimmed string (bullets/lines) or '' if no clear section is found."""
+    """Pull the most decision-relevant sections (Responsibilities + Experience/
+    Qualifications) out of the description. Real postings vary wildly, so we look
+    for several header families, capture each block, and combine them. Returns a
+    trimmed string or '' if nothing requirement-like is found."""
     if not description:
         return ""
-    lines = description.split("\n")
-    out, capturing = [], False
-    for ln in lines:
-        if not capturing:
-            if _REQ_HEADERS.search(ln):
-                capturing = True
-            continue
-        # we're inside the block — stop at the next major section header
-        if _REQ_END.search(ln) or _REQ_HEADERS.search(ln):
-            break
-        out.append(ln)
-        # cap the block so a runaway description doesn't fill it
-        if len("\n".join(out)) > 1200:
-            break
-    text = "\n".join(out).strip()
-    # tidy: collapse blank runs, strip leading/trailing empties
-    text = _re.sub(r"\n{3,}", "\n\n", text).strip()
-    return text[:1200]
+    text = description
+
+    def grab(header_rx):
+        m = header_rx.search(text)
+        if not m:
+            return ""
+        rest = text[m.end():]
+        end_m = _REQ_END.search(rest)
+        nxt = _SECTION_NEXT.search(rest)
+        cut = len(rest)
+        if end_m: cut = min(cut, end_m.start())
+        if nxt: cut = min(cut, nxt.start())
+        block = rest[:cut].strip(" :*#->\n\t")
+        block = _re.sub(r"(?:^|\s)[*]\s+", "\n• ", block)
+        block = _re.sub(r"(?:^|\s)[+](?=\s)\s*", "\n• ", block)
+        block = _re.sub(r"\n{3,}", "\n\n", block).strip()
+        return block
+
+    parts = []
+    resp = grab(_RESP_HEADER)
+    if len(resp) >= 25:
+        parts.append("What you'll do:\n" + resp[:700])
+    exp = grab(_EXP_HEADER)
+    if len(exp) >= 25:
+        parts.append("What you need:\n" + exp[:700])
+    if parts:
+        return ("\n\n".join(parts))[:1400]
+
+    # fallback: single requirements-style block (older logic)
+    m = _REQ_HEADERS.search(text)
+    if m:
+        rest = text[m.end():]
+        end_m = _REQ_END.search(rest)
+        block = (rest[:end_m.start()] if end_m else rest).strip(" :*#->\n\t")
+        block = _re.sub(r"(?:^|\s)[*]\s+", "\n• ", block)
+        block = _re.sub(r"(?:^|\s)[+](?=\s)\s*", "\n• ", block)
+        block = _re.sub(r"\n{3,}", "\n\n", block).strip()
+        if len(block) >= 25:
+            return block[:1200]
+    # last resort: a bulleted list with no recognizable header
+    bullets = _re.findall(r"(?:^|\n)\s*[*\-•+]\s+(.{8,200})", text)
+    if len(bullets) >= 3:
+        return ("• " + "\n• ".join(b.strip() for b in bullets[:12]))[:1200]
+    return ""
+
+
+def extract_salary_from_text(text):
+    """When JobSpy's structured salary field is empty, many postings still state
+    pay in the description prose (e.g. 'The compensation for this role is
+    $90,000 - $110,000'). Pull a numeric range out of the text. Returns
+    (min, max) annualized ints, or (0, 0) if nothing credible is found."""
+    if not text:
+        return 0, 0
+    t = text.replace(",", "")
+    # hourly range first: $45/hr - $60/hr  (annualize at 2080 h/yr)
+    hr = _re.search(r"\$\s?(\d{1,3})\s?/?\s?(?:hr|hour|hourly)?\s?(?:-|–|to)\s?\$?\s?(\d{1,3})\s?/?\s?(?:hr|hour|hourly)\b", t)
+    if hr:
+        lo = int(hr.group(1)) * 2080; hi = int(hr.group(2)) * 2080
+        if 10000 <= lo <= 2000000 and hi >= lo:
+            return lo, hi
+    # annual range: $90000 - $110000  |  $90K-$110K  |  $90000 to $110000
+    rng = _re.search(
+        r"\$\s?(\d{2,7})\s?([kK])?\s?(?:-|–|to)\s?\$?\s?(\d{2,7})\s?([kK])?",
+        t)
+    if rng:
+        lo = int(rng.group(1)); hi = int(rng.group(3))
+        if rng.group(2): lo *= 1000          # $90K
+        if rng.group(4): hi *= 1000
+        # sanity: ignore absurd or tiny matches (years of experience, etc.)
+        if 10000 <= lo <= 2000000 and 10000 <= hi <= 5000000 and hi >= lo:
+            return lo, hi
+    # single value: "$95,000 per year" / "$95K annually"
+    one = _re.search(r"\$\s?(\d{2,7})\s?([kK])?\s?(?:per\s+year|/?\s?yr|annually)", t)
+    if one:
+        v = int(one.group(1));  v *= 1000 if one.group(2) else 1
+        if 10000 <= v <= 2000000:
+            return v, v
+    return 0, 0
 
 
 def normalize_row(row, region, source_hint):
@@ -185,6 +267,26 @@ def normalize_row(row, region, source_hint):
     full_desc = safe_str(row.get("description"))
     description = full_desc[:2000]
     requirements = extract_requirements(full_desc)
+    # FALLBACK: if JobSpy gave no structured salary, try to pull it from the prose
+    # (e.g. LinkedIn often omits the salary field but states pay in the text)
+    if not smin and not smax:
+        smin, smax = extract_salary_from_text(full_desc)
+    # capture the posting date when JobSpy provides it — powers the "Newest" sort.
+    # JobSpy uses date_posted; some sources use date. Both handled.
+    date_posted = safe_str(row.get("date_posted")) or safe_str(row.get("date"))
+    # JOB SPECIFICS (the "On-site · Full-time" tags) — all optional, any source.
+    job_type = safe_str(row.get("job_type")).lower()          # fulltime/parttime/contract/internship
+    remote_flag = row.get("is_remote")
+    is_remote_job = bool(remote_flag) if remote_flag is not None else ("remote" in (location or "").lower())
+    job_level = safe_str(row.get("job_level")).lower()         # entry/mid/senior when present
+    # WORK SETTING: prefer an explicit mention in the text, else derive from remote flag.
+    work_setting = ""
+    ws_m = _re.search(r"(?i)work setting[:\s]*\b(in[- ]person|on[- ]site|hybrid|remote)\b", full_desc)
+    if ws_m:
+        raw_ws = ws_m.group(1).lower().replace("-", " ")
+        work_setting = {"in person":"On-site","on site":"On-site","hybrid":"Hybrid","remote":"Remote"}.get(raw_ws, "")
+    if not work_setting and is_remote_job:
+        work_setting = "Remote"
 
     # Build a human-readable salary string so Browse cards display it correctly.
     # Without this field the frontend shows "Salary on request" even when
@@ -210,6 +312,11 @@ def normalize_row(row, region, source_hint):
         "salary": salary_display,        # display string for Browse cards
         "description": description,
         "requirements": requirements,    # extracted req/qualifications block
+        "date_posted": date_posted,      # source posting date (for "Newest" sort)
+        "job_type": job_type,            # fulltime/parttime/contract/internship
+        "is_remote": is_remote_job,      # bool
+        "work_setting": work_setting,    # "Remote" or "" (display tag)
+        "job_level": job_level,          # entry/mid/senior when source provides it
     }
 
 
