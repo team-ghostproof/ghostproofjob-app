@@ -27,18 +27,43 @@ except ImportError:
     from python_jobspy import scrape_jobs  # fallback import name
 
 COLLECTION = "jobs"
-RESULTS_PER_QUERY = 100
+RESULTS_PER_QUERY = int(os.environ.get("RESULTS_PER_QUERY", "200"))
 # ZipRecruiter removed: it consistently returns 403 (Cloudflare bot-block) and
 # wastes ~2 min per attempt failing, burning harvest budget for zero results.
 # LinkedIn + Indeed return reliably. Re-add "zip_recruiter" only if they relax it.
 SITES = ["linkedin", "indeed"]
 
 # country -> (region label, [locations], [roles])
+# US_ROLE_LIBRARY: a broad pool of specific high-demand titles + general buckets.
+# It's too large to search every role every day (each role = a scrape), so the
+# runner ROTATES a slice of it per run (see US_ROLES_PER_RUN below) — the full
+# library is covered every few days, like the metro rotation.
+US_ROLE_LIBRARY = [
+    # broad buckets (each returns many related titles)
+    "operations", "sales", "retail", "hospitality", "trades", "marketing",
+    "data entry", "executive", "engineering", "administrative",
+    "customer service", "finance", "internship",
+    # healthcare (specific)
+    "registered nurse", "medical assistant", "physician", "pharmacy technician",
+    "home health aide", "physical therapist", "dental assistant",
+    # education
+    "teacher", "substitute teacher", "teaching assistant", "school counselor",
+    # transportation / logistics
+    "truck driver", "delivery driver", "bus driver", "warehouse associate",
+    "forklift operator", "diesel mechanic",
+    # skilled trades
+    "electrician", "plumber", "hvac technician", "welder", "carpenter",
+    # tech / office
+    "software engineer", "data analyst", "project manager", "accountant",
+    "human resources", "graphic designer", "social worker",
+    # service
+    "security guard", "janitor", "cook", "barista", "cashier", "receptionist",
+]
 TARGETS = [
-    # 🇺🇸 NORTH AMERICA (US, CA, MX)
-    {"country": "usa", "region": "United States", "locations": ["United States", "Houston, TX", "Remote"], "roles": ["operations", "sales", "retail", "hospitality", "trades", "marketing", "data entry", "executive", "engineering", "healthcare", "administrative", "customer service", "finance", "internship"]},
-    {"country": "canada", "region": "Canada", "locations": ["Canada"], "roles": ["operations", "sales", "retail", "trades", "internship", "data entry"]},
-    {"country": "mexico", "region": "Mexico", "locations": ["Mexico"], "roles": ["operaciones", "ventas", "retail", "practicante"]},
+    # 🇺🇸 NORTH AMERICA (US, CA, MX) — US roles are filled from the rotating library
+    {"country": "usa", "region": "United States", "locations": ["United States", "Houston, TX", "Remote"], "roles": US_ROLE_LIBRARY},
+    {"country": "canada", "region": "Canada", "locations": ["Canada"], "roles": ["operations", "sales", "retail", "trades", "internship", "data entry", "registered nurse", "truck driver", "teacher"]},
+    {"country": "mexico", "region": "Mexico", "locations": ["Mexico"], "roles": ["operaciones", "ventas", "retail", "practicante", "enfermera", "chofer"]},
 
     # 🇬🇧/🇪🇺 EUROPE & UK (GB, DE, FR, IT, ES, NL, BE, AT, PL, CH)
     {"country": "uk", "region": "United Kingdom", "locations": ["United Kingdom", "London"], "roles": ["operations", "sales", "retail", "hospitality", "trades", "internship", "data entry", "creative"]},
@@ -118,12 +143,16 @@ def parse_salary(row):
     lo = to_num(row.get("min_amount"))
     hi = to_num(row.get("max_amount"))
     interval = safe_str(row.get("interval")).lower()
-    if interval in ("hourly", "hour"):
-        lo = lo * 2080
+    is_hourly = interval in ("hourly", "hour")
+    hr_lo = hr_hi = 0
+    if is_hourly:
+        hr_lo, hr_hi = lo, hi          # keep the real hourly rate for display
+        lo = lo * 2080                 # annualize for sorting/filtering
         hi = hi * 2080
     if lo and hi and lo > hi:
         lo, hi = hi, lo
-    return lo, hi
+        hr_lo, hr_hi = hr_hi, hr_lo
+    return lo, hi, is_hourly, hr_lo, hr_hi
 
 
 import re as _re
@@ -221,38 +250,72 @@ def extract_requirements(description):
     return ""
 
 
+_CURRENCY = {
+    "$": "$", "£": "£", "€": "€", "₹": "₹", "¥": "¥",
+    "usd": "$", "gbp": "£", "eur": "€", "cad": "C$", "aud": "A$",
+    "inr": "₹", "mxn": "$", "brl": "R$", "jpy": "¥",
+}
+# matches a leading currency symbol OR a trailing/leading code
+_CUR_RX = "(\\$|£|€|₹|¥|R\\$|C\\$|A\\$)"
+
+def _detect_currency(text):
+    """Return a display symbol for the dominant currency mentioned, default $."""
+    for sym in ("£", "€", "₹", "R$", "C$", "A$", "¥", "$"):
+        if sym in text:
+            return sym
+    low = text.lower()
+    for code, sym in _CURRENCY.items():
+        if len(code) == 3 and _re.search(r"\b" + code + r"\b", low):
+            return sym
+    return "$"
+
 def extract_salary_from_text(text):
     """When JobSpy's structured salary field is empty, many postings still state
-    pay in the description prose (e.g. 'The compensation for this role is
-    $90,000 - $110,000'). Pull a numeric range out of the text. Returns
-    (min, max) annualized ints, or (0, 0) if nothing credible is found."""
+    pay in the description prose (e.g. '$90,000 - $110,000' or 'annual salary of
+    £19,625'). Pull a numeric range out of the text, in ANY major currency.
+    Returns (min, max, currency_symbol); (0, 0, '$') if nothing credible found."""
     if not text:
-        return 0, 0
-    t = text.replace(",", "")
-    # hourly range first: $45/hr - $60/hr  (annualize at 2080 h/yr)
-    hr = _re.search(r"\$\s?(\d{1,3})\s?/?\s?(?:hr|hour|hourly)?\s?(?:-|–|to)\s?\$?\s?(\d{1,3})\s?/?\s?(?:hr|hour|hourly)\b", t)
+        return 0, 0, "$", 0, 0
+    cur = _detect_currency(text)
+    # normalize European dot-thousands (€45.000 -> €45000) BEFORE stripping commas:
+    # a dot followed by exactly 3 digits, not more digits after, = thousands sep
+    t = _re.sub(r"(\d)\.(\d{3})(?!\d)", r"\1\2", text)
+    t = t.replace(",", "")
+    # currency CODE prefix form: "AUD 80000 to 95000" / "GBP 30000"
+    code = _re.search(r"\b(usd|gbp|eur|cad|aud|inr|mxn|brl|jpy)\b\s*(\d{4,7})\s*(?:-|–|to)?\s*(\d{4,7})?", t, _re.I)
+    if code:
+        sym = _CURRENCY.get(code.group(1).lower(), cur)
+        lo = int(code.group(2)); hi = int(code.group(3)) if code.group(3) else lo
+        if 8000 <= lo <= 3000000 and hi >= lo:
+            return lo, hi, sym, 0, 0
+    # hourly RANGE first: $15/hr - $20/hr, £12.50 - £15.00 per hour (decimals ok)
+    hr = _re.search(_CUR_RX + r"\s?(\d{1,3}(?:\.\d{1,2})?)\s?/?\s?(?:hr|hour|hourly|ph)?\s?(?:-|–|to)\s?" + _CUR_RX + r"?\s?(\d{1,3}(?:\.\d{1,2})?)\s?/?\s?(?:hr|hour|hourly|ph|/hour|per hour)\b", t)
     if hr:
-        lo = int(hr.group(1)) * 2080; hi = int(hr.group(2)) * 2080
-        if 10000 <= lo <= 2000000 and hi >= lo:
-            return lo, hi
-    # annual range: $90000 - $110000  |  $90K-$110K  |  $90000 to $110000
-    rng = _re.search(
-        r"\$\s?(\d{2,7})\s?([kK])?\s?(?:-|–|to)\s?\$?\s?(\d{2,7})\s?([kK])?",
-        t)
+        rlo = float(hr.group(2)); rhi = float(hr.group(4))
+        lo = int(rlo * 2080); hi = int(rhi * 2080)
+        if 6000 <= lo <= 3000000 and hi >= lo:
+            return lo, hi, (hr.group(1) or cur), rlo, rhi
+    # single HOURLY value: "$22 per hour", "$18.50/hr", "starting at $17/hour", "$25 hourly"
+    hr1 = _re.search(_CUR_RX + r"\s?(\d{1,3}(?:\.\d{1,2})?)\s?(?:/\s?hr\b|/\s?hour\b|\s?per\s+hour\b|\s?hourly\b|\s?ph\b)", t)
+    if hr1:
+        rv = float(hr1.group(2)); v = int(rv * 2080)
+        if 6000 <= v <= 3000000:
+            return v, v, (hr1.group(1) or cur), rv, rv
+    # annual range: £90000 - £110000 | $90K-$110K | €90000 to €110000
+    rng = _re.search(_CUR_RX + r"\s?(\d{2,7})\s?([kK])?\s?(?:-|–|to)\s?" + _CUR_RX + r"?\s?(\d{2,7})\s?([kK])?", t)
     if rng:
-        lo = int(rng.group(1)); hi = int(rng.group(3))
-        if rng.group(2): lo *= 1000          # $90K
-        if rng.group(4): hi *= 1000
-        # sanity: ignore absurd or tiny matches (years of experience, etc.)
-        if 10000 <= lo <= 2000000 and 10000 <= hi <= 5000000 and hi >= lo:
-            return lo, hi
-    # single value: "$95,000 per year" / "$95K annually"
-    one = _re.search(r"\$\s?(\d{2,7})\s?([kK])?\s?(?:per\s+year|/?\s?yr|annually)", t)
-    if one:
-        v = int(one.group(1));  v *= 1000 if one.group(2) else 1
-        if 10000 <= v <= 2000000:
-            return v, v
-    return 0, 0
+        lo = int(rng.group(2)); hi = int(rng.group(5))
+        if rng.group(3): lo *= 1000
+        if rng.group(6): hi *= 1000
+        if 8000 <= lo <= 3000000 and 8000 <= hi <= 6000000 and hi >= lo:
+            return lo, hi, (rng.group(1) or cur), 0, 0
+    # single value: "annual salary of £19,625" / "$95K annually" / "salary of €45000"
+    one = _re.search(_CUR_RX + r"\s?(\d{2,7})\s?([kK])?\s?(?:per\s+year|/?\s?yr|annually|per\s+annum|p\.?a\.?)?", t)
+    if one and (_re.search(r"salary|compensation|pay|annum|per year|annually|/yr", t.lower())):
+        v = int(one.group(2));  v *= 1000 if one.group(3) else 1
+        if 8000 <= v <= 3000000:
+            return v, v, (one.group(1) or cur), 0, 0
+    return 0, 0, "$", 0, 0
 
 
 def normalize_row(row, region, source_hint):
@@ -263,14 +326,25 @@ def normalize_row(row, region, source_hint):
     source = safe_str(row.get("site")) or source_hint or "jobspy"
     if not title or not url:
         return None
-    smin, smax = parse_salary(row)
+    smin, smax, is_hourly, hr_lo, hr_hi = parse_salary(row)
     full_desc = safe_str(row.get("description"))
     description = full_desc[:2000]
     requirements = extract_requirements(full_desc)
+    # currency: JobSpy sometimes returns a 'currency' code on the structured salary;
+    # otherwise infer from region; prose extractor can also report it.
+    cur_code = safe_str(row.get("currency")).lower()
+    region_cur = {"United Kingdom":"£","Germany":"€","France":"€","Italy":"€",
+                  "Spain":"€","Netherlands":"€","Canada":"C$","Mexico":"$",
+                  "Brazil":"R$","India":"₹","Australia":"A$","Japan":"¥"}.get(region, "$")
+    currency = _CURRENCY.get(cur_code, region_cur if cur_code=="" else "$")
     # FALLBACK: if JobSpy gave no structured salary, try to pull it from the prose
     # (e.g. LinkedIn often omits the salary field but states pay in the text)
     if not smin and not smax:
-        smin, smax = extract_salary_from_text(full_desc)
+        smin, smax, cur_from_text, p_hr_lo, p_hr_hi = extract_salary_from_text(full_desc)
+        if smin or smax:
+            currency = cur_from_text or currency
+            if p_hr_lo or p_hr_hi:
+                is_hourly = True; hr_lo, hr_hi = p_hr_lo, p_hr_hi
     # capture the posting date when JobSpy provides it — powers the "Newest" sort.
     # JobSpy uses date_posted; some sources use date. Both handled.
     date_posted = safe_str(row.get("date_posted")) or safe_str(row.get("date"))
@@ -288,15 +362,31 @@ def normalize_row(row, region, source_hint):
     if not work_setting and is_remote_job:
         work_setting = "Remote"
 
-    # Build a human-readable salary string so Browse cards display it correctly.
-    # Without this field the frontend shows "Salary on request" even when
-    # salary_min / salary_max exist in Firestore.
-    if smin and smax:
-        salary_display = "${:,}K – ${:,}K / yr".format(smin // 1000, smax // 1000)
+    # Build a human-readable salary string with the correct currency symbol.
+    def _fmt(n, useK):
+        return "{:,}K".format(n // 1000) if useK else "{:,}".format(n)
+    def _hr(n):  # format an hourly rate (show cents only when present)
+        if isinstance(n, float) and n != int(n):
+            return "{:.2f}".format(n)
+        return "{}".format(int(n))
+    if is_hourly and (hr_lo or hr_hi):
+        # show the pay EXACTLY as stated (hourly) — do NOT show an annualized number.
+        # salary_min/max remain annualized in the record ONLY so the salary
+        # filter/sort can still compare hourly jobs against salaried ones.
+        if hr_lo and hr_hi and hr_lo != hr_hi:
+            salary_display = "{}{}–{}{} / hr".format(currency, _hr(hr_lo), currency, _hr(hr_hi))
+        else:
+            salary_display = "{}{} / hr".format(currency, _hr(hr_lo or hr_hi))
+    elif smin and smax:
+        useK = (smin >= 100000 or smax >= 100000)
+        if smin == smax:
+            salary_display = "{}{} / yr".format(currency, _fmt(smin, useK))
+        else:
+            salary_display = "{}{} – {}{} / yr".format(currency, _fmt(smin, useK), currency, _fmt(smax, useK))
     elif smin:
-        salary_display = "${:,}K+ / yr".format(smin // 1000)
+        salary_display = "{}{}+ / yr".format(currency, _fmt(smin, smin >= 100000))
     elif smax:
-        salary_display = "Up to ${:,}K / yr".format(smax // 1000)
+        salary_display = "Up to {}{} / yr".format(currency, _fmt(smax, smax >= 100000))
     else:
         salary_display = ""
 
@@ -310,6 +400,8 @@ def normalize_row(row, region, source_hint):
         "salary_min": smin if smin else None,
         "salary_max": smax if smax else None,
         "salary": salary_display,        # display string for Browse cards
+        "currency": currency,            # symbol for the frontend to reuse
+        "is_hourly": is_hourly,          # so the frontend knows it's an hourly rate
         "description": description,
         "requirements": requirements,    # extracted req/qualifications block
         "date_posted": date_posted,      # source posting date (for "Newest" sort)
@@ -432,16 +524,17 @@ US_METROS = [
     "Minneapolis, MN", "Portland, OR", "Las Vegas, NV", "Nashville, TN",
 ]
 # how many metros to deep-search per run (cycles the full list in ceil(len/N) days)
-US_METROS_PER_RUN = int(os.environ.get("US_METROS_PER_RUN", "5"))
+US_METROS_PER_RUN = int(os.environ.get("US_METROS_PER_RUN", "4"))
 
 
 def main():
     db = init_firestore()
     total = 0
     slice_size = int(os.environ.get("TARGETS_PER_RUN", "6"))
-    max_scrapes = int(os.environ.get("MAX_SCRAPES_PER_RUN", "120"))
-    # workflow timeout is 60 min; leave a safety margin and stop at 52 min
-    budget_secs = int(os.environ.get("RUN_BUDGET_SECS", "3120"))
+    max_scrapes = int(os.environ.get("MAX_SCRAPES_PER_RUN", "240"))
+    # NOTE: with 10 metros/run + 150 results/query this needs a longer window.
+    # Set the GitHub Actions workflow `timeout-minutes` to ~110 to match.
+    budget_secs = int(os.environ.get("RUN_BUDGET_SECS", "3120"))   # 100 min
     start_ts = datetime.datetime.utcnow()
     day_index = datetime.datetime.utcnow().timetuple().tm_yday
 
@@ -461,6 +554,20 @@ def main():
     us_targets = [t for t in TARGETS if t["country"] == "usa"]
     intl_targets = [t for t in TARGETS if t["country"] != "usa"]
 
+    # ROLE ROTATION — the US library is large (~45 roles incl. nurses, teachers,
+    # drivers, trades). Searching every role daily would blow the budget (each role
+    # = a scrape). So rotate a slice per run; the whole library is covered every
+    # few days, just like the metro rotation. Env-tunable.
+    roles_per_run = int(os.environ.get("US_ROLES_PER_RUN", "8"))
+    lib = US_ROLE_LIBRARY
+    r_total = max(1, len(lib))
+    r_start = (day_index * roles_per_run) % r_total
+    todays_us_roles = (lib + lib)[r_start:r_start + roles_per_run]
+    # apply today's role slice to the national base US target
+    us_targets = [dict(t, roles=todays_us_roles) for t in us_targets]
+    print("US roles this run ({}-day role cycle): {}".format(
+        -(-r_total // max(1, roles_per_run)), ", ".join(todays_us_roles)))
+
     # OPTION A — rotating deep metro coverage. Pick today's slice of US metros and
     # build a US target whose locations are those metros (each gets the 50mi radius
     # in harvest_one because they contain a comma). The base US target above
@@ -469,8 +576,12 @@ def main():
     m_total = max(1, len(US_METROS))
     m_start = (day_index * US_METROS_PER_RUN) % m_total
     todays_metros = [m for m in (US_METROS + US_METROS)[m_start:m_start + US_METROS_PER_RUN] if m != "Houston, TX"]
-    us_roles = us_targets[0]["roles"] if us_targets else ["operations", "sales", "marketing"]
-    metro_target = {"country": "usa", "region": "United States", "locations": todays_metros, "roles": us_roles} if todays_metros else None
+    # The national base target already harvests today's role slice across the whole
+    # US. The metro slice only adds LOCAL depth, so it uses a focused set of
+    # high-volume roles — otherwise metros × many roles would starve the intl rotation.
+    METRO_ROLES = [r.strip() for r in os.environ.get(
+        "METRO_ROLES", "operations,sales,retail,registered nurse,administrative").split(",") if r.strip()]
+    metro_target = {"country": "usa", "region": "United States", "locations": todays_metros, "roles": METRO_ROLES} if todays_metros else None
 
     start = (day_index * slice_size) % max(1, len(intl_targets))
     rotated_intl = (intl_targets + intl_targets)[start:start + slice_size]
