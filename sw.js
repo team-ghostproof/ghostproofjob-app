@@ -5,7 +5,7 @@
    exists, triggers the in-app "Refresh" banner, and clears the old cache so
    home-screen users (like Kristina) never get stuck on a stale build.
 */
-const CACHE_VERSION = 'gpj-v40';          // <-- BUMP THIS on every deploy
+const CACHE_VERSION = 'gpj-v44';          // <-- BUMP THIS on every deploy
 const CACHE_NAME = CACHE_VERSION;
 
 // install: cache the shell, then become the waiting worker
@@ -13,7 +13,14 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll([
       './',
-      './index.html'
+      './index.html',
+      '/manifest.webmanifest',
+      '/assets/logo.png',
+      '/assets/icon-192.png',
+      '/assets/icon-512.png',
+      '/assets/icon-maskable-512.png',
+      '/assets/apple-touch-icon.png',
+      '/assets/favicon-32.png'
     ])).catch(() => {})
   );
   // do NOT skipWaiting here — we wait for the user to tap "Refresh" so we don't
