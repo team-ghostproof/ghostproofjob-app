@@ -38,7 +38,7 @@ COLLECTION = "jobs"
 RESULTS_PER_QUERY = int(os.environ.get("RESULTS_PER_QUERY", "200"))
 # ZipRecruiter removed: it consistently returns 403 (Cloudflare bot-block) and
 # wastes ~2 min per attempt failing. LinkedIn + Indeed return reliably.
-SITES = ["linkedin", "indeed"]
+SITES = [s.strip() for s in os.environ.get("SITES", "linkedin,indeed").split(",") if s.strip()]   # env-overridable; add ",google" / ",zip_recruiter" to widen capture
 
 US_ROLE_LIBRARY = [
     # broad buckets (each returns many related titles)
@@ -369,6 +369,39 @@ def extract_requirements(description):
     return ""
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# OPT-IN DESCRIPTION BACKFILL ("both on" redundancy). When JobSpy returns little or
+# no body for a posting, optionally fetch the employer page and extract its text so
+# the card shows real duties/requirements. FULLY ISOLATED: bounded by BACKFILL_MAX
+# (default 0 = OFF -> never runs, zero behavior change), short timeout, any failure
+# returns "" and the original (possibly empty) description stands. Free: GitHub
+# Actions compute only, no paid service. Enable by setting env BACKFILL_MAX=50.
+# ─────────────────────────────────────────────────────────────────────────────
+_BACKFILL_MAX = int(os.environ.get("BACKFILL_MAX", "0") or 0)
+_backfill_used = 0
+def _backfill_remaining():
+    return _backfill_used < _BACKFILL_MAX
+def _backfill_inc():
+    global _backfill_used
+    _backfill_used += 1
+def _backfill_from_page(url, timeout=8):
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0 (compatible; GhostProofJob/1.0)"}, timeout=timeout)
+        if not getattr(r, "ok", False) or not r.text:
+            return ""
+        soup = BeautifulSoup(r.text, "html.parser")
+        for tag in soup(["script", "style", "noscript", "header", "footer", "nav", "svg", "form"]):
+            tag.decompose()
+        node = (soup.find(attrs={"class": _re.compile(r"(job|posting|descript|detail|content)", _re.I)})
+                or soup.find("main") or soup.find("article") or soup.body or soup)
+        text = node.get_text("\n", strip=True)
+        return _re.sub(r"\n{3,}", "\n\n", text)[:6000]
+    except Exception:
+        return ""
+
+
 def normalize_row(row, region, source_hint):
     title = safe_str(row.get("title"))
     company = safe_str(row.get("company"))
@@ -381,9 +414,17 @@ def normalize_row(row, region, source_hint):
     smin, smax, is_hourly, hr_lo, hr_hi = parse_salary(row)
     raw_desc = safe_str(row.get("description"))
     full_desc = clean_md(raw_desc)            # cleaned ONCE, reused everywhere
-    description = full_desc[:2000]
-    requirements = extract_requirements(raw_desc)
-    benefits = extract_benefits(raw_desc)
+    section_src = raw_desc
+    # opt-in backfill: only when the source gave us almost nothing AND a budget remains
+    if len(full_desc) < 200 and url and _backfill_remaining():
+        fetched = _backfill_from_page(url)
+        if fetched and len(clean_md(fetched)) > len(full_desc):
+            full_desc = clean_md(fetched)
+            section_src = fetched
+            _backfill_inc()
+    description = full_desc[:3500]   # keep more of the captured body (card summary + match context)
+    requirements = extract_requirements(section_src)
+    benefits = extract_benefits(section_src)
 
     cur_code = safe_str(row.get("currency")).lower()
     region_cur = {"United Kingdom": "£", "Germany": "€", "France": "€", "Italy": "€",
