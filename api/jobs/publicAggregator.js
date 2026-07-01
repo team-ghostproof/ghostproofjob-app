@@ -3,12 +3,14 @@
  * api/jobs/publicAggregator.js — LAYER 4 (isolated, self-contained)
  * Free public ATS JSON only (Greenhouse + Lever). Zero keys.
  * Schema out: title, company, location, direct_apply_url, source, region,
- *             description, salary_min, salary_max.
+ *             description, requirements, benefits, salary_min, salary_max.
  *
- * PATCH (insert-only): the full posting body was fetched (Greenhouse content=true,
- * Lever descriptionPlain) but only used for salary-mining/matching and then
- * DISCARDED, so every ATS card landed with an empty description. We now carry the
- * cleaned description through to the record (capped 3500, same as the harvester).
+ * PATCH (insert-only): the full posting body was fetched but only used for salary
+ * mining/matching and then DISCARDED, so ATS cards were empty. We now (a) convert
+ * the body to structured text that PRESERVES line breaks, (b) carry the cleaned
+ * description through (capped 3500), and (c) extract the real Responsibilities /
+ * Requirements / Benefits sections — the SAME parsing the Python harvester uses —
+ * so ATS cards are as detailed as JobSpy cards.
  */
 
 const REQUEST_TIMEOUT_MS = 10000;
@@ -46,10 +48,90 @@ async function getJSON(url) {
   }
 }
 
+/* one-line strip (kept for matching/salary hay where structure doesn't matter) */
 function stripHtml(s) {
   return (s || '').toString().replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').replace(/\s{2,}/g, ' ').trim();
 }
+
+/* structured strip: turns block-level tags into newlines FIRST so section headers
+   stay at line starts — this is what makes the ^header section parsing work. */
+function htmlToText(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/<\s*(br|\/p|\/div|\/li|\/h[1-6]|\/tr)\s*\/?>/gi, '\n')
+    .replace(/<\s*(p|div|li|h[1-6]|ul|ol|tr)\b[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&[a-z]+;/gi, ' ')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/^\s+|\s+$/g, '');
+}
 function norm(s) { return (s || '').toString().toLowerCase(); }
+
+/* ── SECTION PARSING (ported 1:1 from the Python harvester so ATS + JobSpy agree) ── */
+const RESP_HEADER = /^\s*(?:•\s*)?(job responsibilities|responsibilities|what you(?:'| a)?ll do|key responsibilities|duties|the role|role overview|day[- ]to[- ]day|essential functions|what you will do)\b[:\s]*/im;
+const REQ_HEADER = /^\s*(?:•\s*)?(requirements added by the job poster|requirements?|required qualifications?|minimum qualifications?|basic qualifications?|qualifications?|what you(?:'| a)?ll need|what you bring|required skills?|skills? (?:&|and) experience|who you are|the ideal candidate|experience required|must[- ]haves?)\b[:\s]*/im;
+const BENE_HEADER = /^\s*(?:•\s*)?(featured benefits|benefits?(?: and perks)?|perks?(?: and benefits)?|what we offer|compensation (?:&|and) benefits|our benefits)\b[:\s]*/im;
+const NEXT_SECTION = /^\s*(?:•\s*)?(about (?:us|the company|the team|our)|featured benefits|benefits?|perks?|requirements?|qualifications?|responsibilities|duties|what we offer|how to apply|to apply|equal opportunity|why join|our culture|compensation|pay range|salary range|set alert|job description)\b/im;
+
+function grab(headerRx, text, limit) {
+  limit = limit || 900;
+  const m = headerRx.exec(text);
+  if (!m) return '';
+  const rest = text.slice(m.index + m[0].length);
+  const nxt = NEXT_SECTION.exec(rest);
+  let block = nxt ? rest.slice(0, nxt.index) : rest;
+  block = block.replace(/^[\s:*#>\-\n\t]+|[\s:*#>\-\n\t]+$/g, '').replace(/\n{3,}/g, '\n\n').trim();
+  return block.slice(0, limit);
+}
+
+function extractRequirements(description) {
+  if (!description) return '';
+  const text = String(description);
+  const parts = [];
+  const resp = grab(RESP_HEADER, text, 900);
+  if (resp.length >= 20) parts.push("What you'll do:\n" + resp.slice(0, 700));
+  const req = grab(REQ_HEADER, text, 900);
+  if (req.length >= 20) parts.push('What you need:\n' + req.slice(0, 700));
+  if (parts.length) return parts.join('\n\n').slice(0, 1400);
+  // fallback A: a "responsible for ..." duties sentence (prose-only postings)
+  const duty = /(?:will be |is |are )?responsible for\b([\s\S]{30,500}?)(?:\.\s|\n|$)/i.exec(text);
+  if (duty) {
+    const d = duty[1].replace(/\s+/g, ' ').replace(/^[\s,;]+|[\s,;]+$/g, '');
+    if (d.length >= 25) return ('Responsible for ' + d + '.').slice(0, 900);
+  }
+  // fallback B: an unlabeled bulleted list
+  const bullets = [];
+  const bx = /^\s*•\s+(.{8,200})/gim;
+  let bm;
+  while ((bm = bx.exec(text)) !== null) { bullets.push(bm[1].trim()); if (bullets.length >= 12) break; }
+  if (bullets.length >= 3) return ('• ' + bullets.join('\n• ')).slice(0, 1200);
+  return '';
+}
+
+function extractBenefits(text) {
+  if (!text) return '';
+  const t = String(text);
+  const b = grab(BENE_HEADER, t, 500);
+  if (b.length >= 6) return b;
+  const kws = ['medical insurance', 'health insurance', 'dental insurance', 'vision insurance',
+    '401(k)', '401k', 'paid time off', 'pto', 'life insurance', 'remote work', 'flexible schedule', 'tuition'];
+  const hits = [];
+  for (const kw of kws) {
+    if (new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(t)) hits.push(kw);
+  }
+  if (hits.length >= 2) {
+    const seen = new Set(); const out = [];
+    for (const h of hits) {
+      const key = h.toLowerCase().replace('401k', '401(k)');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(key.replace(/\b\w/g, (c) => c.toUpperCase()).replace('401(K)', '401(k)').replace('Pto', 'PTO'));
+    }
+    return out.join(', ');
+  }
+  return '';
+}
 
 /* pull the first salary-looking phrase out of free text for the parser */
 function extractSalaryText(text) {
@@ -58,8 +140,7 @@ function extractSalaryText(text) {
   return m ? m[0] : '';
 }
 
-/* normalize a messy multi-location string into a clean region token:
-   "Main Street Office - Dayton Area" -> "Dayton" ; falls back to caller region */
+/* normalize a messy multi-location string into a clean region token */
 function normalizeRegion(rawLoc, fallback) {
   let s = stripHtml(rawLoc);
   if (!s) return (fallback || '').trim();
@@ -90,6 +171,7 @@ function matches(text, role, region) {
 
 function toRecord(p, region) {
   var sal = parseSalary(p.salaryText || '');
+  var desc = (p.description || '').toString();
   return {
     title: (p.title || '').toString().trim(),
     company: (p.company || '').toString().trim(),
@@ -97,8 +179,10 @@ function toRecord(p, region) {
     direct_apply_url: (p.direct_apply_url || '').toString().trim(),
     source: SOURCE,
     region: (region || '').toString().trim(),
-    description: (p.description || '').toString().slice(0, DESC_CAP),   // NEW: carry the real body through
-    salaryText: (p.salaryText || '').toString(),                        // NEW: keep for the writer/debug
+    description: desc.slice(0, DESC_CAP),                 // real body, structure preserved
+    requirements: extractRequirements(desc),             // NEW: responsibilities + requirements sections
+    benefits: extractBenefits(desc),                     // NEW: benefits section / inline sniff
+    salaryText: (p.salaryText || '').toString(),
     salary_min: sal.salary_min,
     salary_max: sal.salary_max,
   };
@@ -112,7 +196,7 @@ async function pullGreenhouse(token, role, region) {
     for (const j of data.jobs) {
       if (out.length >= MAX_PER_BOARD) break;
       const loc = (j.location && j.location.name) || '';
-      const fullDesc = stripHtml(j.content);
+      const fullDesc = htmlToText(j.content);
       const hay = (j.title || '') + ' ' + loc + ' ' + fullDesc.slice(0, 400);
       if (!matches(hay, role, region)) continue;
       const subEmployer = (j.company_name && j.company_name.trim()) || '';
@@ -122,7 +206,7 @@ async function pullGreenhouse(token, role, region) {
         company: subEmployer || token,
         location: cleanLoc,
         direct_apply_url: j.absolute_url,
-        description: fullDesc,                            // NEW
+        description: fullDesc,
         salaryText: extractSalaryText(fullDesc),
       }, cleanLoc));
     }
@@ -143,7 +227,7 @@ async function pullLever(token, role, region) {
       if (out.length >= MAX_PER_BOARD) break;
       const cats = j.categories || {};
       const loc = cats.location || '';
-      const fullDesc = stripHtml(j.descriptionPlain || j.description);
+      const fullDesc = htmlToText(j.descriptionPlain || j.description);
       const hay = (j.text || '') + ' ' + loc + ' ' + fullDesc.slice(0, 400);
       if (!matches(hay, role, region)) continue;
       const cleanLoc = normalizeRegion(loc, region);
@@ -155,7 +239,7 @@ async function pullLever(token, role, region) {
         company: token,
         location: cleanLoc,
         direct_apply_url: j.hostedUrl || j.applyUrl,
-        description: fullDesc,                            // NEW
+        description: fullDesc,
         salaryText: leverSalRaw,
       }, cleanLoc));
     }
@@ -245,3 +329,6 @@ module.exports.normalizeRegion = normalizeRegion;
 module.exports.isWildcardRole = isWildcardRole;
 module.exports.toRecord = toRecord;
 module.exports.dedupe = dedupe;
+module.exports.extractRequirements = extractRequirements;
+module.exports.extractBenefits = extractBenefits;
+module.exports.htmlToText = htmlToText;
