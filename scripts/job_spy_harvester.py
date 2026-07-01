@@ -38,7 +38,7 @@ COLLECTION = "jobs"
 RESULTS_PER_QUERY = int(os.environ.get("RESULTS_PER_QUERY", "200"))
 # ZipRecruiter removed: it consistently returns 403 (Cloudflare bot-block) and
 # wastes ~2 min per attempt failing. LinkedIn + Indeed return reliably.
-SITES=linkedin,indeed,google [s.strip() for s in os.environ.get("SITES", "linkedin,indeed").split(",") if s.strip()]   # env-overridable; add ",google" / ",zip_recruiter" to widen capture
+SITES = [s.strip() for s in os.environ.get("SITES", "linkedin,indeed").split(",") if s.strip()]   # env-overridable; add ",google" / ",zip_recruiter" to widen capture
 
 US_ROLE_LIBRARY = [
     # broad buckets (each returns many related titles)
@@ -377,7 +377,7 @@ def extract_requirements(description):
 # returns "" and the original (possibly empty) description stands. Free: GitHub
 # Actions compute only, no paid service. Enable by setting env BACKFILL_MAX=50.
 # ─────────────────────────────────────────────────────────────────────────────
-_BACKFILL_MAX =50
+_BACKFILL_MAX = int(os.environ.get("BACKFILL_MAX", "0") or 0)
 _backfill_used = 0
 def _backfill_remaining():
     return _backfill_used < _BACKFILL_MAX
