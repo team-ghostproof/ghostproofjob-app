@@ -2,12 +2,19 @@
 /**
  * api/jobs/publicAggregator.js — LAYER 4 (isolated, self-contained)
  * Free public ATS JSON only (Greenhouse + Lever). Zero keys.
- * Schema out: title, company, location, direct_apply_url, source, region.
+ * Schema out: title, company, location, direct_apply_url, source, region,
+ *             description, salary_min, salary_max.
+ *
+ * PATCH (insert-only): the full posting body was fetched (Greenhouse content=true,
+ * Lever descriptionPlain) but only used for salary-mining/matching and then
+ * DISCARDED, so every ATS card landed with an empty description. We now carry the
+ * cleaned description through to the record (capped 3500, same as the harvester).
  */
 
 const REQUEST_TIMEOUT_MS = 10000;
 const CHUNK_SIZE = 5;            // bounded concurrency for Vercel 2GB ceiling
 const MAX_PER_BOARD = 50;
+const DESC_CAP = 3500;
 const SOURCE = 'PublicATS';
 const { parseSalary } = require('./salaryParser');
 
@@ -90,6 +97,8 @@ function toRecord(p, region) {
     direct_apply_url: (p.direct_apply_url || '').toString().trim(),
     source: SOURCE,
     region: (region || '').toString().trim(),
+    description: (p.description || '').toString().slice(0, DESC_CAP),   // NEW: carry the real body through
+    salaryText: (p.salaryText || '').toString(),                        // NEW: keep for the writer/debug
     salary_min: sal.salary_min,
     salary_max: sal.salary_max,
   };
@@ -103,7 +112,8 @@ async function pullGreenhouse(token, role, region) {
     for (const j of data.jobs) {
       if (out.length >= MAX_PER_BOARD) break;
       const loc = (j.location && j.location.name) || '';
-      const hay = (j.title || '') + ' ' + loc + ' ' + stripHtml(j.content).slice(0, 400);
+      const fullDesc = stripHtml(j.content);
+      const hay = (j.title || '') + ' ' + loc + ' ' + fullDesc.slice(0, 400);
       if (!matches(hay, role, region)) continue;
       const subEmployer = (j.company_name && j.company_name.trim()) || '';
       const cleanLoc = normalizeRegion(loc, region);
@@ -112,7 +122,8 @@ async function pullGreenhouse(token, role, region) {
         company: subEmployer || token,
         location: cleanLoc,
         direct_apply_url: j.absolute_url,
-        salaryText: extractSalaryText(stripHtml(j.content)),
+        description: fullDesc,                            // NEW
+        salaryText: extractSalaryText(fullDesc),
       }, cleanLoc));
     }
   } catch (e) {
@@ -132,17 +143,19 @@ async function pullLever(token, role, region) {
       if (out.length >= MAX_PER_BOARD) break;
       const cats = j.categories || {};
       const loc = cats.location || '';
-      const hay = (j.text || '') + ' ' + loc + ' ' + stripHtml(j.descriptionPlain || j.description).slice(0, 400);
+      const fullDesc = stripHtml(j.descriptionPlain || j.description);
+      const hay = (j.text || '') + ' ' + loc + ' ' + fullDesc.slice(0, 400);
       if (!matches(hay, role, region)) continue;
       const cleanLoc = normalizeRegion(loc, region);
       var leverSalRaw = (j.salaryRange && (j.salaryRange.min || j.salaryRange.max))
         ? ((j.salaryRange.min || '') + ' - ' + (j.salaryRange.max || '') + ' ' + (j.salaryRange.interval || ''))
-        : extractSalaryText(stripHtml(j.descriptionPlain || j.description));
+        : extractSalaryText(fullDesc);
       out.push(toRecord({
         title: j.text,
         company: token,
         location: cleanLoc,
         direct_apply_url: j.hostedUrl || j.applyUrl,
+        description: fullDesc,                            // NEW
         salaryText: leverSalRaw,
       }, cleanLoc));
     }
