@@ -1,55 +1,46 @@
 'use strict';
 /**
- * FIRESTORE WRITER
+ * FIRESTORE WRITER  (patched: additive field alignment)
  * -----------------
- * Persists normalized jobs to a global `jobs` collection WITHOUT touching any
- * existing schema. Each job gets a deterministic document ID (hash of
- * source + applyUrl) so re-ingesting the same posting UPDATES rather than
- * duplicates — safe to run on a schedule.
+ * Persists normalized jobs to the global `jobs` collection. Deterministic doc
+ * IDs make re-ingest idempotent (update, not duplicate).
  *
- * Collection: jobs/{deterministicId}
- *   {
- *     title, company, location, country, description, applyUrl, salaryText,
- *     source, postedAt (string|null),
- *     ingestedAt (server timestamp), updatedAt (server timestamp),
- *     active (bool)
- *   }
- *
- * Writes use a 450-op batch ceiling (Firestore hard limit is 500) and commit in
- * chunks to keep memory flat.
+ * PATCH (insert-only, no keys removed): the frontend card (mapFirestoreJob) reads
+ * `direct_apply_url`, `description`, `salary_min/salary_max`, and `region`. The
+ * previous writer stored `applyUrl` (wrong field name), dropped the numeric
+ * salary, and omitted `region` — so ATS jobs landed with no apply link, no
+ * salary, and were skipped by region-scoped deck queries. We now write those
+ * fields too, while KEEPING every original key for backward-compat.
  */
-
 const crypto = require('crypto');
-
 const COLLECTION = 'jobs';
 const BATCH_LIMIT = 450;
 
 /** Stable doc id: never collides across sources, dedupes the same posting. */
 function jobDocId(job) {
-  const basis = `${job.source || 'x'}::${(job.applyUrl || (job.company + '|' + job.title) || '').toLowerCase()}`;
+  const url = job.direct_apply_url || job.applyUrl || '';
+  const basis = `${job.source || 'x'}::${(url || (job.company + '|' + job.title) || '').toLowerCase()}`;
   return crypto.createHash('sha1').update(basis).digest('hex');
 }
 
 /**
  * Upsert normalized jobs into Firestore.
- * @param {FirebaseFirestore.Firestore} db  an initialized Firestore instance
- * @param {object} FieldValue              admin.firestore.FieldValue (for serverTimestamp)
- * @param {Array} jobs                     normalized job objects
  * @returns {Promise<{written:number, batches:number}>}
  */
 async function writeJobs(db, FieldValue, jobs) {
-  const list = Array.isArray(jobs) ? jobs.filter((j) => j && j.title && (j.applyUrl || j.company)) : [];
+  const list = Array.isArray(jobs)
+    ? jobs.filter((j) => j && j.title && (j.direct_apply_url || j.applyUrl || j.company))
+    : [];
   if (!list.length) return { written: 0, batches: 0 };
-
   const col = db.collection(COLLECTION);
   let written = 0;
   let batches = 0;
-
   for (let i = 0; i < list.length; i += BATCH_LIMIT) {
     const slice = list.slice(i, i + BATCH_LIMIT);
     const batch = db.batch();
     for (const job of slice) {
       const ref = col.doc(jobDocId(job));
+      const applyUrl = job.direct_apply_url || job.applyUrl || '';
       batch.set(
         ref,
         {
@@ -57,9 +48,16 @@ async function writeJobs(db, FieldValue, jobs) {
           company: job.company || '',
           location: job.location || '',
           country: (job.country || '').toUpperCase(),
-          description: job.description || '',
-          applyUrl: job.applyUrl || '',
+          region: job.region || '',                       // NEW: region-scoped queries include ATS jobs
+          description: job.description || '',              // now populated by the aggregator
+          requirements: job.requirements || '',           // NEW: carried through when present
+          benefits: job.benefits || '',                   // NEW
+          applyUrl: applyUrl,                              // original key kept for backward-compat
+          direct_apply_url: applyUrl,                      // NEW: the field the card actually reads
           salaryText: job.salaryText || '',
+          salary_min: job.salary_min || 0,                // NEW: numeric salary the card renders
+          salary_max: job.salary_max || 0,                // NEW
+          is_remote: !!job.is_remote,                      // NEW
           source: job.source || 'unknown',
           postedAt: job.postedAt || null,
           active: true,
