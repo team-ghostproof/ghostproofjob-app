@@ -23,7 +23,10 @@ module.exports = defineConfig({
     timeout: 30000,
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'mobile', use: { ...devices['Pixel 7'] } },
+    // Smoke/regression runs on both device profiles. Screenshots run ONCE, in the
+    // dedicated 'visual' project — so no test.skip project-detection is needed.
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: /screenshots\.spec\.js/ },
+    { name: 'mobile', use: { ...devices['Pixel 7'] }, testIgnore: /screenshots\.spec\.js/ },
+    { name: 'visual', use: { ...devices['Desktop Chrome'] }, testMatch: /screenshots\.spec\.js/ },
   ],
 });
