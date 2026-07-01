@@ -33,6 +33,7 @@ jobs:
         with:
           name: screenshots
           path: screenshots/
+          if-no-files-found: ignore
           retention-days: 14
 
       - name: Upload Playwright report
