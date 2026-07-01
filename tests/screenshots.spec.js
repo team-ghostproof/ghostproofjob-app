@@ -20,9 +20,6 @@ const fs = require('fs');
 const OUT = 'screenshots';
 
 test.describe('visual capture', () => {
-  // Run once (via the chromium project), not duplicated across device projects.
-  test.skip(({}, testInfo) => testInfo.project.name !== 'chromium', 'screenshots run once');
-
   test.beforeAll(() => { try { fs.mkdirSync(OUT, { recursive: true }); } catch (e) {} });
 
   async function load(page, w, h) {
