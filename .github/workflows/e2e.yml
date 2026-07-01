@@ -1,0 +1,44 @@
+name: E2E Smoke Tests
+
+# Regression guard for the project standard: every push must keep the app's
+# shell, core functions, nav, and key surfaces working. Also captures desktop +
+# mobile screenshots (artifact) to make desktop-layout work safe. Free (GitHub-hosted).
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Run tests (smoke + visual capture)
+        run: npx playwright test
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: screenshots/
+          retention-days: 14
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
