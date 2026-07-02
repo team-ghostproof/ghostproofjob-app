@@ -193,4 +193,4 @@ async function resolveBatch(urls) {
   return results;
 }
 
-module.exports = { resolveLink, resolveBatch, cleanUrl, unwrapParamUrl };
+module.exports = { resolveLink, resolveBatch, cleanUrl, unwrapParamUrl}.resolve = resolveLink; // alias: regionalRouter calls resolver.resolve(...)};
