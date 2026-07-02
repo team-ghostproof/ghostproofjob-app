@@ -20,7 +20,14 @@ const fs = require('fs');
 const OUT = 'screenshots';
 
 test.describe('visual capture', () => {
-  test.beforeAll(() => { try { fs.mkdirSync(OUT, { recursive: true }); } catch (e) {} });
+  // FIX (v68): the conditional "run once" skip must live in beforeEach, where
+  // testInfo exists. At describe top-level, test.skip(fn) is evaluated before any
+  // test context is created, so `testInfo` is undefined -> "Cannot read properties
+  // of undefined (reading 'project')". beforeEach receives (fixtures, testInfo).
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'screenshots run once (chromium project)');
+    try { fs.mkdirSync(OUT, { recursive: true }); } catch (e) {}
+  });
 
   async function load(page, w, h) {
     await page.setViewportSize({ width: w, height: h });
@@ -29,6 +36,7 @@ test.describe('visual capture', () => {
     await page.evaluate(() => {
       // hide first-run overlays so they don't cover the captured view
       try { const t = document.getElementById('tutorial'); if (t) t.style.display = 'none'; } catch (e) {}
+      try { const o = document.getElementById('onboard-modal'); if (o) o.classList.remove('open'); } catch (e) {}
       try { document.querySelectorAll('.modal-scrim.open').forEach((m) => m.classList.remove('open')); } catch (e) {}
     });
   }
