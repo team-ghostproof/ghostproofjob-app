@@ -25,6 +25,13 @@ function normalizedJob(p) {
     direct_apply_url: (p.direct_apply_url || '').toString().trim(),
     source: (p.source || 'regional').toString(),
     region: (p.region || '').toString().trim(),
+    description: (p.description || '').toString(),
+    requirements: (p.requirements || '').toString(),
+    benefits: (p.benefits || '').toString(),
+    salaryText: (p.salaryText || p.salary_text || '').toString(),
+    salary_min: p.salary_min || 0,
+    salary_max: p.salary_max || 0,
+    is_remote: !!p.is_remote,
   };
 }
 
