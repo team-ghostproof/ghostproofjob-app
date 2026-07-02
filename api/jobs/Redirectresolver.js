@@ -5,11 +5,16 @@
  * Resolves an aggregator link (Jooble / Adzuna) through its redirect chain to
  * the final employer destination, returning a clean URL.
  *
- * Designed for Firebase Cloud Functions memory limits (512MB–2GB):
+ * v68 FIX: file is named `redirectResolver.js` to MATCH `require('./redirectResolver')`
+ * in regionalRouter.js (Vercel's filesystem is case-sensitive; the old
+ * `Redirectresolver.js` never loaded). Exports also expose `resolve` as an alias of
+ * `resolveLink`, which is the method regionalRouter actually calls.
+ *
+ * Designed for Firebase Cloud Functions memory limits (512MB-2GB):
  *   - puppeteer-core + @sparticuz/chromium (no bundled full Chrome).
  *   - Single page, request interception to BLOCK images/fonts/media/css so the
  *     navigation is light and fast (we only need the redirect chain).
- *   - Hard navigation timeout, and a `finally` that ALWAYS closes the browser —
+ *   - Hard navigation timeout, and a `finally` that ALWAYS closes the browser -
  *     a leaked Chromium process is the #1 cause of OOM in serverless.
  *
  * Cold-start note: launch is the expensive part; resolve a small BATCH per
@@ -48,7 +53,7 @@ function cleanUrl(raw) {
   }
 }
 
-/** Some aggregators expose the real URL as a query param — unwrap without a browser. */
+/** Some aggregators expose the real URL as a query param - unwrap without a browser. */
 function unwrapParamUrl(raw) {
   try {
     const u = new URL(raw);
@@ -111,7 +116,7 @@ async function resolveOnBrowser(browser, inputUrl) {
     const resolved = hops > 0 || finalUrl !== inputUrl;
     return { url: cleanUrl(finalUrl), resolved };
   } catch (err) {
-    // Honest fallback: never return a broken link — give back the original.
+    // Honest fallback: never return a broken link - give back the original.
     console.error('[resolver] nav failed:', err && err.message);
     return { url: inputUrl, resolved: false };
   } finally {
@@ -193,4 +198,5 @@ async function resolveBatch(urls) {
   return results;
 }
 
-module.exports = { resolveLink, resolveBatch, cleanUrl, unwrapParamUrl}.resolve = resolveLink; // alias: regionalRouter calls resolver.resolve(...)};
+module.exports = { resolveLink, resolveBatch, cleanUrl, unwrapParamUrl };
+module.exports.resolve = resolveLink; // alias: regionalRouter calls resolver.resolve(...)
