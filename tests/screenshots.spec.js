@@ -24,8 +24,11 @@ test.describe('visual capture', () => {
   // testInfo exists. At describe top-level, test.skip(fn) is evaluated before any
   // test context is created, so `testInfo` is undefined -> "Cannot read properties
   // of undefined (reading 'project')". beforeEach receives (fixtures, testInfo).
+  // FIX (F-TEST, 2026-07-03): this suite runs in the config's dedicated 'visual'
+  // project (testMatch), so guarding on 'chromium' skipped ALL captures — that is
+  // why screenshots never generated. Guard on 'visual' instead.
   test.beforeEach(({}, testInfo) => {
-    test.skip(testInfo.project.name !== 'chromium', 'screenshots run once (chromium project)');
+    test.skip(testInfo.project.name !== 'visual', 'screenshots run once (visual project)');
     try { fs.mkdirSync(OUT, { recursive: true }); } catch (e) {}
   });
 

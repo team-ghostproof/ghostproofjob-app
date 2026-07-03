@@ -16,8 +16,10 @@ module.exports = defineConfig({
     screenshot: 'only-on-failure',
   },
   // Serve the repo root so /index.html (the deployed file) loads exactly as in prod.
+  // 'python' (not 'python3') resolves on Windows dev machines AND on ubuntu CI
+  // runners, where it aliases python3.
   webServer: {
-    command: 'python3 -m http.server 8000',
+    command: 'python -m http.server 8000',
     url: 'http://localhost:8000/index.html',
     reuseExistingServer: !process.env.CI,
     timeout: 30000,

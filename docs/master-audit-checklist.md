@@ -239,7 +239,7 @@ Consistent, transparent copy about features, limitations, pricing, and how GPJ h
 
 ## _**F-TEST · Playwright: signed-in + robust backend + intro capture + SCREENSHOTS not generating · ETA v71**_ 
 
-**Note:** the v68 `screenshots.spec.js` fix (test.skip moved into beforeEach) may not be deployed, or the config’s screenshot project needs re-check — screenshots still not producing. Re-verify when we reach F-TEST. 
+**Note:** SCREENSHOTS FIXED 2026-07-03 — root cause: the beforeEach guard skipped unless the project was named 'chromium', but the config runs this spec only in the 'visual' project, so all 4 captures always skipped. Guard now checks 'visual'; also made the Playwright webServer command portable (`python` instead of `python3`, works on Windows dev + ubuntu CI). Verified: 4/4 visual tests pass, 9 PNGs in ./screenshots, full suite 16/16. Remaining F-TEST scope: signed-in coverage + robust backend + intro capture. 
 
 _**F-BACK · Cloudflare Worker live-path confirm + email-routing 503 + contact-form reply confirm · ETA v71**_ 
 
