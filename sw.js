@@ -5,7 +5,7 @@
    exists, triggers the in-app "Refresh" banner, and clears the old cache so
    home-screen users (like Kristina) never get stuck on a stale build.
 */
-const CACHE_VERSION = 'gpj-v73';          // <-- BUMP THIS on every deploy
+const CACHE_VERSION = 'gpj-v74';          // <-- BUMP THIS on every deploy
 const CACHE_NAME = CACHE_VERSION;
 
 // install: cache the shell, then become the waiting worker

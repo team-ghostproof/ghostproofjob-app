@@ -1,7 +1,7 @@
 # GhostProofJob — Master Audit Checklist & Roadmap
 
 **Frontend benchmark:** v67 (verified: self-test 19/0 · JS clean · div delta 0 · mirror identical · boot harness runs to completion · 0 missing handlers · 0 real dup IDs)
-**Current build:** v73 (deployed). **v74 = next sprint** (Claude Code). v73 = deck Best-Match role-first + always-remote + apply→Applied.
+**Current build:** v74 (built 2026-07-03 — deploy + live location confirm pending). v74 = B-DECK-POOL (deck now draws Browse's catchment) + B-THISROLE (placeholder purge). v73 = deck Best-Match role-first + always-remote + apply→Applied.
 **Updated:** 2026-07-03
 
 ## How to read this
@@ -28,6 +28,7 @@ Known-good surface. Nothing below may regress it.
 - [x] AI fair-use gating (caps by tier)
 
 ## SECTION 2 — COMPLETED FIXES
+- [x] v74 — B-DECK-POOL + B-THISROLE (BUILT & BENCH-VERIFIED 2026-07-03: §5 all-pass — boot harness RAN TO COMPLETION, div delta 0, mirror byte-identical, 0 missing handlers, 0 dup ids, markers v74 in sync; Playwright 16/16. LIVE location/matching outcomes = founder gate on deploy.) (a) B-DECK-POOL: the deck now pulls the WIDE Firestore batch and scopes client-side by location TEXT + always-remote — the SAME catchment Browse has used since its identical v61 fix — so local high-match roles stored under broad `region` values (e.g. "United States") finally enter the deck; the client-side scoping + v73 role-first sort are untouched. (b) B-THISROLE: real job titles now flow through applyTopJob → applyVia → sandbox (`applyTopJob` was passing '' even though it had `j.t`); the display fallbacks ("this role"/"the company") are stripped at every Applied/Skipped/Responses write (`_realTitle`/`_realCo`); a one-time sweep in `archiveSweep` cleans existing phantom rows; cover letters read grammatically when a title/company is missing (no more "the this role position" / "Dear the hiring company Hiring Team"); stat rows fall back to "Role at <company>" instead of a blank title.
 - [x] v73 — Deck fixes (VERIFIED 2026-07-03: apply→Applied recording confirmed live — the Applied bucket populates; remote-always-in-deck confirmed in code; role-first sort landed but its ordering effect is pending live confirm until B-DECK-POOL is fixed, since the pool itself was starving the deck of in-field roles): (a) the deck's "Best Match" now leads with the user's FIELD at the FINAL render sort (applySwipeFilters was re-sorting by raw match, which discarded v72's role ranking — that's why v72 didn't change the deck); (b) REMOTE jobs are now always included in the deck (were only added when local <8), surfacing remote + reducing early dead-ends; (c) B-APPLY-BUCKET: "View Full Posting" now records to Applied (deduped) + advances the deck.
 - [x] v72 — B1 (role-first, CODE done; NEEDS your live confirmation): the swipe deck now leads with the user's field — a job earns the "primary" tier only if its title contains the résumé field word (marketing, pharmacy…), and the deck orders tier -> in-field -> score, so Marketing leads and off-field roles (Operations) only appear after in-field is exhausted. Graceful: no résumé/field => unchanged. Location scoping untouched. + Option A (B-DRAWER-COLLAPSE): the expanded drawer now fully closes on advance (removed the leftover #card-drawer.open), so the next card opens fresh.
 - [x] v71 — B0 (stays-open): "View Full Posting"/apply now resolves the link at CLICK time from the data-model top job, so a drawer left open across a swipe still opens the current job. + F-FLAGMARK: flagged jobs show a red flag next to the ghost in the Skipped list. + B-REVIEW-Z: the company rating prompt (vibe-review) raised above the company modal so it no longer opens behind the card.
@@ -58,14 +59,14 @@ Plan (insert-only): bind View-Full-Posting + company-intel + ghost data to the c
 **Resolves:** deck truly shows only unseen jobs; self-test green again.
 **Plan:** need the specific recycled job (title/company) to pin the key mismatch; then normalize the deck jobKey against lists/saved/expired keys identically. Logic only. **REPRO NEEDED from you.**
 
-### B-DECK-POOL · Deck pool ≠ Browse pool; deck dead-ends & misses high-match roles  ·  ETA v74  ·  HIGHEST
+### [x] B-DECK-POOL · Deck pool ≠ Browse pool — FIXED v74 (deck pulls wide + scopes client-side, same catchment as Browse; LIVE verification pending)
 **What it is:** the deck exhausted at ~45 jobs ("seen everything in your region") while Browse showed ~925 — and served LOW-match Operations (16–52%) while Browse held 98%-match Marketing/Account roles in the SAME market. The deck's server-side region-field query (`fb.fetchJobs(regionKey,3000)`) misses jobs stored with broad `region` values that Browse catches via client-side location-TEXT filtering, so the deck and Browse draw different pools.
 **Fix:** make the deck draw the same catchment as Browse (metro + remote, matched on location TEXT, not just the region field), then apply the role-first sort; refill/broaden (metro → remote → same-state → statewide via the approved control) BEFORE the empty state. Partly mitigated v73 (remote always included). Needs live verification.
 
 ### B-SARATOGA · Browse shows out-of-region jobs (e.g. Saratoga Springs, NY)  ·  ETA v74  ·  [UI-REVIEW] (control)
 **What it is:** with location = Houston, Browse still surfaces out-of-region roles (Saratoga Springs, NY). Browse must hard-scope to the profile market by default and only widen via the approved "other regions" control (a pill; never widens on its own). Pairs with B-SALARY-CYCLE.
 
-### B-THISROLE · "this role" placeholder leaks into Applied + cover letters  ·  ETA v74  ·  HIGH
+### [x] B-THISROLE · "this role" placeholder leaks into Applied + cover letters — FIXED v74 (real titles carried through the apply path; placeholders stripped at every list write; one-time cleanup of stored phantoms; grammatical letter fallbacks)
 **What it is:** a missing job title falls back to the literal string "this role" — it appears as a phantom job in the Applied bucket ("this role · Serenity Healthcare · 34%") and inside the cover-letter prompt ("apply for the this role position"). Fix title resolution in the cover-letter / Match-to-Job / apply path so a real title is always used (or the item skipped); never the placeholder. Cross-ref F-COVERLETTER.
 
 ### B-DESC-CUT · Card description cuts mid-word ("Job Re")  ·  ETA v74  ·  low
@@ -185,6 +186,8 @@ Consistent, transparent copy about features, limitations, pricing, and how GPJ h
 - v70: B2, B3, B4, B5, F-CARD, F-ADDR, F-GHOST, F-ATSPREVIEW. Several [UI-REVIEW].
 - v71: F-RATER, F-AI, F-WORDING, F-TEST, F-BACK, B7.
 - v72: F-TPL, F-DESK, F-LADDER, D1 (Firestore cost before trial ends), final end-to-end.
+- v74 (THIS BUILD, logic-only): B-DECK-POOL (deck draws Browse's catchment) + B-THISROLE (placeholder purge + letter grammar). No [UI-REVIEW] items.
+- v75 (next): B-SALARY-CYCLE + B-SARATOGA market hard-scope + the approved "other regions" control [UI-REVIEW]; then F-AI/F-RATER/F-COVERLETTER quality pass; B-DESC-CUT. Deck broaden-ladder prompt is [UI-REVIEW] — propose before coding.
 
 ## Go-forward process (agreed)
 1. One grouped batch per version, insert-only, no regressions, optimized for mobile/iOS/Android/tablet/desktop.

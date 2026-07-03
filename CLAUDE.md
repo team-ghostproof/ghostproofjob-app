@@ -2,7 +2,7 @@
 
 > Operating manual for any Claude (Claude Code or chat) working on GhostProofJob.
 > Read this fully before making changes. The rules here are non-negotiable.
-> **Current build: v73.**
+> **Current build: v74** (B-DECK-POOL + B-THISROLE; live location confirm pending).
 
 ---
 
@@ -111,7 +111,7 @@ Mission: surface *verified* roles, flag likely "ghost jobs," and tailor résumé
 
 ## 7. ACTIVE LOCATION BUGS (top priority; all need LIVE verification)
 
-- **B-DECK-POOL (HIGH):** the swipe deck dead-ends at ~45 jobs ("You've seen everything in your region") while Browse shows ~925. The deck scopes to metro via `jobMatchesLocation` + remote; it must refill/broaden (metro → remote → same-state → statewide) BEFORE the empty state and refresh more often. Partly mitigated in v73 (remote now always included). Remaining fix ties to the broaden ladder + Firestore-read cost.
+- **B-DECK-POOL — FIXED v74 (live verify pending):** root cause was the deck's region-keyed server query (`fb.fetchJobs(regionKey,3000)`) returning early with only region-tagged docs, missing local roles stored under broad `region` values that Browse catches via client-side location-TEXT filtering (Browse got this identical fix in v61). v74: the deck pulls wide (`fb.fetchJobs('',3000)`) and scopes client-side — same catchment as Browse. Remaining (v75+): the broaden LADDER prompt (same-state → statewide, [UI-REVIEW]) + Firestore-read cost.
 - **B-SALARY-CYCLE:** toggling "Only show jobs with posted salary" re-pulls jobs from random regions. It should be a pure client-side filter over the in-market pool — a symptom of the Browse pool not being hard-scoped.
 - **B-SARATOGA / market hard-scope:** Browse shows out-of-region jobs (e.g. Saratoga Springs, NY) with location = Houston. Browse must hard-scope to the profile market by default and only widen via the control below.
 - **"Other regions" control (APPROVED, not yet built — `[UI-REVIEW]`):** a single pill — Browse: "Showing [City] only · Show other regions"; deck: "Show roles from other parts of [State] →" then "statewide/other cities". Never widens on its own. Reuses `loadDeckOtherCities`.
@@ -149,6 +149,7 @@ Mission: surface *verified* roles, flag likely "ghost jobs," and tailor résumé
 - **v71** — B0 stays-open (`applyTopJob` resolves the link at click time); F-FLAGMARK (🚩 on flagged Skipped rows); B-REVIEW-Z (`vibe-review-modal` z-index 331→360).
 - **v72** — B1 role-first tagging in `searchRankJobs` (in-field gate + tier→infield→score); drawer collapse-on-advance (removed leftover `#card-drawer.open`).
 - **v73** — B1 real fix at the deck's final sort (`applySwipeFilters.sorters.match` leads in-field then match); remote jobs ALWAYS included in the deck; "View Full Posting" records to Applied (deduped) + advances.
+- **v74** — B-DECK-POOL (deck pulls wide + scopes client-side by location text — the same catchment Browse has used since v61 — so broad-region local roles finally enter the deck); B-THISROLE (real titles carried through applyTopJob→applyVia→sandbox; `_realTitle`/`_realCo` strip display placeholders at every Applied/Skipped/Responses write; one-time phantom-row cleanup in `archiveSweep`; grammatical cover-letter fallbacks; stat-row title fallback).
 
 ---
 

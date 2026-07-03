@@ -2258,7 +2258,7 @@
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <div><span onclick="goHome()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);">🏠 Home</span> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> · <span onclick="openLegal('security')" style="cursor:pointer;text-decoration:underline;">Security</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v73</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v74</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -4766,9 +4766,13 @@ function buildLetterText(c){
   const topJob=(me.jobs&&me.jobs[0])||null;
   const skillsTop=(me.skills||'').split(' · ').slice(0,3).join(', ');
   const hl=topJob?String(topJob.b||'').split(/·|\n/).map(s=>s.trim()).filter(Boolean).slice(0,2).join('; '):'';
-  return `Dear ${c.co} Hiring Team,
+  /* B-THISROLE (v74): if the title/company are the display fallbacks (or missing),
+     write grammatical copy — never "the this role position" / "Dear the hiring
+     company Hiring Team". A real title still reads "the <title> position". */
+  const _t74=_realTitle(c.title), _c74=_realCo(c.co);
+  return `${_c74?`Dear ${_c74} Hiring Team,`:'Dear Hiring Team,'}
 
-I'm writing to apply for the ${c.title} position. As a ${me.title||'dedicated professional'}${topJob&&topJob.c?` — most recently at ${topJob.c} —`:''} I bring a track record that maps directly onto this role${hl?`: ${hl.charAt(0).toLowerCase()+hl.slice(1)}`:''}.
+I'm writing to apply for ${_t74?`the ${_t74} position`:'this role'}. As a ${me.title||'dedicated professional'}${topJob&&topJob.c?` — most recently at ${topJob.c} —`:''} I bring a track record that maps directly onto this role${hl?`: ${hl.charAt(0).toLowerCase()+hl.slice(1)}`:''}.
 
 What draws me to ${c.co} is the chance to apply ${skillsTop||'my core strengths'} on a team where measurable results matter. I work with clear outcomes in mind, and I bring the communication habits that keep those wins shipping.
 
@@ -4817,8 +4821,10 @@ function tailorCoverLetter(c, level, meOverride){
   const _relSkills=me.skills.filter(s=>{ const w=String(s).toLowerCase().split(/[\s/]+/)[0]; return w.length>2 && _jobBlob.indexOf(w)>=0; });
   const skillsTop=(_relSkills.length?_relSkills:me.skills).slice(0,3).join(', ')||lead.join(', ')||'my core strengths';
   const hl=me.bullets[0]||'';
-  const co=c.co||'the hiring company', title=c.title||'this role';
-  const p1='Dear '+co+' Hiring Team,\n\nI\u2019m writing to apply for the '+title+' position. As a '+(me.title||'dedicated professional')+(me.topCo?(' \u2014 most recently at '+me.topCo+' \u2014'):'')+' I bring experience that maps directly onto what this role calls for.';
+  /* B-THISROLE (v74): grammatical fallbacks \u2014 never "the this role position". */
+  const _rc=_realCo(c.co), _rt=_realTitle(c.title);
+  const co=_rc||'the hiring company';
+  const p1=(_rc?('Dear '+_rc+' Hiring Team,'):'Dear Hiring Team,')+'\n\nI\u2019m writing to apply for '+(_rt?('the '+_rt+' position'):'this role')+'. As a '+(me.title||'dedicated professional')+(me.topCo?(' \u2014 most recently at '+me.topCo+' \u2014'):'')+' I bring experience that maps directly onto what this role calls for.';
   let p2;
   if(lead.length){
     p2='Your posting emphasizes '+_humanList(lead)+'. That\u2019s squarely where I work: '+(hl?_lc(hl):('I apply '+skillsTop+' to deliver measurable results'))+'.';
@@ -5268,13 +5274,16 @@ async function _fetchLiveMarketJobs(){
     try{
       if(window.fb && fb.fetchJobs){
         const loc=resolveLocation(where||'');
-        /* build the harvester's "City, ST" region format so the server-side
-           region query can match (it stores e.g. "Houston, TX"). metro already
-           carries the state when known; otherwise fall back to a wide pull. */
-        let regionKey='';
-        if(loc.metro && /,\s*[A-Z]{2}$/.test(loc.metro)) regionKey=loc.metro;
-        else if(loc.city && loc.state) regionKey=cap(loc.city)+', '+loc.state;
-        const fsJobs=await fb.fetchJobs(regionKey||loc.metro||where||'', 3000);
+        /* B-DECK-POOL FIX (v74): pull WIDE and scope client-side — the SAME
+           catchment Browse uses (ensureBrowsePool; Browse got this exact fix in
+           v61). The old region-keyed server query (where('region','==',"Houston,
+           TX")) returned EARLY with only region-tagged docs, so real local roles
+           stored with broad region values (e.g. "United States") never entered
+           the deck even though jobMatchesLocation() below catches them by
+           location TEXT. That is why the deck dead-ended at ~45 jobs and served
+           low-match roles while 98%-match in-field roles sat in Browse only.
+           The client-side scoping + role-first sort below are unchanged. */
+        const fsJobs=await fb.fetchJobs('', 3000);
         if(fsJobs && fsJobs.length){
           let scoped=fsJobs.filter(j=>jobMatchesLocation(j, loc));
           /* if local matches are sparse (<8), supplement ONLY with genuine REMOTE
@@ -7000,7 +7009,10 @@ function applyTopJob(ev, fallbackUrl, fallbackCo){
   const j=(typeof _currentTopJob==='function'?_currentTopJob():null);
   const url=(j&&j.url)||fallbackUrl||'';
   if(!url) return;
-  applyVia(url,'',(j&&j.co)||fallbackCo||'');
+  /* B-THISROLE (v74): carry the REAL job title into the apply path — passing ''
+     here let applyVia's display fallback ("this role") flow into _sbJob and then
+     into the Applied bucket as a phantom row ("this role · <company>"). */
+  applyVia(url,(j&&j.t)||'',(j&&j.co)||fallbackCo||'');
   /* Opening the real posting IS the apply action — record it to the Applied bucket
      (deduped in recordSwipe) and refresh the deck so the applied job drops out and the
      next one comes up, instead of the card sitting on a job you already applied to. */
@@ -7019,6 +7031,11 @@ function updateStatCounters(){
   set('stat-skipped',lists.skipped.length);
   set('pm-viewed-count',lists.viewed.length);
 }
+/* B-THISROLE (v74): "this role" / "the company" are DISPLAY fallbacks, not job
+   identity — they must never be STORED on an Applied/Skipped/Responses row. These
+   strip them at every write so a phantom "this role · X" row can never be created. */
+function _realTitle(t){ t=String(t||'').trim(); return /^this role$/i.test(t)?'':t; }
+function _realCo(c){ c=String(c||'').trim(); return /^the (hiring )?company$/i.test(c)?'':c; }
 function recordSwipe(dir,job){
   const rec={t:job.t,co:job.co,ghost:ghostRiskFor(job.co),when:Date.now(),status:null};
   if(dir==='right'){
@@ -7100,8 +7117,8 @@ function renderStatList(kind){
     }
     return `<div class="stat-row">
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:700;">${r.t}</div>
-        <div style="font-size:11px;color:var(--muted);">${r.co} · ${fmtAgo(r.when)} · ${(r.stage||r.reason)?'🚩 ':''}👻 ${r.ghost}%</div>
+        <div style="font-size:13px;font-weight:700;">${r.t||(r.co?('Role at '+r.co):'(untitled role)')}</div>
+        <div style="font-size:11px;color:var(--muted);">${r.co||'—'} · ${fmtAgo(r.when)} · ${(r.stage||r.reason)?'🚩 ':''}👻 ${r.ghost}%</div>
       </div>${right}</div>`;
   }).join('');
 }
@@ -8156,8 +8173,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v73';
+const APP_VERSION = 'v74';
 const CHANGELOG = {
+  'v74':['v74 deck fix: THE DECK NOW DRAWS FROM THE SAME JOB POOL AS BROWSE. It was querying only jobs tagged with your exact region, missing local high-match roles stored under broader region labels — that is why it dead-ended at ~45 jobs and served low-match roles while Browse held 98% matches. It now pulls wide and scopes to your market + remote by location text (exactly like Browse), with your field leading the order.','v74 apply fix: killed the phantom "this role" job. A missing job title could be stored literally as "this role" in your Applied list and leak into cover letters ("the this role position"). Real titles now carry through the whole apply path, placeholders are never stored as jobs, existing phantom rows clean themselves up on next launch, and letters read naturally even when a posting has no title.'],
   'v73':['v73 (deck fixes — please live-confirm): (1) The deck\u2019s "Best Match" now LEADS WITH YOUR FIELD at the final render sort — in-field roles (Marketing) come before off-field ones (the role ranking was being overwritten here before, which is why v72 didn\u2019t change what you saw). (2) REMOTE jobs now ALWAYS appear in your deck (previously only added when local roles dropped below 8), so remote surfaces and the deck doesn\u2019t dead-end on a thin local pool. (3) Tapping "View Full Posting" now records the job to your Applied bucket and advances the deck — applying no longer leaves the card unmarked. Applied entries are de-duplicated.'],
   'v72':['v72: (1) The swipe deck now LEADS WITH YOUR FIELD. If your résumé is Marketing, you see Marketing roles first — off-field roles (e.g. Operations) only appear AFTER your in-field matches are exhausted, under a "running low on exact [field] roles nearby" note. Location scoping is unchanged. (2) When you swipe or flag a card, the expanded drawer now fully closes so the next card opens fresh — no more stale details/links from the previous card lingering in an open drawer.'],
   'v71':['v71: (1) "View Full Posting" / apply from the swipe card now resolves the link at the moment you tap it — so even if you left a card expanded across a swipe, it always opens the CURRENT job, never the previous card\u2019s. (2) Jobs you flagged "no longer accepting" now show a red flag next to the ghost icon in your Skipped list, so you can tell which ones you flagged. (3) The company rating prompt no longer opens behind the card — it now appears on top.'],
@@ -8599,6 +8617,23 @@ async function submitBug(){
 /* ---------- AUTO-ARCHIVE DEAD APPLICATIONS ---------- */
 function archiveSweep(){
   if(!lists.archived) lists.archived=[];
+  /* B-THISROLE (v74) one-time cleanup: earlier builds stored the display fallback
+     as identity ("this role · Serenity Healthcare"). Strip it from existing rows;
+     drop rows left with no identity at all. */
+  try{
+    let dirty=false;
+    ['applied','skipped','responses'].forEach(k=>{
+      if(!Array.isArray(lists[k])) return;
+      const before=lists[k].length;
+      lists[k]=lists[k].filter(r=>{
+        const t=_realTitle(r.t), c=_realCo(r.co);
+        if(t!==(r.t||'')||c!==(r.co||'')){ r.t=t; r.co=c; dirty=true; }
+        return !!(t||c);
+      });
+      if(lists[k].length!==before) dirty=true;
+    });
+    if(dirty){ try{ saveLists(); }catch(e){} try{ updateStatCounters(); }catch(e){} }
+  }catch(e){}
   const cutoff=Date.now()-45*86400000;
   const keep=[];
   lists.applied.forEach(r=>{
@@ -8964,7 +8999,10 @@ function applyVia(url,title,co){
         .then(d=>{
           let real=(d&&d.url)?d.url:'';
           try{ if(real&&typeof unwrapAtsUrl==='function') real=unwrapAtsUrl(real); }catch(e){}
-          if(real && !isAggregatorUrl(real)){ openSandbox(real,title||'this role',co||'the company'); }
+          /* B-THISROLE (v74): pass CLEAN identity into the sandbox — the display
+             sites downstream (tab title, HUD letter chip) keep their own copy
+             fallbacks; the stored _sbJob must never carry a placeholder. */
+          if(real && !isAggregatorUrl(real)){ openSandbox(real,title||'',co||''); }
           else { showToast('⚠️ Couldn\u2019t find a direct link for this listing — skipping it.'); }
         })
         .catch(()=>{ showToast('⚠️ Couldn\u2019t reach this listing right now.'); });
@@ -8973,7 +9011,7 @@ function applyVia(url,title,co){
     showToast('⚠️ This listing only has an aggregator link — skipping it.');
     return;
   }
-  try{ openSandbox(u,title||'this role',co||'the company'); }
+  try{ openSandbox(u,title||'',co||''); }   /* B-THISROLE (v74): no placeholder identity */
   catch(e){ window.open(u,'_blank','noopener'); }
 }
 /* sites that reliably BLOCK iframe embedding or gate behind ads/signup — for
@@ -9066,11 +9104,12 @@ function applyTabDone(){
   /* ADD TO THE APPLIED COUNTER — deduped so a swipe-right that already recorded
      this same job doesn't count it twice */
   try{
-    if(j.title||j.co){
-      const key=((j.title||'')+'|'+(j.co||'')).toLowerCase().replace(/\s+/g,' ').trim();
+    const jt=_realTitle(j.title), jc=_realCo(j.co);   /* B-THISROLE (v74): never store placeholders */
+    if(jt||jc){
+      const key=(jt+'|'+jc).toLowerCase().replace(/\s+/g,' ').trim();
       const already=lists.applied.some(r=>(((r.t||'')+'|'+(r.co||'')).toLowerCase().replace(/\s+/g,' ').trim())===key);
       if(!already){
-        lists.applied.push({t:j.title||'',co:j.co||'',ghost:(typeof ghostRiskFor==='function'?ghostRiskFor(j.co):0),when:Date.now(),status:null});
+        lists.applied.push({t:jt,co:jc,ghost:(typeof ghostRiskFor==='function'?ghostRiskFor(jc):0),when:Date.now(),status:null});
         try{ saveLists(); }catch(e){}
         try{ if(typeof registerApply==='function'){ /* registerApply handles cap/meter */ } }catch(e){}
         try{ updateStatCounters(); }catch(e){}
@@ -9177,10 +9216,11 @@ function sandboxDone(){
   }catch(e){}
   /* record to applied (seen-set) so it leaves the deck and syncs across devices */
   try{
-    if(j.title||j.co){
-      const key=((j.title||'')+'|'+(j.co||'')).toLowerCase().replace(/\s+/g,' ').trim();
+    const jt=_realTitle(j.title), jc=_realCo(j.co);   /* B-THISROLE (v74): never store placeholders */
+    if(jt||jc){
+      const key=(jt+'|'+jc).toLowerCase().replace(/\s+/g,' ').trim();
       const already=lists.applied.some(r=>(((r.t||'')+'|'+(r.co||'')).toLowerCase().replace(/\s+/g,' ').trim())===key);
-      if(!already){ lists.applied.push({t:j.title||'',co:j.co||'',ghost:(typeof ghostRiskFor==='function'?ghostRiskFor(j.co):0),when:Date.now(),status:null}); try{saveLists();}catch(e){} try{updateStatCounters();}catch(e){} try{cloudSync();}catch(e){} }
+      if(!already){ lists.applied.push({t:jt,co:jc,ghost:(typeof ghostRiskFor==='function'?ghostRiskFor(jc):0),when:Date.now(),status:null}); try{saveLists();}catch(e){} try{updateStatCounters();}catch(e){} try{cloudSync();}catch(e){} }
     }
   }catch(e){}
   closeSandbox();
