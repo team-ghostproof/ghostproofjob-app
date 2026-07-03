@@ -1,0 +1,6 @@
+# Never apply text/line-ending conversion to binary assets — a CRLF-converted
+# PDF/image is corrupted on checkout.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.ico binary
