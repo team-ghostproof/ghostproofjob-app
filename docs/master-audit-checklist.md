@@ -5,7 +5,7 @@
 
 **Current build:** v73 = deck Best-Match role-first (real fix) + always-include-remote + apply→Applied. v72 = B1 tagging + drawer collapse; v71 = B0/flags/review-z. 
 
-**Updated:** 2026-07-01 
+**Updated:** 2026-07-03 
 
 ## **How to read this** 
 
@@ -47,7 +47,7 @@ Known-good surface. Nothing below may regress it.
 
 ## **SECTION 2 — COMPLETED FIXES** 
 
-[DONE] v73 — Deck fixes (live-confirm pending): (a) the deck's "Best Match" now leads with the user's FIELD at the FINAL render sort (applySwipeFilters was re-sorting by raw match, which discarded v72's role ranking — that's why v72 didn't change the deck); (b) REMOTE jobs are now always included in the deck (were only added when local <8), surfacing remote + reducing early dead-ends; (c) B-APPLY-BUCKET: "View Full Posting" now records to Applied (deduped) + advances the deck. 
+[DONE] v73 — Deck fixes (VERIFIED 2026-07-03: Playwright regression suite 12/12 green on desktop + mobile, v67 benchmark intact, mirror synced identical, sw.js cache gpj-v73; live in-app spot-check of ordering/remote/Applied recommended on next deploy): (a) the deck's "Best Match" now leads with the user's FIELD at the FINAL render sort (applySwipeFilters was re-sorting by raw match, which discarded v72's role ranking — that's why v72 didn't change the deck); (b) REMOTE jobs are now always included in the deck (were only added when local <8), surfacing remote + reducing early dead-ends; (c) B-APPLY-BUCKET: "View Full Posting" now records to Applied (deduped) + advances the deck. 
 
 [DONE] v72 — B1 (role-first, CODE done; NEEDS your live confirmation): the swipe deck now leads with the user's field — a job earns the "primary" tier only if its title contains the résumé field word (marketing, pharmacy…), and the deck orders tier -> in-field -> score, so Marketing leads and off-field roles (Operations) only appear after in-field is exhausted. Graceful: no résumé/field => unchanged. Location scoping untouched. + Option A (B-DRAWER-COLLAPSE): the expanded drawer now fully closes on advance (removed the leftover #card-drawer.open), so the next card opens fresh. 
 

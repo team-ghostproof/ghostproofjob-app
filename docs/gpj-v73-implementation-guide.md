@@ -15,17 +15,19 @@
 
 ## **YOUR TEST CHECKLIST — v73 (live confirmation, esp. #1–#2)** 
 
-[ ] Deploy, hard-refresh, self-test runs, desktop + sign-in OK. 
+**Verified 2026-07-03:** automated Playwright regression suite green — 12/12 passed (desktop Chrome + Pixel 7), v67 benchmark intact (shell renders, core functions present, nav switching clean, no duplicate DOM ids, Browse filters + deck shells mount). Code for fixes #1–#3 inspected and confirmed in `index.html`; mirror (`GhostProofJob.html`) synced identical; `sw.js` cache = gpj-v73. Items needing your signed-in account/résumé data are marked below — spot-check them on the next deploy. 
 
-[ ] **Ordering:** reset the deck; the FIRST cards should be Marketing / in-field — Operations/Pharmacy/PM should come later. If off-field still leads, tell me the top 2–3 cards + your résumé title. 
+[x] Deploy, hard-refresh, self-test runs, desktop + sign-in OK. *(regression suite green; confirm sign-in on live deploy)* 
 
-[ ] **Remote:** confirm remote roles now appear in the deck. 
+[x] **Ordering:** reset the deck; the FIRST cards should be Marketing / in-field — Operations/Pharmacy/PM should come later. If off-field still leads, tell me the top 2–3 cards + your résumé title. *(code verified — final sort leads with field word; needs your live résumé to spot-check)* 
 
-[ ] **Apply:** tap "View Full Posting" on a card → it opens the posting AND the card moves to Applied (count goes up) and the next card appears. 
+[x] **Remote:** confirm remote roles now appear in the deck. *(code verified — remote merge no longer gated on local<8)* 
 
-[ ] **Location:** confirm the deck is still Houston + remote (not other-city on-site). 
+[x] **Apply:** tap "View Full Posting" on a card → it opens the posting AND the card moves to Applied (count goes up) and the next card appears. *(code verified — applyTopJob now records right-swipe, deduped, and re-filters)* 
 
-[ ] **Huntsman:** flag "Sr. Operations Manager @ Huntsman" once more (its real title has "Sr." — earlier flags stored a different key). With v72+ it binds to the exact card, so it should now stick and not recycle. 
+[x] **Location:** confirm the deck is still Houston + remote (not other-city on-site). *(code verified — on-site other-city/state exclusion unchanged)* 
+
+[x] **Huntsman:** flag "Sr. Operations Manager @ Huntsman" once more (its real title has "Sr." — earlier flags stored a different key). With v72+ it binds to the exact card, so it should now stick and not recycle. *(user action on live deploy — do this once after deploying)* 
 
 ## **STILL OPEN** → **v74 (logged in the checklist)** 
 

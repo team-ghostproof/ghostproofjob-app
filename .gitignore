@@ -1,0 +1,6 @@
+# Local dev/test artifacts — CI installs fresh (npm install in e2e.yml)
+node_modules/
+package-lock.json
+test-results/
+playwright-report/
+screenshots/

@@ -2258,7 +2258,7 @@
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <div><span onclick="goHome()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);">🏠 Home</span> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> · <span onclick="openLegal('security')" style="cursor:pointer;text-decoration:underline;">Security</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v72</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v73</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -5280,7 +5280,12 @@ async function _fetchLiveMarketJobs(){
           /* if local matches are sparse (<8), supplement ONLY with genuine REMOTE
              jobs — anyone can do those regardless of location. NEVER add other-city
              or other-state jobs (someone in Houston shouldn't see NY/FL roles). */
-          if(scoped.length<8){
+          /* ALWAYS include genuine REMOTE jobs — anyone can do them regardless of
+             location, so they belong in every user's deck. This surfaces remote roles
+             (previously they only appeared when local dropped below 8) and keeps the
+             deck from dead-ending on a thin local pool while real matches remain.
+             Still NEVER adds other-city / other-state ON-SITE jobs. */
+          {
             const seen=new Set(scoped.map(j=>((j.title||'')+'|'+(j.company||j.co||'')).toLowerCase()));
             const remoteExtra=fsJobs.filter(j=>{
               const isRemote = j.is_remote===true || /\bremote\b/i.test((j.work_setting||'')+' '+(j.location||j.loc||''));
@@ -6670,7 +6675,17 @@ function applySwipeFilters(){
     (!swFreshDays || j.posting_age_days==null || j.posting_age_days<=swFreshDays)
   );
   const sorters={
-    match:(a,b)=>(b.match||0)-(a.match||0),
+    match:(a,b)=>{
+      /* B1: lead with the user's FIELD (job title contains their résumé field word),
+         THEN by match %. This is the deck's FINAL sort — sorting by raw match here is
+         what previously buried in-field roles under off-field ones. Falls back to pure
+         match when there's no résumé/field word. */
+      const fw=(typeof _resumeFieldWord==='function'?_resumeFieldWord():'');
+      const ai=(fw && (a.t||'').toLowerCase().includes(fw))?1:0;
+      const bi=(fw && (b.t||'').toLowerCase().includes(fw))?1:0;
+      if(bi!==ai) return bi-ai;
+      return (b.match||0)-(a.match||0);
+    },
     ghost:(a,b)=>(a.ghost??50)-(b.ghost??50),
     /* salary sorts: jobs WITHOUT a posted salary sink to the bottom so the ones
        with real numbers actually sort to the top (otherwise they all tie at 0) */
@@ -6982,8 +6997,19 @@ function _currentTopJob(){
    captured when the drawer was hydrated if the model is momentarily unavailable. */
 function applyTopJob(ev, fallbackUrl, fallbackCo){
   if(ev){ try{ ev.stopPropagation(); }catch(_){ } }
-  try{ const j=_currentTopJob(); if(j&&j.url){ applyVia(j.url,'',j.co||fallbackCo||''); return; } }catch(e){}
-  if(fallbackUrl) applyVia(fallbackUrl,'',fallbackCo||'');
+  const j=(typeof _currentTopJob==='function'?_currentTopJob():null);
+  const url=(j&&j.url)||fallbackUrl||'';
+  if(!url) return;
+  applyVia(url,'',(j&&j.co)||fallbackCo||'');
+  /* Opening the real posting IS the apply action — record it to the Applied bucket
+     (deduped in recordSwipe) and refresh the deck so the applied job drops out and the
+     next one comes up, instead of the card sitting on a job you already applied to. */
+  try{
+    if(j && typeof recordSwipe==='function'){
+      recordSwipe('right', j);
+      if(typeof applySwipeFilters==='function') applySwipeFilters();
+    }
+  }catch(e){}
 }
 function updateStatCounters(){
   const set=(id,n)=>{const e=document.getElementById(id);if(e)e.textContent=n;};
@@ -6995,7 +7021,13 @@ function updateStatCounters(){
 }
 function recordSwipe(dir,job){
   const rec={t:job.t,co:job.co,ghost:ghostRiskFor(job.co),when:Date.now(),status:null};
-  if(dir==='right'){ lists.applied.push(rec); }
+  if(dir==='right'){
+    /* de-dupe Applied too (mirrors the skipped path) so recording an apply from the
+       posting button and then a swipe-right can't stack duplicate rows. */
+    const k=((job.t||'')+'|'+(job.co||'')).toLowerCase().replace(/\s+/g,' ').trim();
+    lists.applied=(lists.applied||[]).filter(r=>(((r.t||'')+'|'+(r.co||'')).toLowerCase().replace(/\s+/g,' ').trim())!==k);
+    lists.applied.push(rec);
+  }
   else {
     /* FIX (v41): de-dupe skipped. Swiping left on the same listing twice (or on a
        card that recycled back into the deck) previously stacked duplicate rows in
@@ -8124,8 +8156,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v72';
+const APP_VERSION = 'v73';
 const CHANGELOG = {
+  'v73':['v73 (deck fixes — please live-confirm): (1) The deck\u2019s "Best Match" now LEADS WITH YOUR FIELD at the final render sort — in-field roles (Marketing) come before off-field ones (the role ranking was being overwritten here before, which is why v72 didn\u2019t change what you saw). (2) REMOTE jobs now ALWAYS appear in your deck (previously only added when local roles dropped below 8), so remote surfaces and the deck doesn\u2019t dead-end on a thin local pool. (3) Tapping "View Full Posting" now records the job to your Applied bucket and advances the deck — applying no longer leaves the card unmarked. Applied entries are de-duplicated.'],
   'v72':['v72: (1) The swipe deck now LEADS WITH YOUR FIELD. If your résumé is Marketing, you see Marketing roles first — off-field roles (e.g. Operations) only appear AFTER your in-field matches are exhausted, under a "running low on exact [field] roles nearby" note. Location scoping is unchanged. (2) When you swipe or flag a card, the expanded drawer now fully closes so the next card opens fresh — no more stale details/links from the previous card lingering in an open drawer.'],
   'v71':['v71: (1) "View Full Posting" / apply from the swipe card now resolves the link at the moment you tap it — so even if you left a card expanded across a swipe, it always opens the CURRENT job, never the previous card\u2019s. (2) Jobs you flagged "no longer accepting" now show a red flag next to the ghost icon in your Skipped list, so you can tell which ones you flagged. (3) The company rating prompt no longer opens behind the card — it now appears on top.'],
   'v70':['v70: Fixed the recurring recycle of a flagged job (e.g. Operations Manager @ Huntsman). Flagging "no longer accepting" now records the CURRENT top job\u2019s exact identity from the data model instead of the on-screen card, so the flag reliably matches and hides that job — even after a deck reset. NOTE: because earlier flags stored a mismatched key, flag the recycling job ONE more time after this update and it stays gone for good.'],
