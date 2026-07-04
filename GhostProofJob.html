@@ -2258,7 +2258,7 @@
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <div><span onclick="goHome()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);">🏠 Home</span> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> · <span onclick="openLegal('security')" style="cursor:pointer;text-decoration:underline;">Security</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v75</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v76</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2738,9 +2738,13 @@ function mapFirestoreJob(r){
     salMax:(_mx||_mn||(typeof resolveSalMax==='function'?resolveSalMax(r):0)),
     loc:(typeof r.location==='string'?r.location:(r.location&&r.location.display_name))||r.loc||'See posting',
     url:r.direct_apply_url||r.redirect_url||r.url||'',
-    desc:cutWords(_desc.replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim(),2400),
-    req:cutWords(_req.replace(/<[^>]+>/g,' ').trim(),1000),
-    benefits:cutWords(_ben,600),
+    /* B-DESC-CUT (v76): caps must exceed the harvester's own DESC_CAP (3500) or
+       the drawer still ends in an ellipsis — live proof: a 2600-char description
+       clipped at the old 2400. 4000/2000/1200 mean harvester data is NEVER cut
+       client-side; cutWords only fires on legacy/oversized ATS payloads. */
+    desc:cutWords(_desc.replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim(),4000),
+    req:cutWords(_req.replace(/<[^>]+>/g,' ').trim(),2000),
+    benefits:cutWords(_ben,1200),
     summary:(((_req&&_req.length>20)?_req:_desc).replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim()),
     ghost:Math.min(95, ghostRiskFor(co)+(_stale?15:0)),
     match:(typeof computeMatch==='function'?computeMatch(r.title||'',_desc||r.description||r.desc||''):0),
@@ -2930,7 +2934,10 @@ function buildBrowseExpanded(j,i){
 function ensureBrowseModal(){
   if(document.getElementById('browse-expand-modal')) return;
   const m=document.createElement('div');
-  m.className='modal-scrim'; m.id='browse-expand-modal'; m.style.zIndex='340';
+  /* z 350 (founder-directed v76): the job card must stack OVER the company modal
+     (345) when opened from a company's live openings — closing it returns the
+     user to the company card underneath. Stays below vibe-review (360). */
+  m.className='modal-scrim'; m.id='browse-expand-modal'; m.style.zIndex='350';
   m.innerHTML='<div class="modal-box" style="text-align:left;max-height:88vh;overflow-y:auto;padding:0 0 4px;">'+
     '<div style="position:sticky;top:0;display:flex;justify-content:flex-end;padding:8px 10px 4px;background:var(--plum2);z-index:2;"><div onclick="closeBrowseExpanded()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1;padding:2px 6px;">\u2715</div></div>'+
     '<div id="browse-expand-body" style="padding:0 16px 8px;"></div>'+
@@ -8190,8 +8197,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v75';
+const APP_VERSION = 'v76';
 const CHANGELOG = {
+  'v76':['v76: (1) Job Expectations and Summary clipping is truly gone — the card now carries more text than the harvester ever stores, so descriptions always read to their real end. (2) Open Full Job Card on a company profile now opens the actual JOB CARD on top of the company card — close it and you are back on the company profile. (3) Benefits capture widened: postings that phrase perks as Advantages / We Offer / Why Join Us / What is in it for you are now captured by the harvester on its next runs (your DataAnnotation example was the proof — the field was written, but the extractor missed that heading style).'],
   'v75':['v75 (from your live testing — thank you!): (1) Opening a posting NO LONGER counts as applied — a job moves to Applied ONLY when you tap Done — I Applied; close the posting and you return to the same card. (2) Reporting a job as no longer accepting now requires signing in, and the stray 1 report shown against a placeholder company is cleaned up automatically. (3) Job Expectations and Summary no longer clips mid-word — the expanded card now shows the full description with clean word-boundary trimming, plus Benefits when the posting has them. (4) Open Full Job Card on a company profile now populates the full job panel (summary, requirements, benefits, Match, Cover Letter, Apply) and scrolls it into view.'],
   'v74':['v74 deck fix: THE DECK NOW DRAWS FROM THE SAME JOB POOL AS BROWSE. It was querying only jobs tagged with your exact region, missing local high-match roles stored under broader region labels — that is why it dead-ended at ~45 jobs and served low-match roles while Browse held 98% matches. It now pulls wide and scopes to your market + remote by location text (exactly like Browse), with your field leading the order.','v74 apply fix: killed the phantom "this role" job. A missing job title could be stored literally as "this role" in your Applied list and leak into cover letters ("the this role position"). Real titles now carry through the whole apply path, placeholders are never stored as jobs, existing phantom rows clean themselves up on next launch, and letters read naturally even when a posting has no title.'],
   'v73':['v73 (deck fixes — please live-confirm): (1) The deck\u2019s "Best Match" now LEADS WITH YOUR FIELD at the final render sort — in-field roles (Marketing) come before off-field ones (the role ranking was being overwritten here before, which is why v72 didn\u2019t change what you saw). (2) REMOTE jobs now ALWAYS appear in your deck (previously only added when local roles dropped below 8), so remote surfaces and the deck doesn\u2019t dead-end on a thin local pool. (3) Tapping "View Full Posting" now records the job to your Applied bucket and advances the deck — applying no longer leaves the card unmarked. Applied entries are de-duplicated.'],
@@ -9737,11 +9745,30 @@ function toggleCmJobDesc(i){
 function openRoleFullCard(i){
   const j=cmJobsCache[i]; if(!j) return;
   const co=document.getElementById('cm-name')?document.getElementById('cm-name').textContent:'';
-  /* reuse the unified company-view job panel which has Match + Cover + Apply.
-     B-OPENCARD (v75): the button looked DEAD because openCompanyView re-renders
-     the SAME modal the user is already inside, and the job panel mounts at the
-     TOP (#cm-jobsummary) — off-screen from the openings list. Pass the FULL job
-     context (req/benefits too) and scroll the populated panel into view. */
+  /* B-OPENCARD (v76, founder-directed): open the REAL JOB CARD (the Browse
+     expanded view — same fix pattern as openSavedJobCard) stacked OVER the
+     company modal, instead of repopulating a panel inside it. The expanded
+     card's actions are index-based, so the job must live in liveJobs[idx]:
+     reuse an existing entry or append a normalized copy. */
+  try{
+    if(typeof liveJobs!=='undefined' && Array.isArray(liveJobs) && typeof openBrowseExpanded==='function'){
+      const key=((j.t||'')+'|'+(co||'')).toLowerCase().replace(/\s+/g,' ').trim();
+      let idx=liveJobs.findIndex(x=>(((x.t||'')+'|'+(x.co||'')).toLowerCase().replace(/\s+/g,' ').trim())===key);
+      if(idx<0){
+        liveJobs.push({
+          t:j.t||'Open Role', co:co||'', loc:j.loc||'', url:j.url||'',
+          desc:j.desc||'', req:j.req||'', benefits:j.benefits||'', summary:j.req||j.desc||'',
+          sal:'', ghost:(typeof ghostRiskFor==='function'?(function(){try{return ghostRiskFor(co);}catch(e){return null;}})():null),
+          match:(typeof computeMatch==='function'?(function(){try{return computeMatch(j.t||'',j.desc||'');}catch(e){return 0;}})():0),
+          posting_age_days:null
+        });
+        idx=liveJobs.length-1;
+      }
+      openBrowseExpanded(idx);   /* company modal stays open underneath (z 345 < 350) */
+      return;
+    }
+  }catch(e){}
+  /* fallback: at least populate the in-modal job panel as before */
   if(typeof openCompanyView==='function'){
     openCompanyView(co,{title:j.t,t:j.t,co:co,url:j.url||'',desc:j.desc||'',req:j.req||'',benefits:j.benefits||''});
     try{ const js=document.getElementById('cm-jobsummary'); if(js&&js.scrollIntoView) js.scrollIntoView({block:'start',behavior:'smooth'}); }catch(e){}

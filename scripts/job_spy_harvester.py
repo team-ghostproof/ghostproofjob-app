@@ -291,12 +291,18 @@ _REQ_HEADER = _re.compile(
     r"qualifications?|what you(?:'| a)?ll need|what you bring|required skills?|"
     r"skills? (?:&|and) experience|who you are|the ideal candidate|"
     r"experience required|must[- ]haves?)\b[:\s]*")
+# B-BENEFITS (v76): real postings phrase perks many ways — live repro: a LinkedIn
+# job's perks lived under "Advantages Of Contracting With Us" and extraction
+# returned '' (the field WAS written to Firestore, but empty). Keep 1:1 with
+# publicAggregator.js BENE_HEADER/NEXT_SECTION.
 _BENE_HEADER = _re.compile(
     r"(?im)^\s*(?:•\s*)?(featured benefits|benefits?(?: and perks)?|perks?(?: and benefits)?|"
-    r"what we offer|compensation (?:&|and) benefits|our benefits)\b[:\s]*")
+    r"what we offer|we offer|compensation (?:&|and) benefits|our benefits|"
+    r"advantages(?: of (?:contracting|working)(?: with us)?)?|"
+    r"why (?:join|work) (?:with |for )?us|what(?:'|’)s in it for you)\b[:\s]*")
 _NEXT_SECTION = _re.compile(
     r"(?im)^\s*(?:•\s*)?(about (?:us|the company|the team|our)|featured benefits|benefits?|perks?|"
-    r"requirements?|qualifications?|responsibilities|duties|what we offer|"
+    r"requirements?|qualifications?|responsibilities|duties|what we offer|we offer|advantages|"
     r"how to apply|to apply|equal opportunity|why join|our culture|"
     r"compensation|pay range|salary range|set alert|job description)\b")
 
@@ -748,6 +754,20 @@ def run_selftest():
     reqs = extract_requirements(taylor)
     check("taylor requirements has Bachelor's", "Bachelor" in reqs, reqs[:80])
     check("taylor requirements NOT the about-us blurb", "looking for an experienced" not in reqs)
+
+    # 1b) B-BENEFITS (v76) live repro — DataAnnotation phrased perks as
+    # "Advantages Of Contracting With Us"; the old header regex returned ''.
+    da = (
+        "About The Job\n\n"
+        "We are looking for a Visual Designer to help train AI models.\n\n"
+        "Advantages Of Contracting With Us\n\n"
+        "* You'll be able to choose which projects you want to work on and when\n"
+        "* You work on your own schedule, from the comfort of your own home\n\n"
+        "Responsibilities\n\n"
+        "* Review and critique AI-generated UI/UX designs, mockups, and visuals\n")
+    dbens = extract_benefits(da)
+    check("advantages-style benefits captured", "choose which projects" in dbens, dbens[:80])
+    check("advantages benefits stop at Responsibilities", "critique" not in dbens)
 
     # 2) UTHealth "About us" prose (no headers) — must surface duties, not boilerplate
     uth = ("**About us** The Houston Group is seeking a full\\-time Office Manager to provide "

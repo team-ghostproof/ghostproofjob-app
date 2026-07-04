@@ -26,9 +26,10 @@ jobs:
 
       - name: Run tests (smoke + authed + visual capture)
         env:
-          # Set this repo secret to enable the signed-in (authed) project in CI.
-          # Without it, auth.setup writes an empty state and authed tests skip.
-          GPJ_TEST_PASSWORD: ${{ secrets.GPJ_TEST_PASSWORD }}
+          # Set these repo secrets to enable the signed-in (authed) project in CI.
+          # Without them, auth.setup writes an empty state and authed tests skip.
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
         run: npx playwright test
 
       - name: Upload screenshots

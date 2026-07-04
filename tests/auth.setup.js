@@ -5,50 +5,72 @@ const path = require('path');
 /* ───────────────────────────────────────────────────────────────────────────
    GhostProofJob — AUTH SETUP (F-TEST signed-in harness, [STATE-COVERAGE] rule).
 
-   Signs in ONCE with the test account through the app's real Firebase path
-   (window.fb.signIn — the same call the auth modal makes) and saves the
-   browser storage state, INCLUDING IndexedDB, to playwright/.auth/user.json.
-   Firebase Auth persists sessions in IndexedDB (not localStorage), so the
-   indexedDB:true flag (Playwright ≥1.51) is what makes restore actually work.
+   Drives the app's REAL login UI: opens the auth modal in login mode, fills
+   #auth-email / #auth-pass, clicks the sign-in button (#auth-primary-btn →
+   authPrimary → fb.signIn), then waits for the Firebase Auth session to settle
+   in IndexedDB before saving the storage state (incl. IndexedDB — Firebase
+   does NOT persist sessions in localStorage) to playwright/.auth/user.json.
+   Requires Playwright ≥1.51 for storageState({ indexedDB: true }).
 
    Credentials come from env — NEVER hardcode them (this repo is public):
-     GPJ_TEST_EMAIL     (defaults to the test account)
-     GPJ_TEST_PASSWORD  (required to authenticate; set it locally or as a
-                         GitHub Actions secret)
+     TEST_USER_EMAIL     (defaults to the test account)
+     TEST_USER_PASSWORD  (required to authenticate — set locally or as a
+                          GitHub Actions secret; see .env.example)
+   (GPJ_TEST_EMAIL / GPJ_TEST_PASSWORD are honored as fallbacks.)
 
-   Without GPJ_TEST_PASSWORD this writes an EMPTY storage state and passes,
-   so the suite stays green — the authed project then self-skips. That keeps
+   Without a password this writes an EMPTY storage state and passes, so the
+   suite stays green — the authed project then self-skips. That keeps
    forks/PRs (which never receive secrets) from failing CI.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const AUTH_DIR = path.join(__dirname, '..', 'playwright', '.auth');
 const AUTH_FILE = path.join(AUTH_DIR, 'user.json');
-const EMAIL = process.env.GPJ_TEST_EMAIL || 'asosa@ghostproofjob.com';
-const PASSWORD = process.env.GPJ_TEST_PASSWORD || '';
+const EMAIL = process.env.TEST_USER_EMAIL || process.env.GPJ_TEST_EMAIL || 'asosa@ghostproofjob.com';
+const PASSWORD = process.env.TEST_USER_PASSWORD || process.env.GPJ_TEST_PASSWORD || '';
 
 test('authenticate test account and save storage state', async ({ page }) => {
   fs.mkdirSync(AUTH_DIR, { recursive: true });
 
   if (!PASSWORD) {
     fs.writeFileSync(AUTH_FILE, JSON.stringify({ cookies: [], origins: [] }));
-    console.log('[auth.setup] GPJ_TEST_PASSWORD not set — wrote empty state; authed tests will self-skip.');
+    console.log('[auth.setup] TEST_USER_PASSWORD not set — wrote empty state; authed tests will self-skip.');
     return;
   }
 
   await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
-  // wait for the Firebase module script to expose fb (it degrades to null on error)
-  await page.waitForFunction(() => window.fb && typeof window.fb.signIn === 'function', null, { timeout: 20000 });
+  // wait for the Firebase module script to expose fb and the login UI to exist
+  await page.waitForFunction(() => window.fb && typeof window.fb.signIn === 'function' && typeof window.showAuthModal === 'function', null, { timeout: 20000 });
 
-  const err = await page.evaluate(async ({ email, password }) => {
-    try { await window.fb.signIn(email, password); return ''; }
-    catch (e) { return (e && (e.code || e.message)) || 'sign-in failed'; }
-  }, { email: EMAIL, password: PASSWORD });
-  if (err) throw new Error('[auth.setup] Firebase sign-in failed for ' + EMAIL + ': ' + err + ' — check the GPJ_TEST_PASSWORD secret.');
+  // open the auth modal in LOGIN mode and sign in through the real form
+  await page.evaluate(() => window.showAuthModal('login'));
+  await page.fill('#auth-email', EMAIL);
+  await page.fill('#auth-pass', PASSWORD);
+  await page.click('#auth-primary-btn');
 
-  await page.waitForFunction(() => window.fb && window.fb.current && !!window.fb.current(), null, { timeout: 20000 });
-  // small settle so onAuthStateChanged listeners finish persisting the session
-  await page.waitForTimeout(1500);
+  // 1) Firebase reports a current user…
+  await page.waitForFunction(() => window.fb && window.fb.current && !!window.fb.current(), null, { timeout: 20000 })
+    .catch(() => { throw new Error('[auth.setup] sign-in did not produce a Firebase user for ' + EMAIL + ' — check TEST_USER_PASSWORD.'); });
+
+  // 2) …and the session has actually SETTLED into IndexedDB (what storageState saves)
+  await page.waitForFunction(async () => {
+    try {
+      const dbs = await indexedDB.databases();
+      if (!dbs.some((d) => d.name === 'firebaseLocalStorageDb')) return false;
+      return await new Promise((res) => {
+        const rq = indexedDB.open('firebaseLocalStorageDb');
+        rq.onsuccess = () => {
+          try {
+            const db = rq.result;
+            const count = db.transaction('firebaseLocalStorage', 'readonly').objectStore('firebaseLocalStorage').count();
+            count.onsuccess = () => { res(count.result > 0); db.close(); };
+            count.onerror = () => { res(false); db.close(); };
+          } catch (e) { res(false); }
+        };
+        rq.onerror = () => res(false);
+      });
+    } catch (e) { return false; }
+  }, null, { timeout: 20000 });
 
   await page.context().storageState({ path: AUTH_FILE, indexedDB: true });
-  console.log('[auth.setup] signed in as ' + EMAIL + ' — storage state (incl. IndexedDB) saved.');
+  console.log('[auth.setup] signed in as ' + EMAIL + ' via the login UI — storage state (incl. IndexedDB) saved.');
 });

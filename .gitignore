@@ -6,3 +6,5 @@ playwright-report/
 screenshots/
 # saved auth session (contains live Firebase tokens — never commit)
 playwright/.auth/
+# local credentials (see .env.example)
+.env

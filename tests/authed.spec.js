@@ -12,7 +12,7 @@ const { test, expect } = require('@playwright/test');
    matrix per the [STATE-COVERAGE] rule in CLAUDE.md §3.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test.skip(!process.env.GPJ_TEST_PASSWORD, 'GPJ_TEST_PASSWORD not set — authenticated quadrant skipped');
+test.skip(!(process.env.TEST_USER_PASSWORD || process.env.GPJ_TEST_PASSWORD), 'TEST_USER_PASSWORD not set — authenticated quadrant skipped');
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
@@ -22,7 +22,7 @@ test.beforeEach(async ({ page }) => {
 test('signed-in session restores from storage state', async ({ page }) => {
   await page.waitForFunction(() => window.fb && window.fb.current && !!window.fb.current(), null, { timeout: 20000 });
   const email = await page.evaluate(() => (window.fb.current() && window.fb.current().email) || '');
-  expect(email.toLowerCase()).toBe((process.env.GPJ_TEST_EMAIL || 'asosa@ghostproofjob.com').toLowerCase());
+  expect(email.toLowerCase()).toBe((process.env.TEST_USER_EMAIL || process.env.GPJ_TEST_EMAIL || 'asosa@ghostproofjob.com').toLowerCase());
 });
 
 test('shell stays functional while authenticated', async ({ page }) => {
