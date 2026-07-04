@@ -428,7 +428,15 @@ def normalize_row(row, region, source_hint):
             full_desc = clean_md(fetched)
             section_src = fetched
             _backfill_inc()
-    description = full_desc[:3500]   # keep more of the captured body (card summary + match context)
+    # B-DESC-CUT (v80): cut the SOURCE description on a word boundary + ellipsis —
+    # the old plain slice shipped docs ending mid-word ("…families, and comm"),
+    # which no client-side fix could repair. 3500 cap unchanged.
+    if len(full_desc) > 3500:
+        _cut = full_desc[:3500]
+        _sp = _cut.rfind(" ")
+        description = (_cut[:_sp] if _sp > 2100 else _cut).rstrip(" ,;:.!-") + "…"
+    else:
+        description = full_desc
     requirements = extract_requirements(section_src)
     benefits = extract_benefits(section_src)
 

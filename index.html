@@ -107,21 +107,38 @@
         const cap = max || 150;
         const col = collection(db,'jobs');
         const mapSnap = (snap)=>{ const out=[]; snap.forEach(d=>{ const v=d.data()||{}; if(v.title&&v.direct_apply_url) out.push(v); }); return out; };
-        // 1) region-scoped (active only), newest first when index allows
+        // 1) region-scoped (active only), newest first when index allows.
+        //    B-POOL-MERGE (v80): region docs are COLLECTED and MERGED with the
+        //    wide pull below — never returned alone. Returning early (pre-v74)
+        //    missed broad-region local docs; returning ONLY the wide newest-3000
+        //    (v74-v79) could miss the user's metro entirely when 11-20k national
+        //    docs/day push region-tagged jobs out of the newest window — which is
+        //    exactly how Houston vanished from deck + Browse. Merge = both.
+        let regionDocs=[];
         if(region){
           try{
             const q1 = query(col, where('region','==',region), where('active','==',true), orderBy('ingestedAt','desc'), limit(Math.max(cap,800)));
             const s1 = await getDocs(q1);
-            const r1 = mapSnap(s1);
-            if(r1.length){ console.log('[GPJ] Firestore jobs (region+active):',r1.length); return r1; }
+            regionDocs = mapSnap(s1);
+            if(regionDocs.length) console.log('[GPJ] Firestore jobs (region+active):',regionDocs.length);
           }catch(e){ console.warn('[GPJ] region+active query failed (index/rules?):',e&&e.message); }
-          try{
-            const q2 = query(col, where('region','==',region), limit(Math.max(cap,800)));
-            const s2 = await getDocs(q2);
-            const r2 = mapSnap(s2);
-            if(r2.length){ console.log('[GPJ] Firestore jobs (region):',r2.length); return r2; }
-          }catch(e){ console.warn('[GPJ] region query failed:',e&&e.message); }
+          if(!regionDocs.length){
+            try{
+              const q2 = query(col, where('region','==',region), limit(Math.max(cap,800)));
+              const s2 = await getDocs(q2);
+              regionDocs = mapSnap(s2);
+              if(regionDocs.length) console.log('[GPJ] Firestore jobs (region):',regionDocs.length);
+            }catch(e){ console.warn('[GPJ] region query failed:',e&&e.message); }
+          }
         }
+        const mergeDocs=(a,b)=>{
+          const seen=new Set(), out=[];
+          for(const v of [...a,...b]){
+            const k=((v.title||'')+'|'+(v.company||'')+'|'+(v.location||'')).toLowerCase();
+            if(seen.has(k)) continue; seen.add(k); out.push(v);
+          }
+          return out;
+        };
         // 2) unscoped pull (region empty, OR the exact `region` string the harvester
         //    wrote didn't match what resolveLocation() produced client-side — a single
         //    formatting difference, e.g. "Houston, TX" vs "houston-tx", makes the
@@ -134,8 +151,8 @@
         try{
           const q3 = query(col, where('active','==',true), orderBy('ingestedAt','desc'), limit(wideCap));
           const s3 = await getDocs(q3);
-          const r3 = mapSnap(s3);
-          console.log('[GPJ] Firestore jobs (unscoped, wide):',r3.length,'— if 0, check Security Rules allow reading the "jobs" collection');
+          const r3 = mergeDocs(regionDocs, mapSnap(s3));   /* v80: region docs guaranteed present */
+          console.log('[GPJ] Firestore jobs (region '+regionDocs.length+' + wide, merged):',r3.length,'— if 0, check Security Rules allow reading the "jobs" collection');
           return r3;
         }catch(e){
           console.warn('[GPJ] wide unscoped query failed (likely missing active+ingestedAt index) — retrying without it:',e&&e.message);
@@ -143,10 +160,10 @@
           try{
             const q4 = query(col, limit(wideCap));
             const s4 = await getDocs(q4);
-            const r4 = mapSnap(s4);
-            console.log('[GPJ] Firestore jobs (unscoped, plain):',r4.length);
+            const r4 = mergeDocs(regionDocs, mapSnap(s4));
+            console.log('[GPJ] Firestore jobs (region + plain, merged):',r4.length);
             return r4;
-          }catch(e2){ console.warn('[GPJ] jobs collection READ BLOCKED — likely Security Rules:',e2&&e2.message); return []; }
+          }catch(e2){ console.warn('[GPJ] jobs collection READ BLOCKED — likely Security Rules:',e2&&e2.message); return regionDocs; }
         }
       },
       /* ---- ADMIN (founder) methods. These read/write across profiles, which
@@ -2258,7 +2275,7 @@
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <div><span onclick="goHome()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);">🏠 Home</span> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> · <span onclick="openLegal('security')" style="cursor:pointer;text-decoration:underline;">Security</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v79</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v80</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2773,11 +2790,19 @@ let _browsePoolKey=null;
 let _browseScope='market';
 let _browseRawPool=[];
 let _browseLastLoc=null;
+/* v80: a remote job is only market-valid if it's remote in the USER'S country —
+   postings like "Remote, GB" leaked into US decks. Conservative markers only;
+   never bare 2-letter codes that collide with US states (IN, DE, CA…). */
+function _gpjForeignRemote(v){
+  const t=String((v&&(v.location||v.loc))||'').trim();
+  return /(,\s*)(GB|UK|IE|AU|NZ|FR|ES|NL|PL|BR|MX|PH|PK|ZA|SG|AE)$/i.test(t)
+      || /\b(United Kingdom|England|Scotland|Wales|Ireland|Canada|Australia|New Zealand|India|Germany|France|Spain|Netherlands|Poland|Brazil|Mexico|Philippines|Pakistan|Nigeria|South Africa|Singapore)\b/i.test(t);
+}
 function _scopeBrowsePool(raw, loc){
   if(!(loc && (loc.metro||loc.city||loc.state)) || typeof jobMatchesLocation!=='function') return raw||[];
   const scope=(typeof _browseScope==='string')?_browseScope:'market';
   if(scope==='all') return raw||[];
-  const isRemote=function(v){ return v.is_remote===true || /\bremote\b/i.test((v.work_setting||'')+' '+(v.location||v.loc||'')); };
+  const isRemote=function(v){ return (v.is_remote===true || /\bremote\b/i.test((v.work_setting||'')+' '+(v.location||v.loc||''))) && !_gpjForeignRemote(v); };
   if(scope==='state' && loc.state){
     const st=new RegExp('\\b'+String(loc.state).replace(/[^A-Za-z ]/g,'')+'\\b','i');
     return (raw||[]).filter(function(v){ return st.test(String(v.location||v.loc||'')) || jobMatchesLocation(v, loc) || isRemote(v); });
@@ -2841,7 +2866,9 @@ async function ensureBrowsePool(force){
        nationally-tagged roles that actually serve this metro — which is exactly why
        a 'sales' / 'marketing' search came back empty even though those roles exist
        remotely (and the Swipe deck, which pulls wide, shows them). One read, cached. */
-    raw=await fb.fetchJobs('', 3000)||[];
+    /* v80: pass regionKey — fetchJobs merges region-tagged docs with the wide
+       newest batch, so the metro can't fall out of the pool (see deck note). */
+    raw=await fb.fetchJobs(regionKey||'', 3000)||[];
   }catch(e){ return; }
   /* scope to the region the SAME way the deck does: local OR genuine remote.
      v78: the old "keep the wide pool if nothing matched" guard is GONE — it
@@ -5365,8 +5392,15 @@ async function _fetchLiveMarketJobs(){
            the deck even though jobMatchesLocation() below catches them by
            location TEXT. That is why the deck dead-ended at ~45 jobs and served
            low-match roles while 98%-match in-field roles sat in Browse only.
-           The client-side scoping + role-first sort below are unchanged. */
-        const fsJobs=await fb.fetchJobs('', 3000);
+           The client-side scoping + role-first sort below are unchanged.
+           B-POOL-MERGE (v80): pass the regionKey again — fetchJobs now MERGES
+           region-tagged docs with the wide newest batch (never either/or), so
+           Houston jobs stay in the pool even when 11-20k national docs/day push
+           them out of the newest-3000 window (the "no Houston jobs" report). */
+        let regionKey='';
+        if(loc.metro && /,\s*[A-Z]{2}$/.test(loc.metro)) regionKey=loc.metro;
+        else if(loc.city && loc.state) regionKey=cap(loc.city)+', '+loc.state;
+        const fsJobs=await fb.fetchJobs(regionKey||'', 3000);
         if(fsJobs && fsJobs.length){
           let scoped=fsJobs.filter(j=>jobMatchesLocation(j, loc));
           /* if local matches are sparse (<8), supplement ONLY with genuine REMOTE
@@ -5380,7 +5414,7 @@ async function _fetchLiveMarketJobs(){
           {
             const seen=new Set(scoped.map(j=>((j.title||'')+'|'+(j.company||j.co||'')).toLowerCase()));
             const remoteExtra=fsJobs.filter(j=>{
-              const isRemote = j.is_remote===true || /\bremote\b/i.test((j.work_setting||'')+' '+(j.location||j.loc||''));
+              const isRemote = (j.is_remote===true || /\bremote\b/i.test((j.work_setting||'')+' '+(j.location||j.loc||''))) && !(typeof _gpjForeignRemote==='function'&&_gpjForeignRemote(j));   /* v80: no foreign remote */
               if(!isRemote) return false;
               const k=((j.title||'')+'|'+(j.company||j.co||'')).toLowerCase();
               if(seen.has(k)) return false; seen.add(k); return true;
@@ -6014,7 +6048,10 @@ function fillSlot(cardEl, job){
   set('s-sub',subBits.join(' · '));
   cardEl.dataset.jobAge=(job.posting_age_days!=null?job.posting_age_days:'');
   set('s-salary',job.sal);
-  set('s-loc','📍 '+(job.loc.length>22?job.loc.slice(0,20)+'…':job.loc));
+  /* v80: a REMOTE role's badge says Remote — showing only the HQ city
+     ("📍 Temecula, CA" on a remote job) read like an out-of-market leak. */
+  const _rmBadge=/\bremote\b/i.test((job.work_setting||'')+' '+(job.loc||''));
+  set('s-loc',_rmBadge?'🏠 Remote':('📍 '+(job.loc.length>22?job.loc.slice(0,20)+'…':job.loc)));
   /* reveal vibe stars now that this is a real job */
   const vs=cardEl.querySelector('.vibe-stars'); if(vs) vs.style.display='';
   cardEl.dataset.joburl=job.url||'';
@@ -8297,8 +8334,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v79';
+const APP_VERSION = 'v80';
 const CHANGELOG = {
+  'v80':['v80: (1) YOUR MARKET IS BACK. Houston jobs vanished because the app read only the newest 3000 postings nationwide — with 10k+ posted daily, your metro could fall out of that window entirely. The deck and Browse now ALWAYS load your region\'s tagged jobs AND the newest batch together. (2) Update delivery is bulletproof now: the app re-checks for new versions every time you return to the tab and verifies the deployed version directly, so the refresh banner and What\'s-New popup can\'t silently stop appearing again — if you\'re reading this, it worked; hard-refresh once (Ctrl+Shift+R) to get current first. (3) Remote roles now show a Remote badge instead of their HQ city (that Temecula card was remote — now it says so). (4) Foreign remote postings (Remote, GB) no longer appear in US decks. (5) Fresh harvests no longer cut long descriptions mid-word at the source.'],
   'v79':['v79: you are now in control of WHERE your jobs come from. Browse shows a scope pill above results — Showing Houston + Remote — with one-tap steps to the rest of your state, then all regions, and back; it never widens on its own and switching scopes is instant (no reloading). The swipe deck offers the same ladder: when your region runs dry it first offers roles from other parts of your state, then other cities — always your choice.'],
   'v78':['v78: Browse now stays in YOUR market by default. With the Browse location fields blank it used to show the whole national pool (that Saratoga Springs, NY listing) — it now anchors to your saved profile location, exactly like the swipe deck, showing your market + genuine remote roles only. The posted-salary toggle filters that in-market list instantly on-device — it never pulls jobs from other regions. When nothing local matches, you get remote roles or an honest empty state, never random other-city jobs. Searching a different city explicitly in the Browse fields still works, and nationwide stays a button you choose.'],
   'v77':['v77: found and removed the LAST clipping site — the expanded job card\'s Job Expectations and Summary had its own hidden 2400-character cutoff (separate from the deck drawer). The job card now shows the same full text everywhere, trimmed only on clean word boundaries. Found by our new automated state-coverage tests, which now guard Guest, Signed-in, Offline, and Empty-data behavior on every push.'],
@@ -8456,6 +8494,21 @@ renderUserReports();
         /* check for a new deployed version every time the app opens + hourly */
         try{ reg.update(); }catch(e){}
         setInterval(()=>{ try{ reg.update(); }catch(e){} }, 60*60*1000);
+        /* B-UPDATE-STUCK (v80): also re-check on every tab FOCUS and verify the
+           deployed version DIRECTLY (bypassing every cache) — a client whose SW
+           update flow is wedged still learns a new build exists, so the banner +
+           What's-New popup can never silently stop appearing again. */
+        const _vCheck=async()=>{
+          try{ reg.update(); }catch(e){}
+          try{
+            const txt=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'');
+            const m=txt.match(/gpj-v(\d+)/);
+            const cur=parseInt(String(APP_VERSION).replace(/\D/g,''),10);
+            if(m && parseInt(m[1],10)>cur) showUpdateBanner();
+          }catch(e){}
+        };
+        document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') _vCheck(); });
+        setTimeout(_vCheck, 15000);
         /* when a new SW is found and finishes installing, prompt to refresh */
         reg.addEventListener('updatefound',()=>{
           const nw=reg.installing;

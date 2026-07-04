@@ -37,12 +37,29 @@ test('authenticate test account and save storage state', async ({ page }) => {
     return;
   }
 
+  test.setTimeout(90000);   /* real-network Firebase sign-in under parallel load */
+  /* the app reloads itself when the first SW activation claims a fresh profile
+     (controllerchange). Pre-claim the app's reload flag so the page stays put —
+     without this, evaluate contexts die mid-setup ("context was destroyed"). */
+  await page.addInitScript(() => { window._gpjReloaded = true; });
   await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   // wait for the Firebase module script to expose fb and the login UI to exist
-  await page.waitForFunction(() => window.fb && typeof window.fb.signIn === 'function' && typeof window.showAuthModal === 'function', null, { timeout: 20000 });
+  await page.waitForFunction(() => window.fb && typeof window.fb.signIn === 'function' && typeof window.showAuthModal === 'function', null, { timeout: 30000 });
 
-  // open the auth modal in LOGIN mode and sign in through the real form
+  // first-run overlays (tutorial/onboarding) can cover the auth modal — clear them
+  await page.evaluate(() => {
+    try { const t = document.getElementById('tutorial'); if (t) t.style.display = 'none'; } catch (e) {}
+    try { document.querySelectorAll('.modal-scrim.open').forEach((m) => m.classList.remove('open')); } catch (e) {}
+  });
+
+  // open the auth modal in LOGIN mode (retry once — app init can race under load)
   await page.evaluate(() => window.showAuthModal('login'));
+  try {
+    await page.waitForSelector('#auth-modal.open', { timeout: 10000 });
+  } catch (e) {
+    await page.evaluate(() => window.showAuthModal('login'));
+    await page.waitForSelector('#auth-modal.open', { timeout: 10000 });
+  }
   await page.fill('#auth-email', EMAIL);
   await page.fill('#auth-pass', PASSWORD);
   await page.click('#auth-primary-btn');

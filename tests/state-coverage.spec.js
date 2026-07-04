@@ -101,6 +101,8 @@ test.describe('[STATE-COVERAGE] v78 B-SARATOGA / B-SALARY-CYCLE', () => {
         { t: 'LOCAL', co: 'C1', location: 'Houston, TX' },
         { t: 'SARATOGA', co: 'C2', location: 'Saratoga Springs, NY' },
         { t: 'REMOTE', co: 'C3', location: 'New York, NY', is_remote: true },
+        { t: 'GBREMOTE', co: 'C5', location: 'Remote, GB', is_remote: true },   /* v80: foreign remote */
+        { t: 'INDIANA', co: 'C6', location: 'Indianapolis, IN', is_remote: true },  /* IN must NOT read as India */
       ];
       const scoped = _scopeBrowsePool(raw, loc).map((j) => j.t);
       /* zero in-market matches must NOT fall back to the national pool */
@@ -110,6 +112,8 @@ test.describe('[STATE-COVERAGE] v78 B-SARATOGA / B-SALARY-CYCLE', () => {
     expect(r.scoped).toContain('LOCAL');
     expect(r.scoped).toContain('REMOTE');
     expect(r.scoped).not.toContain('SARATOGA');
+    expect(r.scoped, 'foreign remote (Remote, GB) must be excluded').not.toContain('GBREMOTE');
+    expect(r.scoped, 'US-state remote (…, IN) must not be treated as foreign').toContain('INDIANA');
     expect(r.emptyLen, 'no local matches must yield remote-only/empty, never out-of-region on-site').toBe(0);
   });
 
