@@ -43,3 +43,13 @@ test('shell stays functional while authenticated', async ({ page }) => {
   });
   expect(dupes, 'duplicate ids: ' + dupes.join(', ')).toEqual([]);
 });
+
+test('[STATE-COVERAGE] Q2 authed: long descriptions render uncut while signed in', async ({ page }) => {
+  await page.waitForFunction(() => window.fb && window.fb.current && !!window.fb.current(), null, { timeout: 20000 });
+  const ok = await page.evaluate(() => {
+    const long = 'word '.repeat(700).trim();
+    const j = mapFirestoreJob({ title: 'T', company: 'Co', direct_apply_url: 'https://x.example/a', description: long });
+    return j.desc.length > 3400 && !j.desc.includes('…');
+  });
+  expect(ok).toBe(true);
+});
