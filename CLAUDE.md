@@ -56,6 +56,7 @@ Mission: surface *verified* roles, flag likely "ghost jobs," and tailor résumé
 6. **Never break existing features or prior fixes.** If a change unavoidably alters behavior, disclose it upfront and get sign-off.
 7. **Every build ships:** updated PDFs (Master Audit Checklist + Feature Launch Doc *if* a new user-facing feature was added) + full drop-in files + implementation instructions + a your-side test checklist + any screenshots needed for review.
 8. **Honesty over optimism.** Say when something is architecturally impossible or unverifiable rather than shipping a workaround or overclaiming a fix.
+9. **[STATE-COVERAGE] Matrix Generation.** Before writing a single line of code for any new feature or bug fix, you must mentally map out and explicitly output a 4-quadrant state matrix checking how the change behaves across: 1) Guest/Logged-out, 2) Authenticated, 3) Interrupted/Failed network, and 4) Empty/Missing data states. You must explicitly verify that the existing Playwright tests cover these 4 states, or you must write a new Playwright test targeting the uncovered state before pushing the code.
 
 ---
 
