@@ -24,7 +24,11 @@ jobs:
           npm install
           npx playwright install --with-deps chromium
 
-      - name: Run tests (smoke + visual capture)
+      - name: Run tests (smoke + authed + visual capture)
+        env:
+          # Set this repo secret to enable the signed-in (authed) project in CI.
+          # Without it, auth.setup writes an empty state and authed tests skip.
+          GPJ_TEST_PASSWORD: ${{ secrets.GPJ_TEST_PASSWORD }}
         run: npx playwright test
 
       - name: Upload screenshots

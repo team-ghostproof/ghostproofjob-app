@@ -4,3 +4,5 @@ package-lock.json
 test-results/
 playwright-report/
 screenshots/
+# saved auth session (contains live Firebase tokens — never commit)
+playwright/.auth/

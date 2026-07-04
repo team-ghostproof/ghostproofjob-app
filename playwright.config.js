@@ -25,10 +25,17 @@ module.exports = defineConfig({
     timeout: 30000,
   },
   projects: [
-    // Smoke/regression runs on both device profiles. Screenshots run ONCE, in the
-    // dedicated 'visual' project — so no test.skip project-detection is needed.
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: /screenshots\.spec\.js/ },
-    { name: 'mobile', use: { ...devices['Pixel 7'] }, testIgnore: /screenshots\.spec\.js/ },
+    // AUTH SETUP (F-TEST): signs in the test account once (creds from env; see
+    // tests/auth.setup.js) and saves storage state incl. IndexedDB, where
+    // Firebase Auth keeps its session.
+    { name: 'setup', testMatch: /auth\.setup\.js/ },
+    // Smoke/regression runs on both device profiles SIGNED OUT — that IS the
+    // Guest quadrant of the [STATE-COVERAGE] matrix. Screenshots run ONCE, in
+    // the dedicated 'visual' project — so no test.skip project-detection is needed.
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: /screenshots\.spec\.js|authed\.spec\.js|auth\.setup\.js/ },
+    { name: 'mobile', use: { ...devices['Pixel 7'] }, testIgnore: /screenshots\.spec\.js|authed\.spec\.js|auth\.setup\.js/ },
+    // AUTHED (Quadrant 2): restores the saved session; self-skips without creds.
+    { name: 'authed', use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/user.json' }, dependencies: ['setup'], testMatch: /authed\.spec\.js/ },
     { name: 'visual', use: { ...devices['Desktop Chrome'] }, testMatch: /screenshots\.spec\.js/ },
   ],
 });
