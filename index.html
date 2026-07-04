@@ -2258,7 +2258,7 @@
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <div><span onclick="goHome()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);">🏠 Home</span> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> · <span onclick="openLegal('security')" style="cursor:pointer;text-decoration:underline;">Security</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v78</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v79</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2765,14 +2765,55 @@ let _browsePoolKey=null;
 /* B-SARATOGA (v78): ONE scoping rule for the Browse pool — local OR genuine
    remote, NEVER other-city on-site. If nothing local matches, fall back to
    REMOTE-ONLY (location-agnostic, always valid) instead of silently keeping
-   the whole national pool like before — Browse never widens on its own;
-   widening stays an explicit user action ([UI-REVIEW] "other regions" pill). */
+   the whole national pool like before — Browse never widens on its own.
+   v79 (founder-approved control): the user can explicitly widen market →
+   rest-of-state → all regions and narrow back. Widening re-scopes the CACHED
+   raw pool client-side — zero extra Firestore reads. Scope resets to 'market'
+   whenever the pool is rebuilt for a (new) region. */
+let _browseScope='market';
+let _browseRawPool=[];
+let _browseLastLoc=null;
 function _scopeBrowsePool(raw, loc){
   if(!(loc && (loc.metro||loc.city||loc.state)) || typeof jobMatchesLocation!=='function') return raw||[];
+  const scope=(typeof _browseScope==='string')?_browseScope:'market';
+  if(scope==='all') return raw||[];
   const isRemote=function(v){ return v.is_remote===true || /\bremote\b/i.test((v.work_setting||'')+' '+(v.location||v.loc||'')); };
+  if(scope==='state' && loc.state){
+    const st=new RegExp('\\b'+String(loc.state).replace(/[^A-Za-z ]/g,'')+'\\b','i');
+    return (raw||[]).filter(function(v){ return st.test(String(v.location||v.loc||'')) || jobMatchesLocation(v, loc) || isRemote(v); });
+  }
   const near=(raw||[]).filter(function(v){ return jobMatchesLocation(v, loc) || isRemote(v); });
   if(near.length) return near;
   return (raw||[]).filter(isRemote);   /* honest remote-only (or empty) beats out-of-region on-site */
+}
+function _browseScopeCity(){
+  const loc=_browseLastLoc||{};
+  return loc.metro||((loc.city?(typeof cap==='function'?cap(loc.city):loc.city):'')+(loc.state?(', '+loc.state):''))||'your area';
+}
+function _browseScopePillHtml(){
+  const loc=_browseLastLoc||{};
+  if(!(loc.metro||loc.city||loc.state)) return '';
+  const city=_browseScopeCity(), st=loc.state||'';
+  const pill=function(txt,fn){ return '<span onclick="'+fn+'" style="display:inline-block;margin:2px 0 0 8px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:999px;padding:4px 12px;font-weight:800;cursor:pointer;">'+txt+'</span>'; };
+  if(_browseScope==='market') return '<div style="padding:2px 16px 8px;font-size:11px;color:var(--muted);">📍 Showing <strong style="color:var(--off);">'+city+' + Remote</strong>'+(st?pill('Show other parts of '+st+' →','browseWiden()'):pill('🌎 Show all regions →','browseWiden()'))+'</div>';
+  if(_browseScope==='state') return '<div style="padding:2px 16px 8px;font-size:11px;color:var(--muted);">🗺️ Showing <strong style="color:var(--off);">all of '+st+' + Remote</strong>'+pill('🌎 Show all regions →','browseWiden()')+pill('← '+city+' only','browseNarrow()')+'</div>';
+  return '<div style="padding:2px 16px 8px;font-size:11px;color:var(--muted);">🌎 Showing <strong style="color:var(--off);">all regions</strong>'+pill('← Back to '+city+' only','browseNarrow()')+'</div>';
+}
+function _browseRescope(){
+  try{
+    liveJobs=_scopeBrowsePool(_browseRawPool, _browseLastLoc).map(mapFirestoreJob).filter(Boolean);
+    livePage=1; renderBrowse();
+  }catch(e){}
+}
+function browseWiden(){
+  _browseScope=(_browseScope==='market' && _browseLastLoc && _browseLastLoc.state)?'state':'all';
+  _browseRescope();
+  showToast(_browseScope==='state'?'🗺️ Showing the rest of the state':'🌎 Showing all regions');
+}
+function browseNarrow(){
+  _browseScope='market';
+  _browseRescope();
+  showToast('📍 Back to '+_browseScopeCity());
 }
 async function ensureBrowsePool(force){
   if(!(window.fb&&fb.fetchJobs)) return;
@@ -2806,6 +2847,10 @@ async function ensureBrowsePool(force){
      v78: the old "keep the wide pool if nothing matched" guard is GONE — it
      silently violated the market hard-scope (B-SARATOGA). _scopeBrowsePool
      falls back to remote-only, then an honest empty state. */
+  /* v79: keep the RAW wide pool + loc so the "other regions" pill can widen /
+     narrow entirely client-side (no refetch); scope resets per new region. */
+  if(_browsePoolKey!==key) _browseScope='market';
+  _browseRawPool=raw.slice(); _browseLastLoc=loc;
   raw=_scopeBrowsePool(raw, loc);
   liveJobs=raw.map(mapFirestoreJob).filter(Boolean);
   _browsePoolKey=key; window._browseOwnsLive=true;
@@ -3060,7 +3105,8 @@ function renderBrowse(){
     if(livePage<1) livePage=1;
     const pageStart=(livePage-1)*PER_PAGE;
     const pageJobs=showJobs.slice(pageStart, pageStart+PER_PAGE);
-    out.innerHTML='<div style="padding:0 16px 8px;font-size:10px;color:var(--mint);">'+noteText+'</div>'+
+    out.innerHTML=(typeof _browseScopePillHtml==='function'?_browseScopePillHtml():'')+
+      '<div style="padding:0 16px 8px;font-size:10px;color:var(--mint);">'+noteText+'</div>'+
       pageJobs.map((j,ix)=>browseJobCard(j, liveJobs.indexOf(j))).join('')+
       '<div style="display:flex;gap:10px;margin:4px 16px 14px;">'+
       (livePage>1?'<div onclick="prevLivePage()" style="flex:1;background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:12px;padding:12px;text-align:center;font-size:13px;font-weight:800;cursor:pointer;">← Previous</div>':'')+
@@ -6097,7 +6143,40 @@ function advanceQueue(){
   reloadDeckFromQueue();
 }
 function showDeckExhausted(){
+  /* v79 ladder rung (founder-approved): offer the REST OF THE STATE before the
+     generic other-cities pull. Falls back to other-cities when no state known. */
+  let state=''; try{ state=((localStorage.getItem('gpj_loc')||'').split(',')[1]||'').trim(); }catch(e){}
+  if(state){
+    showDeckMessage('🎉','You\u2019ve seen everything in your region','Great work — you\u2019ve been through every match in your area. New roles post all day, so check back soon — or broaden to the rest of '+state+' first.','🗺️ Show roles from other parts of '+state+' \u2192','loadDeckSameState');
+    return;
+  }
   showDeckMessage('🎉','You\u2019ve seen everything in your region','Great work — you\u2019ve been through every match in your area. New roles post all day, so check back soon — or load openings in other cities.','🌎 Load jobs in other cities','loadDeckOtherCities');
+}
+/* v79: same-state rung — like loadDeckOtherCities below but keeps ONLY roles in
+   the user's STATE outside their metro (local + remote were already surfaced).
+   If the state has nothing left, it OFFERS other cities — never auto-taken. */
+async function loadDeckSameState(){
+  if(!(window.fb&&fb.fetchJobs)){ showToast('Live feed unavailable right now'); return; }
+  let master=''; try{ master=(localStorage.getItem('gpj_loc')||'').trim(); }catch(e){}
+  const state=(master.split(',')[1]||'').trim();
+  if(!state){ loadDeckOtherCities(); return; }
+  showToast('🗺️ Loading roles across '+state+'…');
+  const loc=(typeof resolveLocation==='function')?resolveLocation(master||''):null;
+  let wide=[]; try{ wide=await fb.fetchJobs('', 8000)||[]; }catch(e){ wide=[]; }
+  const hidden=_deckHiddenSet();
+  const inRegion=function(j){ return (loc && (loc.metro||loc.city||loc.state) && typeof jobMatchesLocation==='function') ? jobMatchesLocation(j, loc) : false; };
+  const st=new RegExp('\\b'+state.replace(/[^A-Za-z ]/g,'')+'\\b','i');
+  let sameState=wide.filter(function(j){ return !inRegion(j) && st.test(String(j.location||j.loc||'')); })
+    .map(mapFirestoreJob).filter(Boolean).filter(function(j){ return !hidden.has(jobKey(j)); });
+  if(!sameState.length){
+    showDeckMessage('🔍','No more '+state+' roles right now','You\u2019ve seen every live '+state+' match we have. New roles post all day — or load openings in other cities.','🌎 Load jobs in other cities','loadDeckOtherCities');
+    return;
+  }
+  try{ const ranked=searchRankJobs(sameState, ''); if(ranked&&ranked.length) sameState=ranked; }catch(e){}
+  jobsQueue=sameState; rawQueue=jobsQueue.slice(); queuePtr=0; _broaderNoticeShown=false;
+  try{ clearDeckMessage(); }catch(e){}
+  try{ applySwipeFilters(); }catch(e){}
+  showToast('✅ '+sameState.length+' opening(s) across '+state);
 }
 /* Rung 5 of the deck ladder: ONLY after the user has seen everything in their region
    do we offer jobs in OTHER cities (their local + genuine-remote roles were already
@@ -8218,8 +8297,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v78';
+const APP_VERSION = 'v79';
 const CHANGELOG = {
+  'v79':['v79: you are now in control of WHERE your jobs come from. Browse shows a scope pill above results — Showing Houston + Remote — with one-tap steps to the rest of your state, then all regions, and back; it never widens on its own and switching scopes is instant (no reloading). The swipe deck offers the same ladder: when your region runs dry it first offers roles from other parts of your state, then other cities — always your choice.'],
   'v78':['v78: Browse now stays in YOUR market by default. With the Browse location fields blank it used to show the whole national pool (that Saratoga Springs, NY listing) — it now anchors to your saved profile location, exactly like the swipe deck, showing your market + genuine remote roles only. The posted-salary toggle filters that in-market list instantly on-device — it never pulls jobs from other regions. When nothing local matches, you get remote roles or an honest empty state, never random other-city jobs. Searching a different city explicitly in the Browse fields still works, and nationwide stays a button you choose.'],
   'v77':['v77: found and removed the LAST clipping site — the expanded job card\'s Job Expectations and Summary had its own hidden 2400-character cutoff (separate from the deck drawer). The job card now shows the same full text everywhere, trimmed only on clean word boundaries. Found by our new automated state-coverage tests, which now guard Guest, Signed-in, Offline, and Empty-data behavior on every push.'],
   'v76':['v76: (1) Job Expectations and Summary clipping is truly gone — the card now carries more text than the harvester ever stores, so descriptions always read to their real end. (2) Open Full Job Card on a company profile now opens the actual JOB CARD on top of the company card — close it and you are back on the company profile. (3) Benefits capture widened: postings that phrase perks as Advantages / We Offer / Why Join Us / What is in it for you are now captured by the harvester on its next runs (your DataAnnotation example was the proof — the field was written, but the extractor missed that heading style).'],

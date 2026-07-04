@@ -140,6 +140,58 @@ test.describe('[STATE-COVERAGE] v78 B-SARATOGA / B-SALARY-CYCLE', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v79 other-regions control', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1+Q3+Q4: pill ladder widens/narrows the CACHED pool — zero refetch, honest tiers', async ({ page }) => {
+    let hits = 0;
+    await page.route('**/*firestore.googleapis.com/**', (route) => { hits++; route.abort('failed'); });
+    const r = await page.evaluate(() => {
+      _browseRawPool = [
+        { title: 'Local Role', company: 'C1', location: 'Houston, TX', direct_apply_url: 'https://x.example/1' },
+        { title: 'Dallas Role', company: 'C2', location: 'Dallas, TX', direct_apply_url: 'https://x.example/2' },
+        { title: 'Boise Role', company: 'C3', location: 'Boise, ID', direct_apply_url: 'https://x.example/3' },
+        { title: 'Remote Role', company: 'C4', location: 'New York, NY', is_remote: true, direct_apply_url: 'https://x.example/4' },
+      ];
+      _browseLastLoc = resolveLocation('Houston, TX'); _browseScope = 'market';
+      window._browseOwnsLive = true; _browsePoolKey = '(all)';
+      switchView('browse');
+      _browseRescope(); const market = liveJobs.map((j) => j.t);
+      browseWiden(); const state = liveJobs.map((j) => j.t);
+      browseWiden(); const all = liveJobs.map((j) => j.t);
+      browseNarrow(); const back = liveJobs.map((j) => j.t);
+      const pillText = (document.getElementById('browse-results') || {}).textContent || '';
+      return { market, state, all, back, pillShown: pillText.includes('Showing') };
+    });
+    expect(r.market).toContain('Local Role');
+    expect(r.market).toContain('Remote Role');
+    expect(r.market).not.toContain('Dallas Role');
+    expect(r.state).toContain('Dallas Role');
+    expect(r.state, 'state tier must not include other states').not.toContain('Boise Role');
+    expect(r.all).toContain('Boise Role');
+    expect(r.back).not.toContain('Dallas Role');
+    expect(r.pillShown, 'scope pill must render above results').toBe(true);
+    expect(hits, 'widening/narrowing must never refetch').toBe(0);
+  });
+
+  test('Q1: deck exhausted state offers the same-state rung before other cities', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_loc', 'Houston, TX');
+      showDeckExhausted();
+      const withState = document.getElementById('view-swipe').textContent || '';
+      localStorage.setItem('gpj_loc', '');
+      showDeckExhausted();
+      const without = document.getElementById('view-swipe').textContent || '';
+      return { withState, without };
+    });
+    expect(r.withState).toContain('other parts of TX');
+    expect(r.without).toContain('other cities');
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
