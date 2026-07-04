@@ -3,6 +3,19 @@
 // Runs in GitHub Actions (free) on every push. See tests/smoke.spec.js.
 const { defineConfig, devices } = require('@playwright/test');
 
+/* Load ./.env (gitignored; see .env.example) so TEST_USER_EMAIL/PASSWORD work
+   locally without exporting them — dependency-free parser, real env wins. */
+try {
+  const fs = require('fs'), path = require('path');
+  const envFile = path.join(__dirname, '.env');
+  if (fs.existsSync(envFile)) {
+    for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
+      const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
+      if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+    }
+  }
+} catch (e) { /* .env is optional */ }
+
 module.exports = defineConfig({
   testDir: './tests',
   timeout: 30000,

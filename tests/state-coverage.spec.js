@@ -88,6 +88,58 @@ test.describe('[STATE-COVERAGE] Q1 guest', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v78 B-SARATOGA / B-SALARY-CYCLE', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: Browse pool hard-scopes — local + remote in, other-city on-site OUT, honest empty', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const loc = resolveLocation('Houston, TX');
+      const raw = [
+        { t: 'LOCAL', co: 'C1', location: 'Houston, TX' },
+        { t: 'SARATOGA', co: 'C2', location: 'Saratoga Springs, NY' },
+        { t: 'REMOTE', co: 'C3', location: 'New York, NY', is_remote: true },
+      ];
+      const scoped = _scopeBrowsePool(raw, loc).map((j) => j.t);
+      /* zero in-market matches must NOT fall back to the national pool */
+      const outOfRegionOnly = _scopeBrowsePool([{ t: 'BOISE', co: 'C4', location: 'Boise, ID' }], loc);
+      return { scoped, emptyLen: outOfRegionOnly.length };
+    });
+    expect(r.scoped).toContain('LOCAL');
+    expect(r.scoped).toContain('REMOTE');
+    expect(r.scoped).not.toContain('SARATOGA');
+    expect(r.emptyLen, 'no local matches must yield remote-only/empty, never out-of-region on-site').toBe(0);
+  });
+
+  test('Q1+Q3: salary toggle is a pure client filter — zero Firestore requests, list never blanks', async ({ page }) => {
+    /* install AFTER load so only toggle-time traffic is counted (and killed — Q3) */
+    let hits = 0;
+    await page.route('**/*firestore.googleapis.com/**', (route) => { hits++; route.abort('failed'); });
+    const r = await page.evaluate(async () => {
+      const mk = (t, salMax) => ({ t, co: 'Co', loc: 'Houston, TX', sal: salMax ? '$90K' : '', salMax, ghost: 10, match: 0, desc: '', summary: '', url: 'https://x.example/' + t, posting_age_days: 1, jtype: '', job_type: '', work_setting: '', stale: false, last_ping_status: 'ok' });
+      liveJobs = [mk('WithSalary', 90000), mk('NoSalary', 0)];
+      window._browseOwnsLive = true; _browsePoolKey = '(all)';
+      switchView('browse');
+      renderBrowse();
+      const before = document.querySelectorAll('.job-card-browse').length;
+      const tog = document.getElementById('f-hassal');
+      tog.classList.add('on'); livePage = 1; refreshBrowse();
+      await new Promise((res) => setTimeout(res, 700));   /* let the 300ms debounce fire */
+      const withSal = document.querySelectorAll('.job-card-browse').length;
+      tog.classList.remove('on'); livePage = 1; refreshBrowse();
+      await new Promise((res) => setTimeout(res, 700));
+      const after = document.querySelectorAll('.job-card-browse').length;
+      return { before, withSal, after };
+    });
+    expect(r.before).toBe(2);
+    expect(r.withSal, 'toggle ON filters to posted-salary jobs only').toBe(1);
+    expect(r.after, 'toggle OFF restores the full in-market list').toBe(2);
+    expect(hits, 'toggling must never re-pull from Firestore').toBe(0);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);

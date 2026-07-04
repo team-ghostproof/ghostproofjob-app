@@ -2258,7 +2258,7 @@
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <div><span onclick="goHome()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);">🏠 Home</span> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> · <span onclick="openLegal('security')" style="cursor:pointer;text-decoration:underline;">Security</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v77</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v78</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2762,11 +2762,31 @@ function mapFirestoreJob(r){
    Browse fields behave like the keyword field and combine together. The Swipe deck
    is untouched (it keeps its own resume-ranked jobsQueue). ------------------------*/
 let _browsePoolKey=null;
+/* B-SARATOGA (v78): ONE scoping rule for the Browse pool — local OR genuine
+   remote, NEVER other-city on-site. If nothing local matches, fall back to
+   REMOTE-ONLY (location-agnostic, always valid) instead of silently keeping
+   the whole national pool like before — Browse never widens on its own;
+   widening stays an explicit user action ([UI-REVIEW] "other regions" pill). */
+function _scopeBrowsePool(raw, loc){
+  if(!(loc && (loc.metro||loc.city||loc.state)) || typeof jobMatchesLocation!=='function') return raw||[];
+  const isRemote=function(v){ return v.is_remote===true || /\bremote\b/i.test((v.work_setting||'')+' '+(v.location||v.loc||'')); };
+  const near=(raw||[]).filter(function(v){ return jobMatchesLocation(v, loc) || isRemote(v); });
+  if(near.length) return near;
+  return (raw||[]).filter(isRemote);   /* honest remote-only (or empty) beats out-of-region on-site */
+}
 async function ensureBrowsePool(force){
   if(!(window.fb&&fb.fetchJobs)) return;
   let loc=null, regionKey='';
   if(typeof resolveLocation==='function'){
-    const where=(typeof locationWithState==='function')?locationWithState('f-location','f-state'):((document.getElementById('f-location')||{}).value||'');
+    let where=(typeof locationWithState==='function')?locationWithState('f-location','f-state'):((document.getElementById('f-location')||{}).value||'');
+    /* B-SARATOGA (v78): Browse HARD-SCOPES to the profile market by default.
+       Blank Browse fields used to mean NO scoping — the whole national pool
+       rendered (Saratoga Springs, NY with location=Houston), and the posted-
+       salary toggle re-rendering that pool looked like it "pulled random
+       regions" (B-SALARY-CYCLE was a symptom of this). Blank fields now fall
+       back to the SAVED master location — the same gpj_loc the deck anchors
+       on (v66). No saved location at all => unscoped, as before. */
+    if(!where||!String(where).trim()){ try{ where=(localStorage.getItem('gpj_loc')||'').trim(); }catch(e){} }
     loc=resolveLocation(where||'');
     if(loc.metro && /,\s*[A-Z]{2}$/.test(loc.metro)) regionKey=loc.metro;
     else if(loc.city && loc.state) regionKey=(loc.city.charAt(0).toUpperCase()+loc.city.slice(1))+', '+loc.state;
@@ -2782,13 +2802,11 @@ async function ensureBrowsePool(force){
        remotely (and the Swipe deck, which pulls wide, shows them). One read, cached. */
     raw=await fb.fetchJobs('', 3000)||[];
   }catch(e){ return; }
-  /* scope to the region the SAME way the deck does: local OR genuine remote */
-  if(loc && (loc.metro||loc.city||loc.state) && typeof jobMatchesLocation==='function'){
-    const near=raw.filter(v=> jobMatchesLocation(v, loc) || v.is_remote===true || /\bremote\b/i.test((v.work_setting||'')+' '+(v.location||v.loc||'')) );
-    /* only narrow if scoping actually found local/remote matches; otherwise keep the
-       wide pool so Browse can never silently blank when a metro tag is unusual */
-    if(near.length) raw=near;
-  }
+  /* scope to the region the SAME way the deck does: local OR genuine remote.
+     v78: the old "keep the wide pool if nothing matched" guard is GONE — it
+     silently violated the market hard-scope (B-SARATOGA). _scopeBrowsePool
+     falls back to remote-only, then an honest empty state. */
+  raw=_scopeBrowsePool(raw, loc);
   liveJobs=raw.map(mapFirestoreJob).filter(Boolean);
   _browsePoolKey=key; window._browseOwnsLive=true;
 }
@@ -8200,8 +8218,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v77';
+const APP_VERSION = 'v78';
 const CHANGELOG = {
+  'v78':['v78: Browse now stays in YOUR market by default. With the Browse location fields blank it used to show the whole national pool (that Saratoga Springs, NY listing) — it now anchors to your saved profile location, exactly like the swipe deck, showing your market + genuine remote roles only. The posted-salary toggle filters that in-market list instantly on-device — it never pulls jobs from other regions. When nothing local matches, you get remote roles or an honest empty state, never random other-city jobs. Searching a different city explicitly in the Browse fields still works, and nationwide stays a button you choose.'],
   'v77':['v77: found and removed the LAST clipping site — the expanded job card\'s Job Expectations and Summary had its own hidden 2400-character cutoff (separate from the deck drawer). The job card now shows the same full text everywhere, trimmed only on clean word boundaries. Found by our new automated state-coverage tests, which now guard Guest, Signed-in, Offline, and Empty-data behavior on every push.'],
   'v76':['v76: (1) Job Expectations and Summary clipping is truly gone — the card now carries more text than the harvester ever stores, so descriptions always read to their real end. (2) Open Full Job Card on a company profile now opens the actual JOB CARD on top of the company card — close it and you are back on the company profile. (3) Benefits capture widened: postings that phrase perks as Advantages / We Offer / Why Join Us / What is in it for you are now captured by the harvester on its next runs (your DataAnnotation example was the proof — the field was written, but the extractor missed that heading style).'],
   'v75':['v75 (from your live testing — thank you!): (1) Opening a posting NO LONGER counts as applied — a job moves to Applied ONLY when you tap Done — I Applied; close the posting and you return to the same card. (2) Reporting a job as no longer accepting now requires signing in, and the stray 1 report shown against a placeholder company is cleaned up automatically. (3) Job Expectations and Summary no longer clips mid-word — the expanded card now shows the full description with clean word-boundary trimming, plus Benefits when the posting has them. (4) Open Full Job Card on a company profile now populates the full job panel (summary, requirements, benefits, Match, Cover Letter, Apply) and scrolls it into view.'],
