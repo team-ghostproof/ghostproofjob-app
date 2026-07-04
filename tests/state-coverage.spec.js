@@ -76,6 +76,27 @@ test.describe('[STATE-COVERAGE] Q1 guest', () => {
     expect(r.companyStillOpen, 'closing the job card must return to the company card').toBe(true);
   });
 
+  test('Q1: _fmtJobText renders bullets + section headers, never raw blobs (F-STRUCT)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const src = "What's In It For Me?\n• $50,000 - $60,000 base pay (DOE)\n• Robust PTO and Sick Time Plan\nJob Responsibilities\n• Assist marketing by collecting and analyzing data.\nRegular prose line that stays a paragraph.";
+      const html = _fmtJobText(src);
+      return {
+        bullets: (html.match(/flex-shrink:0;">•/g) || []).length,
+        headResp: /font-weight:800[^>]*>Job Responsibilities</.test(html),
+        headWiifm: /font-weight:800[^>]*>What(?:'|’)s In It For Me\?</.test(html),
+        proseIsNotHead: !/font-weight:800[^>]*>Regular prose/.test(html),
+        empty: _fmtJobText(''),
+        undef: /undefined|NaN/.test(html),
+      };
+    });
+    expect(r.bullets).toBe(3);
+    expect(r.headResp, '"Job Responsibilities" must render as a subhead').toBe(true);
+    expect(r.headWiifm, '"What\'s In It For Me?" must render as a subhead').toBe(true);
+    expect(r.proseIsNotHead, 'prose sentences must not become headers').toBe(true);
+    expect(r.empty).toBe('');
+    expect(r.undef).toBe(false);
+  });
+
   test('Q4-shape: missing desc/req/benefits render fallbacks, never "undefined"', async ({ page }) => {
     const r = await page.evaluate(() => {
       const j = mapFirestoreJob({ title: 'NoData', company: 'Co', direct_apply_url: 'https://x.example/n' });
@@ -103,6 +124,7 @@ test.describe('[STATE-COVERAGE] v78 B-SARATOGA / B-SALARY-CYCLE', () => {
         { t: 'REMOTE', co: 'C3', location: 'New York, NY', is_remote: true },
         { t: 'GBREMOTE', co: 'C5', location: 'Remote, GB', is_remote: true },   /* v80: foreign remote */
         { t: 'INDIANA', co: 'C6', location: 'Indianapolis, IN', is_remote: true },  /* IN must NOT read as India */
+        { t: 'FAKEHYBRID', co: 'C7', location: 'Tucson, AZ', is_remote: true, description: 'Hybrid work schedule (must be local to Tucson, AZ)' },  /* v81: fake remote */
       ];
       const scoped = _scopeBrowsePool(raw, loc).map((j) => j.t);
       /* zero in-market matches must NOT fall back to the national pool */
@@ -114,6 +136,7 @@ test.describe('[STATE-COVERAGE] v78 B-SARATOGA / B-SALARY-CYCLE', () => {
     expect(r.scoped).not.toContain('SARATOGA');
     expect(r.scoped, 'foreign remote (Remote, GB) must be excluded').not.toContain('GBREMOTE');
     expect(r.scoped, 'US-state remote (…, IN) must not be treated as foreign').toContain('INDIANA');
+    expect(r.scoped, 'is_remote flag contradicted by "hybrid/must be local" body must be excluded').not.toContain('FAKEHYBRID');
     expect(r.emptyLen, 'no local matches must yield remote-only/empty, never out-of-region on-site').toBe(0);
   });
 

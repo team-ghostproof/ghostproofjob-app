@@ -299,7 +299,7 @@ _BENE_HEADER = _re.compile(
     r"(?im)^\s*(?:•\s*)?(featured benefits|benefits?(?: and perks)?|perks?(?: and benefits)?|"
     r"what we offer|we offer|compensation (?:&|and) benefits|our benefits|"
     r"advantages(?: of (?:contracting|working)(?: with us)?)?|"
-    r"why (?:join|work) (?:with |for )?us|what(?:'|’)s in it for you)\b[:\s]*")
+    r"why (?:join|work) (?:with |for )?us|what(?:'|’)s in it for (?:you|me))\b[:\s]*")
 _NEXT_SECTION = _re.compile(
     r"(?im)^\s*(?:•\s*)?(about (?:us|the company|the team|our)|featured benefits|benefits?|perks?|"
     r"requirements?|qualifications?|responsibilities|duties|what we offer|we offer|advantages|"
@@ -468,6 +468,15 @@ def normalize_row(row, region, source_hint):
         work_setting = {"in person": "On-site", "on site": "On-site", "hybrid": "Hybrid", "remote": "Remote"}.get(raw_ws, "")
     if not work_setting and is_remote_job:
         work_setting = "Remote"
+
+    # B-FAKE-REMOTE (v81): sources routinely flag HYBRID roles as remote — live
+    # proof: a posting carried is_remote:true while its own body said "Hybrid
+    # work schedule (must be local to Tucson, AZ)". If the body contradicts the
+    # flag, the role is NOT location-agnostic: demote to Hybrid.
+    if is_remote_job and _re.search(r"(?i)\bhybrid\b|must be local|must reside|\bin[- ]office\b", full_desc[:4000]):
+        is_remote_job = False
+        if work_setting in ("", "Remote"):
+            work_setting = "Hybrid"
 
     def _fmt(n, useK):
         return "{:,}K".format(n // 1000) if useK else "{:,}".format(n)
@@ -776,6 +785,27 @@ def run_selftest():
     dbens = extract_benefits(da)
     check("advantages-style benefits captured", "choose which projects" in dbens, dbens[:80])
     check("advantages benefits stop at Responsibilities", "critique" not in dbens)
+
+    # 1c) B-FAKE-REMOTE (v81) + "What's In It For Me?" header (Parker & Sons repro)
+    pk = (
+        "What's In It For Me?\n\n"
+        "* $50,000 - $60,000 base pay (DOE)\n"
+        "* Hybrid work schedule (must be local to Tucson, AZ)\n"
+        "* Robust PTO and Sick Time Plan\n\n"
+        "Job Responsibilities\n\n"
+        "* Assist marketing by collecting and analyzing data.\n")
+    pbens = extract_benefits(pk)
+    check("whats-in-it-for-me benefits captured", "base pay" in pbens, pbens[:80])
+    prow = normalize_row({
+        "title": "Brand and Content Marketing Specialist", "company": "Parker & Sons",
+        "location": "Tucson, AZ", "job_url_direct": "https://x.example/pk",
+        "job_url": "https://x.example/pk", "description": pk, "is_remote": True,
+    }, "Tucson, AZ", "jobspy")
+    if prow is None:
+        check("fake-remote row normalized", False, "normalize_row returned None")
+    else:
+        check("fake-remote demoted (is_remote False)", prow.get("is_remote") is False, prow.get("is_remote"))
+        check("fake-remote work_setting Hybrid", prow.get("work_setting") == "Hybrid", prow.get("work_setting"))
 
     # 2) UTHealth "About us" prose (no headers) — must surface duties, not boilerplate
     uth = ("**About us** The Houston Group is seeking a full\\-time Office Manager to provide "

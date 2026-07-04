@@ -74,7 +74,7 @@ const REQ_HEADER = /^\s*(?:•\s*)?(requirements added by the job poster|require
 /* B-BENEFITS (v76): broadened in lockstep with the Python harvester — real
    postings phrase perks as "Advantages Of Contracting With Us", "We Offer",
    "Why Join Us", "What's in it for you". Keep the two files 1:1. */
-const BENE_HEADER = /^\s*(?:•\s*)?(featured benefits|benefits?(?: and perks)?|perks?(?: and benefits)?|what we offer|we offer|compensation (?:&|and) benefits|our benefits|advantages(?: of (?:contracting|working)(?: with us)?)?|why (?:join|work) (?:with |for )?us|what(?:'|’)s in it for you)\b[:\s]*/im;
+const BENE_HEADER = /^\s*(?:•\s*)?(featured benefits|benefits?(?: and perks)?|perks?(?: and benefits)?|what we offer|we offer|compensation (?:&|and) benefits|our benefits|advantages(?: of (?:contracting|working)(?: with us)?)?|why (?:join|work) (?:with |for )?us|what(?:'|’)s in it for (?:you|me))\b[:\s]*/im;
 const NEXT_SECTION = /^\s*(?:•\s*)?(about (?:us|the company|the team|our)|featured benefits|benefits?|perks?|requirements?|qualifications?|responsibilities|duties|what we offer|we offer|advantages|how to apply|to apply|equal opportunity|why join|our culture|compensation|pay range|salary range|set alert|job description)\b/im;
 
 function grab(headerRx, text, limit) {

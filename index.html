@@ -2275,7 +2275,7 @@
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <div><span onclick="goHome()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);">🏠 Home</span> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> · <span onclick="openLegal('security')" style="cursor:pointer;text-decoration:underline;">Security</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v80</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v81</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2759,17 +2759,19 @@ function mapFirestoreJob(r){
        the drawer still ends in an ellipsis — live proof: a 2600-char description
        clipped at the old 2400. 4000/2000/1200 mean harvester data is NEVER cut
        client-side; cutWords only fires on legacy/oversized ATS payloads. */
-    desc:cutWords(_desc.replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim(),4000),
+    /* v81: preserve LINE structure (headers/bullets) for the section-aware
+       renderer — collapse only horizontal whitespace, keep newlines. */
+    desc:cutWords(_desc.replace(/<[^>]+>/g,' ').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim(),4000),
     req:cutWords(_req.replace(/<[^>]+>/g,' ').trim(),2000),
     benefits:cutWords(_ben,1200),
-    summary:(((_req&&_req.length>20)?_req:_desc).replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim()),
+    summary:(((_req&&_req.length>20)?_req:_desc).replace(/<[^>]+>/g,' ').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim()),
     ghost:Math.min(95, ghostRiskFor(co)+(_stale?15:0)),
     match:(typeof computeMatch==='function'?computeMatch(r.title||'',_desc||r.description||r.desc||''):0),
     posting_age_days:_age,
     stale:_stale,
     jtype:(typeof jobTypeTag==='function'?jobTypeTag(r):''),
     job_type:(r.job_type||'').toLowerCase(),
-    work_setting:r.work_setting||(r.is_remote?'Remote':''),
+    work_setting:(function(){ const ws=r.work_setting||(r.is_remote?'Remote':''); return (ws==='Remote'&&typeof _gpjHybridText==='function'&&_gpjHybridText(r))?'Hybrid':ws; })(),   /* v81: body contradicts "Remote" => Hybrid */
     last_ping_status:'ok'
   };
 }
@@ -2798,11 +2800,45 @@ function _gpjForeignRemote(v){
   return /(,\s*)(GB|UK|IE|AU|NZ|FR|ES|NL|PL|BR|MX|PH|PK|ZA|SG|AE)$/i.test(t)
       || /\b(United Kingdom|England|Scotland|Wales|Ireland|Canada|Australia|New Zealand|India|Germany|France|Spain|Netherlands|Poland|Brazil|Mexico|Philippines|Pakistan|Nigeria|South Africa|Singapore)\b/i.test(t);
 }
+/* B-FAKE-REMOTE (v81): sources routinely flag HYBRID roles as remote — live
+   proof: "Brand and Content Marketing Specialist" carried is_remote:true while
+   its own body said "Hybrid work schedule (must be local to Tucson, AZ)". A
+   job is only market-valid remote if nothing in its text contradicts that. */
+function _gpjHybridText(v){
+  const t=(String((v&&(v.description||v.desc))||'')+' '+String((v&&(v.requirements||v.req))||'')).slice(0,4000);
+  return /\bhybrid\b|must be local|must reside|\bin[- ]office\b/i.test(t);
+}
+function _gpjEffectiveRemote(v){
+  const isR=(v&&v.is_remote===true) || /\bremote\b/i.test(String((v&&v.work_setting)||'')+' '+String((v&&(v.location||v.loc))||''));
+  return isR && !_gpjForeignRemote(v) && !_gpjHybridText(v);
+}
+/* F-STRUCT (v81, founder-requested): render harvested job text the way the
+   SOURCE posting shows it — bullet lines become real bullets, short heading
+   lines ("Job Responsibilities", "What's In It For Me?") become bold subheads —
+   instead of one flat pre-wrap blob. Text-level formatting only. */
+function _fmtJobText(raw){
+  const esc=String(raw||'').replace(/</g,'&lt;');
+  if(!esc.trim()) return '';
+  const HEADWORD=/^(?:[A-Z][\w&'’()\/-]*|and|of|for|the|in|to|with|it|its|me|you|your|a|an|at|on|we|us|our)$/;
+  const lines=esc.split(/\n/);
+  let out='', started=false;
+  for(let ln of lines){
+    ln=ln.trim(); if(!ln) continue;
+    const b=ln.match(/^(?:[•\-\*]|\d+[.)])\s+(.*)$/);
+    if(b){ out+='<div style="display:flex;gap:8px;margin:3px 0;"><span style="color:var(--mint);flex-shrink:0;">•</span><span>'+b[1]+'</span></div>'; started=true; continue; }
+    const words=ln.replace(/[:?]$/,'').split(/\s+/);
+    const isHead=ln.length<=48 && words.length<=6 && /^[A-Z]/.test(ln) && !/[.!]$/.test(ln) &&
+                 (/[:?]$/.test(ln) || words.every(w=>HEADWORD.test(w)));
+    if(isHead){ out+='<div style="font-weight:800;color:var(--off);margin:'+(started?'11px':'2px')+' 0 3px;">'+ln.replace(/:$/,'')+'</div>'; started=true; continue; }
+    out+='<div style="margin:4px 0;">'+ln+'</div>'; started=true;
+  }
+  return out||('<div>'+esc+'</div>');
+}
 function _scopeBrowsePool(raw, loc){
   if(!(loc && (loc.metro||loc.city||loc.state)) || typeof jobMatchesLocation!=='function') return raw||[];
   const scope=(typeof _browseScope==='string')?_browseScope:'market';
   if(scope==='all') return raw||[];
-  const isRemote=function(v){ return (v.is_remote===true || /\bremote\b/i.test((v.work_setting||'')+' '+(v.location||v.loc||''))) && !_gpjForeignRemote(v); };
+  const isRemote=function(v){ return _gpjEffectiveRemote(v); };   /* v81: foreign + fake-hybrid remote excluded */
   if(scope==='state' && loc.state){
     const st=new RegExp('\\b'+String(loc.state).replace(/[^A-Za-z ]/g,'')+'\\b','i');
     return (raw||[]).filter(function(v){ return st.test(String(v.location||v.loc||'')) || jobMatchesLocation(v, loc) || isRemote(v); });
@@ -2994,7 +3030,7 @@ function buildBrowseExpanded(j,i){
   const matchBadge=j.match?('<div onclick="liveMatchInsight('+i+',event)" style="background:linear-gradient(90deg,rgba(0,245,160,.18),rgba(181,95,230,.18));border:1px solid rgba(0,245,160,.4);color:var(--mint);font-size:11px;font-weight:800;padding:3px 9px;border-radius:8px;cursor:pointer;">\ud83c\udfaf '+j.match+'% '+(resumeReady?'Match':'Fit')+'</div>'):'';
   const flagFresh=(j.posting_age_days==null||j.posting_age_days<=14||(j.sal&&j.sal!=='Salary on request'));
   const flag='<div style="border-left:3px solid '+(flagFresh?'var(--mint)':'var(--warn)')+';background:'+(flagFresh?'rgba(0,245,160,.08)':'rgba(255,176,32,.08)')+';padding:9px 11px;border-radius:0 8px 8px 0;font-size:12px;color:'+(flagFresh?'var(--mint)':'var(--warn)')+';margin:12px 0 0;">'+(flagFresh?'\ud83d\udfe2 <strong>Green Flag</strong> \u2014 ':'\u26a0\ufe0f ')+_browseActiveFlag(j)+'</div>';
-  const summary=(j.summary||j.desc||'').replace(/[*#`>]/g,'').replace(/\s{2,}/g,' ').trim();
+  const summary=(j.summary||j.desc||'').replace(/[#`>]/g,'').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim();   /* v81: keep newlines + bullet chars for _fmtJobText */
   return '<div style="display:flex;gap:11px;align-items:flex-start;padding-top:4px;">'+
       '<div style="width:46px;height:46px;border-radius:12px;background:var(--plum3);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">\ud83d\udcbc</div>'+
       '<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:17px;line-height:1.25;overflow-wrap:anywhere;">'+dt(j.t)+'</div>'+
@@ -3020,7 +3056,7 @@ function buildBrowseExpanded(j,i){
     /* B-DESC-CUT (v77): this render had its OWN hard 2400 slice \u2014 the last clip
        site (found by the [STATE-COVERAGE] Q1 test). Word-boundary cut at 4000,
        above the harvester's 3500 max, so the job card never clips real data. */
-    (summary?('<div style="margin-top:14px;"><div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-bottom:5px;">\ud83d\udcc4 JOB EXPECTATIONS &amp; SUMMARY</div><div style="font-size:12px;color:var(--off);line-height:1.55;max-height:280px;overflow-y:auto;">'+dt(typeof cutWords==='function'?cutWords(summary,4000):summary)+'</div></div>'):'')+
+    (summary?('<div style="margin-top:14px;"><div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-bottom:5px;">\ud83d\udcc4 JOB EXPECTATIONS &amp; SUMMARY</div><div style="font-size:12px;color:var(--off);line-height:1.55;max-height:280px;overflow-y:auto;">'+(typeof _fmtJobText==='function'?_fmtJobText(typeof cutWords==='function'?cutWords(summary,4000):summary):dt(summary))+'</div></div>'):'')+
     '<div onclick="reportExpired(\''+t+'\',\''+co+'\');closeBrowseExpanded()" style="margin-top:12px;color:var(--muted);font-size:10px;text-align:center;cursor:pointer;text-decoration:underline;">\ud83d\udea9 No longer accepting applications? Report &amp; hide</div>';
 }
 
@@ -5414,7 +5450,7 @@ async function _fetchLiveMarketJobs(){
           {
             const seen=new Set(scoped.map(j=>((j.title||'')+'|'+(j.company||j.co||'')).toLowerCase()));
             const remoteExtra=fsJobs.filter(j=>{
-              const isRemote = (j.is_remote===true || /\bremote\b/i.test((j.work_setting||'')+' '+(j.location||j.loc||''))) && !(typeof _gpjForeignRemote==='function'&&_gpjForeignRemote(j));   /* v80: no foreign remote */
+              const isRemote = (typeof _gpjEffectiveRemote==='function')?_gpjEffectiveRemote(j):(j.is_remote===true);   /* v81: no foreign or fake-hybrid remote */
               if(!isRemote) return false;
               const k=((j.title||'')+'|'+(j.company||j.co||'')).toLowerCase();
               if(seen.has(k)) return false; seen.add(k); return true;
@@ -5499,7 +5535,7 @@ async function _fetchLiveMarketJobs(){
       posting_age_days:jobAgeDays(r),
     jtype:(typeof jobTypeTag==='function'?jobTypeTag(r):''),
       job_type:(r.job_type||'').toLowerCase(),
-      work_setting:r.work_setting||(r.is_remote?'Remote':''),
+      work_setting:(function(){ const ws=r.work_setting||(r.is_remote?'Remote':''); return (ws==='Remote'&&typeof _gpjHybridText==='function'&&_gpjHybridText(r))?'Hybrid':ws; })(),   /* v81: body contradicts "Remote" => Hybrid */
       last_ping_status:'ok'
     }));
     /* DATA METADATA: stale postings (90+ days) get high-risk ghost flags */
@@ -6899,9 +6935,9 @@ function hydrateDrawer(){
     if(lead||u||bn){
       sumBox.innerHTML=
         '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📋 Job Expectations & Summary</div>'+
-        (lead?('<div class="desc-clamp" style="white-space:pre-wrap;">'+lead.replace(/</g,'&lt;')+'</div>'):'<div style="font-size:11px;color:var(--muted);">Full details live on the original posting.</div>')+
-        ((rq&&d&&d!==rq)?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px;">ℹ️ More about the role</div><div class="desc-clamp">'+d.replace(/</g,'&lt;')+'</div>'):'')+
-        (bn?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px;">🎁 Benefits</div><div class="desc-clamp" style="white-space:pre-wrap;">'+bn.replace(/</g,'&lt;')+'</div>'):'')+
+        (lead?('<div class="desc-clamp">'+_fmtJobText(lead)+'</div>'):'<div style="font-size:11px;color:var(--muted);">Full details live on the original posting.</div>')+
+        ((rq&&d&&d!==rq)?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px;">ℹ️ More about the role</div><div class="desc-clamp">'+_fmtJobText(d)+'</div>'):'')+
+        (bn?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px;">🎁 Benefits</div><div class="desc-clamp">'+_fmtJobText(bn)+'</div>'):'')+
         (u?('<div onclick="applyTopJob(event,\''+u.replace(/'/g,'')+'\',\''+String(co||'').replace(/'/g,'')+'\')" style="margin-top:10px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:10px;text-align:center;font-size:12px;cursor:pointer;">View Full Posting ↗</div>'):'');
       sumBox.style.display='block';
     } else sumBox.style.display='none';
@@ -8255,8 +8291,8 @@ function openCompanyView(co,job){
       const _sum=(typeof cleanMd==='function'?cleanMd(job.summary||job.req||job.desc||''):(job.summary||job.req||job.desc||''));
       const _bn=(typeof cleanMd==='function'?cleanMd(job.benefits||''):(job.benefits||''));
       js.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📋 '+((job.title||'Role').replace(/</g,'&lt;'))+' — Summary</div>'+
-        (_sum?('<div class="desc-clamp" style="white-space:pre-wrap;">'+_sum.replace(/</g,'&lt;')+'</div>'):'<div style="font-size:11px;color:var(--muted);">Open the role below for full details.</div>')+
-        (_bn?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:10px 0 6px;">🎁 Benefits</div><div class="desc-clamp" style="white-space:pre-wrap;">'+_bn.replace(/</g,'&lt;')+'</div>'):'')+
+        (_sum?('<div class="desc-clamp">'+_fmtJobText(_sum)+'</div>'):'<div style="font-size:11px;color:var(--muted);">Open the role below for full details.</div>')+
+        (_bn?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:10px 0 6px;">🎁 Benefits</div><div class="desc-clamp">'+_fmtJobText(_bn)+'</div>'):'')+
         '<div style="display:flex;gap:8px;margin-top:10px;">'+
         '<div onclick="matchToJobForRole(\''+jt+'\',\''+String(job.co||job.company||'').replace(/'/g,'')+'\',\''+String(job.desc||'').replace(/'/g,'').slice(0,200)+'\')" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>'+
         '<div onclick="coverFromDrawer(\''+jt+'\')" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>'+
@@ -8334,8 +8370,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v80';
+const APP_VERSION = 'v81';
 const CHANGELOG = {
+  'v81':['v81: (1) HYBRID JOBS CAN NO LONGER SNEAK IN AS REMOTE. Some sources flag hybrid roles as remote (that Tucson job literally said must be local to Tucson) — the app now reads the posting body and demotes fake-remote roles to Hybrid, keeping them out of your deck and Browse unless they are truly in your market. (2) Job cards now display postings the way the employer wrote them: real bullet points and bold section headings (Job Responsibilities, Skills and Qualifications, What Is In It For Me) instead of one flat text blob — for every posting that carries that structure. (3) The admin What\'s-New popup is fixed: it was checking admin status before sign-in finished and permanently marking versions as seen — it now re-checks after you sign in, so asosa and ksosa will see release notes again starting with the NEXT version. (4) Benefits capture now also recognizes the What\'s In It For Me heading.'],
   'v80':['v80: (1) YOUR MARKET IS BACK. Houston jobs vanished because the app read only the newest 3000 postings nationwide — with 10k+ posted daily, your metro could fall out of that window entirely. The deck and Browse now ALWAYS load your region\'s tagged jobs AND the newest batch together. (2) Update delivery is bulletproof now: the app re-checks for new versions every time you return to the tab and verifies the deployed version directly, so the refresh banner and What\'s-New popup can\'t silently stop appearing again — if you\'re reading this, it worked; hard-refresh once (Ctrl+Shift+R) to get current first. (3) Remote roles now show a Remote badge instead of their HQ city (that Temecula card was remote — now it says so). (4) Foreign remote postings (Remote, GB) no longer appear in US decks. (5) Fresh harvests no longer cut long descriptions mid-word at the source.'],
   'v79':['v79: you are now in control of WHERE your jobs come from. Browse shows a scope pill above results — Showing Houston + Remote — with one-tap steps to the rest of your state, then all regions, and back; it never widens on its own and switching scopes is instant (no reloading). The swipe deck offers the same ladder: when your region runs dry it first offers roles from other parts of your state, then other cities — always your choice.'],
   'v78':['v78: Browse now stays in YOUR market by default. With the Browse location fields blank it used to show the whole national pool (that Saratoga Springs, NY listing) — it now anchors to your saved profile location, exactly like the swipe deck, showing your market + genuine remote roles only. The posted-salary toggle filters that in-market list instantly on-device — it never pulls jobs from other regions. When nothing local matches, you get remote roles or an honest empty state, never random other-city jobs. Searching a different city explicitly in the Browse fields still works, and nationwide stays a button you choose.'],
@@ -8396,12 +8433,15 @@ const CHANGELOG = {
   'v17':['Smarter salary & requirements pulled from more job sources.']
 };
 function showWhatsNew(){
-  /* feature-announcement pop is admin-only for now; regular users just record the version silently */
-  if(typeof isAdmin!=='undefined' && !isAdmin){ try{ localStorage.setItem('gpj_seen_version',APP_VERSION); }catch(e){} return; }
+  if(document.getElementById('gpj-whatsnew')) return;
+  /* B-WHATSNEW (v81): this runs at BOOT, before Firebase auth resolves — so
+     isAdmin was always false here and the old code marked the version "seen"
+     and bailed, permanently swallowing the popup for admins (why asosa/ksosa
+     stopped seeing it). Non-admins now return WITHOUT writing, and the auth
+     handler re-invokes this once isAdmin is actually known. */
+  if(typeof isAdmin!=='undefined' && !isAdmin) return;
   let last='';
   try{ last=localStorage.getItem('gpj_seen_version')||''; }catch(e){}
-  /* first-ever visit: don't nag — just record the current version silently */
-  if(!last){ try{ localStorage.setItem('gpj_seen_version',APP_VERSION); }catch(e){} return; }
   if(last===APP_VERSION) return;                 /* already on this version */
   const notes=CHANGELOG[APP_VERSION];
   /* always advance the stored version so we only check once per release */
@@ -10535,7 +10575,7 @@ function adminCheck(user){
   const MASTER_EMAILS=['asosa@ghostproofjob.com','ksosa@ghostproofjob.com'];
   isAdmin=!!(user&&MASTER_EMAILS.includes((user.email||'').toLowerCase()));
   try{ const st=document.getElementById('pm-selftest'); if(st) st.style.display=isAdmin?'flex':'none'; }catch(e){}
-  if(isAdmin){ adminTargetUid=(user&&user.uid)||''; renderAdminPanel(); }
+  if(isAdmin){ adminTargetUid=(user&&user.uid)||''; renderAdminPanel(); try{ showWhatsNew(); }catch(e){} }   /* B-WHATSNEW (v81): re-check once admin status is real */
 }
 function renderAdminPanel(){
   if(document.getElementById('admin-panel')) return;
