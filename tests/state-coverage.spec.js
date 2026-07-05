@@ -253,6 +253,74 @@ test.describe('[STATE-COVERAGE] v79 other-regions control', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v83 scroll/clip/rater fixes', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: expanded description scrolls and does NOT collapse on inner taps', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const el = document.createElement('div');
+      el.className = 'desc-clamp';
+      el.innerHTML = _fmtJobText(('A real line of description text that wraps.\n').repeat(60));
+      document.body.appendChild(el);
+      el.click();                                   /* tap 1: expand */
+      const afterExpand = el.classList.contains('expanded');
+      const cs = getComputedStyle(el);
+      const scrolls = cs.overflowY === 'auto' && el.scrollHeight > el.clientHeight && el.clientHeight <= 362;
+      const hasCollapseBar = !!el.querySelector('.clamp-collapse');
+      el.querySelector('div').click();              /* tap 2: inside content — must NOT collapse */
+      const stillExpanded = el.classList.contains('expanded');
+      el.querySelector('.clamp-collapse').click();  /* tap 3: explicit collapse */
+      const collapsed = !el.classList.contains('expanded');
+      el.remove();
+      return { afterExpand, scrolls, hasCollapseBar, stillExpanded, collapsed };
+    });
+    expect(r.afterExpand).toBe(true);
+    expect(r.scrolls, 'expanded box must be a real 360px scroll region').toBe(true);
+    expect(r.hasCollapseBar).toBe(true);
+    expect(r.stillExpanded, 'tapping inside to scroll/select must not collapse').toBe(true);
+    expect(r.collapsed, 'the ▴ collapse bar must collapse it').toBe(true);
+  });
+
+  test('Q1: match insight stacks ABOVE the job card and shows the full title', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      openMatchInsight('Digital Content Specialist (Photo/Video & Social Media Design)', 26);
+      const m = document.getElementById('match-modal');
+      const t = document.getElementById('mi-title').textContent || '';
+      return { open: m.classList.contains('open'), z: parseInt(getComputedStyle(m).zIndex, 10), full: t.includes('(Photo/Video & Social Media Design)'), ellipsis: t.includes('…') };
+    });
+    expect(r.open).toBe(true);
+    expect(r.z, 'match modal must stack above the expanded job card (350)').toBeGreaterThan(350);
+    expect(r.full, 'full job title must be shown').toBe(true);
+    expect(r.ellipsis).toBe(false);
+  });
+
+  test('Q1+Q4: rater suggestions reject non-skill words, keep real skills (F-RATER)', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      including: _realSkillTerm('including'),
+      various: _realSkillTerm('various'),
+      experience: _realSkillTerm('experience'),
+      blank: _realSkillTerm(''),
+      number: _realSkillTerm('2024'),
+      salesforce: _realSkillTerm('salesforce'),
+      phrase: _realSkillTerm('project management'),
+      customer: _realSkillTerm('customer service'),
+      fullBtn: typeof jettFullImprove === 'function',
+    }));
+    expect(r.including, '"including" is not a skill').toBe(false);
+    expect(r.various).toBe(false);
+    expect(r.experience).toBe(false);
+    expect(r.blank).toBe(false);
+    expect(r.number).toBe(false);
+    expect(r.salesforce).toBe(true);
+    expect(r.phrase).toBe(true);
+    expect(r.customer).toBe(true);
+    expect(r.fullBtn, 'jettFullImprove must exist (F-JETT-FULL)').toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
