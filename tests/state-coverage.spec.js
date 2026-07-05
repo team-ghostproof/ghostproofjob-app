@@ -27,7 +27,9 @@ test.describe('[STATE-COVERAGE] Q1 guest', () => {
 
   test('B-DESC-CUT: harvester-sized descriptions are never cut; oversized cut on word boundary', async ({ page }) => {
     const r = await page.evaluate(() => {
-      const harvesterMax = 'word '.repeat(700).trim();       // 3499 chars — max the harvester stores
+      /* punctuation-terminated: v80+ harvester docs end with '.', '…' etc — the
+         v82 legacy-dressing only trims cap-length docs WITHOUT terminal punctuation */
+      const harvesterMax = ('word '.repeat(699) + 'sentence.').trim();  // ~3504 chars, clean ending
       const j = mapFirestoreJob({ title: 'T', company: 'Co', direct_apply_url: 'https://x.example/a', description: harvesterMax });
       const oversized = 'word '.repeat(1200).trim();          // ~6000 chars — legacy/ATS payload
       const j2 = mapFirestoreJob({ title: 'T2', company: 'Co', direct_apply_url: 'https://x.example/b', description: oversized });
@@ -95,6 +97,38 @@ test.describe('[STATE-COVERAGE] Q1 guest', () => {
     expect(r.proseIsNotHead, 'prose sentences must not become headers').toBe(true);
     expect(r.empty).toBe('');
     expect(r.undef).toBe(false);
+  });
+
+  test('Q1: legacy cap-truncated docs get dressed to a whole word + ellipsis (v82)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      /* a pre-v80 doc: exactly at the 3500 cap, ending mid-word, no punctuation */
+      const legacy = ('word '.repeat(699) + 'comfortable working within cl').slice(0, 3500);
+      const j = mapFirestoreJob({ title: 'L', company: 'Co', direct_apply_url: 'https://x.example/l', description: legacy });
+      const short = mapFirestoreJob({ title: 'S', company: 'Co', direct_apply_url: 'https://x.example/s', description: 'A clean short description.' });
+      return { dressed: /\S…$/.test(j.desc), noMidWord: !/\bcl…?$/.test(j.desc) && !j.desc.endsWith('cl'), shortUntouched: short.desc === 'A clean short description.' };
+    });
+    expect(r.dressed, 'cap-length desc without punctuation must end on a word + …').toBe(true);
+    expect(r.noMidWord, 'the mid-word fragment must be trimmed away').toBe(true);
+    expect(r.shortUntouched).toBe(true);
+  });
+
+  test('Q1+Q4: _aiJobContext labels the target role; empty posting yields title-only (F-AI)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const full = _aiJobContext('Marketing Manager', 'IDIQ', 'Own the TikTok Shop strategy for ecommerce brands. '.repeat(50));
+      const empty = _aiJobContext('Marketing Manager', 'IDIQ', '');
+      const none = _aiJobContext('', '', '');
+      return {
+        hasRole: full.includes('TARGET ROLE: Marketing Manager'), hasCo: full.includes('COMPANY: IDIQ'),
+        hasPosting: full.includes('POSTING: '), capped: full.length < 1700,
+        emptyOk: empty === 'TARGET ROLE: Marketing Manager\nCOMPANY: IDIQ', noneOk: none === '',
+      };
+    });
+    expect(r.hasRole).toBe(true);
+    expect(r.hasCo).toBe(true);
+    expect(r.hasPosting).toBe(true);
+    expect(r.capped, 'posting text must cap ~1500 chars').toBe(true);
+    expect(r.emptyOk).toBe(true);
+    expect(r.noneOk).toBe(true);
   });
 
   test('Q4-shape: missing desc/req/benefits render fallbacks, never "undefined"', async ({ page }) => {
