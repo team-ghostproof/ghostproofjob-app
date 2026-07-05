@@ -415,6 +415,44 @@ test.describe('[STATE-COVERAGE] v85 B2/B3/B5/B7 verification', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v86 dressing + D1 session cache', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: legacy raw-sliced REQUIREMENTS get dressed; clean fields untouched (B-DESC-CUT final)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      /* a pre-v86 doc: requirements stored at the raw 900 cap, ending mid-word */
+      const legacyReq = ('• Strong communication and organization skills\n'.repeat(18) + 'must have prior experien').slice(-900 - 24).slice(0, 900);
+      const j = mapFirestoreJob({ title: 'R', company: 'Co', direct_apply_url: 'https://x.example/r', description: 'Short and complete.', requirements: legacyReq });
+      const clean = mapFirestoreJob({ title: 'C', company: 'Co', direct_apply_url: 'https://x.example/c', description: 'Short and complete.', requirements: 'Must have 5 years of experience.' });
+      return {
+        reqDressed: /\S…$/.test(j.req), reqNoMidWord: !/experien$/.test(j.req),
+        summaryDressed: /\S…$/.test(j.summary),
+        cleanReq: clean.req, cleanDesc: clean.desc,
+      };
+    });
+    expect(r.reqDressed, 'cap-length requirements must end on a whole word + …').toBe(true);
+    expect(r.reqNoMidWord).toBe(true);
+    expect(r.summaryDressed, 'summary derives from the dressed requirements').toBe(true);
+    expect(r.cleanReq).toBe('Must have 5 years of experience.');
+    expect(r.cleanDesc).toBe('Short and complete.');
+  });
+
+  test('Q1: fetchJobs session cache — repeat pulls are read-free; clear hook exists (D1)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      if (!(window.fb && fb.fetchJobs && fb.jobsCacheClear)) return { ready: false };
+      const a = await fb.fetchJobs('', 50);
+      const b = await fb.fetchJobs('', 50);
+      fb.jobsCacheClear();
+      return { ready: true, n: a.length, identical: a === b };
+    });
+    expect(r.ready, 'fb.fetchJobs + fb.jobsCacheClear must exist').toBe(true);
+    if (r.n > 0) expect(r.identical, 'second identical pull must be served from the session cache').toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);

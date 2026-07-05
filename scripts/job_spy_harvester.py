@@ -315,7 +315,14 @@ def _grab(header_rx, text, limit=900):
     nxt = _NEXT_SECTION.search(rest)
     block = (rest[:nxt.start()] if nxt else rest).strip(" :*#->\n\t")
     block = _re.sub(r"\n{3,}", "\n\n", block).strip()
-    return block[:limit]
+    # B-DESC-CUT (v86): sections were stored with a RAW slice — requirements
+    # (cap 900) shipped ending mid-word, the residual clip after the desc fix.
+    # Cut on a word boundary + ellipsis, same rule as the main description.
+    if len(block) > limit:
+        cut = block[:limit]
+        sp = cut.rfind(" ")
+        block = (cut[:sp] if sp > int(limit * 0.6) else cut).rstrip(" ,;:.!-") + "…"
+    return block
 
 
 def extract_benefits(text):
