@@ -361,6 +361,60 @@ test.describe('[STATE-COVERAGE] v84 B-TEXT-CLIP', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v85 B2/B3/B5/B7 verification', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1 B2+B3: Browse work-style filter + min-salary slider act on the pool', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const mk = (t, ws, salMax) => ({ t, co: 'Co', loc: 'Houston, TX', sal: salMax ? ('$' + salMax / 1000 + 'K') : '', salMax, ghost: 10, match: 0, desc: '', summary: '', url: 'https://x.example/' + t, posting_age_days: 1, jtype: '', job_type: '', work_setting: ws, stale: false, last_ping_status: 'ok' });
+      liveJobs = [mk('REMOTEJOB', 'Remote', 90000), mk('HYBRIDJOB', 'Hybrid', 120000), mk('ONSITEJOB', 'On-site', 0)];
+      window._browseOwnsLive = true; _browsePoolKey = '(all)';
+      switchView('browse');
+      const names = () => [...document.querySelectorAll('.job-card-browse')].map((el) => (el.textContent.match(/REMOTEJOB|HYBRIDJOB|ONSITEJOB/) || [''])[0]);
+      document.getElementById('f-style').value = 'Remote'; renderBrowse();
+      const remoteOnly = names();
+      document.getElementById('f-style').value = ''; document.getElementById('f-salary').value = '100'; renderBrowse();
+      const salaried = names();
+      document.getElementById('f-salary').value = '0'; renderBrowse();
+      return { remoteOnly, salaried };
+    });
+    expect(r.remoteOnly, 'work-style Remote must show only remote').toEqual(['REMOTEJOB']);
+    expect(r.salaried, 'min $100K keeps 120K + unknown-salary, drops 90K').toEqual(expect.arrayContaining(['HYBRIDJOB', 'ONSITEJOB']));
+    expect(r.salaried).not.toContain('REMOTEJOB');
+  });
+
+  test('Q1 B5: saved location pre-fills résumé/browse city+state fields', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      /* .pf-city/.pf-state mount with the resume editor; #f-location is static
+         and set by the SAME function — the hard assert (incl. city-only strip) */
+      const fLoc = document.getElementById('f-location'); if (fLoc) fLoc.value = '';
+      document.querySelectorAll('.pf-city,.pf-state').forEach((el) => { el.value = ''; });
+      gpjApplyLocation('Houston, TX', 'TX', { force: true });
+      const city = [...document.querySelectorAll('.pf-city')].map((el) => el.value);
+      const state = [...document.querySelectorAll('.pf-state')].map((el) => el.value);
+      return { fLoc: fLoc ? fLoc.value : '(missing)', cityOk: city.every((v) => v === 'Houston'), stateOk: state.every((v) => v === 'TX') };
+    });
+    expect(r.fLoc, 'Browse city box fills with CITY ONLY (no ", TX" tail)').toBe('Houston');
+    expect(r.cityOk, 'any mounted resume city fields fill with city only').toBe(true);
+    expect(r.stateOk).toBe(true);
+  });
+
+  test('Q1 B7: password lives in a real form; sandbox iframe cannot escape', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      inForm: !!document.getElementById('auth-pass').closest('form'),
+      formIntercepted: (document.getElementById('auth-form').getAttribute('onsubmit') || '').includes('return false'),
+      sandbox: document.getElementById('sandbox-frame').getAttribute('sandbox') || '',
+    }));
+    expect(r.inForm, 'password field must be inside a <form>').toBe(true);
+    expect(r.formIntercepted).toBe(true);
+    expect(r.sandbox).not.toContain('allow-same-origin');
+    expect(r.sandbox).toContain('allow-scripts');
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
