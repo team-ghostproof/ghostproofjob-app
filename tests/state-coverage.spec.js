@@ -321,6 +321,46 @@ test.describe('[STATE-COVERAGE] v83 scroll/clip/rater fixes', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v84 B-TEXT-CLIP', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: location badges never cut mid-word; remote says Remote', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      long: _locBadge('Rancho Cucamonga, CA, United States', ''),   /* 35 chars → whole city, no cut */
+      fits: _locBadge('The Woodlands, TX, US', ''),                 /* 21 chars → fits, shown whole */
+      short: _locBadge('Houston, TX', ''),
+      remote: _locBadge('Temecula, CA', 'Remote'),
+      empty: _locBadge('', ''),
+    }));
+    expect(r.long, 'long locations show the whole city').toBe('📍 Rancho Cucamonga');
+    expect(r.long.includes('…')).toBe(false);
+    expect(r.fits).toBe('📍 The Woodlands, TX, US');
+    expect(r.short).toBe('📍 Houston, TX');
+    expect(r.remote).toBe('🏠 Remote');
+    expect(r.empty).toBe('📍 ');
+  });
+
+  test('Q1: popups are dynamic — modal-box wraps long text and scrolls in-viewport', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const box = document.createElement('div');
+      box.className = 'modal-box';
+      box.textContent = 'SupercalifragilisticDigitalContentSpecialistTitleThatNeverEnds '.repeat(80);
+      document.body.appendChild(box);
+      const cs = getComputedStyle(box);
+      const out = { overflow: cs.overflowY, wraps: cs.overflowWrap, bounded: box.clientHeight <= window.innerHeight, scrolls: box.scrollHeight > box.clientHeight };
+      box.remove();
+      return out;
+    });
+    expect(r.overflow).toBe('auto');
+    expect(r.wraps).toBe('anywhere');
+    expect(r.bounded, 'modal must stay inside the viewport').toBe(true);
+    expect(r.scrolls, 'overflowing content must scroll, not clip').toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
