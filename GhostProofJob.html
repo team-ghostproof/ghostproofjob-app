@@ -2312,7 +2312,7 @@
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <div><span onclick="goHome()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);">🏠 Home</span> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> · <span onclick="openLegal('security')" style="cursor:pointer;text-decoration:underline;">Security</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v86</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v87</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -6041,13 +6041,18 @@ function _ratingStructure(){
 /* F-RATER (v83): the corpus miner counts every frequent posting word — but
    "including", "various" etc. are frequent WITHOUT being skills. Never surface
    (or score against) a term a person couldn't genuinely put on a resume. */
-const _SKILL_STOP=/^(including|include|includes|included|various|within|across|according|required|requirements|preferred|ability|abilities|experience|experienced|work|working|works|team|teams|will|must|other|others|ensure|ensures|ensuring|provide|provides|providing|support|supports|supporting|strong|excellent|related|applicable|knowledge|skills|skill|years|year|position|positions|candidate|candidates|company|opportunity|opportunities|benefits|please|apply|applying|using|used|based|well|good|great|high|responsibilities|duties|perform|performs|performing|maintain|maintains|maintaining|assist|assists|assisting|general|daily|weekly|monthly|between|through|throughout|during|additional|things|areas|inside|about|environment|employees|customers|while|where|when|which|every|their|those|being|under|would|should|could)$/i;
+const _SKILL_STOP=/^(including|include|includes|included|various|within|across|according|required|requirements|preferred|ability|abilities|experience|experienced|work|working|works|team|teams|will|must|other|others|ensure|ensures|ensuring|provide|provides|providing|support|supports|supporting|strong|excellent|related|applicable|knowledge|skills|skill|years|year|position|positions|candidate|candidates|company|opportunity|opportunities|benefits|please|apply|applying|using|used|based|well|good|great|high|responsibilities|duties|perform|performs|performing|maintain|maintains|maintaining|assist|assists|assisting|general|daily|weekly|monthly|between|through|throughout|during|additional|things|areas|inside|about|environment|employees|customers|while|where|when|which|every|their|those|being|under|would|should|could|business|professional|professionals|process|processes|internal|external|development|solutions|services|product|products|department|departments|organization|organizations|information|activities|procedures|functions|initiatives|objectives|individuals|effective|successful|proven|dynamic|results|driven|track|record|quality|level|levels|role|roles|needs|goals|tasks|items)$/i;
 function _realSkillTerm(t){
   t=String(t||'').trim();
   if(t.length<3||t.length>40) return false;
   if(/^\d+$/.test(t)) return false;
   const words=t.split(/\s+/);
-  return !_SKILL_STOP.test(t) && words.some(w=>!_SKILL_STOP.test(w));
+  /* v87: MULTI-WORD phrases are specific by construction ("digital marketing",
+     "business development", "process improvement") — they pass. SINGLE generic
+     corporate nouns ("business", "professional", "process", "internal") do not:
+     live repro — all four surfaced as "skills" and even graded the score. */
+  if(words.length>1) return true;
+  return !_SKILL_STOP.test(t);
 }
 async function rateResume(){
   if(!(resumeData&&(resumeData.title||resumeData.skills||(resumeData.jobs&&resumeData.jobs.length)))){
@@ -6059,7 +6064,19 @@ async function rateResume(){
   if(host) host.innerHTML='<div style="text-align:center;padding:20px;font-size:12px;color:var(--muted);">📊 Scoring against live '+safe+' postings…</div>';
   const st=_ratingStructure();
   const text=_resumeText();
-  let corpus=null; try{ if(window.fb&&fb.mineRoleKeywords) corpus=await fb.mineRoleKeywords(role); }catch(e){}
+  /* F-RATER (v87): SESSION-CACHE the corpus per role (10 min). Every re-rate
+     used to mine a FRESH posting sample, so the benchmark itself wobbled and a
+     score could DROP after a real improvement (founder live repro). Within the
+     window, re-rates now measure the RESUME against the same yardstick. */
+  let corpus=null;
+  try{
+    const cc=window._roleCorpusCache;
+    if(cc && cc.role===role && (Date.now()-cc.ts)<10*60*1000){ corpus=cc.corpus; }
+    else if(window.fb&&fb.mineRoleKeywords){
+      corpus=await fb.mineRoleKeywords(role);
+      if(corpus) window._roleCorpusCache={role:role,ts:Date.now(),corpus:corpus};
+    }
+  }catch(e){}
   /* F-RATER (v83): strip non-skill words ("including") BEFORE scoring/suggesting */
   try{ if(corpus&&corpus.terms) corpus.terms=corpus.terms.filter(t=>_realSkillTerm(t.term)); }catch(e){}
   let covPts=0, covMax=55; const covered=[], missing=[];
@@ -6080,7 +6097,7 @@ async function rateResume(){
   const ring='<div style="position:relative;width:120px;height:120px;margin:0 auto 6px;"><svg viewBox="0 0 120 120" style="width:120px;height:120px;transform:rotate(-90deg);"><circle cx="60" cy="60" r="52" fill="none" stroke="var(--plum3)" stroke-width="10"/><circle cx="60" cy="60" r="52" fill="none" stroke="'+col+'" stroke-width="10" stroke-linecap="round" stroke-dasharray="'+dash+' 326.7"/></svg><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;"><div style="font-size:30px;font-weight:800;color:'+col+';">'+score+'</div><div style="font-size:9px;color:var(--muted);">/ 100</div></div></div>';
   let html=ring+'<div style="text-align:center;font-size:14px;font-weight:800;color:'+col+';margin-bottom:2px;">'+label+'</div>'+
     '<div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:14px;">Callback Readiness for <strong>'+safe+'</strong>'+((corpus&&corpus.matched)?(' · vs '+corpus.matched+' live postings'):'')+'</div>';
-  try{ window._rateMissingTerms=missing.slice(0,8).map(t=>t.term||t); window._rateRole=role; }catch(e){}
+  try{ window._rateMissingTerms=missing.slice(0,8).map(t=>t.term||t); window._rateCoveredTerms=covered.slice(0,10).map(t=>t.term||t); window._rateRole=role; }catch(e){}
   if(missing.length){
     html+='<div style="font-size:11px;font-weight:800;color:var(--cyber);margin-bottom:6px;">🎯 Biggest score gains available</div>';
     html+=missing.slice(0,5).map(t=>'<div style="display:flex;justify-content:space-between;align-items:center;background:var(--plum3);border-radius:9px;padding:9px 12px;margin-bottom:6px;"><span style="font-size:12px;font-weight:600;text-transform:capitalize;">'+t.term.replace(/</g,'')+'</span><span style="font-size:10px;font-weight:800;color:var(--cyber);">'+t.pct+'% of postings</span></div>').join('');
@@ -6153,8 +6170,13 @@ async function jettFullImprove(){
     if(bullets.length){
       let out=bullets;
       if(window.fb&&fb.smartMatch&&aiHourlyAllowed('improve')){
-        const kw=(((window._rateMissingTerms||[]).filter(function(t){ return (typeof _realSkillTerm!=='function')||_realSkillTerm(t); }).slice(0,6).join(' '))||skills);
-        const res=await fb.smartMatch(bullets,kw,true,{avoid:'',jobContext:'GOAL: rewrite EVERY bullet as a strong resume bullet for a '+((recent&&recent.t)||title||'professional')+' — start each with a different action verb, keep every real fact, quantify only where numbers already exist, max ~22 words each. Never invent achievements.'});
+        /* v87: pass covered + missing corpus terms and ORDER the model to keep
+           the covered ones — rewrites were silently dropping terms the score
+           counts, so a genuinely better resume could re-rate LOWER. */
+        const _covered=(window._rateCoveredTerms||[]).filter(function(t){ return (typeof _realSkillTerm!=='function')||_realSkillTerm(t); }).slice(0,8);
+        const _missing=(window._rateMissingTerms||[]).filter(function(t){ return (typeof _realSkillTerm!=='function')||_realSkillTerm(t); }).slice(0,6);
+        const kw=((_missing.concat(_covered).join(' '))||skills);
+        const res=await fb.smartMatch(bullets,kw,true,{avoid:'',jobContext:'GOAL: rewrite EVERY bullet as a strong resume bullet for a '+((recent&&recent.t)||title||'professional')+' — start each with a different action verb, keep every real fact, quantify only where numbers already exist, max ~22 words each. Never invent achievements. NEVER remove numbers.'+(_covered.length?(' PRESERVE these exact terms wherever they already appear: '+_covered.join(', ')+'.'):'')});
         if(res&&Array.isArray(res.finalResume)&&res.finalResume.length){ out=res.finalResume.map(function(x,i){ return String(x||bullets[i]||'').trim(); }); usedAI=true; }
       }
       const perJob={};
@@ -7395,7 +7417,9 @@ function updateStatCounters(){
 function _realTitle(t){ t=String(t||'').trim(); return /^this role$/i.test(t)?'':t; }
 function _realCo(c){ c=String(c||'').trim(); return /^the (hiring )?company$/i.test(c)?'':c; }
 function recordSwipe(dir,job){
-  const rec={t:job.t,co:job.co,ghost:ghostRiskFor(job.co),when:Date.now(),status:null};
+  /* B-SKIP-APPLY (v87): keep the job's url+loc on the row so opening it later
+     from Applied/Skipped can rebuild a fully wired JOB card. */
+  const rec={t:job.t,co:job.co,ghost:ghostRiskFor(job.co),when:Date.now(),status:null,url:job.url||'',loc:job.loc||''};
   if(dir==='right'){
     /* de-dupe Applied too (mirrors the skipped path) so recording an apply from the
        posting button and then a swipe-right can't stack duplicate rows. */
@@ -8542,8 +8566,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v86';
+const APP_VERSION = 'v87';
 const CHANGELOG = {
+  'v87':['v87: (1) YOUR RESUME SCORE IS TRUSTWORTHY NOW. Re-rating used to benchmark against a fresh random sample of postings each time, so the score could drop even after a real improvement — within a session, re-rates now measure against the SAME yardstick, so score changes reflect YOUR resume only. Jett\'s full-resume rewrite is also told to preserve the exact terms your score counts, and junk suggestions like Business / Professional / Process / Internal are gone — only real, resume-worthy skills are suggested. (2) Opening a job from your Applied or Skipped lists now opens the REAL JOB CARD with working Apply, Match to Job and Cover Letter buttons — no more dead generic company panel. Jobs you act on from now on remember their posting link forever.'],
   'v86':['v86: (1) The LAST clipping source is fixed — requirements and benefits sections from older harvests were stored cut mid-word at their caps; every long field now displays trimmed to a clean word with an ellipsis, and future harvests store clean endings for all sections. (2) Faster + cheaper: the deck and Browse now share one cached job pull per session (10-minute freshness window) instead of re-reading thousands of postings on every rebuild — pool switches and filter changes are instant, and our database costs drop sharply. Resetting your cards still forces a completely fresh pull.'],
   'v85':['v85: housekeeping + guarantees. (1) Pressing Enter now submits the sign-in form, and Chrome\'s password-manager warning is gone (the login fields live in a real form now). (2) The in-app posting viewer is properly sandboxed — the browser console warning about iframe escape is resolved. (3) Verified with automated tests that the Browse work-style filter (Remote/Hybrid/On-site) and the minimum-salary slider filter your in-market pool exactly as designed, and that your saved location pre-fills the resume and Browse city/state fields automatically.'],
   'v84':['v84: text never gets cut off anymore. Every popup card now sizes itself to its content — long titles and names wrap in full, and anything taller than the screen scrolls inside the card instead of clipping or spilling offscreen. Location badges on job cards show the whole city name (never a chopped word), and the location pill trims cleanly. Part of our no-incomplete-text standard across the whole app.'],
@@ -10201,10 +10226,46 @@ renderStatList=function(kind){
     const co=(sub.textContent||'').split(' · ')[0].trim();
     if(!co) return;
     name.style.cursor='pointer'; name.style.textDecoration='underline'; name.style.textDecorationColor='rgba(181,95,230,.4)';
-    name.title='Open '+co+' company intel';
-    name.onclick=e=>{ e.stopPropagation(); document.getElementById('stat-modal').classList.remove('open'); openCompanyView(co,{title:name.textContent}); };
+    name.title='Open this job';
+    /* B-SKIP-APPLY (v87): a row opens the REAL JOB CARD (working Apply / Match /
+       Cover — the founder-approved openSavedJobCard reuse pattern) whenever job
+       data survives anywhere; the bare company view is only the last resort. */
+    name.onclick=e=>{
+      e.stopPropagation();
+      const t=(name.textContent||'').trim();
+      if(typeof openStatJobCard==='function' && openStatJobCard(t,co)) return;
+      document.getElementById('stat-modal').classList.remove('open');
+      openCompanyView(co,{title:t});
+    };
   });
 };
+
+/* B-SKIP-APPLY (v87): find a stat row's job anywhere it survives — live pools,
+   deck queues, the raw Browse pool, or the row's own stored url (rows keep
+   url+loc since v87) — normalize into liveJobs and open the REAL job card
+   (openBrowseExpanded), exactly like openSavedJobCard / openRoleFullCard.
+   Returns false when nothing survives, so the caller can fall back. */
+function openStatJobCard(t,co){
+  try{
+    const key=((t||'')+'|'+(co||'')).toLowerCase().replace(/\s+/g,' ').trim();
+    const kOf=function(j){ return (((j.t||j.title||'')+'|'+(j.co||j.company||'')).toLowerCase().replace(/\s+/g,' ').trim()); };
+    let j=null;
+    [(typeof liveJobs!=='undefined'?liveJobs:[]),(typeof jobsQueue!=='undefined'?jobsQueue:[]),(typeof rawQueue!=='undefined'?rawQueue:[])].some(function(arr){ j=(arr||[]).find(function(x){ return kOf(x)===key; })||null; return !!j; });
+    if(!j && typeof _browseRawPool!=='undefined'){ const r=(_browseRawPool||[]).find(function(x){ return kOf(x)===key; }); if(r) j=mapFirestoreJob(r); }
+    if(!j){
+      const rec=[].concat(lists.applied||[],lists.skipped||[],lists.responses||[]).find(function(r){ return (((r.t||'')+'|'+(r.co||'')).toLowerCase().replace(/\s+/g,' ').trim())===key; });
+      if(rec && rec.url) j={t:rec.t||t,co:rec.co||co,url:rec.url,loc:rec.loc||'',desc:'',req:'',benefits:'',summary:'',sal:'',ghost:(typeof ghostRiskFor==='function'?ghostRiskFor(co):null),match:0,posting_age_days:null};
+    }
+    if(j && typeof liveJobs!=='undefined' && Array.isArray(liveJobs) && typeof openBrowseExpanded==='function'){
+      let idx=liveJobs.findIndex(function(x){ return kOf(x)===key; });
+      if(idx<0){ liveJobs.push(j); idx=liveJobs.length-1; }
+      try{ const sm=document.getElementById('stat-modal'); if(sm) sm.classList.remove('open'); }catch(e){}
+      openBrowseExpanded(idx);
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
 
 /* ---------- PERSONALIZATION GATING: nothing fake, ever ---------- */
 function gatePersonalized(){

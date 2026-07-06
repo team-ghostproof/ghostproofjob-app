@@ -453,6 +453,60 @@ test.describe('[STATE-COVERAGE] v86 dressing + D1 session cache', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v87 rater trust + B-SKIP-APPLY', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: rater — generic singles rejected, corpus cached across re-rates, covered terms tracked', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      if (!window.fb) return null;
+      const singles = { business: _realSkillTerm('business'), professional: _realSkillTerm('professional'), process: _realSkillTerm('process'), internal: _realSkillTerm('internal') };
+      const phrases = { bd: _realSkillTerm('business development'), dm: _realSkillTerm('digital marketing') };
+      let mined = 0;
+      window._roleCorpusCache = null;
+      fb.mineRoleKeywords = async () => { mined++; return { matched: 9, terms: [{ term: 'digital marketing', pct: 50 }, { term: 'process', pct: 45 }, { term: 'crm', pct: 40 }] }; };
+      fb.mineHires = async () => null;
+      Object.assign(resumeData, { title: 'Marketing Specialist', skills: 'Digital Marketing · Excel', jobs: [{ t: 'Marketing Specialist', c: 'Acme', b: 'Ran digital marketing campaigns end to end' }], summary: 'Marketing person with real campaign experience behind them.' });
+      await rateResume();
+      await rateResume();   /* second rate must hit the session cache */
+      return { singles, phrases, mined, missing: window._rateMissingTerms || [], covered: window._rateCoveredTerms || [] };
+    });
+    test.skip(r === null, 'fb unavailable in this environment');
+    expect(Object.values(r.singles).every((v) => v === false), 'business/professional/process/internal are not skills').toBe(true);
+    expect(r.phrases.bd).toBe(true);
+    expect(r.phrases.dm).toBe(true);
+    expect(r.mined, 'corpus mined ONCE — re-rates reuse the same yardstick').toBe(1);
+    expect(r.missing).toContain('crm');
+    expect(r.missing, 'filtered junk must not be suggested').not.toContain('process');
+    expect(r.covered, 'covered terms tracked for rewrite preservation').toContain('digital marketing');
+  });
+
+  test('Q1+Q4: stat rows open the real JOB card; graceful fallback when nothing survives (B-SKIP-APPLY)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      liveJobs = [{ t: 'Skipped Role', co: 'SkipCo', loc: 'Houston, TX', url: 'https://x.example/s', desc: 'd', summary: 'd', sal: '', ghost: 10, match: 0, posting_age_days: 1 }];
+      const okPool = openStatJobCard('Skipped Role', 'SkipCo');
+      const modalOpen = document.getElementById('browse-expand-modal').classList.contains('open');
+      const body = (document.getElementById('browse-expand-body') || {}).textContent || '';
+      closeBrowseExpanded();
+      liveJobs = []; jobsQueue = []; rawQueue = []; _browseRawPool = [];
+      lists.skipped = [{ t: 'Rec Role', co: 'RecCo', url: 'https://x.example/r', loc: 'Houston, TX', when: Date.now() }];
+      const okRec = openStatJobCard('Rec Role', 'RecCo');
+      const recShown = (document.getElementById('browse-expand-body') || {}).textContent || '';
+      closeBrowseExpanded();
+      const okNone = openStatJobCard('Ghost Role', 'NoCo');
+      return { okPool, modalOpen, hasTitle: body.includes('Skipped Role'), okRec, recShown: recShown.includes('Rec Role'), okNone };
+    });
+    expect(r.okPool).toBe(true);
+    expect(r.modalOpen, 'the real job card modal must open').toBe(true);
+    expect(r.hasTitle).toBe(true);
+    expect(r.okRec, 'a row-stored url rebuilds a wired job card').toBe(true);
+    expect(r.recShown).toBe(true);
+    expect(r.okNone, 'no surviving data → false → caller falls back to company view').toBe(false);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
