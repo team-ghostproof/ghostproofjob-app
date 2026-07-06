@@ -2312,7 +2312,7 @@
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <div><span onclick="goHome()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);">🏠 Home</span> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> · <span onclick="openLegal('security')" style="cursor:pointer;text-decoration:underline;">Security</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v88</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v89</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2781,9 +2781,16 @@ function dressEnd(s,min){
   s=String(s||'');
   /* v88: dress ANYTHING that doesn't end like a finished sentence — the v86
      check required an alphanumeric last char, which let comma-terminated
-     truncations through ("…building a stronger," — founder live repro). */
-  if(s.length>=(min||250) && !/[.!?…)"'\]]\s*$/.test(s.trim())) return cutWords(s, Math.max(1,s.length-1));
-  return s;
+     truncations through ("…building a stronger," — founder live repro).
+     v89: EXCEPT when the text ends on a complete short bullet line — bullet
+     lists legitimately end without punctuation ("• Coached and supported
+     career growth") and must not lose their last word. */
+  if(s.length<(min||250)) return s;
+  const t=s.trim();
+  if(/[.!?…)"'\]]\s*$/.test(t)) return s;
+  const lines=t.split(/\n/); const last=(lines[lines.length-1]||'').trim();
+  if(/^(?:[•\-\*]|\d+[.)])\s+/.test(last) && last.length<=80) return s;
+  return cutWords(s, Math.max(1,s.length-1));
 }
 /* B-TEXT-CLIP (v84): the deck's location badge — remote says Remote; long
    locations show the whole CITY (first comma segment), never a mid-word cut. */
@@ -2893,9 +2900,18 @@ function _aiJobContext(title,co,text){
 /* F-STRUCT (v81, founder-requested): render harvested job text the way the
    SOURCE posting shows it — bullet lines become real bullets, short heading
    lines ("Job Responsibilities", "What's In It For Me?") become bold subheads —
-   instead of one flat pre-wrap blob. Text-level formatting only. */
+   instead of one flat pre-wrap blob. Text-level formatting only.
+   v89 (founder screenshots): sanitize + dress AT RENDER so NO ingest path can
+   ever paint raw markdown or a mid-word cut — live repros showed literal
+   "**We are ERock!**", backslash escapes ("long\-term"), ====== / ------ rule
+   lines rendered as text, and undressed endings ("like a bank wi"). */
 function _fmtJobText(raw){
-  const esc=String(raw||'').replace(/</g,'&lt;');
+  let src=String(raw||'');
+  src=src.replace(/\\([\-.*_#(){}\[\]+])/g,'$1');                         /* un-escape long\-term → long-term */
+  src=src.replace(/\*\*([^*\n]+)\*\*/g,'$1').replace(/\*\*/g,'');         /* strip **bold** markers */
+  src=src.replace(/[=\-_~]{6,}/g,' ');                                    /* kill ===== / ----- rule runs, line or inline */
+  if(typeof dressEnd==='function') src=dressEnd(src,250);                 /* ragged ends dressed at render, every path */
+  const esc=src.replace(/</g,'&lt;');
   if(!esc.trim()) return '';
   const HEADWORD=/^(?:[A-Z][\w&'’()\/-]*|and|of|for|the|in|to|with|it|its|me|you|your|a|an|at|on|we|us|our)$/;
   const lines=esc.split(/\n/);
@@ -8618,8 +8634,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v88';
+const APP_VERSION = 'v89';
 const CHANGELOG = {
+  'v89':['v89: job text is now cleaned at the moment it\'s drawn, so no posting can ever display raw formatting junk again — stray **asterisks**, backslash escapes like long\-term, and ====== / ------ divider lines are stripped, and any description that ends mid-word gets a clean trimmed ending with an ellipsis, no matter where the data came from or when it was harvested. Complete bullet lists keep their last word (they legitimately end without periods).'],
   'v88':['v88: (1) The last clipping shape is gone — postings stored ending mid-sentence with a comma now display trimmed to a clean word with an ellipsis, like everything else. (2) Improve My Whole Resume with Jett is now a true rewrite: Jett is instructed to restructure every sentence from scratch (never just sprinkle keywords), filler skills like Professional or Process are removed automatically (and you are told which), and — most importantly — your ORIGINAL resume is saved to your Tailored Resumes shelf before anything changes, with a one-tap Restore this version button. Experiment freely; you can always go back.'],
   'v87':['v87: (1) YOUR RESUME SCORE IS TRUSTWORTHY NOW. Re-rating used to benchmark against a fresh random sample of postings each time, so the score could drop even after a real improvement — within a session, re-rates now measure against the SAME yardstick, so score changes reflect YOUR resume only. Jett\'s full-resume rewrite is also told to preserve the exact terms your score counts, and junk suggestions like Business / Professional / Process / Internal are gone — only real, resume-worthy skills are suggested. (2) Opening a job from your Applied or Skipped lists now opens the REAL JOB CARD with working Apply, Match to Job and Cover Letter buttons — no more dead generic company panel. Jobs you act on from now on remember their posting link forever.'],
   'v86':['v86: (1) The LAST clipping source is fixed — requirements and benefits sections from older harvests were stored cut mid-word at their caps; every long field now displays trimmed to a clean word with an ellipsis, and future harvests store clean endings for all sections. (2) Faster + cheaper: the deck and Browse now share one cached job pull per session (10-minute freshness window) instead of re-reading thousands of postings on every rebuild — pool switches and filter changes are instant, and our database costs drop sharply. Resetting your cards still forces a completely fresh pull.'],

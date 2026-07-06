@@ -548,6 +548,37 @@ test.describe('[STATE-COVERAGE] v88 comma-dressing + Jett snapshot/tidy', () => 
   });
 });
 
+test.describe('[STATE-COVERAGE] v89 render-layer sanitize + dress', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: _fmtJobText strips raw markdown, drops rule lines, dresses ragged ends (founder repros)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const src = '**We are ERock!** Enchanted Rock has responded to long\\-term trends in electricity by becoming the first smart\\-grid supplier.\n' +
+        '============================\n' +
+        '---------------------- About the Role\n' +
+        'The specialist plays a critical role keeping things running smoothly for customers and internal teams across the enterprise, ' +
+        'focused on account provisioning and clean paperwork, and we operate like a bank wi';
+      const html = _fmtJobText(src);
+      const bullets = _fmtJobText('Benefits we offer include the following list of real perks for everyone on the team all year round and beyond:\n• Robust PTO and Sick Time Plan\n• Coached and supported career growth');
+      return {
+        noBold: !html.includes('**'),
+        unescaped: html.includes('long-term') && !html.includes('long\\-term'),
+        noRuleLines: !/={6,}/.test(html) && !/-{10,}/.test(html),
+        dressed: /\S…</.test(html) && !/bank wi</.test(html),
+        bulletEndKept: bullets.includes('career growth') && !bullets.includes('career…'),
+      };
+    });
+    expect(r.noBold, 'raw **bold** markers must be stripped').toBe(true);
+    expect(r.unescaped, 'backslash escapes must render as plain text').toBe(true);
+    expect(r.noRuleLines, '====== / ------ rule lines must not render').toBe(true);
+    expect(r.dressed, 'mid-word endings dressed at render, any path').toBe(true);
+    expect(r.bulletEndKept, 'a complete final bullet must keep its last word').toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
