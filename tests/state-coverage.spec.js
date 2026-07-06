@@ -579,6 +579,67 @@ test.describe('[STATE-COVERAGE] v89 render-layer sanitize + dress', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v90 requirements check + cap force-dress + admin AI', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: _reqGaps finds degree/years/cert/skill gaps vs the whole resume (F-REQMATCH)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      resumeReady = true;
+      Object.assign(resumeData, { title: 'Accountant', skills: 'Excel · QuickBooks', education: 'Associate degree in Accounting', jobs: [{ t: 'Bookkeeper', c: 'Acme', b: 'Managed monthly close with QuickBooks and Excel' }], summary: 'Bookkeeper with an associate degree.' });
+      const job = { t: 'Senior Accountant', req: "Bachelor's degree required. 5+ years of accounting experience. CPA required. Salesforce experience preferred.", desc: '' };
+      const g = _reqGaps(job);
+      openReqGaps(job);
+      const modalOpen = document.getElementById('match-modal').classList.contains('open');
+      const missHtml = document.getElementById('mi-miss').innerHTML;
+      document.getElementById('match-modal').classList.remove('open');
+      /* Q4: no resume → graceful, no crash, empty gaps */
+      resumeReady = false;
+      const none = _reqGaps(job);
+      resumeReady = true;
+      return { labels: g.gaps.map((x) => x.label), modalOpen, missHasDegree: missHtml.includes('Bachelor'), noneLen: none.gaps.length };
+    });
+    expect(r.labels.join('|')).toContain('Bachelor’s degree');
+    expect(r.labels.join('|')).toContain('Cpa');
+    expect(r.labels.join('|')).toContain('years of experience');
+    expect(r.modalOpen, 'tapping the gap chip opens the requirements check on top (z 356)').toBe(true);
+    expect(r.missHasDegree).toBe(true);
+    expect(r.noneLen, 'no resume → no gaps computed, no crash').toBe(0);
+  });
+
+  test('Q1: fields stored AT a harvester cap are dressed even when ending on a bullet (Lone Star repro)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      let ben = 'Cultural Beliefs\n• One LSC\n• Student Focused\n• Own It\n• Foster Belonging\n• Cultivate Community\n';
+      while (ben.length < 476) ben += '• Padding value line\n';
+      ben += '• Choose Learning The Chr';   /* lands the raw length inside the 450-550 cap window */
+      const j = mapFirestoreJob({ title: 'L', company: 'Co', direct_apply_url: 'https://x.example/l', description: 'Complete description here.', benefits: ben });
+      const short = mapFirestoreJob({ title: 'S', company: 'Co', direct_apply_url: 'https://x.example/s', description: 'Complete.', benefits: '• Robust PTO\n• Coached and supported career growth' });
+      return { capLen: ben.length, dressed: /…$/.test(j.benefits), noChr: !/Chr$/.test(j.benefits), shortKept: /career growth$/.test(short.benefits) };
+    });
+    expect(r.capLen).toBeGreaterThanOrEqual(450);
+    expect(r.dressed, 'cap-length benefits must dress even a bullet ending').toBe(true);
+    expect(r.noChr).toBe(true);
+    expect(r.shortKept, 'short real bullet lists keep their last word').toBe(true);
+  });
+
+  test('Q2: admin accounts get unlimited AI for testing', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const key = aiImproveKey('summary');
+      localStorage.setItem(key, '99');   /* way past the monthly cap */
+      isAdmin = false;
+      const blocked = aiImproveAllowed('summary');
+      isAdmin = true;
+      const allowed = aiImproveAllowed('summary') && aiHourlyAllowed('improve') && isPaid();
+      isAdmin = false; localStorage.removeItem(key);
+      return { blocked, allowed };
+    });
+    expect(r.blocked, 'non-admin past the cap stays blocked').toBe(false);
+    expect(r.allowed, 'admin bypasses monthly + hourly caps').toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
