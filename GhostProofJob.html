@@ -2312,7 +2312,7 @@
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <div><span onclick="goHome()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);">🏠 Home</span> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> · <span onclick="openLegal('security')" style="cursor:pointer;text-decoration:underline;">Security</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v87</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v88</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2779,7 +2779,10 @@ function cutWords(s,n){ s=String(s||''); if(s.length<=n) return s; const c=s.sli
    punctuation-terminated text pass through untouched. */
 function dressEnd(s,min){
   s=String(s||'');
-  if(s.length>=(min||250) && /[A-Za-z0-9]$/.test(s) && !/[.!?…)"'\]]\s*$/.test(s)) return cutWords(s, Math.max(1,s.length-1));
+  /* v88: dress ANYTHING that doesn't end like a finished sentence — the v86
+     check required an alphanumeric last char, which let comma-terminated
+     truncations through ("…building a stronger," — founder live repro). */
+  if(s.length>=(min||250) && !/[.!?…)"'\]]\s*$/.test(s.trim())) return cutWords(s, Math.max(1,s.length-1));
   return s;
 }
 /* B-TEXT-CLIP (v84): the deck's location badge — remote says Remote; long
@@ -6144,6 +6147,10 @@ async function jettFullImprove(){
   }
   const btn=document.getElementById('jett-full-btn');
   if(btn){ btn._t=btn.textContent; btn.textContent='🚀 Rewriting your resume…'; btn.style.pointerEvents='none'; btn.style.opacity='.7'; }
+  /* v88 (founder-directed): snapshot the CURRENT resume onto the saved-resumes
+     shelf BEFORE anything changes — restorable with one tap, synced like the
+     Match-Job copies. */
+  try{ storeResumeSnapshot('My resume — before Jett full rewrite'); }catch(e){}
   const title=(resumeData.title||'').trim();
   const recent=(resumeData.jobs&&resumeData.jobs[0])||null;
   const recentRoles=(resumeData.jobs||[]).filter(j=>j&&j.t&&j.t!=='(role)').slice(0,3).map(j=>j.t+(j.c?(' at '+j.c):'')).join('; ');
@@ -6155,7 +6162,7 @@ async function jettFullImprove(){
     const seed=cur||('Professional with experience as '+(title||recentRoles||'a dedicated team member')+(skills?(', skilled in '+skills):'')+'.');
     let improved=localSummaryRewrite(cur,title,recentRoles,skills,'');
     if(window.fb&&fb.smartMatch&&aiHourlyAllowed('improve')){
-      const res=await fb.smartMatch([seed],[title,recentRoles,skills].filter(Boolean).join(' · '),true,{avoid:cur,jobContext:'GOAL: rewrite into a specific professional summary anchored on the MOST RECENT role ('+((recent&&recent.t)||title||'this profession')+'). Use ONLY facts present in the text. Ban filler like "results-driven", "proven track record", "dynamic professional".'});
+      const res=await fb.smartMatch([seed],[title,recentRoles,skills].filter(Boolean).join(' · '),true,{avoid:cur,jobContext:'GOAL: COMPLETELY REWRITE this professional summary — restructure the sentences from scratch, do NOT just insert or swap keywords. Anchor on the MOST RECENT role ('+((recent&&recent.t)||title||'this profession')+'). Use ONLY facts present in the text; keep every real number. Ban filler like "results-driven", "proven track record", "dynamic professional". It must read like a sharp human wrote it.'});
       if(res&&Array.isArray(res.finalResume)&&res.finalResume[0]){
         const c=String(res.finalResume[0]).trim();
         if(c&&(typeof _materiallyDifferent!=='function'||_materiallyDifferent(c,seed))){ improved=c; usedAI=true; }
@@ -6176,7 +6183,7 @@ async function jettFullImprove(){
         const _covered=(window._rateCoveredTerms||[]).filter(function(t){ return (typeof _realSkillTerm!=='function')||_realSkillTerm(t); }).slice(0,8);
         const _missing=(window._rateMissingTerms||[]).filter(function(t){ return (typeof _realSkillTerm!=='function')||_realSkillTerm(t); }).slice(0,6);
         const kw=((_missing.concat(_covered).join(' '))||skills);
-        const res=await fb.smartMatch(bullets,kw,true,{avoid:'',jobContext:'GOAL: rewrite EVERY bullet as a strong resume bullet for a '+((recent&&recent.t)||title||'professional')+' — start each with a different action verb, keep every real fact, quantify only where numbers already exist, max ~22 words each. Never invent achievements. NEVER remove numbers.'+(_covered.length?(' PRESERVE these exact terms wherever they already appear: '+_covered.join(', ')+'.'):'')});
+        const res=await fb.smartMatch(bullets,kw,true,{avoid:'',jobContext:'GOAL: FULLY REWRITE every bullet for a '+((recent&&recent.t)||title||'professional')+' — restructure each sentence (new verb, tighter phrasing, outcome first where one exists); do NOT just sprinkle keywords into the old wording. Keep every real fact, quantify only where numbers already exist, max ~22 words each. Never invent achievements. NEVER remove numbers.'+(_covered.length?(' PRESERVE these exact terms wherever they already appear: '+_covered.join(', ')+'.'):'')});
         if(res&&Array.isArray(res.finalResume)&&res.finalResume.length){ out=res.finalResume.map(function(x,i){ return String(x||bullets[i]||'').trim(); }); usedAI=true; }
       }
       const perJob={};
@@ -6189,20 +6196,20 @@ async function jettFullImprove(){
       });
     }
   }catch(e){}
-  /* 3) SKILLS tidy — dedupe + capitalize; adds nothing that isn't already real */
+  /* 3) SKILLS — dedupe + capitalize + DROP junk a recruiter would discount
+     (v88: "Professional"/"Process"-grade filler goes; real phrases survive) */
+  let _skillsRemoved=[];
   try{
-    const seen=new Set(); const tidy=[];
-    (resumeData.skills||'').split('·').map(function(s){ return s.trim(); }).filter(Boolean).forEach(function(s){
-      const k=s.toLowerCase(); if(!seen.has(k)){ seen.add(k); tidy.push(s.charAt(0).toUpperCase()+s.slice(1)); }
-    });
-    if(tidy.length) resumeData.skills=tidy.join(' · ');
+    const tidy=_tidySkills(resumeData.skills||'');
+    if(tidy.skills) resumeData.skills=tidy.skills;
+    _skillsRemoved=tidy.removed||[];
   }catch(e){}
   /* counters: 1 Summary + 1 Key-Duties rewrite, ONLY when the AI contributed */
   if(usedAI){ try{ bumpAiImprove('summary'); bumpAiImprove('duties'); bumpAiHour('improve'); }catch(e){} }
   try{ updateJettCounts(); }catch(e){}
   try{ if(typeof saveDraft==='function') saveDraft(); if(typeof updateProgress==='function') updateProgress(); if(typeof cloudSync==='function') cloudSync(); }catch(e){}
   if(btn){ btn.textContent=btn._t||'🚀 Improve My Whole Resume with Jett'; btn.style.pointerEvents='auto'; btn.style.opacity='1'; }
-  showToast(usedAI?'🚀 Full resume rewritten — review each section in the Resume tab and make it yours.':'🚀 Resume strengthened with internal polish — your AI rewrites are untouched.');
+  showToast((usedAI?'🚀 Full resume rewritten — review each section in the Resume tab and make it yours.':'🚀 Resume strengthened with internal polish — your AI rewrites are untouched.')+(_skillsRemoved.length?(' Removed filler skills: '+_skillsRemoved.join(', ')+'.'):'')+' Your previous version is saved under Tailored Resumes (↩ restore anytime).');
   try{ rateResume(); }catch(e){}   /* re-score so the improvement is visible immediately */
 }
 /* Rate-My-Resume → Jett: take the mined "missing" terms and open the same
@@ -6243,6 +6250,47 @@ async function logHireFromResume(title){
   const payload={ roleKey:title.toLowerCase().trim(), titleRaw:title, skills:skills.slice(0,24), region:region, ts:Date.now() };
   try{ if(window.fb&&fb.logHire) await fb.logHire(payload); }catch(e){}
 }
+/* F-JETT-FULL (v88): before Jett's whole-resume rewrite touches anything, the
+   CURRENT resume is snapshotted onto the same shelf as the Match-Job tailored
+   resumes (gpj_optimized — cloud-synced), fully restorable with one tap. */
+function storeResumeSnapshot(label){
+  try{
+    let list=JSON.parse(localStorage.getItem('gpj_optimized')||'[]');
+    list.unshift({title:label||'My resume — before Jett rewrite',co:'Backup',added:[],file:'',when:Date.now(),snapshot:JSON.parse(JSON.stringify(resumeData))});
+    localStorage.setItem('gpj_optimized',JSON.stringify(list.slice(0,30)));
+    try{ gpjSyncArtifact('optimizedResumes'); }catch(e){}
+    try{ renderOptimizedList(); }catch(e){}
+    return true;
+  }catch(e){ return false; }
+}
+function restoreResumeSnapshot(i){
+  try{
+    const list=JSON.parse(localStorage.getItem('gpj_optimized')||'[]');
+    const it=list[i];
+    if(!(it&&it.snapshot)){ showToast('No snapshot stored on that entry.'); return; }
+    if(!confirm('Restore this saved version of your resume?\n\nYour CURRENT resume will be replaced with the "'+(it.title||'saved')+'" version from '+new Date(it.when).toLocaleDateString()+'. Continue?')) return;
+    Object.keys(resumeData).forEach(k=>{ delete resumeData[k]; });
+    Object.assign(resumeData, JSON.parse(JSON.stringify(it.snapshot)));
+    try{ if(typeof saveDraft==='function') saveDraft(); }catch(e){}
+    try{ if(typeof cloudSync==='function') cloudSync(); }catch(e){}
+    showToast('↩ Resume restored — reloading…');
+    setTimeout(function(){ try{ location.reload(); }catch(e){} }, 600);
+  }catch(e){ showToast('Could not restore that version.'); }
+}
+/* v88: skills tidy for the whole-resume rewrite — dedupe, capitalize, and DROP
+   junk entries a recruiter would discount ("Professional", "Process"); real
+   phrases always survive. Returns what was removed so the user is told. */
+function _tidySkills(str){
+  const seen=new Set(); const keep=[]; const removed=[];
+  String(str||'').split('·').map(function(s){ return s.trim(); }).filter(Boolean).forEach(function(s){
+    const k=s.toLowerCase();
+    if(seen.has(k)) return;
+    seen.add(k);
+    if(typeof _realSkillTerm==='function' && !_realSkillTerm(s)){ removed.push(s); return; }
+    keep.push(s.charAt(0).toUpperCase()+s.slice(1));
+  });
+  return {skills:keep.join(' · '), removed:removed};
+}
 /* persist a record of each optimized resume so users can find them on the account page */
 function storeOptimizedResume(title,co,added,fname){
   let list=[]; try{ list=JSON.parse(localStorage.getItem('gpj_optimized')||'[]'); }catch(e){}
@@ -6257,9 +6305,13 @@ function renderOptimizedList(){
   if(!box) return;
   let list=[]; try{ list=JSON.parse(localStorage.getItem('gpj_optimized')||'[]'); }catch(e){}
   if(!list.length){ box.innerHTML='<div style="font-size:12px;color:var(--muted);">Nothing here yet — tailor one from any job card.</div>'; return; }
-  box.innerHTML=list.map(r=>{
+  box.innerHTML=list.map((r,i)=>{
     const d=new Date(r.when); const ds=(d.getMonth()+1)+'/'+d.getDate();
-    return '<div style="background:var(--plum3);border-radius:10px;padding:11px 12px;margin-bottom:8px;"><div style="font-size:13px;font-weight:700;">'+(r.title||'Role').replace(/</g,'')+' — '+(r.co||'Company').replace(/</g,'')+'</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">'+ds+(r.added&&r.added.length?(' · added: '+r.added.join(', ')):'')+'</div><div onclick="downloadResume()" style="margin-top:7px;display:inline-block;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:800;cursor:pointer;">📄 Re-download</div></div>';
+    /* v88: snapshot entries (Jett full-rewrite backups) restore with one tap */
+    const act=r.snapshot
+      ? '<div onclick="restoreResumeSnapshot('+i+')" style="margin-top:7px;display:inline-block;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:800;cursor:pointer;">↩ Restore this version</div>'
+      : '<div onclick="downloadResume()" style="margin-top:7px;display:inline-block;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:800;cursor:pointer;">📄 Re-download</div>';
+    return '<div style="background:var(--plum3);border-radius:10px;padding:11px 12px;margin-bottom:8px;"><div style="font-size:13px;font-weight:700;">'+(r.snapshot?'🛟 ':'')+(r.title||'Role').replace(/</g,'')+' — '+(r.co||'Company').replace(/</g,'')+'</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">'+ds+(r.added&&r.added.length?(' · added: '+r.added.join(', ')):'')+'</div>'+act+'</div>';
   }).join('');
 }
 const communityGhost={'Stripe':12,'Linear':9,'Figma':15,'Amazon':74,'Meta':41,'Chime':18,'Tenet Health':22,'HEB Digital':11,'Favor':31,'HubSpot':14,'Visit Houston':19,'Houston Methodist':8,'ADP':26,'Houston ISD':7,'Sysco':13,'Deloitte':24,'HEB':10,'Baker Botts':17,'Hilton Americas':20,'Bechtel':9,'Target':11,'Starbucks':9,'Accenture':16,'Kelsey-Seybold':12,'Alorica':23,'MD Anderson':10,'Local Foods':18,'Pappadeaux':8,'John Moore Services':9};
@@ -8566,8 +8618,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v87';
+const APP_VERSION = 'v88';
 const CHANGELOG = {
+  'v88':['v88: (1) The last clipping shape is gone — postings stored ending mid-sentence with a comma now display trimmed to a clean word with an ellipsis, like everything else. (2) Improve My Whole Resume with Jett is now a true rewrite: Jett is instructed to restructure every sentence from scratch (never just sprinkle keywords), filler skills like Professional or Process are removed automatically (and you are told which), and — most importantly — your ORIGINAL resume is saved to your Tailored Resumes shelf before anything changes, with a one-tap Restore this version button. Experiment freely; you can always go back.'],
   'v87':['v87: (1) YOUR RESUME SCORE IS TRUSTWORTHY NOW. Re-rating used to benchmark against a fresh random sample of postings each time, so the score could drop even after a real improvement — within a session, re-rates now measure against the SAME yardstick, so score changes reflect YOUR resume only. Jett\'s full-resume rewrite is also told to preserve the exact terms your score counts, and junk suggestions like Business / Professional / Process / Internal are gone — only real, resume-worthy skills are suggested. (2) Opening a job from your Applied or Skipped lists now opens the REAL JOB CARD with working Apply, Match to Job and Cover Letter buttons — no more dead generic company panel. Jobs you act on from now on remember their posting link forever.'],
   'v86':['v86: (1) The LAST clipping source is fixed — requirements and benefits sections from older harvests were stored cut mid-word at their caps; every long field now displays trimmed to a clean word with an ellipsis, and future harvests store clean endings for all sections. (2) Faster + cheaper: the deck and Browse now share one cached job pull per session (10-minute freshness window) instead of re-reading thousands of postings on every rebuild — pool switches and filter changes are instant, and our database costs drop sharply. Resetting your cards still forces a completely fresh pull.'],
   'v85':['v85: housekeeping + guarantees. (1) Pressing Enter now submits the sign-in form, and Chrome\'s password-manager warning is gone (the login fields live in a real form now). (2) The in-app posting viewer is properly sandboxed — the browser console warning about iframe escape is resolved. (3) Verified with automated tests that the Browse work-style filter (Remote/Hybrid/On-site) and the minimum-salary slider filter your in-market pool exactly as designed, and that your saved location pre-fills the resume and Browse city/state fields automatically.'],

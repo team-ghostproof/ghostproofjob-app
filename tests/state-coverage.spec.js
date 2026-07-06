@@ -507,6 +507,47 @@ test.describe('[STATE-COVERAGE] v87 rater trust + B-SKIP-APPLY', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v88 comma-dressing + Jett snapshot/tidy', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: comma-terminated truncations get dressed too (Stantec repro)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const legacy = ('At Stantec we have leading professionals passionate about the work. '.repeat(7) + 'we are building a stronger,').trim();
+      const j = mapFirestoreJob({ title: 'S', company: 'Co', direct_apply_url: 'https://x.example/s', description: legacy });
+      const clean = mapFirestoreJob({ title: 'C', company: 'Co', direct_apply_url: 'https://x.example/c', description: 'This one ends like a finished sentence.' });
+      return { dressed: /\S…$/.test(j.desc), noComma: !/,\s*…?$/.test(j.desc) && !j.desc.endsWith(','), cleanUntouched: clean.desc === 'This one ends like a finished sentence.' };
+    });
+    expect(r.dressed, 'a long desc ending in a comma is a truncation — dress it').toBe(true);
+    expect(r.noComma).toBe(true);
+    expect(r.cleanUntouched).toBe(true);
+  });
+
+  test('Q1: Jett full rewrite snapshots the old resume, restorable; skills tidy drops junk', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      Object.assign(resumeData, { title: 'Marketing Specialist', skills: 'Excel · Professional · Digital Marketing · excel', jobs: [{ t: 'MS', c: 'Acme', b: 'Did things' }], summary: 'A summary.' });
+      localStorage.setItem('gpj_optimized', '[]');
+      const ok = storeResumeSnapshot('My resume — before Jett full rewrite');
+      const list = JSON.parse(localStorage.getItem('gpj_optimized') || '[]');
+      const tidy = _tidySkills(resumeData.skills);
+      return {
+        ok, n: list.length,
+        hasSnapshot: !!(list[0] && list[0].snapshot && list[0].snapshot.title === 'Marketing Specialist'),
+        restoreFn: typeof restoreResumeSnapshot === 'function',
+        tidySkills: tidy.skills, removed: tidy.removed,
+      };
+    });
+    expect(r.ok).toBe(true);
+    expect(r.n).toBe(1);
+    expect(r.hasSnapshot, 'the full resume content must be stored, not just metadata').toBe(true);
+    expect(r.restoreFn).toBe(true);
+    expect(r.tidySkills, 'dedupe + keep real skills').toBe('Excel · Digital Marketing');
+    expect(r.removed, 'junk singles dropped and reported').toEqual(['Professional']);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
