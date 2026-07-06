@@ -685,6 +685,67 @@ test.describe('[STATE-COVERAGE] v91 F-CARD unification', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v92 Jett-does-it + rater accuracy', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: _leadWithVerb guarantees a strong action-verb lead the rater recognizes', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const cases = ['Responsible for customer accounts and renewals', 'Various administrative and scheduling tasks', 'Managing a team of five reps', 'monthly financial reporting for leadership', 'Led onboarding for new hires'];
+      const led = cases.map((c) => _leadWithVerb(c));
+      const allStrong = led.every((b) => _STRONG_VERBS_RX.test(b.replace(/^[•\-\s]+/, '')));
+      return { led, allStrong, noWeakLead: !/^Responsible for|^Various /.test(led.join('|')) };
+    });
+    expect(r.allStrong, 'every rewritten bullet must lead with a rater-recognized strong verb').toBe(true);
+    expect(r.noWeakLead, 'weak "Responsible for" / "Various" leads are replaced').toBe(true);
+    expect(r.led[2]).toMatch(/^Managed /);   /* gerund → past */
+  });
+
+  test('Q1: requirements years reads EXPERIENCE not age (minimum 2, not "16 of age")', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      resumeReady = true;
+      Object.assign(resumeData, { title: 'Pharma Sales', skills: 'Sales', jobs: [{ t: 'Rep', c: 'Acme', b: 'Sold products' }], summary: 'A rep.' });
+      const job = { t: 'Pharmaceutical Sales Specialist', req: 'Minimum 2 years experience required. Must be 16 years of age or older. Valid driver license.', desc: '' };
+      const g = _reqGaps(job);
+      return { labels: g.gaps.map((x) => x.label) };
+    });
+    expect(r.labels.join('|'), 'the 2-year experience requirement is detected').toContain('2+ years of experience');
+    expect(r.labels.join('|'), '"16 years of age" must NOT become an experience gap').not.toContain('16');
+  });
+
+  test('Q1+Q4: skill suggestions reject junk singles; user\'s own unusual skills survive tidy', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      execution: _realSkillTerm('Execution'), time: _realSkillTerm('Time'), build: _realSkillTerm('Build'), services: _realSkillTerm('Services'), service: _realSkillTerm('Service'),
+      excel: _realSkillTerm('Excel'), salesforce: _realSkillTerm('Salesforce'), phrase: _realSkillTerm('Customer Service'),
+      tidy: _tidySkills('Excel · Mixology · Execution · excel'),
+    }));
+    ['execution', 'time', 'build', 'services', 'service'].forEach((k) => expect(r[k], k + ' is not a suggestable skill').toBe(false));
+    expect(r.excel).toBe(true);
+    expect(r.salesforce).toBe(true);
+    expect(r.phrase).toBe(true);
+    expect(r.tidy.skills, 'a real but unusual user skill (Mixology) is kept; junk + dupes dropped').toBe('Excel · Mixology');
+    expect(r.tidy.removed).toEqual(['Execution']);
+  });
+
+  test('Q1: match-insight vs requirements-check show DISTINCT labels', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      resumeReady = true;
+      Object.assign(resumeData, { title: 'Sales', skills: 'Sales · Excel', jobs: [{ t: 'Rep', c: 'Acme', b: 'Sold' }], summary: 'x' });
+      openMatchInsight('Sales Specialist', 56);
+      const mHave = document.getElementById('mi-have-label').textContent;
+      openReqGaps({ t: 'Sales Specialist', req: "Bachelor's degree required.", desc: '' });
+      const rHave = document.getElementById('mi-have-label').textContent, rMiss = document.getElementById('mi-miss-label').textContent;
+      document.getElementById('match-modal').classList.remove('open');
+      return { mHave, rHave, rMiss };
+    });
+    expect(r.mHave).toBe('✅ Your matching strengths');
+    expect(r.rHave, 'requirements mode makes clear the count is requirements, not skills').toBe('✅ Requirements you already meet');
+    expect(r.rMiss).toBe('🎯 Requirements to address');
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);

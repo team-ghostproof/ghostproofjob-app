@@ -1335,9 +1335,9 @@
     <div class="modal-box" style="text-align:left;">
       <div style="display:flex;align-items:flex-start;margin-bottom:4px;"><div style="font-size:15px;font-weight:800;flex:1;overflow-wrap:anywhere;line-height:1.35;padding-right:4px;" id="mi-title">🎯 Why this match</div><div onclick="document.getElementById('match-modal').classList.remove('open')" style="color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;flex-shrink:0;">✕</div></div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px;" id="mi-sub"></div>
-      <div style="font-size:11px;font-weight:700;color:var(--mint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">✅ Your matching strengths</div>
+      <div id="mi-have-label" style="font-size:11px;font-weight:700;color:var(--mint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">✅ Your matching strengths</div>
       <div id="mi-have" style="margin-bottom:12px;"></div>
-      <div style="font-size:11px;font-weight:700;color:var(--warn);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">🎯 Add these to raise it</div>
+      <div id="mi-miss-label" style="font-size:11px;font-weight:700;color:var(--warn);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">🎯 Add these to raise it</div>
       <div id="mi-miss" style="margin-bottom:6px;"></div>
     </div>
   </div>
@@ -2319,7 +2319,7 @@
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <div><span onclick="goHome()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);">🏠 Home</span> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> · <span onclick="openLegal('security')" style="cursor:pointer;text-decoration:underline;">Security</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v91</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v92</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2962,15 +2962,23 @@ function _reqGaps(job){
       if(haveL>=needL) out.met.push(needLabel);
       else out.gaps.push({label:needLabel, note:haveL?('you list: '+haveLabel):'nothing in your Education section yet'});
     }
-    const ym=req.match(/(\d{1,2})\s*\+?\s*years?/);
-    if(ym){
-      const needY=parseInt(ym[1],10);
-      if(needY>1&&needY<=20){
-        const ry=res.match(/(\d{1,2})\s*\+?\s*years?/);
-        const haveY=ry?parseInt(ry[1],10):0;
-        if(haveY>=needY) out.met.push(needY+'+ years experience');
-        else out.gaps.push({label:needY+'+ years of experience', note:haveY?('your resume shows '+haveY):'your resume doesn’t state your years — add them so employers see it'});
-      }
+    /* F-REQMATCH (v92): years-of-experience must be EXPERIENCE, not age.
+       Live repro: a posting requiring "minimum 2 years" showed "16+ years"
+       because the regex grabbed "16 years of age or older". Strip age phrases,
+       then anchor on an experience keyword. */
+    const _stripAge=function(s){ return String(s||'').replace(/\b\d{1,2}\s*\+?\s*years?\s+(?:of\s+)?age\b/g,' ').replace(/\b\d{1,2}\s+years?\s+old\b/g,' ').replace(/\bage\s+of\s+\d{1,2}\b/g,' '); };
+    const reqA=_stripAge(req), resA=_stripAge(res);
+    const _expYears=function(s){
+      const m=s.match(/(?:minimum|min\.?|at least)?\s*(\d{1,2})\s*\+?\s*years?(?:['’]?)?\s*(?:of\s+)?(?:[a-z]+\s+){0,3}(?:experience|exp\b)/);
+      if(m) return parseInt(m[1],10);
+      const g=s.match(/(\d{1,2})\s*\+?\s*years?\b/);   /* fallback: first years mention (age already stripped) */
+      return g?parseInt(g[1],10):0;
+    };
+    const needY=_expYears(reqA);
+    if(needY>1&&needY<=20){
+      const haveY=_expYears(resA);
+      if(haveY>=needY) out.met.push(needY+'+ years experience');
+      else out.gaps.push({label:needY+'+ years of experience', note:haveY?('your resume shows '+haveY):'your resume doesn’t state your years — add them so employers see it'});
     }
     _CERTS.forEach(function(c){
       if(req.indexOf(c)>=0){
@@ -2996,6 +3004,10 @@ function openReqGaps(j){
   const g=_reqGaps(j);
   document.getElementById('mi-title').textContent='📋 Requirements check — '+(j.t||'this role');
   document.getElementById('mi-sub').textContent='Compared against your ENTIRE resume — education, skills, and every job.';
+  /* v92: distinct labels — this modal lists REQUIREMENTS met/missing, not your
+     overall skill list, so "1" here means one requirement met (not a low match). */
+  document.getElementById('mi-have-label').textContent='✅ Requirements you already meet';
+  document.getElementById('mi-miss-label').textContent='🎯 Requirements to address';
   document.getElementById('mi-have').innerHTML=g.met.length?g.met.map(function(m){ return '<span class="skill-chip">'+String(m).replace(/</g,'&lt;')+'</span>'; }).join(''):'<div style="font-size:12px;color:var(--muted);">No matched requirements detected in this posting.</div>';
   document.getElementById('mi-miss').innerHTML=g.gaps.length
     ? g.gaps.map(function(x){ return '<div style="font-size:12px;color:var(--off);background:rgba(255,179,71,.08);border-left:3px solid var(--warn);border-radius:0 8px 8px 0;padding:8px 10px;margin-bottom:6px;line-height:1.5;"><strong>'+String(x.label).replace(/</g,'&lt;')+'</strong> — '+String(x.note).replace(/</g,'&lt;')+'</div>'; }).join('')
@@ -4012,12 +4024,43 @@ async function improveSummary(){
 /* Improve the Key Duties of one employment row. INTERNAL-FIRST: a local bullet
    strengthener always runs and always returns a result; we escalate to the AI only
    within the monthly (2 per section) + hourly budget. Mirrors improveSummary. */
-function localStrengthenBullet(b){
+/* F-RATER (v92): ONE canonical strong-verb list, shared by the rater's
+   "bullets start with a strong action verb" check AND the rewrite engine \u2014 so
+   Jett provably MOVES that checkbox instead of just recommending it. */
+const _STRONG_VERBS=['led','built','drove','grew','managed','created','launched','delivered','improved','reduced','increased','designed','developed','owned','negotiated','trained','implemented','streamlined','coordinated','achieved','generated','expanded','optimized','spearheaded','oversaw','directed','boosted','handled','processed','maintained','supported','resolved','executed','organized','analyzed','produced','established'];
+const _STRONG_VERBS_RX=new RegExp('^(?:'+_STRONG_VERBS.join('|').replace('optimized','optimi').replace('spearheaded','spearhead')+')','i');
+/* present/gerund \u2192 strong past tense, so rephrasing keeps the fact and only
+   sharpens the wording (never invents). */
+const _VERB_MAP={managing:'Managed',manage:'Managed',leading:'Led',lead:'Led',building:'Built',build:'Built',creating:'Created',create:'Created',developing:'Developed',develop:'Developed',coordinating:'Coordinated',coordinate:'Coordinated',supporting:'Supported',support:'Supported',handling:'Handled',handle:'Handled',maintaining:'Maintained',maintain:'Maintained',driving:'Drove',drive:'Drove',growing:'Grew',grow:'Grew',improving:'Improved',improve:'Improved',delivering:'Delivered',deliver:'Delivered',implementing:'Implemented',implement:'Implemented',designing:'Designed',design:'Designed',training:'Trained',train:'Trained',overseeing:'Oversaw',oversee:'Oversaw',directing:'Directed',direct:'Directed',resolving:'Resolved',resolve:'Resolved',processing:'Processed',process:'Processed',generating:'Generated',generate:'Generated',organizing:'Organized',organize:'Organized',analyzing:'Analyzed',analyze:'Analyzed',executing:'Executed',execute:'Executed',producing:'Produced',produce:'Produced',establishing:'Established',establish:'Established',negotiating:'Negotiated',negotiate:'Negotiated',streamlining:'Streamlined',optimizing:'Optimized',expanding:'Expanded',boosting:'Boosted',achieving:'Achieved',performing:'Handled',performed:'Handled',assisting:'Supported',assist:'Supported',providing:'Delivered',provide:'Delivered'};
+function _contentVerb(t){
+  const s=String(t||'').toLowerCase();
+  if(/customer|client|patient|guest|member/.test(s)) return 'Supported';
+  if(/sales|revenue|quota|deal|pipeline|account/.test(s)) return 'Drove';
+  if(/report|data|analy|metric|kpi|dashboard|forecast/.test(s)) return 'Analyzed';
+  if(/team|staff|people|hir|mentor/.test(s)) return 'Led';
+  if(/process|workflow|efficien|operation/.test(s)) return 'Streamlined';
+  if(/project|program|initiative|launch/.test(s)) return 'Led';
+  if(/budget|cost|expense|financ|payroll|invoice/.test(s)) return 'Managed';
+  if(/campaign|market|content|social|brand/.test(s)) return 'Executed';
+  if(/system|software|tool|platform|database/.test(s)) return 'Managed';
+  if(/inventory|supply|logistic|schedul|ship/.test(s)) return 'Coordinated';
+  if(/train|onboard|teach|coach/.test(s)) return 'Trained';
+  return 'Delivered';
+}
+/* guarantee a bullet LEADS with a strong action verb (the rater's exact list) */
+function _leadWithVerb(b){
   let t=String(b||'').replace(/^[\u2022\-\*\s]+/,'').trim();
   if(!t) return t;
-  t=t.replace(/^(responsible for|responsibilities included|duties included|tasked with|helped to|help to|worked on|in charge of|assisted with|assisted in|involved in)\s+/i,'');
-  t=t.charAt(0).toUpperCase()+t.slice(1);
-  return t;
+  t=t.replace(/^(responsible for|responsibilities included|duties included|tasked with|helped to|help to|worked on|in charge of|assisted with|assisted in|involved in|duties:|responsibilities:)\s+/i,'');
+  if(_STRONG_VERBS_RX.test(t)) return t.charAt(0).toUpperCase()+t.slice(1);
+  const first=(t.match(/^([A-Za-z']+)/)||[])[1]||'';
+  const mapped=_VERB_MAP[first.toLowerCase()];
+  if(mapped){ return mapped+t.slice(first.length); }         /* "Managing X" \u2192 "Managed X" */
+  const v=_contentVerb(t);                                    /* noun-led \u2192 prepend a fitting strong verb */
+  return v+' '+t.charAt(0).toLowerCase()+t.slice(1);
+}
+function localStrengthenBullet(b){
+  return _leadWithVerb(b);   /* v92: now guarantees a strong action-verb lead */
 }
 async function improveKeyDuties(ix){
   const ta=document.getElementById('duties-ta-'+ix);
@@ -6009,7 +6052,9 @@ function openMatch2Job(title,co,desc){
   const missing=jobWords.filter(w=>!have.includes(w)).slice(0,12);
   /* keep only the ones that read like real skills/keywords (not generic verbs) */
   const SKILLY=/(management|customer|service|inventory|compliance|training|safety|patient|sales|data|analysis|software|systems|communication|leadership|certified|license|accuracy|scheduling|operations|documentation|insurance|pharmacy|clinical|marketing|campaign|crm|salesforce|excel|project|logistics|account|retail|medication|immuniz|hipaa|osha)/i;
-  const realistic=missing.filter(w=>SKILLY.test(w)).slice(0,6);
+  /* v92: also gate through _realSkillTerm so lone junk ("Services", "Service",
+     "Execution") never appears as a suggested add — SKILLY alone let them in. */
+  const realistic=missing.filter(w=>SKILLY.test(w)&&(typeof _realSkillTerm!=='function'||_realSkillTerm(w))).slice(0,6);
   m2jContext.suggestions=realistic;
   document.getElementById('m2j-role').textContent='For: '+m2jContext.title+' · '+m2jContext.co+'  ·  current match '+pct+'%';
   const body=document.getElementById('m2j-body');
@@ -6140,8 +6185,9 @@ function _ratingStructure(){
   const skills=(me.skills||'').split(/[·,]/).map(x=>x.trim()).filter(Boolean);
   const bullets=[]; (me.jobs||[]).forEach(j=>String(j.b||'').split(/\n/).forEach(b=>{ b=b.trim(); if(b.length>8) bullets.push(b); }));
   const quantified=bullets.filter(b=>/\d|%|\$/.test(b)).length;
-  const VERBS=/^(led|built|drove|grew|managed|created|launched|delivered|improved|reduced|increased|designed|developed|owned|negotiated|trained|implemented|streamlined|coordinated|achieved|generated|expanded|optimi|spearhead|oversaw|directed|boosted|handled|processed|maintained|supported|resolved)/i;
-  const strongStart=bullets.filter(b=>VERBS.test(b.replace(/^[•\-\s]+/,''))).length;
+  /* v92: SAME regex the rewrite engine leads with, so "Improve with Jett"
+     provably checks this box on re-rate (was a separate list that could drift). */
+  const strongStart=bullets.filter(b=>_STRONG_VERBS_RX.test(b.replace(/^[•\-\s]+/,''))).length;
   const items=[]; let pts=0;
   const contact=!!(me.name&&me.contact); if(contact) pts+=8; items.push([contact,'Contact details complete']);
   const hasSummary=!!(me.summary&&me.summary.length>30); if(hasSummary) pts+=5; items.push([hasSummary,'Has a summary / headline']);
@@ -6154,18 +6200,28 @@ function _ratingStructure(){
 /* F-RATER (v83): the corpus miner counts every frequent posting word — but
    "including", "various" etc. are frequent WITHOUT being skills. Never surface
    (or score against) a term a person couldn't genuinely put on a resume. */
-const _SKILL_STOP=/^(including|include|includes|included|various|within|across|according|required|requirements|preferred|ability|abilities|experience|experienced|work|working|works|team|teams|will|must|other|others|ensure|ensures|ensuring|provide|provides|providing|support|supports|supporting|strong|excellent|related|applicable|knowledge|skills|skill|years|year|position|positions|candidate|candidates|company|opportunity|opportunities|benefits|please|apply|applying|using|used|based|well|good|great|high|responsibilities|duties|perform|performs|performing|maintain|maintains|maintaining|assist|assists|assisting|general|daily|weekly|monthly|between|through|throughout|during|additional|things|areas|inside|about|environment|employees|customers|while|where|when|which|every|their|those|being|under|would|should|could|business|professional|professionals|process|processes|internal|external|development|solutions|services|product|products|department|departments|organization|organizations|information|activities|procedures|functions|initiatives|objectives|individuals|effective|successful|proven|dynamic|results|driven|track|record|quality|level|levels|role|roles|needs|goals|tasks|items)$/i;
+const _SKILL_STOP=/^(including|include|includes|included|various|within|across|according|required|requirements|preferred|ability|abilities|experience|experienced|work|working|works|team|teams|will|must|other|others|ensure|ensures|ensuring|provide|provides|providing|support|supports|supporting|strong|excellent|related|applicable|knowledge|skills|skill|years|year|position|positions|candidate|candidates|company|opportunity|opportunities|benefits|please|apply|applying|using|used|based|well|good|great|high|responsibilities|duties|perform|performs|performing|maintain|maintains|maintaining|assist|assists|assisting|general|daily|weekly|monthly|between|through|throughout|during|additional|things|areas|inside|about|environment|employees|customers|while|where|when|which|every|their|those|being|under|would|should|could|business|professional|professionals|process|processes|internal|external|development|solutions|services|product|products|department|departments|organization|organizations|information|activities|procedures|functions|initiatives|objectives|individuals|effective|successful|proven|dynamic|results|driven|track|record|quality|level|levels|role|roles|needs|goals|tasks|items|execution|time|times|build|builds|building|priorities|priority|deliverables|stakeholders|standards|policies|values|mission|vision|culture)$/i;
+/* v92: single-word SUGGESTIONS now need a POSITIVE signal — a stoplist alone is
+   whack-a-mole (live repros kept leaking "Execution", "Time", "Build",
+   "Services"). A lone word must be a KNOWN real skill/tool/domain to be
+   suggested or scored. Multi-word phrases stay specific-by-construction. */
+const _SKILL_OK=new Set(['excel','powerpoint','word','outlook','sharepoint','onedrive','salesforce','hubspot','quickbooks','sap','oracle','netsuite','workday','adp','kronos','tableau','powerbi','looker','sql','python','java','javascript','typescript','html','css','php','ruby','swift','kotlin','photoshop','illustrator','indesign','lightroom','canva','figma','sketch','wordpress','shopify','magento','marketo','mailchimp','klaviyo','zendesk','freshdesk','servicenow','jira','confluence','asana','trello','notion','monday','slack','autocad','solidworks','revit','matlab','sas','spss','stata','git','github','gitlab','aws','azure','gcp','kubernetes','docker','terraform','linux','bilingual','multilingual','spanish','french','mandarin','bookkeeping','accounting','payroll','invoicing','reconciliation','forecasting','budgeting','underwriting','auditing','taxation','recruiting','onboarding','sourcing','scheduling','dispatch','merchandising','purchasing','procurement','logistics','warehousing','inventory','negotiation','prospecting','upselling','telemarketing','copywriting','proofreading','editing','translation','blogging','seo','sem','ppc','crm','erp','saas','analytics','automation','wireframing','prototyping','phlebotomy','venipuncture','triage','charting','coding','billing','credentialing','welding','machining','soldering','plumbing','carpentry','electrical','hvac','forklift','osha','hipaa','cpr','bls','acls','servsafe','notary','cdl','marketing','sales','operations','communications','communication','leadership','management','compliance','documentation','training','mentoring','presentations','reporting','research','testing','debugging','troubleshooting','provisioning','administration','coordination','facilitation','cashiering','bartending','barista','cooking','baking','catering','housekeeping','landscaping','driving','detailing','tutoring','teaching','coaching','counseling','nursing','caregiving','dispatching']);
 function _realSkillTerm(t){
   t=String(t||'').trim();
   if(t.length<3||t.length>40) return false;
   if(/^\d+$/.test(t)) return false;
   const words=t.split(/\s+/);
-  /* v87: MULTI-WORD phrases are specific by construction ("digital marketing",
-     "business development", "process improvement") — they pass. SINGLE generic
-     corporate nouns ("business", "professional", "process", "internal") do not:
-     live repro — all four surfaced as "skills" and even graded the score. */
-  if(words.length>1) return true;
-  return !_SKILL_STOP.test(t);
+  if(words.length>1) return !/^\d/.test(t);           /* phrases are specific — pass unless it's a stray number lead */
+  const w=t.toLowerCase();
+  if(_SKILL_STOP.test(w)) return false;
+  return _SKILL_OK.has(w);                              /* lone word must be a known real skill */
+}
+/* v92: DIFFERENT bar for the user's OWN skills — only drop DEFINITE junk
+   (stoplist singles), never an unusual-but-real skill they typed themselves. */
+function _isJunkSkill(t){
+  t=String(t||'').trim().toLowerCase();
+  if(!t||t.split(/\s+/).length>1) return false;
+  return _SKILL_STOP.test(t);
 }
 async function rateResume(){
   if(!(resumeData&&(resumeData.title||resumeData.skills||(resumeData.jobs&&resumeData.jobs.length)))){
@@ -6222,7 +6278,7 @@ async function rateResume(){
      around the most recent role, tidies skills. Counts against the SAME
      monthly allotment as the section buttons. */
   html+='<div id="jett-full-btn" onclick="jettFullImprove()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);border-radius:10px;padding:12px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;margin-bottom:6px;">🚀 Improve My Whole Resume with Jett</div>'+
-    '<div style="font-size:10px;color:var(--muted);text-align:center;margin-bottom:12px;line-height:1.5;">Reads your whole resume and rewrites the summary + every job’s key duties around your most recent role, plus a skills tidy-up — never invents anything. Counts as 1 Summary + 1 Key-Duties AI rewrite'+(isPaid()?'':(' · '+aiImproveLeft('summary')+' of '+AI_IMPROVE_MONTHLY+' left this month'))+'.</div>';
+    '<div style="font-size:10px;color:var(--muted);text-align:center;margin-bottom:12px;line-height:1.5;">Reads your whole resume and rewrites the summary + every job’s key duties around your most recent role (every bullet re-led with a strong action verb), plus a skills tidy-up — never invents anything. <strong>Real numbers must come from you</strong> — Jett won’t fabricate metrics. Counts as 1 Summary + 1 Key-Duties AI rewrite'+(isPaid()?'':(' · '+aiImproveLeft('summary')+' of '+AI_IMPROVE_MONTHLY+' left this month'))+'.</div>';
   html+='<div style="font-size:11px;font-weight:800;color:var(--mint);margin-bottom:6px;">✅ What’s working</div>';
   html+=st.items.map(it=>'<div style="font-size:11px;color:'+(it[0]?'var(--off)':'var(--muted)')+';margin-bottom:4px;">'+(it[0]?'✅':'⬜')+' '+it[1]+'</div>').join('');
   if(!corpus||!corpus.terms||!corpus.terms.length){
@@ -6297,7 +6353,10 @@ async function jettFullImprove(){
         if(res&&Array.isArray(res.finalResume)&&res.finalResume.length){ out=res.finalResume.map(function(x,i){ return String(x||bullets[i]||'').trim(); }); usedAI=true; }
       }
       const perJob={};
-      out.forEach(function(text,idx){ if(idx<map.length){ const ji=map[idx][0],li=map[idx][1]; (perJob[ji]=perJob[ji]||[])[li]=text; } });
+      /* v92: guarantee every FINAL bullet leads with a strong action verb —
+         whether it came from the AI or the local pass — so the rater's
+         "bullets start with a strong action verb" line actually moves. */
+      out.forEach(function(text,idx){ if(idx<map.length){ const ji=map[idx][0],li=map[idx][1]; (perJob[ji]=perJob[ji]||[])[li]=_leadWithVerb(text); } });
       Object.keys(perJob).forEach(function(ji){
         if(resumeData.jobs[ji]){
           resumeData.jobs[ji].b=perJob[ji].filter(Boolean).join('\n');
@@ -6354,7 +6413,7 @@ async function logHireFromResume(title){
   try{
     const corpus=(window.fb&&fb.mineRoleKeywords)?await fb.mineRoleKeywords(title):null;
     const text=_resumeText();
-    if(corpus&&corpus.terms){ corpus.terms.forEach(t=>{ if(t.pct>=20 && text.indexOf(t.term)>=0 && skills.indexOf(t.term)<0) skills.push(t.term); }); }
+    if(corpus&&corpus.terms){ corpus.terms.forEach(t=>{ if(t.pct>=20 && text.indexOf(t.term)>=0 && skills.indexOf(t.term)<0 && (typeof _realSkillTerm!=='function'||_realSkillTerm(t.term))) skills.push(t.term); }); }   /* v92: no junk into the shared hire pool */
   }catch(e){}
   let region=''; try{ region=((localStorage.getItem('gpj_loc')||'').split(',')[1]||'').trim(); }catch(e){}
   const payload={ roleKey:title.toLowerCase().trim(), titleRaw:title, skills:skills.slice(0,24), region:region, ts:Date.now() };
@@ -6396,7 +6455,9 @@ function _tidySkills(str){
     const k=s.toLowerCase();
     if(seen.has(k)) return;
     seen.add(k);
-    if(typeof _realSkillTerm==='function' && !_realSkillTerm(s)){ removed.push(s); return; }
+    /* v92: use the LENIENT junk check for the user's OWN skills — drop only
+       definite filler, never an unusual-but-real skill they entered. */
+    if(typeof _isJunkSkill==='function' && _isJunkSkill(s)){ removed.push(s); return; }
     keep.push(s.charAt(0).toUpperCase()+s.slice(1));
   });
   return {skills:keep.join(' · '), removed:removed};
@@ -8745,8 +8806,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v91';
+const APP_VERSION = 'v92';
 const CHANGELOG = {
+  'v92':['v92: (1) Improve My Whole Resume with Jett now truly DOES what the rater recommends — every bullet is rewritten to lead with a strong action verb (the exact thing the score checks for), so re-rating actually moves that line up. It also honestly notes that real numbers/metrics must come from you — Jett won\'t fabricate them. (2) Skill suggestions no longer surface junk words like Execution, Time, Build, or Services — single-word suggestions now must be genuine skills; your own unusual real skills are never removed. (3) Requirements Check no longer misreads 16 years of age as 16+ years of experience — it now reads the real experience requirement (e.g. minimum 2 years). (4) The match card and the requirements check now use clearly different labels so the numbers aren\'t confusing — one shows your skills, the other shows requirements met vs missing.'],
   'v91':['v91: ONE CARD DESIGN, EVERYWHERE. The expanded job card now carries the same company intel as the swipe card — Recent Company News links and the Connect with Hiring Team buttons (LinkedIn, X, Glassdoor, website) — and the company profile card mirrors the same sections. On desktop, both the expanded job card and the company card open at the full swipe-card width, so Job Expectations & Summary finally has room to breathe.'],
   'v90':['v90: (1) NEW — Requirements Check: when a posting asks for things your resume doesn\'t show (a Bachelor\'s degree, 5+ years, a CPA, a named skill), the job card now shows a small amber chip next to the match score — tap it and GPJ compares the posting\'s requirements against your ENTIRE resume (education, skills, every job) and lists exactly what\'s missing and what you already cover. The job still shows; now you know what to fix or address in your cover letter. (2) Postings stored exactly at a data cap now trim cleanly even when they end on a bullet (that Choose Learning The Chr card). (3) Admin test accounts now have unlimited AI so features can be fully tested.'],
   'v89':['v89: job text is now cleaned at the moment it\'s drawn, so no posting can ever display raw formatting junk again — stray **asterisks**, backslash escapes like long\-term, and ====== / ------ divider lines are stripped, and any description that ends mid-word gets a clean trimmed ending with an ellipsis, no matter where the data came from or when it was harvested. Complete bullet lists keep their last word (they legitimately end without periods).'],
@@ -11196,6 +11258,9 @@ function openMatchInsight(title,pct,ev){
   if(ev) ev.stopPropagation();
   /* v83 (B-TEXT-CLIP): show the FULL title — the header wraps now, no slicing */
   document.getElementById('mi-title').textContent='🎯 '+(pct?pct+'% match':'Match insight')+' — '+title;
+  /* v92: restore match-mode labels (the shared modal is also used by the
+     requirements check, which relabels them) — this list is YOUR SKILLS. */
+  try{ document.getElementById('mi-have-label').textContent='✅ Your matching strengths'; document.getElementById('mi-miss-label').textContent='🎯 Add these to raise it'; }catch(e){}
   const have=document.getElementById('mi-have'), miss=document.getElementById('mi-miss'), sub=document.getElementById('mi-sub');
   if(!resumeReady){
     sub.textContent='This score is a market estimate. Upload your resume and it recalibrates to your real skills.';
