@@ -640,6 +640,51 @@ test.describe('[STATE-COVERAGE] v90 requirements check + cap force-dress + admin
   });
 });
 
+test.describe('[STATE-COVERAGE] v91 F-CARD unification', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: job card carries Recent Company News + Connect with Hiring Team', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const html = buildBrowseExpanded({ t: 'Unified Role', co: 'Acme Corp', loc: 'Houston, TX', url: 'https://x.example/u', desc: 'A role.', summary: 'A role.', sal: '', ghost: 10, match: 0, posting_age_days: 1 }, 0);
+      return {
+        news: html.includes('RECENT COMPANY NEWS') && html.includes('Latest news about Acme Corp'),
+        hiring: html.includes('hiring &amp; layoff coverage'),
+        connect: html.includes('CONNECT WITH HIRING TEAM'),
+        icons: (html.match(/class="social-icon"/g) || []).length,
+      };
+    });
+    expect(r.news).toBe(true);
+    expect(r.hiring).toBe(true);
+    expect(r.connect).toBe(true);
+    expect(r.icons, 'LinkedIn/X/Glassdoor/Web icons').toBe(4);
+  });
+
+  test('Q1: company card mirrors the sections; desktop width parity 640px', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      openCompanyView('Acme Corp', { title: 'Unified Role', url: 'https://x.example/u', desc: 'A role.' });
+      const links = document.getElementById('cm-links').innerHTML;
+      const open = document.getElementById('company-modal').classList.contains('open');
+      document.body.classList.add('desk');
+      ensureBrowseModal();
+      const jb = document.querySelector('#browse-expand-modal .modal-box');
+      const cb = document.querySelector('#company-modal .modal-box');
+      const wJob = getComputedStyle(jb).maxWidth, wCo = getComputedStyle(cb).maxWidth;
+      document.body.classList.remove('desk');
+      document.getElementById('company-modal').classList.remove('open');
+      return { open, news: links.includes('RECENT COMPANY NEWS'), connect: links.includes('CONNECT WITH HIRING TEAM'), icons: (links.match(/class="social-icon"/g) || []).length, wJob, wCo };
+    });
+    expect(r.open).toBe(true);
+    expect(r.news).toBe(true);
+    expect(r.connect).toBe(true);
+    expect(r.icons).toBe(4);
+    expect(r.wJob, 'expanded job card = swipe-card width on desktop').toBe('640px');
+    expect(r.wCo, 'company card = same width on desktop').toBe('640px');
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
