@@ -155,9 +155,9 @@ test.describe('[STATE-COVERAGE] v78 B-SARATOGA / B-SALARY-CYCLE', () => {
       const raw = [
         { t: 'LOCAL', co: 'C1', location: 'Houston, TX' },
         { t: 'SARATOGA', co: 'C2', location: 'Saratoga Springs, NY' },
-        { t: 'REMOTE', co: 'C3', location: 'New York, NY', is_remote: true },
+        { t: 'REMOTE', co: 'C3', location: 'New York, NY', is_remote: true, desc: 'Fully remote, work from home anywhere in the US.' },   /* v95: genuine remote needs confirmation */
         { t: 'GBREMOTE', co: 'C5', location: 'Remote, GB', is_remote: true },   /* v80: foreign remote */
-        { t: 'INDIANA', co: 'C6', location: 'Indianapolis, IN', is_remote: true },  /* IN must NOT read as India */
+        { t: 'INDIANA', co: 'C6', location: 'Indianapolis, IN', is_remote: true, desc: 'Fully remote, work from home.' },  /* IN must NOT read as India; v95: genuine remote confirmed */
         { t: 'FAKEHYBRID', co: 'C7', location: 'Tucson, AZ', is_remote: true, description: 'Hybrid work schedule (must be local to Tucson, AZ)' },  /* v81: fake remote */
       ];
       const scoped = _scopeBrowsePool(raw, loc).map((j) => j.t);
@@ -215,7 +215,7 @@ test.describe('[STATE-COVERAGE] v79 other-regions control', () => {
         { title: 'Local Role', company: 'C1', location: 'Houston, TX', direct_apply_url: 'https://x.example/1' },
         { title: 'Dallas Role', company: 'C2', location: 'Dallas, TX', direct_apply_url: 'https://x.example/2' },
         { title: 'Boise Role', company: 'C3', location: 'Boise, ID', direct_apply_url: 'https://x.example/3' },
-        { title: 'Remote Role', company: 'C4', location: 'New York, NY', is_remote: true, direct_apply_url: 'https://x.example/4' },
+        { title: 'Remote Role', company: 'C4', location: 'New York, NY', is_remote: true, description: 'Fully remote, work from home anywhere in the US.', direct_apply_url: 'https://x.example/4' },   /* v95: genuine remote needs confirmation */
       ];
       _browseLastLoc = resolveLocation('Houston, TX'); _browseScope = 'market';
       window._browseOwnsLive = true; _browsePoolKey = '(all)';
@@ -877,6 +877,49 @@ test.describe('[STATE-COVERAGE] v94 F-REVIEW unified review flow', () => {
     expect(r2.secondCo, 'skipping advances to the next company').toBe('Fresh Co Two');
     expect(r2.skippedNotSaved, 'a skipped company is not saved').toBe(true);
     expect(r2.secondSaved).toBe(5);
+  });
+});
+
+test.describe('[STATE-COVERAGE] v95 city-anchored fake-remote', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: city-anchored "remote" needs positive confirmation; genuine remote still passes (IDIQ repro)', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      idiq: _gpjEffectiveRemote({ location: 'Temecula, CA', is_remote: true, work_setting: 'Remote', description: 'IDIQ is an award-winning company looking for talented individuals to join the team. We are passionate about supporting your career goals.' }),
+      genuineCity: _gpjEffectiveRemote({ location: 'Austin, TX', is_remote: true, description: 'This is a fully remote position — work from home anywhere in the US.' }),
+      countryLevel: _gpjEffectiveRemote({ location: 'United States', is_remote: true, description: 'generic blurb' }),
+      locSaysRemote: _gpjEffectiveRemote({ location: 'Remote', is_remote: true }),
+      foreign: _gpjEffectiveRemote({ location: 'Remote, GB', is_remote: true }),
+      hybridText: _gpjEffectiveRemote({ location: 'Tucson, AZ', is_remote: true, description: 'Hybrid work schedule (must be local to Tucson, AZ)' }),
+    }));
+    expect(r.idiq, 'city-anchored remote flag with no confirming text is NOT trusted').toBe(false);
+    expect(r.genuineCity, 'city HQ + "fully remote / work from home" text IS trusted').toBe(true);
+    expect(r.countryLevel).toBe(true);
+    expect(r.locSaysRemote).toBe(true);
+    expect(r.foreign).toBe(false);
+    expect(r.hybridText).toBe(false);
+  });
+
+  test('Q1: the IDIQ-style job is excluded from a Houston pool; genuine remote included', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      _browseScope = 'market';
+      const loc = resolveLocation('Houston, TX');
+      const raw = [
+        { title: 'HOU Role', company: 'A', location: 'Houston, TX', direct_apply_url: 'https://x.example/1' },
+        { title: 'IDIQ Marketing Manager', company: 'IDIQ', location: 'Temecula, CA', is_remote: true, work_setting: 'Remote', description: 'IDIQ is an award-winning company. We provide award-winning services and a positive work environment.', direct_apply_url: 'https://x.example/2' },
+        { title: 'True Remote', company: 'C', location: 'Denver, CO', is_remote: true, description: 'Fully remote, work from home anywhere in the US.', direct_apply_url: 'https://x.example/3' },
+      ];
+      const scoped = _scopeBrowsePool(raw, loc).map((j) => j.title);
+      const badge = mapFirestoreJob(raw[1]);   /* IDIQ mapped: work_setting must not read Remote */
+      return { scoped, idiqWs: badge.work_setting };
+    });
+    expect(r.scoped, 'the metro job stays').toContain('HOU Role');
+    expect(r.scoped, 'genuinely-remote job stays').toContain('True Remote');
+    expect(r.scoped, 'city-anchored fake-remote (IDIQ/Temecula) is EXCLUDED from a Houston pool').not.toContain('IDIQ Marketing Manager');
+    expect(r.idiqWs, 'IDIQ no longer displays as Remote').not.toBe('Remote');
   });
 });
 

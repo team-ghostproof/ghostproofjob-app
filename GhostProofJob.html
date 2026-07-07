@@ -2322,7 +2322,7 @@
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <div><span onclick="goHome()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);">🏠 Home</span> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> · <span onclick="openLegal('security')" style="cursor:pointer;text-decoration:underline;">Security</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v94</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v95</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2881,7 +2881,16 @@ function mapFirestoreJob(r){
     stale:_stale,
     jtype:(typeof jobTypeTag==='function'?jobTypeTag(r):''),
     job_type:(r.job_type||'').toLowerCase(),
-    work_setting:(function(){ const ws=r.work_setting||(r.is_remote?'Remote':''); return (ws==='Remote'&&typeof _gpjHybridText==='function'&&_gpjHybridText(r))?'Hybrid':ws; })(),   /* v81: body contradicts "Remote" => Hybrid */
+    work_setting:(function(){
+      const ws=r.work_setting||(r.is_remote?'Remote':'');
+      /* v95: a "Remote" label we can't confirm (city-anchored, no remote text)
+         must not display as Remote — show Hybrid if the body says so, else drop
+         to '' so the badge shows the real city. Keeps display + scoping honest. */
+      if(ws==='Remote' && typeof _gpjEffectiveRemote==='function' && !_gpjEffectiveRemote(r)){
+        return (typeof _gpjHybridText==='function' && _gpjHybridText(r)) ? 'Hybrid' : '';
+      }
+      return ws;
+    })(),
     last_ping_status:'ok'
   };
 }
@@ -2918,9 +2927,29 @@ function _gpjHybridText(v){
   const t=(String((v&&(v.description||v.desc))||'')+' '+String((v&&(v.requirements||v.req))||'')).slice(0,4000);
   return /\bhybrid\b|must be local|must reside|\bin[- ]office\b/i.test(t);
 }
+/* B-FAKE-REMOTE (v95): the body POSITIVELY confirms remote work. Used to trust a
+   remote flag on a job that's anchored to a specific CITY (see below). */
+function _gpjPositiveRemote(v){
+  const t=(String((v&&(v.description||v.desc))||'')+' '+String((v&&(v.requirements||v.req))||'')+' '+String((v&&v.work_setting)||'')).slice(0,4000);
+  return /\b(fully remote|100%\s*remote|work[\s-]?from[\s-]?home|\bwfh\b|telecommut|remote[\s-]first|work anywhere|anywhere in the|remote position|remote role|remote opportunity|home[\s-]based|virtual position)\b/i.test(t);
+}
+/* B-FAKE-REMOTE (v95, founder live repro): IDIQ was flagged is_remote:true but
+   LinkedIn's structured field said HYBRID · Temecula, CA, and the harvested body
+   was a generic company blurb (no "hybrid"/"remote" text for v81 to catch). Rule:
+   a job anchored to a SPECIFIC city ("Temecula, CA") that claims remote must
+   POSITIVELY confirm it in the text — otherwise a wrong source flag leaks an
+   out-of-market job into the deck. Country-level / "Remote"-in-location jobs are
+   trusted as before. */
 function _gpjEffectiveRemote(v){
-  const isR=(v&&v.is_remote===true) || /\bremote\b/i.test(String((v&&v.work_setting)||'')+' '+String((v&&(v.location||v.loc))||''));
-  return isR && !_gpjForeignRemote(v) && !_gpjHybridText(v);
+  if(!v) return false;
+  if(_gpjForeignRemote(v)||_gpjHybridText(v)) return false;
+  const loc=String(v.location||v.loc||'').trim();
+  const flagged=(v.is_remote===true) || /\bremote\b/i.test(String(v.work_setting||'')+' '+loc);
+  if(!flagged) return false;
+  if(/\bremote\b/i.test(loc)) return true;                                   /* location literally says Remote */
+  if(/^(united states|usa|u\.?s\.?a?\.?|anywhere|nationwide|remote)$/i.test(loc)) return true;  /* country-level */
+  if(/,\s*[A-Z]{2}\b/.test(loc)) return _gpjPositiveRemote(v);               /* City, ST anchored → must confirm */
+  return true;                                                              /* non-city location + flag → trust */
 }
 /* F-AI (v82): ONE rich job-context builder for every smart-match call. The
    near-identical-across-roles outputs happened because the model barely saw
@@ -5808,7 +5837,16 @@ async function _fetchLiveMarketJobs(){
       posting_age_days:jobAgeDays(r),
     jtype:(typeof jobTypeTag==='function'?jobTypeTag(r):''),
       job_type:(r.job_type||'').toLowerCase(),
-      work_setting:(function(){ const ws=r.work_setting||(r.is_remote?'Remote':''); return (ws==='Remote'&&typeof _gpjHybridText==='function'&&_gpjHybridText(r))?'Hybrid':ws; })(),   /* v81: body contradicts "Remote" => Hybrid */
+      work_setting:(function(){
+      const ws=r.work_setting||(r.is_remote?'Remote':'');
+      /* v95: a "Remote" label we can't confirm (city-anchored, no remote text)
+         must not display as Remote — show Hybrid if the body says so, else drop
+         to '' so the badge shows the real city. Keeps display + scoping honest. */
+      if(ws==='Remote' && typeof _gpjEffectiveRemote==='function' && !_gpjEffectiveRemote(r)){
+        return (typeof _gpjHybridText==='function' && _gpjHybridText(r)) ? 'Hybrid' : '';
+      }
+      return ws;
+    })(),
       last_ping_status:'ok'
     }));
     /* DATA METADATA: stale postings (90+ days) get high-risk ghost flags */
@@ -8841,8 +8879,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v94';
+const APP_VERSION = 'v95';
 const CHANGELOG = {
+  'v95':['v95: closed a location loophole — some jobs were slipping into your deck labeled Remote when they\'re actually hybrid or on-site in a specific city (a Temecula, CA marketing job that LinkedIn itself lists as Hybrid). Now, when a job is tied to a specific city but claims remote, we require the posting to actually confirm remote work (fully remote, work from home, etc.) before trusting it — otherwise it\'s treated as local to that city and kept out of your market. Genuinely remote roles (nationwide, work-from-home, or Remote-listed) are unaffected.'],
   'v94':['v94: ONE review flow everywhere (F-REVIEW). Rating a company — from a job card, a company profile, or the prompt after you import your resume/past jobs — now uses the same modal: tap to set stars, add an optional comment the community sees, submit. The old separate stars-only past-jobs prompt is gone; every rating is now saved and can carry your notes. Cancel on the past-jobs prompt simply skips to the next company.'],
   'v93':['v93: (1) Job cards no longer clip mid-word on bullet lists either — a bullet that was cut off (like Compensation: Commi) now trims to a clean ellipsis, while complete short bullets (One LSC, Own It, career growth) keep every word. (2) Requirements Check now reads your EDUCATION — if a job needs a Bachelor\'s and you have an Associate (or nothing listed), it correctly flags the gap and names what you have; it also reads the requirement wherever it appears in the posting, and recognizes more ways degrees are written (BA/BS, MBA, 4-year degree, undergraduate). (3) Verified end-to-end that location + resume + remote matching still holds: your deck and Browse show your metro and genuine remote roles only, and never widen to other cities until you choose to.'],
   'v92':['v92: (1) Improve My Whole Resume with Jett now truly DOES what the rater recommends — every bullet is rewritten to lead with a strong action verb (the exact thing the score checks for), so re-rating actually moves that line up. It also honestly notes that real numbers/metrics must come from you — Jett won\'t fabricate them. (2) Skill suggestions no longer surface junk words like Execution, Time, Build, or Services — single-word suggestions now must be genuine skills; your own unusual real skills are never removed. (3) Requirements Check no longer misreads 16 years of age as 16+ years of experience — it now reads the real experience requirement (e.g. minimum 2 years). (4) The match card and the requirements check now use clearly different labels so the numbers aren\'t confusing — one shows your skills, the other shows requirements met vs missing.'],
