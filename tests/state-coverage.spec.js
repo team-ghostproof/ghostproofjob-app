@@ -746,6 +746,79 @@ test.describe('[STATE-COVERAGE] v92 Jett-does-it + rater accuracy', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v93 clip fragments + req education + location no-regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: truncated final BULLET is dressed; complete short bullets survive (Compensation: Commi)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const words = {
+        Commi: _looksCompleteWord('Commi'), Chr: _looksCompleteWord('Chr'), backu: _looksCompleteWord('backu'),
+        It: _looksCompleteWord('It'), LSC: _looksCompleteWord('LSC'), growth: _looksCompleteWord('growth'),
+        Focused: _looksCompleteWord('Focused'), Community: _looksCompleteWord('Community'), Own: _looksCompleteWord('Own'),
+      };
+      const trunc = ('Details of the role and the day to day work you will own here. '.repeat(5) + '\n• Position Type: 1099 Independent Contractor\n• Compensation: Commi').trim();
+      const complete = ('Here is what this team genuinely offers everyone who joins us for the long haul. '.repeat(4) + '\n• Robust PTO\n• Coached and supported career growth').trim();
+      return {
+        words,
+        truncDressed: /…$/.test(dressEnd(trunc, 250)) && !/Commi$/.test(dressEnd(trunc, 250)),
+        completeKept: /career growth$/.test(dressEnd(complete, 250)),
+      };
+    });
+    expect(r.words.Commi, 'Commi is a fragment').toBe(false);
+    expect(r.words.Chr).toBe(false);
+    expect(r.words.backu).toBe(false);
+    expect(r.words.It).toBe(true);
+    expect(r.words.LSC).toBe(true);
+    expect(r.words.growth).toBe(true);
+    expect(r.words.Focused).toBe(true);
+    expect(r.words.Community).toBe(true);
+    expect(r.words.Own).toBe(true);
+    expect(r.truncDressed, 'a bullet ending mid-word gets dressed').toBe(true);
+    expect(r.completeKept, 'a complete final bullet keeps its last word').toBe(true);
+  });
+
+  test('Q1: Requirements Check sees education — Bachelor gap for an Associate-holder (Strategic Sourcing repro)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      resumeReady = true;
+      Object.keys(resumeData).forEach((k) => { delete resumeData[k]; });
+      Object.assign(resumeData, { title: 'Sourcing', skills: 'Procurement', edu: 'Associate of Arts, Business — Houston CC', jobs: [{ t: 'Buyer', c: 'Acme', b: 'Handled procurement' }], summary: 'A buyer.' });
+      const rt = _resumeText();
+      /* degree requirement lives in the DESC (not req) — must still be found */
+      const job = { t: 'Strategic Sourcing Specialist', req: '', desc: "Qualifications: Bachelor's degree in Supply Chain, Engineering, Business, Operations, or related field. 2-5 years of experience.", summary: 'Summary sourcing role.' };
+      const g = _reqGaps(job);
+      const degGap = g.gaps.find((x) => /Bachelor/.test(x.label));
+      return { eduInText: rt.includes('associate'), labels: g.gaps.map((x) => x.label), degNote: degGap ? degGap.note : '' };
+    });
+    expect(r.eduInText, 'resume text now includes the Education field').toBe(true);
+    expect(r.labels.join('|'), 'Bachelor requirement detected even when it lives in the description').toContain('Bachelor’s degree');
+    expect(r.degNote, 'the note reflects what the user actually has').toContain('Associate');
+  });
+
+  test('Q1: LOCATION no-regression — local + remote only, other-city on-site out, no auto-widen', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      _browseScope = 'market';
+      const loc = resolveLocation('Houston, TX');
+      const raw = [
+        { t: 'HOU', co: 'A', location: 'Houston, TX' },
+        { t: 'REMOTE_US', co: 'C', location: 'United States', is_remote: true },
+        { t: 'NY_ONSITE', co: 'D', location: 'New York, NY' },
+        { t: 'REMOTE_GB', co: 'E', location: 'Remote, GB', is_remote: true },
+      ];
+      const scoped = _scopeBrowsePool(raw, loc).map((j) => j.t);
+      const scopeUnchanged = _browseScope === 'market';   /* scoping must NOT widen on its own */
+      return { scoped, scopeUnchanged };
+    });
+    expect(r.scoped, 'metro job included').toContain('HOU');
+    expect(r.scoped, 'genuine US remote included').toContain('REMOTE_US');
+    expect(r.scoped, 'other-city on-site EXCLUDED until user widens').not.toContain('NY_ONSITE');
+    expect(r.scoped, 'foreign remote excluded').not.toContain('REMOTE_GB');
+    expect(r.scopeUnchanged, 'the deck/Browse scope never widens without an explicit tap').toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
