@@ -923,6 +923,55 @@ test.describe('[STATE-COVERAGE] v95 city-anchored fake-remote', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v96 match-insight truth', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: matching strengths reflect THIS posting, not the user\'s top skills echoed everywhere', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      resumeReady = true;
+      Object.keys(resumeData).forEach((k) => { delete resumeData[k]; });
+      Object.assign(resumeData, { title: 'Marketing Specialist', skills: 'Photoshop · Excel · Sales · HubSpot', jobs: [{ t: 'Account Manager', c: 'Acme', b: 'Ran campaigns and managed client accounts' }], summary: 'Marketing and account pro.' });
+
+      /* water/wastewater ops job — NONE of the user's skills apply */
+      const waterJob = { t: 'Operations Specialist', req: 'Extensive experience in water and wastewater process operations. Upper-level licensing. AAS in Water Quality. Minimum 15 years.', desc: 'Provides facility optimization services and process troubleshooting.', summary: '' };
+      openMatchInsight('Operations Specialist', 47, null, waterJob);
+      const waterHave = document.getElementById('mi-have').innerHTML;
+
+      /* marketing job — the user's skills genuinely appear */
+      const mktJob = { t: 'Marketing Manager', req: 'Proficiency in Excel. Sales enablement.', desc: 'Photoshop and social media campaigns; HubSpot CRM.', summary: '' };
+      openMatchInsight('Marketing Manager', 88, null, mktJob);
+      const mktHave = document.getElementById('mi-have').innerHTML;
+      document.getElementById('match-modal').classList.remove('open');
+
+      return {
+        waterHonest: /None of your listed skills/.test(waterHave),
+        waterNoPhotoshop: !/Photoshop/.test(waterHave),
+        mktShowsReal: /Photoshop/.test(mktHave) && /Excel/.test(mktHave) && /Sales/.test(mktHave),
+      };
+    });
+    expect(r.waterHonest, 'a stretch job honestly says no skills overlap — not a fake Photoshop chip').toBe(true);
+    expect(r.waterNoPhotoshop, 'Photoshop must NOT show for a water/wastewater job').toBe(true);
+    expect(r.mktShowsReal, 'skills that genuinely appear in the posting DO show').toBe(true);
+  });
+
+  test('Q1: gaps are the posting\'s real missing terms, not a generic template', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      resumeReady = true;
+      Object.keys(resumeData).forEach((k) => { delete resumeData[k]; });
+      Object.assign(resumeData, { title: 'Marketing Specialist', skills: 'Photoshop · Excel', jobs: [{ t: 'Coordinator', c: 'Acme', b: 'Marketing tasks' }], summary: 'x' });
+      const job = { t: 'Operations Specialist', req: 'Requires water and wastewater treatment plant operation, regulatory compliance, and supervisory experience.', desc: '', summary: '' };
+      openMatchInsight('Operations Specialist', 47, null, job);
+      const miss = (document.getElementById('mi-miss').textContent || '').toLowerCase();
+      document.getElementById('match-modal').classList.remove('open');
+      return { mentionsDomain: /wastewater|water|treatment|compliance|supervis|regulatory/.test(miss) };
+    });
+    expect(r.mentionsDomain, 'the gaps name the posting\'s real domain terms the user lacks').toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
