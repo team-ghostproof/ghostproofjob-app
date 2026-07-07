@@ -819,6 +819,67 @@ test.describe('[STATE-COVERAGE] v93 clip fragments + req education + location no
   });
 });
 
+test.describe('[STATE-COVERAGE] v94 F-REVIEW unified review flow', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: vibe modal picks stars, requires a choice, persists rating + comment', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_corate', '{}'); localStorage.setItem('gpj_vibe_reviews', '{}');
+      _vibeQueue = []; _vibeQueueIdx = 0;
+      openVibeReview('Acme Reviews Co', 0);
+      const litBefore = [...document.getElementById('vibe-review-stars').children].filter((s) => s.style.color.includes('warn')).length;
+      submitVibeReview();                                   /* 0 stars → must be rejected */
+      const savedAfterEmpty = localStorage.getItem('gpj_corate');
+      setVibeStars(4);
+      const litAfter = [...document.getElementById('vibe-review-stars').children].filter((s) => s.style.color.includes('warn')).length;
+      document.getElementById('vibe-review-text').value = 'Responsive recruiter, clear process.';
+      submitVibeReview();
+      const rate = JSON.parse(localStorage.getItem('gpj_corate') || '{}');
+      const rev = JSON.parse(localStorage.getItem('gpj_vibe_reviews') || '{}');
+      return { litBefore, rejectedEmpty: savedAfterEmpty === '{}', litAfter, stars: rate['Acme Reviews Co'], note: (rev['Acme Reviews Co'] || [{}])[0].note };
+    });
+    expect(r.litBefore, 'no stars preselected when opened fresh').toBe(0);
+    expect(r.rejectedEmpty, 'submitting with 0 stars saves nothing').toBe(true);
+    expect(r.litAfter).toBe(4);
+    expect(r.stars).toBe(4);
+    expect(r.note).toContain('Responsive recruiter');
+  });
+
+  test('Q1: past-jobs prompt runs through the SAME modal; queue skips rated + advances', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.requireSignIn = () => true;   /* exercising queue logic, not the auth gate */
+      localStorage.setItem('gpj_corate', JSON.stringify({ 'Already Rated Inc': 5 }));
+      _vibeQueue = []; _vibeQueueIdx = 0;
+      startRateExLoop(['Already Rated Inc', 'Fresh Co One', 'Fresh Co Two']);
+      return { queue: _vibeQueue.slice(), skippedRated: !_vibeQueue.includes('Already Rated Inc') };
+    });
+    expect(r.skippedRated, 'already-rated companies are not re-prompted').toBe(true);
+    expect(r.queue).toEqual(['Fresh Co One', 'Fresh Co Two']);
+
+    // advancing: cancel (skip) the first, submit the second
+    const r2 = await page.evaluate(async () => {
+      await new Promise((res) => setTimeout(res, 1000));   /* the 900ms open timer */
+      const firstCo = document.getElementById('vibe-review-co').textContent;
+      const cancelLabel = document.getElementById('vibe-review-cancel').textContent;
+      cancelVibeReview();                                   /* skip Fresh Co One */
+      await new Promise((res) => setTimeout(res, 500));
+      const secondCo = document.getElementById('vibe-review-co').textContent;
+      setVibeStars(5); submitVibeReview();
+      await new Promise((res) => setTimeout(res, 200));
+      const rate = JSON.parse(localStorage.getItem('gpj_corate') || '{}');
+      return { firstCo, cancelLabel, secondCo, skippedNotSaved: !rate['Fresh Co One'], secondSaved: rate['Fresh Co Two'] };
+    });
+    expect(r2.cancelLabel, 'in the queue, Cancel reads "Skip"').toBe('Skip');
+    expect(r2.firstCo).toBe('Fresh Co One');
+    expect(r2.secondCo, 'skipping advances to the next company').toBe('Fresh Co Two');
+    expect(r2.skippedNotSaved, 'a skipped company is not saved').toBe(true);
+    expect(r2.secondSaved).toBe(5);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);

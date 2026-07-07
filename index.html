@@ -1136,11 +1136,14 @@
     <div class="modal-box" style="text-align:left;">
       <div style="display:flex;align-items:center;margin-bottom:4px;"><div style="font-size:15px;font-weight:800;flex:1;">⭐ Rate the Vibe</div><div onclick="cancelVibeReview()" style="color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;">✕</div></div>
       <div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Anonymous. Your honest take powers the community Vibe Score for <span id="vibe-review-co" style="color:var(--mint);font-weight:800;"></span>. Helps every hunter behind you.</div>
-      <div id="vibe-review-stars" style="font-size:26px;color:var(--warn);text-align:center;margin-bottom:10px;">★★★★☆</div>
+      <!-- F-REVIEW (v94): interactive stars so this ONE modal is a complete
+           review (pick + comment + submit) — every rating entry point now uses
+           it, incl. the past-jobs prompt that used a separate stars-only modal. -->
+      <div id="vibe-review-stars" class="star-rater" style="font-size:30px;justify-content:center;gap:4px;margin-bottom:10px;"><span onclick="setVibeStars(1)" style="cursor:pointer;color:var(--plum4);">★</span><span onclick="setVibeStars(2)" style="cursor:pointer;color:var(--plum4);">★</span><span onclick="setVibeStars(3)" style="cursor:pointer;color:var(--plum4);">★</span><span onclick="setVibeStars(4)" style="cursor:pointer;color:var(--plum4);">★</span><span onclick="setVibeStars(5)" style="cursor:pointer;color:var(--plum4);">★</span></div>
       <div style="font-size:11px;font-weight:700;color:var(--off);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">What was the vibe like? (visible to the community)</div>
       <textarea id="vibe-review-text" rows="4" placeholder="e.g. responsive recruiter, clear process, respectful interviews — or the opposite." style="width:100%;background:var(--plum3);border:1px solid var(--plum4);border-radius:10px;padding:10px;color:var(--off);font-size:12px;resize:vertical;margin-bottom:12px;box-sizing:border-box;"></textarea>
       <div style="display:flex;gap:8px;">
-        <div onclick="cancelVibeReview()" style="flex:1;background:var(--plum3);border:1px solid var(--plum4);color:var(--muted);border-radius:10px;padding:11px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;">Cancel</div>
+        <div id="vibe-review-cancel" onclick="cancelVibeReview()" style="flex:1;background:var(--plum3);border:1px solid var(--plum4);color:var(--muted);border-radius:10px;padding:11px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;">Cancel</div>
         <div onclick="submitVibeReview()" style="flex:2;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);border-radius:10px;padding:11px;text-align:center;font-size:13px;font-weight:800;cursor:pointer;">⭐ Submit Vibe Rating</div>
       </div>
     </div>
@@ -2319,7 +2322,7 @@
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <div><span onclick="goHome()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);">🏠 Home</span> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> · <span onclick="openLegal('security')" style="cursor:pointer;text-decoration:underline;">Security</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v93</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v94</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -7258,32 +7261,21 @@ function applyRealParse(text){
 }
 
 /* ---------- RATE YOUR EX LOOP ---------- */
-let rateExQueue=[], rateExIdx=0;
+/* F-REVIEW (v94): the past-jobs rating prompt now runs through the SAME
+   vibe-review modal every other rating uses (stars + comment + persisted +
+   cancel-to-skip) instead of the old stars-only, non-persisting rate-ex modal.
+   One review flow everywhere. Only prompts for companies not already rated. */
 function startRateExLoop(companies){
   if(!requireSignIn('rate companies and contribute to the community')) return;
-  rateExQueue=companies; rateExIdx=0;
-  setTimeout(showNextRateEx,900);
+  let rated={}; try{ rated=(typeof ratedCompanies==='function')?ratedCompanies():JSON.parse(localStorage.getItem('gpj_corate')||'{}'); }catch(e){}
+  const todo=[...new Set((companies||[]).filter(Boolean))].filter(c=>!rated[c]);
+  if(!todo.length) return;
+  _vibeQueue=todo; _vibeQueueIdx=0;
+  setTimeout(()=>{ try{ openVibeReview(_vibeQueue[0],0); }catch(e){} },900);
 }
-function showNextRateEx(){
-  if(rateExIdx>=rateExQueue.length){
-    document.getElementById('rate-ex-modal').classList.remove('open');
-    showToast('💚 Ratings logged — the ecosystem thanks you');
-    return;
-  }
-  document.getElementById('rate-ex-name').textContent=rateExQueue[rateExIdx];
-  const stars=[...document.getElementById('rate-ex-stars').querySelectorAll('span')];
-  stars.forEach(s=>s.style.color='var(--plum4)');
-  stars.forEach((s,i)=>{
-    s.onclick=()=>{
-      stars.forEach((x,j)=>x.style.color=j<=i?'var(--mint)':'var(--plum4)');
-      showToast('⭐ '+(i+1)+'/5 for '+rateExQueue[rateExIdx]);
-      rateExIdx++;
-      setTimeout(showNextRateEx,650);
-    };
-  });
-  document.getElementById('rate-ex-modal').classList.add('open');
-}
-function skipRateEx(){ rateExIdx++; showNextRateEx(); }
+/* legacy shims — kept so any old caller/handler resolves (insert-only) */
+function showNextRateEx(){ if(_vibeQueue.length&&_vibeQueueIdx<_vibeQueue.length) openVibeReview(_vibeQueue[_vibeQueueIdx],0); }
+function skipRateEx(){ if(typeof cancelVibeReview==='function') cancelVibeReview(); }
 
 /* ---------- PRIVACY VAULT: PERMANENT PURGE ---------- */
 async function purgeProfile(){
@@ -8849,8 +8841,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v93';
+const APP_VERSION = 'v94';
 const CHANGELOG = {
+  'v94':['v94: ONE review flow everywhere (F-REVIEW). Rating a company — from a job card, a company profile, or the prompt after you import your resume/past jobs — now uses the same modal: tap to set stars, add an optional comment the community sees, submit. The old separate stars-only past-jobs prompt is gone; every rating is now saved and can carry your notes. Cancel on the past-jobs prompt simply skips to the next company.'],
   'v93':['v93: (1) Job cards no longer clip mid-word on bullet lists either — a bullet that was cut off (like Compensation: Commi) now trims to a clean ellipsis, while complete short bullets (One LSC, Own It, career growth) keep every word. (2) Requirements Check now reads your EDUCATION — if a job needs a Bachelor\'s and you have an Associate (or nothing listed), it correctly flags the gap and names what you have; it also reads the requirement wherever it appears in the posting, and recognizes more ways degrees are written (BA/BS, MBA, 4-year degree, undergraduate). (3) Verified end-to-end that location + resume + remote matching still holds: your deck and Browse show your metro and genuine remote roles only, and never widen to other cities until you choose to.'],
   'v92':['v92: (1) Improve My Whole Resume with Jett now truly DOES what the rater recommends — every bullet is rewritten to lead with a strong action verb (the exact thing the score checks for), so re-rating actually moves that line up. It also honestly notes that real numbers/metrics must come from you — Jett won\'t fabricate them. (2) Skill suggestions no longer surface junk words like Execution, Time, Build, or Services — single-word suggestions now must be genuine skills; your own unusual real skills are never removed. (3) Requirements Check no longer misreads 16 years of age as 16+ years of experience — it now reads the real experience requirement (e.g. minimum 2 years). (4) The match card and the requirements check now use clearly different labels so the numbers aren\'t confusing — one shows your skills, the other shows requirements met vs missing.'],
   'v91':['v91: ONE CARD DESIGN, EVERYWHERE. The expanded job card now carries the same company intel as the swipe card — Recent Company News links and the Connect with Hiring Team buttons (LinkedIn, X, Glassdoor, website) — and the company profile card mirrors the same sections. On desktop, both the expanded job card and the company card open at the full swipe-card width, so Job Expectations & Summary finally has room to breathe.'],
@@ -11018,17 +11011,38 @@ function bindCmRate(co){
 /* vibe review modal — mirrors the ghost-report flow, but for the star/vibe rating.
    Cancel REMOVES the rating (doesn't just dismiss). */
 let _vibePending={co:'',stars:0};
+let _vibeQueue=[], _vibeQueueIdx=0;   /* F-REVIEW (v94): past-jobs prompt runs through this same modal */
+/* paint the interactive star row to reflect the current selection */
+function _paintVibeStars(n){
+  const st=document.getElementById('vibe-review-stars'); if(!st) return;
+  [...st.children].forEach((s,i)=>{ s.style.color=i<n?'var(--warn)':'var(--plum4)'; });
+}
+function setVibeStars(n){ _vibePending.stars=n; _paintVibeStars(n); }
 function openVibeReview(co, stars){
-  _vibePending={co:co,stars:stars};
+  _vibePending={co:co,stars:stars||0};
   const m=document.getElementById('vibe-review-modal'); if(!m) return;
   const nm=document.getElementById('vibe-review-co'); if(nm) nm.textContent=co;
-  const st=document.getElementById('vibe-review-stars'); if(st) st.textContent='★'.repeat(stars)+'☆'.repeat(5-stars);
+  _paintVibeStars(stars||0);
   const ta=document.getElementById('vibe-review-text'); if(ta) ta.value='';
+  /* in the past-jobs queue, Cancel means "skip this one" (nothing was set yet) */
+  const cx=document.getElementById('vibe-review-cancel');
+  if(cx) cx.textContent=(_vibeQueue.length && _vibeQueueIdx<_vibeQueue.length)?'Skip':'Cancel';
   m.classList.add('open');
+}
+/* advance the past-jobs queue (if one is running) after a submit/skip */
+function _vibeAdvance(){
+  if(_vibeQueue.length && _vibeQueueIdx<_vibeQueue.length){
+    _vibeQueueIdx++;
+    if(_vibeQueueIdx<_vibeQueue.length){ setTimeout(()=>openVibeReview(_vibeQueue[_vibeQueueIdx],0),350); return true; }
+    _vibeQueue=[]; _vibeQueueIdx=0;
+    try{ showToast('💚 Thanks for rating — the ecosystem thanks you'); }catch(e){}
+  }
+  return false;
 }
 function submitVibeReview(){
   const {co,stars}=_vibePending;
   if(!co){ return; }
+  if(!stars){ try{ showToast('Tap a star to set your rating first'); }catch(e){} return; }   /* F-REVIEW (v94): interactive picker requires a choice */
   let ratings={}; try{ratings=JSON.parse(localStorage.getItem('gpj_corate')||'{}');}catch(e){}
   /* once-only guard: if somehow already rated, block a second submission */
   if(ratings[co] && _vibePending._fromLocked){ document.getElementById('vibe-review-modal').classList.remove('open'); return; }
@@ -11047,9 +11061,19 @@ function submitVibeReview(){
   document.querySelectorAll('.star-rater[data-co]').forEach(r=>{ if((r.dataset.co||'')===co){ r.dataset.bound=''; } });
   try{ bindStarRaters(); }catch(e){}
   showToast('⭐ '+stars+'/5 logged for '+co+' — thank you for helping the community');
+  _vibePending={co:'',stars:0};
+  _vibeAdvance();   /* F-REVIEW (v94): continue the past-jobs queue if one is running */
 }
 function cancelVibeReview(){
-  /* Cancel = REMOVE the rating entirely (like cancelling a ghost report) */
+  /* F-REVIEW (v94): in the past-jobs QUEUE, Cancel means "skip this one" — nothing
+     was set yet, so don't show "rating removed"; just advance to the next. */
+  if(_vibeQueue.length && _vibeQueueIdx<_vibeQueue.length){
+    _vibePending={co:'',stars:0};
+    document.getElementById('vibe-review-modal').classList.remove('open');
+    if(!_vibeAdvance()){ /* queue done */ }
+    return;
+  }
+  /* Otherwise Cancel = REMOVE the rating entirely (like cancelling a ghost report) */
   const {co}=_vibePending;
   if(co){
     let ratings={}; try{ratings=JSON.parse(localStorage.getItem('gpj_corate')||'{}');}catch(e){}
