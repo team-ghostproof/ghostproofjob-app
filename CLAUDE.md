@@ -2,7 +2,7 @@
 
 > Operating manual for any Claude (Claude Code or chat) working on GhostProofJob.
 > Read this fully before making changes. The rules here are non-negotiable.
-> **Current build: v74** (B-DECK-POOL + B-THISROLE; live location confirm pending).
+> **Current build: v98** (candidate-side; confirmed benchmark, Playwright 126/126). Recruiter tier R0 (backend/schema/tests) is scaffolded — see `docs/recruiter-tier.md` + `docs/R0-report.md`; no recruiter app code shipped yet.
 
 ---
 
@@ -151,6 +151,10 @@ Mission: surface *verified* roles, flag likely "ghost jobs," and tailor résumé
 - **v72** — B1 role-first tagging in `searchRankJobs` (in-field gate + tier→infield→score); drawer collapse-on-advance (removed leftover `#card-drawer.open`).
 - **v73** — B1 real fix at the deck's final sort (`applySwipeFilters.sorters.match` leads in-field then match); remote jobs ALWAYS included in the deck; "View Full Posting" records to Applied (deduped) + advances.
 - **v74** — B-DECK-POOL (deck pulls wide + scopes client-side by location text — the same catchment Browse has used since v61 — so broad-region local roles finally enter the deck); B-THISROLE (real titles carried through applyTopJob→applyVia→sandbox; `_realTitle`/`_realCo` strip display placeholders at every Applied/Skipped/Responses write; one-time phantom-row cleanup in `archiveSweep`; grammatical cover-letter fallbacks; stat-row title fallback).
+- **v75–v79** — v75 confirm-only apply (View Full Posting no longer auto-records; only "Done—I Applied") + B-DEMO-FLAG (sign-in gated reports, placeholder-report scrub) + B-DESC-CUT (word-boundary dressing) + B-OPENCARD; v76 B-DECK-POOL merge + B-THISROLE finish; v77 [STATE-COVERAGE] test suite; v78 B-SARATOGA market hard-scope + B-SALARY-CYCLE; v79 "other regions" pill (Browse) + deck same-state rung.
+- **v80–v85** — v80 region+wide pool MERGE + iOS update probe + foreign-remote guard; v81 fake-remote (hybrid) demotion + F-STRUCT structured cards + What's-New auth-race fix; v82 AI labeled job context; v83 scroll-region fix + match-insight z + rater stopword gate + F-JETT-FULL (whole-résumé improve); v84 B-TEXT-CLIP (dynamic popups, whole-city badges); v85 B2/B3/B5 verified + B7 console warnings (auth `<form>`, sandbox `allow-same-origin` dropped).
+- **v86–v92** — v86 B-DESC-CUT final (requirements dressing) + D1 phase 1 (fetchJobs session cache); v87 rater trust (stable corpus yardstick, keyword preservation) + B-SKIP-APPLY core; v88 comma-dressing + Jett true-rewrite + pre-rewrite résumé snapshot; v89 render-layer sanitize (strip raw markdown); v90 F-REQMATCH (Requirements Check) + admin unlimited AI; v91 F-CARD unification; v92 Jett verb engine + junk-skill whitelist + years-vs-age.
+- **v93–v98** — v93 bullet-fragment clipping + Requirements-Check reads education + location no-regression; v94 F-REVIEW unified review flow; v95 city-anchored fake-remote loophole (IDIQ/Temecula); v96 MATCH-TRUTH (match modal shows real overlap, not echoed skills) + iOS PWA auto-update + admin popup — **CONFIRMED benchmark**; v97 Sprint R-pre (harvester boilerplate-strip + generous ceilings, F-ADDR toggles, review dedup, Max-Distance removal + F-GEO, self-test fix); v98 R-pre live fixes (apply-flow z-index above job card, F-ADDR City/State extraction + export). **Recruiter tier R0** = backend rules + emulator test suite + in-repo reverse-match scorer + scaffolding (no app code).
 
 ---
 

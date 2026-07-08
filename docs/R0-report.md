@@ -73,7 +73,7 @@ Per `recruiter-tier.md` §2. Collision check performed against live collections 
 
 Complete `rules_version='2'` file committed at repo root. Enforces every §3 invariant: recruiters read applications/recommended_candidates **only for jobs they own** (via a single `get()` on the parent job — recruiter path only, never the candidate hot path); recruiters **never** read raw `profiles`; recruiter-visible candidate data flows through the backend-written `candidate_cards` projection; `recommended_candidates`/`candidate_cards`/`match_tokens`/`notifications`-inbound are `allow write:if false`; a recruiter cannot self-flip `isValidated`/`plan`; `jobs` writes scoped so a recruiter touches only their own `source:'internal'` job and harvested jobs stay untouchable; `appeals` admin-only.
 
-> **Base-against-live caveat (honest):** the repo had no `firestore.rules`, so this file is reconstructed from the collections the app actually uses + the recruiter additions. **Diff it against the live console rules before publishing** — do not blind-overwrite.
+> **RECONCILED vs live (2026-07-06):** the founder provided the live console rules; `firestore.rules` is now their EXACT current blocks + insert-only recruiter additions. Two flagged reconciliations: **(A)** live `jobs` was `write:if false` → changed to a scoped write (admin, or recruiter on their own `source:'internal'` job; harvested untouchable) — required by the tier. **(B)** the pasted live rules nested `keyword_templates`/`ai_sentence_cache`/`user_usage`/`hired` INSIDE the `bugReports` block (a brace slip) → restored to top level where the live comment intends. ⚠️ **Verify live `hired` writes currently succeed** — if they don't, the live rules have that same nesting bug (the app guards `fb.logHire` in try/catch, so a denial is silent).
 
 ### Rules test matrix (`tests/rules/firestore-rules.test.mjs`, `@firebase/rules-unit-testing` + emulator)
 Proves, among 20 cases: recruiter ✅ own-job apps / ❌ other recruiter's apps / ❌ any raw profile / ✅ own recommended_candidates / ❌ other's; candidate ✅ own app+profile / ❌ another's; ❌ client writes to recommended_candidates / candidate_cards / match_tokens; ❌ recruiter self-flip isValidated; jobs write-scope (own internal ✅, spoofed owner ❌, harvested ❌, guest ❌, public read ✅); appeals admin-only.
@@ -113,10 +113,10 @@ Architectural rule adopted: **the reverse-match scorer is in-repo, pure, and uni
 
 ---
 
-## Open questions for the founder
-1. **Apply the `CLAUDE.md` refresh** now (doc-only) or hold?
-2. **`gpj_optimized` `jobId` keying** — approve the small candidate-side addition (R2) so "résumé for THIS job" works? Without it, the recruiter sees the latest variant for `(company, role)`, not the exact job.
-3. **Provide the live console rules** so I can diff before we ever publish `firestore.rules`.
-4. Confirm the `isAdmin()` email list in the rules (`asosa@`, `ksosa@ghostproofjob.com`) is complete.
+## Founder decisions (RESOLVED 2026-07-06)
+1. ✅ CLAUDE.md refresh — **applied** (build → v98, v75–v98 history, recruiter pointer).
+2. ✅ `gpj_optimized` `jobId` keying — **approved**; lands R2 with internal-apply (candidate-side, additive, zero hot-path read cost).
+3. ✅ Live console rules provided — `firestore.rules` reconciled to them (see §4).
+4. ✅ Admin emails (`asosa@`, `ksosa@ghostproofjob.com`) confirmed complete.
 
-**STOP — awaiting approval before any recruiter feature code in `index.html`.**
+**R0 foundation complete and approved. Next: R1 (dual-role onboarding + domain-email verification + `isValidated` gate + admin verify queue + the recruiter auth harness that activates the authed-recruiter test quadrant). R1 has `[UI-REVIEW]` items — I will propose each before writing that code.**
