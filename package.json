@@ -12,7 +12,7 @@
     "test:smoke": "playwright test smoke",
     "screenshots": "playwright test screenshots",
     "report": "playwright show-report",
-    "test:match": "node --test tests/match/reverseMatch.test.mjs",
+    "test:match": "node --test tests/match/reverseMatch.test.mjs tests/recruiter/domainCheck.test.mjs",
     "test:rules": "firebase emulators:exec --only firestore \"node --test tests/rules/firestore-rules.test.mjs\""
   },
   "dependencies": {

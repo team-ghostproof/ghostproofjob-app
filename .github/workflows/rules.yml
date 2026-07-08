@@ -12,7 +12,9 @@ on:
       - 'firebase.json'
       - 'tests/rules/**'
       - 'tests/match/**'
+      - 'tests/recruiter/**'
       - 'api/match/**'
+      - 'api/recruiter/**'
       - '.github/workflows/rules.yml'
   pull_request:
   workflow_dispatch:
@@ -36,7 +38,7 @@ jobs:
       - name: Install deps
         run: npm install
 
-      - name: Reverse-match unit tests (no emulator)
+      - name: Backend unit tests — reverse-match + recruiter domain-check (no emulator)
         run: npm run test:match
 
       - name: Rules isolation tests (Firestore emulator)
