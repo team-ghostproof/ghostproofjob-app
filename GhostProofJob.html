@@ -1193,11 +1193,13 @@
       <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📡 Open Roles <span id="cm-jobs-status" style="font-weight:400;text-transform:none;"></span></div>
       <div style="max-height:200px;min-height:64px;overflow-y:auto;margin-bottom:10px;-webkit-overflow-scrolling:touch;" id="cm-jobs"></div>
       <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;" id="cm-links"></div>
+      <!-- F-REVIEW (v97): the duplicate inline "Rate:" star row was removed — the
+           top Vibe stars + the "Rate this company" button inside the reviews panel
+           are the single rating path now (both route through the vibe-review flow). -->
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;background:var(--plum3);border-radius:10px;padding:8px 10px;">
         <div id="cm-save" onclick="toggleSaveCompany()" style="font-size:12px;font-weight:800;color:var(--cyber);cursor:pointer;">🔖 Save Company</div>
         <div style="flex:1;"></div>
-        <div style="font-size:11px;color:var(--muted);">Rate:</div>
-        <div class="star-rater" id="cm-rate" style="display:flex;gap:2px;"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></div>
+        <div onclick="openCmReviews()" style="font-size:11px;font-weight:700;color:var(--cyber);cursor:pointer;">⭐ Rate / see reviews</div>
       </div>
       <div id="cm-reviews" style="display:none;max-height:170px;overflow-y:auto;margin-bottom:10px;"></div>
       <div onclick="prefillGhostReport()" style="background:rgba(181,95,230,.12);border:1px dashed rgba(181,95,230,.4);color:var(--cyber);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:700;cursor:pointer;">👻 Report this company</div>
@@ -1643,8 +1645,10 @@
         <div class="toggle-row" style="margin-bottom:8px;"><div style="font-size:13px;font-weight:600;">💰 Only show jobs with posted salary</div><div class="toggle-switch" id="f-hassal" onclick="this.classList.toggle('on');livePage=1;refreshBrowse()"></div></div>
         <div class="field-label">Min Salary: <span id="f-sal-out" style="color:var(--mint);">Any</span></div>
         <input type="range" class="range-input" id="f-salary" min="0" max="250" step="5" value="0" oninput="livePage=1;refreshBrowse()"/>
-        <div class="field-label" style="margin-top:8px;">Max Distance: <span id="f-dist-out" style="color:var(--cyber);">50 mi</span> <span id="loc-status" style="color:var(--warn);font-weight:400;text-transform:none;">(set location in ⚙️ Settings)</span></div>
-        <input type="range" class="range-input" id="f-dist" min="5" max="100" step="5" value="50" oninput="refreshBrowse()"/>
+        <!-- F-GEO (v97): Max Distance slider REMOVED — live job docs carry no
+             coordinates, so it could never filter by distance (dead/misleading
+             control). Re-added in a later candidate version once F-GEO lands
+             lat/long on user+job docs (bundled US city-centroid table + haversine). -->
       </div>
       <div id="browse-results"></div>
     </div>
@@ -2164,6 +2168,11 @@
         <div class="field-label">Address</div>
         <input class="field-input" id="acc-address" name="street-address" autocomplete="street-address" placeholder="Street, City, State, ZIP" style="margin-bottom:4px;font-size:13px;" oninput="harvestProfileDebounced('acc')"/>
         <div style="font-size:10px;color:var(--muted);">Used to pre-fill applications. Never sold or shared. Edit anytime.</div>
+        <!-- F-ADDR (v97): show-address on résumé (default OFF) + full vs City, State.
+             Both feed resumeData.contact, which every résumé template AND the PDF
+             export already render — so no template surgery, export stays intact. -->
+        <div style="display:flex;align-items:center;gap:8px;margin:8px 0 6px;"><div style="flex:1;font-size:11px;color:var(--muted);">Show address on my résumé</div><div class="toggle-switch" id="addr-on-resume-toggle" onclick="toggleAddressOnResume(this)"></div></div>
+        <div style="display:flex;align-items:center;gap:8px;margin:-2px 0 10px;"><div style="flex:1;font-size:11px;color:var(--muted);">Full street address <span style="color:var(--plum4);">(off = City, State only)</span></div><div class="toggle-switch" id="addr-full-toggle" onclick="toggleAddressFull(this)"></div></div>
         <div onclick="saveAccountManual()" style="margin-top:12px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:11px;font-size:13px;cursor:pointer;text-align:center;">💾 Save Account Info</div>
       </div>
 
@@ -2322,7 +2331,7 @@
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <div><span onclick="goHome()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);">🏠 Home</span> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> · <span onclick="openLegal('security')" style="cursor:pointer;text-decoration:underline;">Security</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v96</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v97</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2869,12 +2878,15 @@ function mapFirestoreJob(r){
        clipping"). dressEnd trims any long field that ends without terminal
        punctuation to a whole word + …; summary derives from dressed sources. */
     desc:(function(){
-      const s=cutWords(_desc.replace(/<[^>]+>/g,' ').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim(),4000);
+      /* v97: display caps sit ABOVE the harvester ceilings (desc 10k / req 3.5k /
+         benefits 2k) so stored text is NEVER re-truncated at render; View Full
+         Posting covers any rare overflow tail. */
+      const s=cutWords(_desc.replace(/<[^>]+>/g,' ').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim(),11000);
       return dressEnd(s,300,_capD);
     })(),
-    req:dressEnd(cutWords(_req.replace(/<[^>]+>/g,' ').trim(),2000),250,_capR),
-    benefits:dressEnd(cutWords(_ben,1200),200,_capB),
-    summary:dressEnd((((_req&&_req.length>20)?_req:_desc).replace(/<[^>]+>/g,' ').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim()),250,((_req&&_req.length>20)?_capR:_capD)),
+    req:dressEnd(cutWords(_req.replace(/<[^>]+>/g,' ').trim(),4000),250,_capR),
+    benefits:dressEnd(cutWords(_ben,2500),200,_capB),
+    summary:cutWords(dressEnd((((_req&&_req.length>20)?_req:_desc).replace(/<[^>]+>/g,' ').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim()),250,((_req&&_req.length>20)?_capR:_capD)),11000),
     ghost:Math.min(95, ghostRiskFor(co)+(_stale?15:0)),
     match:(typeof computeMatch==='function'?computeMatch(r.title||'',_desc||r.description||r.desc||''):0),
     posting_age_days:_age,
@@ -3307,7 +3319,7 @@ function buildBrowseExpanded(j,i){
     /* B-DESC-CUT (v77): this render had its OWN hard 2400 slice \u2014 the last clip
        site (found by the [STATE-COVERAGE] Q1 test). Word-boundary cut at 4000,
        above the harvester's 3500 max, so the job card never clips real data. */
-    (summary?('<div style="margin-top:14px;"><div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-bottom:5px;">\ud83d\udcc4 JOB EXPECTATIONS &amp; SUMMARY</div><div class="desc-scroll" style="font-size:12px;color:var(--off);line-height:1.55;max-height:280px;overflow-y:auto;">'+(typeof _fmtJobText==='function'?_fmtJobText(typeof cutWords==='function'?cutWords(summary,4000):summary):dt(summary))+'</div></div>'):'')+
+    (summary?('<div style="margin-top:14px;"><div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-bottom:5px;">\ud83d\udcc4 JOB EXPECTATIONS &amp; SUMMARY</div><div class="desc-scroll" style="font-size:12px;color:var(--off);line-height:1.55;max-height:280px;overflow-y:auto;">'+(typeof _fmtJobText==='function'?_fmtJobText(typeof cutWords==='function'?cutWords(summary,11000):summary):dt(summary))+'</div></div>'):'')+
     /* F-CARD (v91): the job card carries the SAME company sections as the swipe
        drawer \u2014 Recent Company News + Connect with Hiring Team \u2014 one card design. */
     (function(){
@@ -3451,16 +3463,14 @@ function renderBrowse(){
   const sal=parseInt(document.getElementById('f-salary').value,10);
   const jt=document.getElementById('f-type')?document.getElementById('f-type').value:'';
   const lv=document.getElementById('f-lvl')?document.getElementById('f-lvl').value:'';
-  const dist=parseInt(document.getElementById('f-dist').value,10);
-  document.getElementById('f-sal-out').textContent=sal>0?('$'+sal+'K'):'Any';
-  document.getElementById('f-dist-out').textContent=dist+' mi';
+  document.getElementById('f-sal-out').textContent=sal>0?('$'+sal+'K'):'Any';   /* F-GEO (v97): distance slider removed */
   const out=document.getElementById('browse-results');
   const hits=browseJobs.filter(j=>
     (!kw||j.t.toLowerCase().includes(kw)||j.co.toLowerCase().includes(kw))&&
     (!ind||j.ind===ind)&&(!sty||j.style===sty)&&
     (!jt||j.type===jt)&&(!lv||j.lvl===lv)&&
     (!(document.getElementById('f-hassal')&&document.getElementById('f-hassal').classList.contains('on'))||j.max>0)&&
-    j.max>=sal&&(j.style==='Remote'||j.dist<=dist)
+    j.max>=sal
   );
   if(!hits.length){
     out.innerHTML=browseJobs.length
@@ -3790,8 +3800,9 @@ function confirmVerify(){
   const name=v('vf-name'), title=v('vf-title'), email=v('vf-email'), phone=v('vf-phone');
   if(name){ resumeData.name=name; }
   if(title){ resumeData.title=(typeof correctTitleTypos==='function'?correctTitleTypos(title):title); }
-  /* rebuild contact from confirmed values */
-  const parts=[email,phone].filter(Boolean);
+  /* rebuild contact from confirmed values + honor the address prefs (F-ADDR v97) */
+  const _addr=(typeof _addressForResume==='function')?_addressForResume((typeof getProfile==='function')?getProfile():{}):'';
+  const parts=[email,phone,_addr].filter(Boolean);
   if(parts.length){ resumeData.contact=parts.join(' · '); }
   /* push confirmed values into the unified profile so they fan out everywhere */
   try{
@@ -4316,8 +4327,8 @@ function toggleGeo(el){
   navigator.geolocation.getCurrentPosition(
     pos=>{
       el.classList.add('on');
-      document.getElementById('loc-status').textContent='(📍 device location active)';
-      document.getElementById('loc-status').style.color='var(--mint)';
+      /* v97: loc-status lived in the removed Max Distance label — null-guard it */
+      const _ls=document.getElementById('loc-status'); if(_ls){ _ls.textContent='(📍 device location active)'; _ls.style.color='var(--mint)'; }
       showToast('📍 Location enabled — nearby jobs prioritized');
     },
     err=>{ showToast('⚠️ Permission denied — you can type your city instead'); }
@@ -8100,23 +8111,69 @@ function setProfile(patch){
   try{ localStorage.setItem('gpj_profile',JSON.stringify(p)); }catch(e){}
   /* keep resumeData in sync so applications/auto-fill use the freshest values */
   if(p.first||p.last) resumeData.name=[p.first,p.last].filter(Boolean).join(' ');
-  resumeData.contact=[p.email,((p.preferences&&p.preferences.showPhoneOnResume===false)?'':p.phone),((p.preferences&&p.preferences.showAddressOnResume===true)?p.address:'')].filter(Boolean).join(' · ');
+  _rebuildContact(p);   /* F-ADDR (v97): one contact builder honoring phone + address prefs */
   /* push to cloud if signed in — carry the edit timestamp */
   try{ if(window.fb&&fb.current()) fb.saveProfile(fb.current().uid,{account:p,accountEditedAt:now,savedAt:now}); }catch(e){}
   fillProfileFields();
   return p;
 }
 /* fan the unified profile OUT into every field that shows this data */
+/* F-ADDR (v97): reduce a stored "Street, City, State, ZIP" to "City, State". */
+function _cityStateOf(addr){
+  addr=String(addr||'').trim(); if(!addr) return '';
+  const m=addr.match(/([A-Za-z][A-Za-z .'\-]+),\s*([A-Za-z]{2})\b/);
+  if(m) return m[1].trim()+', '+m[2].toUpperCase();
+  const parts=addr.split(',').map(s=>s.trim()).filter(Boolean);
+  return parts.length>=2 ? parts.slice(-2).join(', ') : addr;
+}
+/* the address string to put on the r\u00e9sum\u00e9, honoring both F-ADDR toggles */
+function _addressForResume(p){
+  p=p||{}; const pr=p.preferences||{};
+  if(pr.showAddressOnResume!==true) return '';
+  const a=p.address||'';
+  return pr.addressFull ? a : _cityStateOf(a);
+}
+/* rebuild resumeData.contact from the current profile + all contact prefs \u2014
+   ONE place, so phone/address toggles stay consistent (F-ADDR v97). */
+function _rebuildContact(p){
+  p=p||((typeof getProfile==='function')?getProfile():{});
+  const pr=p.preferences||{};
+  const phone=(pr.showPhoneOnResume===false)?'':p.phone;
+  resumeData.contact=[p.email,phone,_addressForResume(p)].filter(Boolean).join(' \u00b7 ');
+  return resumeData.contact;
+}
 function togglePhoneOnResume(el){
   const on=!el.classList.contains('on'); el.classList.toggle('on',on);
   try{
     const p=(typeof getProfile==='function')?getProfile():{}; p.preferences=p.preferences||{}; p.preferences.showPhoneOnResume=on;
     localStorage.setItem('gpj_profile',JSON.stringify(p));
     if(window.fb&&fb.current()) fb.saveProfile(fb.current().uid,{preferences:p.preferences,prefsEditedAt:Date.now()});
-    resumeData.contact=[p.email,(on?p.phone:''),p.address].filter(Boolean).join(' \u00b7 ');
+    _rebuildContact(p);
   }catch(e){}
   try{ if(typeof renderTplPreview==='function') renderTplPreview(); }catch(e){}
   showToast(on?'\ud83d\udcde Phone will show on your r\u00e9sum\u00e9':'\ud83d\udcde Phone hidden from your r\u00e9sum\u00e9');
+}
+function toggleAddressOnResume(el){
+  const on=!el.classList.contains('on'); el.classList.toggle('on',on);
+  try{
+    const p=(typeof getProfile==='function')?getProfile():{}; p.preferences=p.preferences||{}; p.preferences.showAddressOnResume=on;
+    localStorage.setItem('gpj_profile',JSON.stringify(p));
+    if(window.fb&&fb.current()) fb.saveProfile(fb.current().uid,{preferences:p.preferences,prefsEditedAt:Date.now()});
+    _rebuildContact(p);
+  }catch(e){}
+  try{ if(typeof renderTplPreview==='function') renderTplPreview(); }catch(e){}
+  showToast(on?'\ud83d\udccd Address will show on your r\u00e9sum\u00e9':'\ud83d\udccd Address hidden from your r\u00e9sum\u00e9');
+}
+function toggleAddressFull(el){
+  const on=!el.classList.contains('on'); el.classList.toggle('on',on);
+  try{
+    const p=(typeof getProfile==='function')?getProfile():{}; p.preferences=p.preferences||{}; p.preferences.addressFull=on;
+    localStorage.setItem('gpj_profile',JSON.stringify(p));
+    if(window.fb&&fb.current()) fb.saveProfile(fb.current().uid,{preferences:p.preferences,prefsEditedAt:Date.now()});
+    _rebuildContact(p);
+  }catch(e){}
+  try{ if(typeof renderTplPreview==='function') renderTplPreview(); }catch(e){}
+  showToast(on?'\ud83c\udfe0 Full street address on your r\u00e9sum\u00e9':'\ud83c\udfd9\ufe0f City, State only on your r\u00e9sum\u00e9');
 }
 function fillProfileFields(){
   const p=getProfile();
@@ -8128,6 +8185,9 @@ function fillProfileFields(){
   setValForce('acc-first',p.first); setValForce('acc-last',p.last);
   setValForce('acc-email',p.email); setValForce('acc-phone',p.phone); setValForce('acc-address',p.address);
   try{ const pt=document.getElementById('phone-on-resume-toggle'); if(pt) pt.classList.toggle('on', !(p.preferences&&p.preferences.showPhoneOnResume===false)); }catch(e){}
+  /* F-ADDR (v97): reflect saved address prefs on the toggles (both default OFF) */
+  try{ const at=document.getElementById('addr-on-resume-toggle'); if(at) at.classList.toggle('on', !!(p.preferences&&p.preferences.showAddressOnResume===true)); }catch(e){}
+  try{ const af=document.getElementById('addr-full-toggle'); if(af) af.classList.toggle('on', !!(p.preferences&&p.preferences.addressFull===true)); }catch(e){}
   /* RESUME TAB fields (.pf-* classes) — this is what was missing, leaving them
      empty even when the account was fully filled */
   setSelForce('.pf-first',p.first); setSelForce('.pf-last',p.last);
@@ -8879,8 +8939,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v96';
+const APP_VERSION = 'v97';
 const CHANGELOG = {
+  'v97':['v97 (R-pre stabilize & verify): (1) Job data is captured smarter — the harvester now strips boilerplate (EEO/legal/how-to-apply) before storing and keeps much more real content (fuller descriptions, requirements, and benefits), so cards show complete postings and matching/requirements read from richer text. (2) Résumé address controls: show address on your résumé (default off), and choose full street address vs City, State only — saved, synced, and reflected on download. (3) The dead Max Distance slider was removed (it couldn\'t filter without map coordinates; a real distance filter returns later). (4) Company rating is now one clean control (removed the duplicate). (5) Self-test runs fully green on unlimited/admin accounts.'],
   'v96':['v96: (1) MATCH ACCURACY — Match details now show the truth. Your matching strengths are the skills that ACTUALLY appear in THAT specific posting (not your top skills repeated on every job — that is why every card used to say Photoshop). If none of your skills appear, it says so honestly and calls it a stretch role. Add these to raise it now lists the posting\'s real missing requirements, not a generic template. (2) iOS home-screen app now auto-loads the latest version when you open it, instead of waiting on a refresh tap — and the admin What\'s New popup now retries through slow sign-in so it reliably appears for admins.'],
   'v95':['v95: closed a location loophole — some jobs were slipping into your deck labeled Remote when they\'re actually hybrid or on-site in a specific city (a Temecula, CA marketing job that LinkedIn itself lists as Hybrid). Now, when a job is tied to a specific city but claims remote, we require the posting to actually confirm remote work (fully remote, work from home, etc.) before trusting it — otherwise it\'s treated as local to that city and kept out of your market. Genuinely remote roles (nationwide, work-from-home, or Remote-listed) are unaffected.'],
   'v94':['v94: ONE review flow everywhere (F-REVIEW). Rating a company — from a job card, a company profile, or the prompt after you import your resume/past jobs — now uses the same modal: tap to set stars, add an optional comment the community sees, submit. The old separate stars-only past-jobs prompt is gone; every rating is now saved and can carry your notes. Cancel on the past-jobs prompt simply skips to the next company.'],
@@ -9507,8 +9568,14 @@ function runSelfTest(){
     const d=accountAgeDays();
     const grace=(document.getElementById('grace-full')||{}).textContent||'';
     const setg=(document.getElementById('set-grace')||{}).textContent||'';
-    const both=grace.includes('Day '+d)&&(!setg||setg.includes('Day '+d));
-    add('Day counter consistent everywhere', both?'pass':'warn', 'computed Day '+d+' · header="'+grace.replace(/^.*Day/,'Day')+'"');
+    /* v97 (#8): an Unlimited/paid tier LEGITIMATELY shows "Unlimited" instead of
+       "Day N" — that's correct, not an inconsistency. Only warn on a real
+       Day-N mismatch for day-counted (free/grace) tiers, so the self-test runs
+       green for admins/paid without masking a genuine drift. */
+    const _unlim=(typeof isPaid==='function' && isPaid());
+    const both=_unlim ? /unlimited/i.test(grace)
+                      : (grace.includes('Day '+d)&&(!setg||setg.includes('Day '+d)));
+    add('Day counter consistent everywhere', both?'pass':'warn', _unlim?('Unlimited tier — header shows "Unlimited" (internal Day '+d+')'):('computed Day '+d+' · header="'+grace.replace(/^.*Day/,'Day')+'"'));
     add('Day counter sourced from install date', getInstallDate()>0?'pass':'fail', 'install ts '+getInstallDate());
   }catch(e){ add('Day counter','fail',String(e)); }
 
@@ -11467,7 +11534,13 @@ function fillCmReviews(co){
   const neg=all.filter(r=>r.s==='−').slice(0,5);
   const cell=r=>'<div style="background:var(--plum3);border-left:3px solid '+(r.s==='+'?'var(--mint)':'var(--danger)')+';border-radius:0 10px 10px 0;padding:8px 10px;margin-bottom:6px;"><div style="font-size:12px;color:var(--off);line-height:1.5;">'+String(r.t).replace(/</g,'&lt;')+'</div>'+(r.when?('<div style="font-size:10px;color:var(--muted);margin-top:3px;">'+fmtAgo(r.when)+' · community report</div>'):'')+'</div>';
   const empty='<div style="font-size:11px;color:var(--muted);padding:6px 0;">None yet — be the first to report.</div>';
-  box.innerHTML='<div style="display:flex;gap:10px;">'+
+  /* F-REVIEW (v97): rating lives HERE now (one control) — the duplicate inline
+     "Rate:" row was removed. This routes through the unified vibe-review flow. */
+  const rated=(function(){ try{ return (JSON.parse(localStorage.getItem('gpj_corate')||'{}'))[co]||0; }catch(e){ return 0; } })();
+  const rateBtn=rated
+    ? '<div style="font-size:11px;color:var(--mint);text-align:center;padding:6px 0 10px;">⭐ You rated '+co.replace(/</g,'&lt;')+' '+rated+'/5 — thank you</div>'
+    : '<div onclick="openVibeReview(document.getElementById(\'cm-name\').textContent,0)" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:9px;padding:9px;text-align:center;font-size:12px;cursor:pointer;margin-bottom:10px;">⭐ Rate this company</div>';
+  box.innerHTML=rateBtn+'<div style="display:flex;gap:10px;">'+
     '<div style="flex:1;min-width:0;"><div style="font-size:11px;font-weight:800;color:var(--mint);margin-bottom:6px;">🟢 Positive ('+pos.length+')</div>'+(pos.map(cell).join('')||empty)+'</div>'+
     '<div style="flex:1;min-width:0;"><div style="font-size:11px;font-weight:800;color:var(--danger);margin-bottom:6px;">🔴 Negative ('+neg.length+')</div>'+(neg.map(cell).join('')||empty)+'</div>'+
     '</div>'+

@@ -76,7 +76,7 @@ test('no duplicate DOM ids', async ({ page }) => {
 
 test('Browse filter controls mount', async ({ page }) => {
   await page.evaluate(() => window.switchView && window.switchView('browse'));
-  for (const id of ['f-keyword', 'f-industry', 'f-style', 'f-type', 'f-lvl', 'f-livesort', 'f-salary', 'f-dist']) {
+  for (const id of ['f-keyword', 'f-industry', 'f-style', 'f-type', 'f-lvl', 'f-livesort', 'f-salary']) {   /* f-dist removed v97 (F-GEO) */
     await expect(page.locator('#' + id)).toHaveCount(1);
   }
 });

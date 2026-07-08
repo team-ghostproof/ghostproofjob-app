@@ -972,6 +972,73 @@ test.describe('[STATE-COVERAGE] v96 match-insight truth', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v97 F-ADDR + fuller storage caps + dedup', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: F-ADDR — address on résumé honors show + full/City,State toggles', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      Object.keys(resumeData).forEach((k) => { delete resumeData[k]; });
+      const base = { email: 'a@x.com', phone: '(713) 555-0100', address: '123 Main St, Houston, TX, 77002', preferences: {} };
+      const city = _cityStateOf('123 Main St, Houston, TX, 77002');
+      // default OFF → no address in contact
+      const off = _rebuildContact(Object.assign({}, base, { preferences: {} }));
+      // ON + city/state only
+      const cityOnly = _rebuildContact(Object.assign({}, base, { preferences: { showAddressOnResume: true, addressFull: false } }));
+      // ON + full
+      const full = _rebuildContact(Object.assign({}, base, { preferences: { showAddressOnResume: true, addressFull: true } }));
+      // phone hidden still respected alongside address
+      const noPhone = _rebuildContact(Object.assign({}, base, { preferences: { showAddressOnResume: true, addressFull: false, showPhoneOnResume: false } }));
+      return { city, off, cityOnly, full, noPhone };
+    });
+    expect(r.city).toBe('Houston, TX');
+    expect(r.off, 'address OFF by default').not.toContain('Houston');
+    expect(r.off).toContain('a@x.com');
+    expect(r.cityOnly, 'City, State only when full is off').toContain('Houston, TX');
+    expect(r.cityOnly).not.toContain('Main St');
+    expect(r.full, 'full street address when toggled on').toContain('Main St');
+    expect(r.noPhone).not.toContain('555-0100');
+    expect(r.noPhone).toContain('Houston, TX');
+  });
+
+  test('Q1: fuller storage — long requirements/description render without re-truncation (#3)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const longReq = 'What you need:\n' + '• A specific real qualification line here. '.repeat(60);   // ~2500 chars
+      const longDesc = 'This role does meaningful work every day. '.repeat(180);                          // ~7500 chars
+      const j = mapFirestoreJob({ title: 'Ops', company: 'Co', direct_apply_url: 'https://x.example/o', description: longDesc, requirements: longReq });
+      return { reqLen: j.req.length, reqCut: /…$/.test(j.req), descLen: j.desc.length, descCut: /…$/.test(j.desc) };
+    });
+    expect(r.reqLen, 'a ~2.5k requirement is kept in full (client cap 4000)').toBeGreaterThan(2000);
+    expect(r.reqCut, 'requirements not re-truncated at render').toBe(false);
+    expect(r.descLen, 'a ~7.5k description is kept in full (client cap 11000)').toBeGreaterThan(6000);
+    expect(r.descCut, 'description not re-truncated at render').toBe(false);
+  });
+
+  test('Q1: review dedup — company card rating routes through one flow, no #cm-rate row', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const removed = !document.getElementById('cm-rate');           // the duplicate inline row is gone
+      openCompanyView('Dedup Co', { title: 'Role', url: '', desc: '' });
+      fillCmReviews('Dedup Co');
+      const reviews = document.getElementById('cm-reviews').innerHTML;
+      document.getElementById('company-modal').classList.remove('open');
+      return { removed, hasRateBtn: /Rate this company/.test(reviews) && /openVibeReview/.test(reviews) };
+    });
+    expect(r.removed, 'duplicate inline "Rate:" star row removed').toBe(true);
+    expect(r.hasRateBtn, 'rating lives in the reviews panel via the unified vibe flow').toBe(true);
+  });
+
+  test('Q1: Max Distance slider removed (F-GEO logged)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      switchView('browse');
+      return { gone: !document.getElementById('f-dist'), salaryStays: !!document.getElementById('f-salary') };
+    });
+    expect(r.gone, 'dead distance slider removed').toBe(true);
+    expect(r.salaryStays, 'salary slider still present').toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);

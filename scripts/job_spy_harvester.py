@@ -325,11 +325,42 @@ def _grab(header_rx, text, limit=900):
     return block
 
 
+# R-pre (v97): strip BOILERPLATE from the stored description — EEO/legal
+# statements and application instructions are never useful for the card or for
+# matching, and they were eating the description budget + diluting computeMatch.
+# section_src (for req/benefits extraction) stays RAW, so nothing downstream
+# loses signal. Conservative: paragraph-level, and a leading "About us" block is
+# dropped ONLY when real sections follow (never for prose-only postings).
+_EEO_RX = _re.compile(r"(?i)\b(equal opportunity|eeo\b|affirmative action|e-verify|"
+                      r"drug[- ]free workplace|without regard to (?:race|sex|age|religion|gender|"
+                      r"color|national origin|disability|veteran)|reasonable accommodation|"
+                      r"protected veteran|all qualified applicants)\b")
+_APPLY_RX = _re.compile(r"(?i)\b(how to apply|to apply[,:]|please (?:apply|submit)|"
+                        r"apply (?:today|now|online|here|via|by|through)|click (?:here|to apply)|"
+                        r"submit your (?:resume|application|cv))\b")
+
+def strip_boilerplate(text):
+    if not text:
+        return text
+    paras = _re.split(r"\n\s*\n", text)
+    kept = [p for p in paras if not (
+        (_EEO_RX.search(p) and len(p.strip()) < 700) or
+        (_APPLY_RX.search(p) and len(p.strip()) < 450))]
+    out = "\n\n".join(kept).strip()
+    # drop a leading About-Us marketing block only when real sections follow
+    if _re.search(r"(?im)^\s*(?:•\s*)?(responsibilities|requirements?|qualifications?|what you|the role|position summary|job summary|duties)\b", out):
+        out = _re.sub(
+            r"(?is)^\s*(?:about (?:us|the company|our company|the team)|who we are)\b.*?"
+            r"(?=\n\s*(?:•\s*)?(?:responsibilities|requirements?|qualifications?|what you|the role|position summary|job summary|duties)\b)",
+            "", out, count=1).strip()
+    return out if len(out) >= 120 else text
+
+
 def extract_benefits(text):
     if not text:
         return ""
     t = clean_md(text)
-    b = _grab(_BENE_HEADER, t, 500)
+    b = _grab(_BENE_HEADER, t, 2000)   # v97: generous ceiling — rarely fires
     if len(b) >= 6:
         return b
     # inline common-benefit sniff
@@ -359,14 +390,16 @@ def extract_requirements(description):
         return ""
     text = clean_md(description)
     parts = []
-    resp = _grab(_RESP_HEADER, text)
+    # v97: generous per-section ceilings (resp+req) so full duties/qualifications
+    # are stored — was 700 each / 1400 total, which truncated real requirements.
+    resp = _grab(_RESP_HEADER, text, 1600)
     if len(resp) >= 20:
-        parts.append("What you'll do:\n" + resp[:700])
-    req = _grab(_REQ_HEADER, text)
+        parts.append("What you'll do:\n" + resp[:1500])
+    req = _grab(_REQ_HEADER, text, 1600)
     if len(req) >= 20:
-        parts.append("What you need:\n" + req[:700])
+        parts.append("What you need:\n" + req[:1500])
     if parts:
-        return ("\n\n".join(parts))[:1400]
+        return ("\n\n".join(parts))[:3500]
 
     # fallback A: a "responsible for ..." duties sentence (UTHealth-style prose)
     duty = _re.search(r"(?is)\b(?:will be |is |are )?responsible for\b(.{30,500}?)(?:\.\s|\n|$)", text)
@@ -426,7 +459,9 @@ def normalize_row(row, region, source_hint):
 
     smin, smax, is_hourly, hr_lo, hr_hi = parse_salary(row)
     raw_desc = safe_str(row.get("description"))
-    full_desc = clean_md(raw_desc)            # cleaned ONCE, reused everywhere
+    # v97: strip boilerplate from the DISPLAY description; keep section_src RAW so
+    # requirements/benefits extraction (header-based) is unaffected.
+    full_desc = strip_boilerplate(clean_md(raw_desc))
     section_src = raw_desc
     # opt-in backfill: only when the source gave us almost nothing AND a budget remains
     if len(full_desc) < 200 and url and _backfill_remaining():
@@ -435,13 +470,16 @@ def normalize_row(row, region, source_hint):
             full_desc = clean_md(fetched)
             section_src = fetched
             _backfill_inc()
-    # B-DESC-CUT (v80): cut the SOURCE description on a word boundary + ellipsis —
-    # the old plain slice shipped docs ending mid-word ("…families, and comm"),
-    # which no client-side fix could repair. 3500 cap unchanged.
-    if len(full_desc) > 3500:
-        _cut = full_desc[:3500]
+    # B-DESC-CUT (v80): cut the SOURCE description on a word boundary + ellipsis.
+    # v97: ceiling raised 3500 -> 10000 (a generous cap that rarely fires) so real
+    # postings store in full; boilerplate was already stripped above. The display
+    # caps (client cutWords/drawer) sit ABOVE this, and View Full Posting covers
+    # the rare overflow tail.
+    DESC_CAP = 10000
+    if len(full_desc) > DESC_CAP:
+        _cut = full_desc[:DESC_CAP]
         _sp = _cut.rfind(" ")
-        description = (_cut[:_sp] if _sp > 2100 else _cut).rstrip(" ,;:.!-") + "…"
+        description = (_cut[:_sp] if _sp > int(DESC_CAP * 0.6) else _cut).rstrip(" ,;:.!-") + "…"
     else:
         description = full_desc
     requirements = extract_requirements(section_src)
@@ -637,9 +675,52 @@ US_METROS = [
 US_METROS_PER_RUN = int(os.environ.get("US_METROS_PER_RUN", "4"))
 
 
+def run_stats():
+    """v97: sample live postings and print per-section length distributions WITHOUT
+    writing to Firestore, so the storage ceilings can be tuned to real data.
+    Usage: python job_spy_harvester.py --stats   (needs the same scrape env)."""
+    from jobspy import scrape_jobs
+    sites = os.environ.get("SITES", "indeed,linkedin").split(",")
+    role = os.environ.get("STATS_ROLE", "operations manager")
+    loc = os.environ.get("STATS_LOC", "Houston, TX")
+    n = int(os.environ.get("STATS_N", "60"))
+    print("[stats] scraping ~%d '%s' postings near %s from %s ..." % (n, role, loc, sites))
+    try:
+        df = scrape_jobs(site_name=sites, search_term=role, location=loc,
+                         results_wanted=n, linkedin_fetch_description=True,
+                         description_format="markdown")
+    except Exception as e:
+        print("[stats] scrape failed:", e); return
+    if df is None or len(df) == 0:
+        print("[stats] no rows"); return
+    import statistics
+    cols = {"description_stored": [], "requirements": [], "benefits": [], "raw_desc": []}
+    for row in df.to_dict("records"):
+        rec = normalize_row(row, "United States", "jobspy")
+        if not rec:
+            continue
+        cols["raw_desc"].append(len(clean_md(safe_str(row.get("description")))))
+        cols["description_stored"].append(len(rec.get("description", "")))
+        cols["requirements"].append(len(rec.get("requirements", "")))
+        cols["benefits"].append(len(rec.get("benefits", "")))
+    def pct(a, p):
+        a = sorted(a)
+        return a[min(len(a) - 1, int(len(a) * p / 100))] if a else 0
+    print("\n[stats] per-section char lengths (n=%d)" % len(cols["description_stored"]))
+    print("  field                 min   p50   p90   p99   max   empties")
+    for k, a in cols.items():
+        empt = sum(1 for x in a if x == 0)
+        print("  %-20s %5d %5d %5d %5d %5d   %d" % (
+            k, min(a) if a else 0, pct(a, 50), pct(a, 90), pct(a, 99), max(a) if a else 0, empt))
+    print("\n[stats] ceilings now: desc 10000 / req 3500 / benefits 2000. "
+          "If p99 sits well under a ceiling, it rarely fires (good).")
+
+
 def main():
     if "--selftest" in sys.argv:
         return run_selftest()
+    if "--stats" in sys.argv:
+        return run_stats()
 
     db = init_firestore()
     total = 0
@@ -778,6 +859,40 @@ def run_selftest():
     reqs = extract_requirements(taylor)
     check("taylor requirements has Bachelor's", "Bachelor" in reqs, reqs[:80])
     check("taylor requirements NOT the about-us blurb", "looking for an experienced" not in reqs)
+
+    # R-pre (v97): boilerplate stripping + generous ceilings.
+    boiler = (
+        "The Real Estate Company is looking for a Marketing Manager to lead campaigns.\n\n"
+        "Responsibilities\n\n"
+        "* Develop and execute marketing strategies\n"
+        "* Manage the marketing budget\n\n"
+        "We are an Equal Opportunity Employer. All qualified applicants will receive "
+        "consideration without regard to race, color, religion, sex, or national origin.\n\n"
+        "How to apply: please submit your resume and cover letter through our careers page.\n")
+    sb = strip_boilerplate(clean_md(boiler))
+    check("boilerplate: EEO statement stripped", "Equal Opportunity" not in sb and "without regard to" not in sb, sb[-80:])
+    check("boilerplate: apply instructions stripped", "submit your resume" not in sb.lower(), sb[-80:])
+    check("boilerplate: real content kept", "marketing strategies" in sb and "Marketing Manager" in sb)
+    # a leading About-Us block is dropped when real sections follow (realistic length)
+    au = ("About Us\n\nWe are an award-winning company that values people and innovation.\n\n"
+          "Qualifications\n\n"
+          "* Bachelor's degree in a related field of study\n"
+          "* 5 years of progressive experience in operations\n"
+          "* Strong project management and communication skills\n"
+          "* Proficiency in Microsoft Excel and ERP systems\n"
+          "* Ability to travel as needed to regional sites\n")
+    sau = strip_boilerplate(clean_md(au))
+    check("boilerplate: leading About-Us dropped when sections follow", "award-winning" not in sau, sau[:60])
+    check("boilerplate: qualifications kept", "5 years of progressive experience" in sau)
+    # prose-only posting is NEVER stripped to nothing
+    prose = "About us. The Houston Group is seeking a full-time Office Manager to greet clients and manage files."
+    check("boilerplate: prose-only posting preserved", "Office Manager" in strip_boilerplate(clean_md(prose)))
+    # generous ceilings rarely fire — a normal-length description stores in full
+    normal = clean_md("This role supports operations. " * 60)   # ~1800 chars
+    r_norm = normalize_row({"title": "Ops", "company": "Co", "location": "Houston, TX",
+                            "job_url": "https://x.example/n", "job_url_direct": "https://x.example/n",
+                            "description": normal}, "Houston, TX", "jobspy")
+    check("ceiling: normal description not truncated (no ellipsis)", r_norm and not r_norm["description"].endswith("…"), len(r_norm["description"]) if r_norm else -1)
 
     # 1b) B-BENEFITS (v76) live repro — DataAnnotation phrased perks as
     # "Advantages Of Contracting With Us"; the old header regex returned ''.
