@@ -1,0 +1,155 @@
+rules_version = '2';
+// ============================================================================
+// GhostProofJob — Firestore Security Rules  (R0, recruiter-tier foundation)
+// ----------------------------------------------------------------------------
+// INSERT-ONLY over the current candidate rules. Candidate collections keep their
+// existing behavior; recruiter collections are ADDED with strict isolation.
+//
+// KEY INVARIANTS (recruiter-tier.md §3):
+//  * Recruiters read applications/recommended_candidates ONLY for jobs they own.
+//  * Recruiters NEVER read raw `profiles`. Recruiter-visible candidate data flows
+//    through a backend-written projection doc (`candidate_cards`), and contact is
+//    present in that doc ONLY when the backend confirmed consent.
+//  * Candidates read/write only their OWN application; no cross-candidate read.
+//  * Backend-only docs (recommended_candidates, candidate_cards, match tokens,
+//    companies reputation, notifications inbound) are `allow write: if false`
+//    for clients — the Admin SDK writes them.
+//  * Appeals are admin-only to read/decide.
+//
+// NOTE: base this against the LIVE console rules before publishing — this file is
+// reconstructed from the collections the app actually uses (profiles, jobs,
+// bugReports, hired) plus the recruiter additions. Diff, don't blind-overwrite.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- helpers ------------------------------------------------------------
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function isOwner(id) { return signedIn() && uid() == id; }
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email in ['asosa@ghostproofjob.com', 'ksosa@ghostproofjob.com'];
+    }
+    // a signed-in recruiter (role claimed on their recruiter doc)
+    function isRecruiter() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/recruiters/$(uid()));
+    }
+    // the owner recruiter of a given job (one get(), recruiter-path only — never
+    // on the candidate deck/Browse hot path)
+    function jobOwner(jobId) {
+      return get(/databases/$(database)/documents/jobs/$(jobId)).data.ownerUid;
+    }
+
+    // ======================= CANDIDATE COLLECTIONS ==========================
+    // Unchanged behavior — self-or-admin. Recruiters CANNOT read raw profiles.
+    match /profiles/{userId} {
+      allow read:  if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId);
+      // admin may set verification/role flags
+      allow update: if isAdmin();
+    }
+
+    // public job pool (harvested + verified internal). Anyone may READ (deck +
+    // Browse). WRITE is scoped: harvested jobs (no ownerUid) are backend/admin
+    // only; a recruiter may create/edit ONLY their own internal job.
+    match /jobs/{jobId} {
+      allow read: if true;
+      allow create: if isAdmin()
+        || (isRecruiter()
+            && request.resource.data.ownerUid == uid()
+            && request.resource.data.source == 'internal');
+      allow update, delete: if isAdmin()
+        || (isRecruiter()
+            && resource.data.ownerUid == uid()
+            && resource.data.source == 'internal');
+
+      // ---- applications: candidate owns their own; owner recruiter may read ----
+      match /applications/{candidateUid} {
+        allow create: if isOwner(candidateUid);
+        allow read:   if isOwner(candidateUid) || isAdmin()
+                        || (isRecruiter() && jobOwner(jobId) == uid());
+        allow update: if isOwner(candidateUid) || isAdmin()
+                        || (isRecruiter() && jobOwner(jobId) == uid()); // status changes
+        allow delete: if isOwner(candidateUid) || isAdmin();
+      }
+
+      // ---- recommended_candidates: backend-written; owner recruiter reads ----
+      match /recommended_candidates/{candUid} {
+        allow read:  if isAdmin() || (isRecruiter() && jobOwner(jobId) == uid());
+        allow write: if false;   // Admin SDK only (reverse-match scorer)
+      }
+    }
+
+    // ======================= RECRUITER COLLECTIONS ==========================
+    match /recruiters/{rId} {
+      allow read:  if isOwner(rId) || isAdmin();
+      allow create: if isOwner(rId);
+      allow update: if (isOwner(rId)
+                        // a recruiter may edit their own profile but NOT flip
+                        // their own verification/plan — those are admin/backend.
+                        && !( 'isValidated' in request.resource.data
+                              && request.resource.data.isValidated != resource.data.get('isValidated', false) )
+                        && !( 'plan' in request.resource.data
+                              && request.resource.data.plan != resource.data.get('plan', 'free') ))
+                     || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // canonical company records — public READ (company profile/reviews), but
+    // reputation + verified-employer fields are backend/admin-written only.
+    match /companies/{companyId} {
+      allow read: if true;
+      allow write: if isAdmin();   // Responsiveness Rate / Verified status: backend
+    }
+
+    // recruiter-visible candidate projection (backend-written). Contact fields
+    // are present ONLY when the backend confirmed consent (applied / discoverable
+    // / accepted). Clients never write this doc.
+    match /candidate_cards/{candUid} {
+      allow read:  if isAdmin() || isRecruiter();
+      allow write: if false;   // Admin SDK only
+    }
+
+    // per-candidate match-token cache (pre-extracted title/skill tokens) — keeps
+    // reverse-match reads low. Backend-written; self/admin/verified-recruiter read.
+    match /match_tokens/{candUid} {
+      allow read:  if isOwner(candUid) || isAdmin() || isRecruiter();
+      allow write: if false;   // Admin SDK only
+    }
+
+    // candidate notification tray — self read/update (opening auto-logs a
+    // response); inbound items are backend-written.
+    match /notifications/{userId}/items/{itemId} {
+      allow read:   if isOwner(userId) || isAdmin();
+      allow update: if isOwner(userId);   // mark-read / logged-response
+      allow create, delete: if false;     // Admin SDK only
+    }
+
+    // review appeals — recruiter files own; admin-only read/decide.
+    match /appeals/{appealId} {
+      allow create: if isRecruiter()
+                      && request.resource.data.ownerUid == uid();
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ======================= EXISTING MISC ==================================
+    match /bugReports/{id} {
+      allow create: if signedIn();
+      allow read, update, delete: if isAdmin();
+    }
+    match /hired/{id} {
+      allow create: if signedIn();
+      allow read: if isAdmin();   // aggregated server-side; not client-listed
+    }
+
+    // backend-only caches (Worker/Admin SDK) — read self, never client-write.
+    match /ai_sentence_cache/{id} { allow read: if signedIn(); allow write: if false; }
+    match /user_usage/{userId}   { allow read: if isOwner(userId); allow write: if false; }
+
+    // default deny
+    match /{document=**} { allow read, write: if false; }
+  }
+}

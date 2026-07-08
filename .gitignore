@@ -8,3 +8,12 @@ screenshots/
 playwright/.auth/
 # local credentials (see .env.example)
 .env
+# firebase emulator artifacts
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.firebase/
+
+# python bytecode
+scripts/__pycache__/
+__pycache__/

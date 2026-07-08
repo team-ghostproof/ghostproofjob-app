@@ -18,6 +18,11 @@ try {
 
 module.exports = defineConfig({
   testDir: './tests',
+  // Only load candidate .spec.js / .setup.js files. The backend suites under
+  // tests/match and tests/rules are Node's built-in test runner (node:test),
+  // NOT Playwright — this testMatch excludes their .mjs so Playwright never
+  // imports them. They run via `npm run test:match` / `npm run test:rules`.
+  testMatch: /.*\.(spec|setup)\.js$/,
   timeout: 30000,
   expect: { timeout: 10000 },
   fullyParallel: true,
@@ -50,5 +55,14 @@ module.exports = defineConfig({
     // AUTHED (Quadrant 2): restores the saved session; self-skips without creds.
     { name: 'authed', use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/user.json' }, dependencies: ['setup'], testMatch: /authed\.spec\.js/ },
     { name: 'visual', use: { ...devices['Desktop Chrome'] }, testMatch: /screenshots\.spec\.js/ },
+    // RECRUITER (Quadrant 3 — authed-recruiter). STUBBED in R0: matches
+    // recruiter.spec.js (none yet, so it runs zero tests). The recruiter AUTH
+    // SETUP harness (tests/recruiter.setup.js, mirroring auth.setup.js) lands in
+    // R1 once the recruiter LOGIN ROUTE exists — it will save
+    // playwright/.auth/recruiter.json and become this project's `dependencies`
+    // + storageState. Activated by the CI secret GPJ_RECRUITER_TEST_PASSWORD
+    // (mirrors GPJ_TEST_PASSWORD / TEST_USER_PASSWORD); without it the recruiter
+    // specs self-skip, exactly like the candidate authed project.
+    { name: 'recruiter', use: { ...devices['Desktop Chrome'] }, testMatch: /recruiter\.spec\.js/ },
   ],
 });

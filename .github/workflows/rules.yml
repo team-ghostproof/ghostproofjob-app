@@ -1,0 +1,43 @@
+name: Rules + Match tests
+
+# Backend isolation proof (Firestore emulator + @firebase/rules-unit-testing)
+# and the in-repo reverse-match unit tests. The boot harness does NOT exercise
+# rules — this is the only real proof of the recruiter-tier privacy isolation
+# (recruiter-tier.md §7.4/§7.5). Free (GitHub-hosted).
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'firestore.rules'
+      - 'firebase.json'
+      - 'tests/rules/**'
+      - 'tests/match/**'
+      - 'api/match/**'
+      - '.github/workflows/rules.yml'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # the Firestore emulator requires a JRE
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install deps
+        run: npm install
+
+      - name: Reverse-match unit tests (no emulator)
+        run: npm run test:match
+
+      - name: Rules isolation tests (Firestore emulator)
+        run: npm run test:rules
