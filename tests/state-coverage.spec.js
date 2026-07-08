@@ -1039,6 +1039,59 @@ test.describe('[STATE-COVERAGE] v97 F-ADDR + fuller storage caps + dedup', () =>
   });
 });
 
+test.describe('[STATE-COVERAGE] v98 R-pre live-fixes', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: _cityStateOf never leaks the street across address formats (F-ADDR bug)', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      full4: _cityStateOf('123 Main St, Houston, TX, 77002'),
+      zipInState: _cityStateOf('123 Main St, Houston, TX 77002'),
+      oneComma: _cityStateOf('1234 Oak Lane Apt 5, Houston TX'),
+      bare: _cityStateOf('Houston, TX'),
+      spaces: _cityStateOf('987 Elm Street Houston TX 77003'.replace(/,/g, '')),   /* no commas */
+      withUSA: _cityStateOf('500 Pine Rd, Austin, TX, USA'),
+    }));
+    expect(r.full4).toBe('Houston, TX');
+    expect(r.zipInState).toBe('Houston, TX');
+    expect(r.oneComma, 'a 1-comma address still reduces to City, ST').toBe('Houston, TX');
+    expect(r.bare).toBe('Houston, TX');
+    expect(r.withUSA).toBe('Austin, TX');
+    // the critical invariant: no street token survives when reduced
+    Object.values(r).forEach((v) => { expect(/\bSt\b|Street|Lane|Apt|Rd\b|Pine|Elm|Oak|Main|987|123|1234|500/.test(v)).toBe(false); });
+  });
+
+  test('Q1: F-ADDR export path — resumeData.contact honors toggles at build time', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      Object.keys(resumeData).forEach((k) => { delete resumeData[k]; });
+      Object.assign(resumeData, { name: 'Test User', title: 'Specialist', skills: 'Excel · Sales', jobs: [{ t: 'Rep', c: 'Acme', b: 'Did work' }], summary: 'A summary.', certs: [], eduExtra: [] });
+      const p = { email: 'a@x.com', phone: '(713) 555-0100', address: '123 Main St, Houston, TX, 77002',
+                  preferences: { showAddressOnResume: true, addressFull: false } };
+      localStorage.setItem('gpj_profile', JSON.stringify(p));
+      // stale contact with the full street (simulating pre-toggle state)
+      resumeData.contact = 'a@x.com · (713) 555-0100 · 123 Main St, Houston, TX, 77002';
+      const html = buildResumeHTML(true);   // rebuilds contact from prefs
+      return { contact: resumeData.contact, htmlHasStreet: /Main St/.test(html), htmlHasCity: /Houston, TX/.test(html) };
+    });
+    expect(r.contact, 'build-time rebuild drops the street for City,State-only').not.toContain('Main St');
+    expect(r.contact).toContain('Houston, TX');
+    expect(r.htmlHasStreet, 'exported HTML must not show the street').toBe(false);
+    expect(r.htmlHasCity).toBe(true);
+  });
+
+  test('Q1: apply flow stacks ABOVE the expanded job card (View Full Posting bug)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const z = (id) => parseInt(getComputedStyle(document.getElementById(id)).zIndex, 10);
+      return { sandbox: z('apply-sandbox'), tab: z('apply-tab-modal'), card: (function(){ ensureBrowseModal(); return z('browse-expand-modal'); })() };
+    });
+    expect(r.card).toBe(350);
+    expect(r.sandbox, 'apply sandbox above the job card').toBeGreaterThan(r.card);
+    expect(r.tab, 'apply-tab modal above the job card').toBeGreaterThan(r.card);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
