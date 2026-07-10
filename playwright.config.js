@@ -50,19 +50,17 @@ module.exports = defineConfig({
     // Smoke/regression runs on both device profiles SIGNED OUT — that IS the
     // Guest quadrant of the [STATE-COVERAGE] matrix. Screenshots run ONCE, in
     // the dedicated 'visual' project — so no test.skip project-detection is needed.
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: /screenshots\.spec\.js|authed\.spec\.js|auth\.setup\.js/ },
-    { name: 'mobile', use: { ...devices['Pixel 7'] }, testIgnore: /screenshots\.spec\.js|authed\.spec\.js|auth\.setup\.js/ },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: /screenshots\.spec\.js|authed\.spec\.js|auth\.setup\.js|recruiter\.spec\.js|recruiter\.setup\.js/ },
+    { name: 'mobile', use: { ...devices['Pixel 7'] }, testIgnore: /screenshots\.spec\.js|authed\.spec\.js|auth\.setup\.js|recruiter\.spec\.js|recruiter\.setup\.js/ },
     // AUTHED (Quadrant 2): restores the saved session; self-skips without creds.
     { name: 'authed', use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/user.json' }, dependencies: ['setup'], testMatch: /authed\.spec\.js/ },
     { name: 'visual', use: { ...devices['Desktop Chrome'] }, testMatch: /screenshots\.spec\.js/ },
-    // RECRUITER (Quadrant 3 — authed-recruiter). STUBBED in R0: matches
-    // recruiter.spec.js (none yet, so it runs zero tests). The recruiter AUTH
-    // SETUP harness (tests/recruiter.setup.js, mirroring auth.setup.js) lands in
-    // R1 once the recruiter LOGIN ROUTE exists — it will save
-    // playwright/.auth/recruiter.json and become this project's `dependencies`
-    // + storageState. Activated by the CI secret GPJ_RECRUITER_TEST_PASSWORD
-    // (mirrors GPJ_TEST_PASSWORD / TEST_USER_PASSWORD); without it the recruiter
-    // specs self-skip, exactly like the candidate authed project.
-    { name: 'recruiter', use: { ...devices['Desktop Chrome'] }, testMatch: /recruiter\.spec\.js/ },
+    // RECRUITER (Quadrant 3 — authed-recruiter). R1: the recruiter auth harness
+    // (recruiter.setup.js) signs in a test recruiter via the employer login route
+    // and saves playwright/.auth/recruiter.json (incl. IndexedDB). Activated by
+    // the CI secret GPJ_RECRUITER_TEST_PASSWORD (mirrors GPJ_TEST_PASSWORD);
+    // without it the harness writes an empty state and recruiter.spec.js self-skips.
+    { name: 'recruiter-setup', testMatch: /recruiter\.setup\.js/ },
+    { name: 'recruiter', use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/recruiter.json' }, dependencies: ['recruiter-setup'], testMatch: /recruiter\.spec\.js/ },
   ],
 });

@@ -1092,6 +1092,148 @@ test.describe('[STATE-COVERAGE] v98 R-pre live-fixes', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v99 recruiter tier (R1 — candidate-first invariant)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: recruiter entry points exist (nav tab + footer link) but Employer view is hidden until opened', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      navTab: !!document.getElementById('nav-employer'),
+      footerLink: [...document.querySelectorAll('[onclick*="openEmployer"]')].length,
+      view: !!document.getElementById('view-employer'),
+      viewActive: (document.getElementById('view-employer') || {}).classList ? document.getElementById('view-employer').classList.contains('active') : false,
+      modal: !!document.getElementById('recruiter-auth-modal'),
+      modalOpen: (document.getElementById('recruiter-auth-modal') || {}).classList ? document.getElementById('recruiter-auth-modal').classList.contains('open') : false,
+    }));
+    expect(r.navTab, 'employer nav tab present').toBe(true);
+    expect(r.footerLink, 'at least one openEmployer entry point (footer + nav)').toBeGreaterThanOrEqual(1);
+    expect(r.view, 'employer view exists in the DOM').toBe(true);
+    expect(r.viewActive, 'employer view is NOT active for a guest until opened').toBe(false);
+    expect(r.modal, 'recruiter auth modal exists').toBe(true);
+    expect(r.modalOpen, 'recruiter auth modal is closed on load').toBe(false);
+  });
+
+  test('Q1: guest tapping "For Employers" opens the recruiter auth modal, not the Employer view', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.requireSignIn = () => true;   // isolate the recruiter gate from the generic auth gate
+      openEmployer();
+      return {
+        modalOpen: document.getElementById('recruiter-auth-modal').classList.contains('open'),
+        viewActive: document.getElementById('view-employer').classList.contains('active'),
+      };
+    });
+    expect(r.modalOpen, 'a guest is routed to recruiter auth first').toBe(true);
+    expect(r.viewActive, 'the Employer view must not open for an unauthenticated recruiter').toBe(false);
+  });
+
+  test('Q1: recruiter email gate — corporate domains pass, free/disposable/invalid rejected (R1 BE)', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      corporate: _recruiterEmailReason('jane@acmecorp.com'),
+      gmail: _recruiterEmailReason('jane@gmail.com'),
+      outlook: _recruiterEmailReason('jane@outlook.com'),
+      disposable: _recruiterEmailReason('jane@mailinator.com'),
+      malformed: _recruiterEmailReason('not-an-email'),
+      empty: _recruiterEmailReason(''),
+    }));
+    expect(r.corporate, 'a corporate-domain email passes').toBe('ok');
+    expect(r.gmail, 'free provider rejected').toBe('free_provider');
+    expect(r.outlook).toBe('free_provider');
+    expect(r.disposable, 'disposable domain rejected').toBe('disposable');
+    expect(r.malformed, 'malformed email rejected').toBe('invalid');
+    expect(r.empty, 'empty email rejected').toBe('invalid');
+  });
+
+  test('Q1 candidate-first invariant: recruiter reads never fire for a pure candidate', async ({ page }) => {
+    // The hot path (deck/Browse) legitimately reads the `jobs` collection; the
+    // invariant is that NO RECRUITER-SPECIFIC read (loadRecruiter / pending queue)
+    // ever fires for someone who never opted into the recruiter role.
+    const r = await page.evaluate(() => {
+      let recReads = 0;
+      localStorage.removeItem('gpj_role');
+      window._recruiter = null;
+      if (window.fb) {
+        ['loadRecruiter', 'adminPendingRecruiters', 'loadCompany'].forEach((m) => {
+          if (typeof fb[m] === 'function') { const orig = fb[m]; fb[m] = function () { recReads++; return orig.apply(fb, arguments); }; }
+        });
+      }
+      // candidate uses the hot path
+      switchView('browse'); renderBrowse();
+      switchView('swipe');
+      if (typeof gpjAuthChanged === 'function') { try { gpjAuthChanged(null); } catch (e) {} }   // signed-out auth event
+      return { recReads, role: localStorage.getItem('gpj_role') };
+    });
+    expect(r.role, 'no recruiter role flag for a candidate').toBeNull();
+    expect(r.recReads, 'candidate browse/swipe/auth-change must not trigger any recruiter doc read').toBe(0);
+  });
+});
+
+test.describe('[STATE-COVERAGE] v100 deck + company-card smart-data caps', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('Q1: DECK mapper carries full desc + req/benefits/summary (was a 460-char stub with no sections)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      localStorage.setItem('gpj_loc', 'Houston, TX');
+      const longDesc = ('A real paragraph of deck description text with substance in it. '.repeat(50) + 'It ends cleanly.').trim();   // ~3200 chars
+      const longReq = ('• A requirement line with real substance\n'.repeat(50) + '• Final requirement.').trim();                       // ~2000 chars
+      const ben = ('• A benefit line\n'.repeat(40) + '• Final benefit.').trim();
+      const origFetch = window.fb && fb.fetchJobs;
+      window.fb = window.fb || {};
+      fb.fetchJobs = async () => [
+        { title: 'Deck Cap Role', company: 'CapCo', location: 'Houston, TX', direct_apply_url: 'https://x.example/deckcap', description: longDesc, requirements: longReq, benefits: ben },
+        /* Q4 shape: a doc with NO req/benefits must map to '' — never undefined */
+        { title: 'Deck Bare Role', company: 'BareCo', location: 'Houston, TX', direct_apply_url: 'https://x.example/deckbare', description: 'Short and complete.' },
+      ];
+      try { await _fetchLiveMarketJobs(); } finally { if (origFetch) fb.fetchJobs = origFetch; }
+      const j = (jobsQueue || []).find((x) => x.t === 'Deck Cap Role') || {};
+      const bare = (jobsQueue || []).find((x) => x.t === 'Deck Bare Role') || {};
+      /* the deck drawer must now render the requirements + benefits sections */
+      let drawer = '';
+      try {
+        rawQueue = [j]; jobsQueue = [j]; applySwipeFilters(); hydrateDrawer();
+        drawer = (document.getElementById('drawer-summary') || {}).textContent || '';
+      } catch (e) { drawer = 'ERR ' + e; }
+      return {
+        descLen: (j.desc || '').length, reqLen: (j.req || '').length, benLen: (j.benefits || '').length, sumLen: (j.summary || '').length,
+        bareReq: bare.req, bareBen: bare.benefits,
+        drawerReq: drawer.includes('Final requirement'), drawerBen: drawer.includes('Final benefit'),
+        drawerUndef: /undefined|NaN/.test(drawer),
+      };
+    });
+    expect(r.descLen, 'deck desc must carry the full stored text, not the old 460 slice').toBeGreaterThan(2500);
+    expect(r.reqLen, 'deck jobs now carry requirements').toBeGreaterThan(1500);
+    expect(r.benLen, 'deck jobs now carry benefits').toBeGreaterThan(400);
+    expect(r.sumLen, 'deck jobs now carry a summary').toBeGreaterThan(400);
+    expect(r.bareReq, 'missing requirements map to empty string').toBe('');
+    expect(r.bareBen, 'missing benefits map to empty string').toBe('');
+    expect(r.drawerReq, 'drawer renders the requirements tail (not a 460-char stub)').toBe(true);
+    expect(r.drawerBen, 'drawer renders the Benefits section').toBe(true);
+    expect(r.drawerUndef).toBe(false);
+  });
+
+  test('Q1: COMPANY-CARD jobs carry full stored text at the v97 caps (Open Full Job Card)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const longDesc = ('Company card description content with real sentences in it here. '.repeat(50) + 'Ends cleanly.').trim();
+      const longReq = ('• Company requirement with substance\n'.repeat(40) + '• Final cc requirement.').trim();
+      const ben = ('• Company benefit\n'.repeat(30) + '• Final cc benefit.').trim();
+      const origFetch = window.fb && fb.fetchJobs;
+      window.fb = window.fb || {};
+      fb.fetchJobs = async () => [{ title: 'CC Cap Role', company: 'CapCo', location: 'Houston, TX', direct_apply_url: 'https://x.example/cc', description: longDesc, requirements: longReq, benefits: ben }];
+      try { await loadCompanyJobs('CapCo'); } finally { if (origFetch) fb.fetchJobs = origFetch; }
+      const j = (cmJobsCache || [])[0] || {};
+      return { n: (cmJobsCache || []).length, descLen: (j.desc || '').length, reqLen: (j.req || '').length, benLen: (j.benefits || '').length };
+    });
+    expect(r.n, 'company match must land in cmJobsCache').toBeGreaterThan(0);
+    expect(r.descLen, 'company-card desc past the old 460 slice').toBeGreaterThan(2500);
+    expect(r.reqLen, 'company-card requirements past the old 600 slice').toBeGreaterThan(1200);
+    expect(r.benLen, 'company-card jobs now carry benefits').toBeGreaterThan(300);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
