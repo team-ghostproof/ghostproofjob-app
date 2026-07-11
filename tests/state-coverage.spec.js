@@ -1234,6 +1234,202 @@ test.describe('[STATE-COVERAGE] v100 deck + company-card smart-data caps', () =>
   });
 });
 
+test.describe('[STATE-COVERAGE] v101 stabilize (bugs 1-5 + AI quality 7-9)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('#1: pools collapse doc-ID twins — cosmetic loc variants + broad twins fold, real cities stay', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const twins = [
+        { title: 'Operations Manager', company: 'DupCorp', location: 'Houston, TX', description: 'The richer stored copy of this description wins the collapse.' },
+        { title: 'Operations Manager', company: 'DupCorp', location: 'Houston, Texas, US', description: 'Short copy.' },
+        { title: 'Operations Manager', company: 'DupCorp', location: 'United States', is_remote: true, description: 'Broad twin.' },
+        { title: 'Operations Manager', company: 'DupCorp', location: 'Dallas, TX', description: 'A genuinely distinct city posting.' },
+        { title: 'RN', company: 'HCA', location: 'Remote', is_remote: true, description: 'Fully remote, work from home.' },
+      ];
+      const out = _gpjDedupePool(twins);
+      const houston = out.filter((r2) => /houston/i.test(r2.location));
+      /* Browse render path uses it too */
+      _browseRawPool = twins.slice(0, 3).map((t, i) => Object.assign({ direct_apply_url: 'https://x.example/' + i }, t));
+      _browseLastLoc = resolveLocation('Houston, TX'); _browseScope = 'market';
+      window._browseOwnsLive = true; _browsePoolKey = '(all)';
+      _browseRescope();
+      return { n: out.length, houstonN: houston.length, houstonDesc: houston[0] && houston[0].description,
+               hasDallas: out.some((r2) => /dallas/i.test(r2.location)), hasRemoteRN: out.some((r2) => r2.title === 'RN'),
+               browseRows: liveJobs.filter((j) => j.t === 'Operations Manager').length };
+    });
+    expect(r.houstonN, 'Houston cosmetic variants collapse to ONE card').toBe(1);
+    expect(r.houstonDesc, 'the richer desc wins').toContain('richer stored copy');
+    expect(r.hasDallas, 'a genuinely different city stays a distinct card').toBe(true);
+    expect(r.hasRemoteRN, 'a purely remote job (no city sibling) survives').toBe(true);
+    expect(r.n, 'broad United States twin folds into the city row').toBe(3);
+    expect(r.browseRows, 'Browse renders the deduped pool (was 2 identical rows)').toBe(1);
+  });
+
+  test('#2: Applied/Skipped/Responses render newest→oldest; onclick indices stay valid', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const day = 86400000, now = Date.now();
+      const mk = (t, co, off, extra) => Object.assign({ t: t, co: co, when: now - off * day }, extra || {});
+      lists.skipped = [mk('OLD', 'A', 9), mk('NEW', 'B', 0), mk('MID', 'C', 4)];
+      lists.applied = [mk('A-OLD', 'A', 8), mk('A-NEW', 'B', 0)];
+      lists.responses = [mk('R-OLD', 'A', 6, { status: 'rejection' }), mk('R-NEW', 'B', 1, { status: 'interview' })];
+      const order = {};
+      ['skipped', 'applied', 'responses'].forEach((k) => { renderStatList(k); order[k] = lists[k].map((x) => x.t); });
+      renderStatList('skipped');
+      const firstRow = (document.querySelector('#stat-modal-list > div') || {}).textContent || '';
+      /* index validity: row 0's put-back control must act on lists.skipped[0] === NEW */
+      return { order, firstRow: firstRow.slice(0, 30), zeroIsNewest: lists.skipped[0].t === 'NEW' };
+    });
+    expect(r.order.skipped).toEqual(['NEW', 'MID', 'OLD']);
+    expect(r.order.applied).toEqual(['A-NEW', 'A-OLD']);
+    expect(r.order.responses).toEqual(['R-NEW', 'R-OLD']);
+    expect(r.firstRow, 'top rendered row is the newest').toContain('NEW');
+    expect(r.zeroIsNewest, 'in-place sort keeps onclick indices aligned').toBe(true);
+  });
+
+  test('#3: Match-to-Job modal stacks ABOVE the expanded job card on Browse', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.requireSignIn = () => true; window.matchAllowed = () => true; window.aiHourlyAllowed = () => true;
+      resumeReady = true;
+      Object.assign(resumeData, { title: 'Ops', skills: 'Excel', jobs: [{ t: 'Ops', c: 'Acme', b: 'x' }], summary: 's', certs: [], eduExtra: [] });
+      liveJobs = [{ t: 'Stack Role', co: 'ZCo', loc: 'Houston, TX', url: 'https://x.example/z', desc: 'd', summary: 'd', sal: '', ghost: 10, match: 60, posting_age_days: 1 }];
+      window._browseOwnsLive = true; _browsePoolKey = '(all)';
+      switchView('browse'); renderBrowse(); openBrowseExpanded(0);
+      matchToJobForRole('Stack Role', 'ZCo', 'd');
+      const m = document.getElementById('match2job-modal');
+      const out = { open: m.classList.contains('open'), z: parseInt(getComputedStyle(m).zIndex, 10),
+                    card: parseInt(getComputedStyle(document.getElementById('browse-expand-modal')).zIndex, 10) };
+      m.classList.remove('open'); closeBrowseExpanded();
+      return out;
+    });
+    expect(r.open, 'M2J modal opens').toBe(true);
+    expect(r.z, 'M2J above the expanded job card').toBeGreaterThan(r.card);
+    expect(r.z, 'below apply-flow (358) and vibe-review (360)').toBeLessThan(358);
+  });
+
+  test('#4: field/territory remote confirmed even DEEP in a full-length desc; v95 fake-remote intact (Medtronic fixture)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const filler = 'The Clinical Specialist provides clinical and technical support to customers in the assigned area. '.repeat(52); // ~5100 chars — past the old 4000 scan window
+      const medtronic = { title: 'Clinical Specialist', company: 'Medtronic', location: 'Austin, TX', is_remote: true,
+        description: filler + ' This is a remote position not located at a physical Medtronic site.' };
+      const fieldBased = { title: 'Territory Rep', company: 'FieldCo', location: 'Tucson, AZ', is_remote: true,
+        description: 'You will be field-based, covering your territory from a home office.' };
+      const idiq = { title: 'Marketing Manager', company: 'IDIQ', location: 'Temecula, CA', is_remote: true,
+        description: 'IDIQ is a leader in identity protection. Great culture, great benefits, join us.' };
+      return { medtronic: _gpjEffectiveRemote(medtronic), fieldBased: _gpjEffectiveRemote(fieldBased), idiq: _gpjEffectiveRemote(idiq) };
+    });
+    expect(r.medtronic, 'confirming line beyond the old 4000-char window now counts').toBe(true);
+    expect(r.fieldBased, 'field-based/territory phrasing confirms remote').toBe(true);
+    expect(r.idiq, 'v95 protection intact: city-anchored flag with a generic blurb stays excluded').toBe(false);
+  });
+
+  test('#5: ATS preview and résumé/PDF produce the SAME toggled contact (founder state: unsaved field)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const p = { first: 'T', last: 'U', email: '', phone: '', address: '', preferences: { showAddressOnResume: true, addressFull: false } };
+      localStorage.setItem('gpj_profile', JSON.stringify(p));
+      const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+      set('acc-email', 't@x.com'); set('acc-phone', '(713) 555-0100'); set('acc-address', '123 Main St, Houston, TX, 77002');
+      resumeReady = true;
+      Object.keys(resumeData).forEach((k) => { delete resumeData[k]; });
+      Object.assign(resumeData, { name: 'T U', title: 'Spec', skills: 'Excel', jobs: [{ t: 'Rep', c: 'Acme', b: 'x' }], summary: 's', certs: [], eduExtra: [] });
+      syncProfileToResume();                    /* ATS-preview writer */
+      const ats = resumeData.contact;
+      const html = buildResumeHTML(true);       /* visible/PDF writer */
+      const built = resumeData.contact;
+      /* full-address toggle ON → street shows on BOTH */
+      const p2 = JSON.parse(localStorage.getItem('gpj_profile')); p2.preferences.addressFull = true;
+      localStorage.setItem('gpj_profile', JSON.stringify(p2));
+      syncProfileToResume(); const atsFull = resumeData.contact;
+      buildResumeHTML(true); const builtFull = resumeData.contact;
+      /* parse-preservation: nothing available must NOT wipe a parsed contact */
+      set('acc-email', ''); set('acc-phone', ''); set('acc-address', '');
+      localStorage.setItem('gpj_profile', JSON.stringify({ preferences: {} }));
+      resumeData.contact = 'parsed@resume.com · (832) 555-0100';
+      _rebuildContact();
+      return { ats, built, same: ats === built, htmlHasCity: /Houston, TX/.test(html), htmlHasStreet: /Main St/.test(html),
+               atsFull, builtFull, sameFull: atsFull === builtFull, parsedKept: resumeData.contact };
+    });
+    expect(r.same, 'both writers now produce the identical contact').toBe(true);
+    expect(r.built).toContain('Houston, TX');
+    expect(r.built, 'city/state mode never leaks the street').not.toContain('Main St');
+    expect(r.htmlHasCity, 'visible résumé renders the address').toBe(true);
+    expect(r.htmlHasStreet).toBe(false);
+    expect(r.sameFull).toBe(true);
+    expect(r.builtFull, 'full-address ON shows the street on both').toContain('Main St');
+    expect(r.parsedKept, 'empty rebuild never wipes a parsed contact').toBe('parsed@resume.com · (832) 555-0100');
+  });
+
+  test('#7: bullets that already lead with a verb never get a second verb prepended (founder strings)', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      collab: _leadWithVerb('Collaborated with cross-functional teams to launch campaigns'),
+      util: _leadWithVerb('utilized CRM tools to track accounts'),
+      ensure: _leadWithVerb('Ensured compliance across 500+ locations'),
+      gerund: _leadWithVerb('Collaborating with vendors on pricing'),
+      weak: _leadWithVerb('Responsible for customer accounts and renewals'),
+      noun: _leadWithVerb('Monthly financial reporting for leadership'),
+    }));
+    expect(r.collab).toBe('Collaborated with cross-functional teams to launch campaigns');
+    expect(r.util).toBe('Utilized CRM tools to track accounts');
+    expect(r.ensure).toBe('Ensured compliance across 500+ locations');
+    expect(r.gerund, 'gerund lead converts to past tense, no prepend').toBe('Collaborated with vendors on pricing');
+    expect(r.weak, 'weak-phrase strip + strong lead still works').toMatch(/^(Supported|Drove|Managed|Led|Delivered)\s/);
+    expect(r.weak).not.toMatch(/\b(Supported|Drove|Managed|Led|Delivered)\s+(collaborated|utilized|ensured)/i);
+    expect(r.noun, 'noun-led bullets still get a fitting verb').toMatch(/^[A-Z][a-z]+ed\s/);
+    Object.values(r).forEach((b) => expect(b).not.toMatch(/^[A-Z][a-z]+(ed|ove|ew|aw|uilt|ed)\s+[a-z]+ed\s/));
+  });
+
+  test('#8: summary facts block reads years/roles/scope from the REAL résumé; empty résumé yields none', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      Object.keys(resumeData).forEach((k) => { delete resumeData[k]; });
+      Object.assign(resumeData, { title: 'Account Manager', skills: 'Salesforce · Excel · Retention',
+        jobs: [
+          { t: 'Account Manager', c: 'BigCo', d: '2019 – 2024', b: 'Managed 500+ locations nationwide\nLed teams of 8+ reps' },
+          { t: 'Coordinator', c: 'OldCo', d: '2014 – 2019', b: 'Handled onboarding' },
+        ], summary: '', certs: [], eduExtra: [] });
+      const facts = _summaryFacts();
+      Object.keys(resumeData).forEach((k) => { delete resumeData[k]; });
+      Object.assign(resumeData, { jobs: [], skills: '', certs: [], eduExtra: [] });
+      const none = _summaryFacts();
+      return { facts, none };
+    });
+    expect(r.facts).toContain('YEARS OF EXPERIENCE');
+    expect(r.facts, 'years computed from the earliest job date').toMatch(/1[0-2]\+ years/);
+    expect(r.facts).toContain('Account Manager at BigCo');
+    expect(r.facts, 'real scope numbers quoted verbatim').toContain('500+ locations');
+    expect(r.facts).toContain('teams of 8+');
+    expect(r.none, 'no résumé → no facts block, never fabricated').toBe('');
+  });
+
+  test('#9: skills tidy — paren mashups split, dupes/titles/fragments drop, cap 15 (founder string)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      Object.assign(resumeData, { title: 'Marketing Specialist', jobs: [{ t: 'Account Manager', c: 'X', b: '' }] });
+      const founder = _tidySkills('(PowerPoint · Word · Excel) Expert · Excel · CRM (Salesforce · HubSpot)Compliance · Account Retention · Retention account · Marketing Specialist · Account Manager');
+      const legacy1 = _tidySkills('Excel · Mixology · Execution · excel');
+      const legacy2 = _tidySkills('Excel · Professional · Digital Marketing · excel');
+      const many = _tidySkills(Array.from({ length: 20 }, (_, i) => 'Salesforce' + i).join(' · '));
+      return { founder: founder.skills, removed: founder.removed, legacy1, legacy2, manyN: many.skills.split(' · ').length };
+    });
+    const list = r.founder.split(' · ');
+    expect(list).toContain('PowerPoint');
+    expect(list).toContain('Word');
+    expect(list).toContain('Excel');
+    expect(list.filter((s) => /^excel$/i.test(s)).length, 'Excel appears once despite the paren dupe').toBe(1);
+    expect(list).toContain('CRM');
+    expect(list).toContain('Salesforce');
+    expect(list).toContain('HubSpot');
+    expect(list).toContain('Compliance');
+    expect(list.filter((s) => /retention/i.test(s)).length, 'word-set dedupe collapses the reversed fragment').toBe(1);
+    expect(r.founder, 'job titles are not skills').not.toMatch(/Marketing Specialist|Account Manager/);
+    expect(r.removed.join('|')).toMatch(/Expert/);
+    expect(r.legacy1.skills, 'v92 behavior preserved').toBe('Excel · Mixology');
+    expect(r.legacy1.removed).toEqual(['Execution']);
+    expect(r.legacy2.skills).toBe('Excel · Digital Marketing');
+    expect(r.manyN, 'capped at 15').toBe(15);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
