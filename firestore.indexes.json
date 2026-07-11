@@ -1,0 +1,23 @@
+{
+  "__comment": "GPJ composite indexes (v101a #3). The app's job-pool queries need these two; without the active+ingestedAt one, every pool build logs 'wide unscoped query failed' and silently degrades to an UNORDERED limit() pull — same read count (no cost inflation) but a random-by-docID sample instead of the newest window, so fresh jobs get missed and stale ones leak in. Create via the console error link (~30s) or `firebase deploy --only firestore:indexes`.",
+  "indexes": [
+    {
+      "collectionGroup": "jobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "active", "order": "ASCENDING" },
+        { "fieldPath": "ingestedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "jobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "region", "order": "ASCENDING" },
+        { "fieldPath": "active", "order": "ASCENDING" },
+        { "fieldPath": "ingestedAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

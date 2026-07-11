@@ -1234,6 +1234,114 @@ test.describe('[STATE-COVERAGE] v100 deck + company-card smart-data caps', () =>
   });
 });
 
+test.describe('[STATE-COVERAGE] v101a account-switch desync (Q2-switch quadrant)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('#1a: day counter never latches a fresh now() while signed in / pre-auth; cloud force lands', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.removeItem('gpj_install_date');
+      localStorage.setItem('gpj_profile', JSON.stringify({}));
+      localStorage.setItem('gpj_owner_uid', 'switchedUser123');   /* an account is signed in */
+      window._gpjAuthResolved = true;
+      const d1 = accountAgeDays();
+      const latchedSignedIn = !!localStorage.getItem('gpj_install_date');
+      const poisoned = !!(JSON.parse(localStorage.getItem('gpj_profile') || '{}').createdAt);
+      /* cloud createdAt arrives (loadTierFromProfile force path) */
+      const cloudTs = Date.now() - 40 * 86400000;
+      localStorage.setItem('gpj_install_date', String(cloudTs));
+      const d2 = accountAgeDays();
+      /* pre-first-auth-event boot must not latch either */
+      localStorage.removeItem('gpj_install_date'); localStorage.removeItem('gpj_owner_uid');
+      window._gpjAuthResolved = false;
+      accountAgeDays();
+      const latchedPreAuth = !!localStorage.getItem('gpj_install_date');
+      /* genuine guest (auth resolved signed-out) DOES latch */
+      window._gpjAuthResolved = true;
+      accountAgeDays();
+      const latchedGuest = !!localStorage.getItem('gpj_install_date');
+      localStorage.removeItem('gpj_owner_uid');
+      return { d1, latchedSignedIn, poisoned, d2, latchedPreAuth, latchedGuest };
+    });
+    expect(r.latchedSignedIn, 'signed-in read must NOT persist a fresh install date').toBe(false);
+    expect(r.poisoned, 'signed-in read must NOT push a bogus createdAt into the profile').toBe(false);
+    expect(r.d2, 'cloud createdAt lands as the real day count').toBe(40);
+    expect(r.latchedPreAuth, 'before the FIRST auth event nothing may latch').toBe(false);
+    expect(r.latchedGuest, 'a genuine guest still gets an anchored install date').toBe(true);
+  });
+
+  test('#1b: admin "This device" line repaints when the cloud lists sync lands', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      isAdmin = true;
+      lists = { applied: [], responses: [], skipped: [], viewed: [] };
+      try { const old = document.getElementById('admin-panel'); if (old) old.remove(); } catch (e) {}
+      renderAdminPanel();
+      const line = () => ((document.getElementById('admin-device-stats') || {}).textContent || '(missing)').replace(/\s+/g, ' ').trim();
+      const preSync = line();
+      lists.applied = Array.from({ length: 11 }, (_, i) => ({ t: 'A' + i, co: 'C', when: Date.now() - i }));
+      lists.skipped = Array.from({ length: 4 }, (_, i) => ({ t: 'S' + i, co: 'C', when: Date.now() - i }));
+      lists.responses = Array.from({ length: 60 }, (_, i) => ({ t: 'R' + i, co: 'C', when: Date.now() - i }));
+      updateStatCounters();   /* what the cloud merge calls */
+      const postSync = line();
+      isAdmin = false;
+      return { preSync, postSync };
+    });
+    expect(r.preSync).toContain('Applied: 0');
+    expect(r.postSync, 'the SAME lists object now paints the admin line too').toContain('Applied: 11');
+    expect(r.postSync).toContain('Skipped: 4');
+    expect(r.postSync).toContain('Responses: 60');
+  });
+
+  test('#1c: gpj_role never survives a sign-out wipe or a candidate sign-in', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      localStorage.setItem('gpj_role', 'recruiter');
+      gpjWipeLocalUserData();
+      const afterWipe = localStorage.getItem('gpj_role');
+      /* candidate signs in on a device with a stale flag */
+      localStorage.setItem('gpj_role', 'recruiter');
+      window.fb = window.fb || {};
+      const orig = fb.loadRecruiter;
+      fb.loadRecruiter = async () => null;
+      _gpjRecruiterAuthApply({ uid: 'candidateX' });
+      await new Promise((res) => setTimeout(res, 120));
+      if (orig) fb.loadRecruiter = orig;
+      const afterCandidate = localStorage.getItem('gpj_role');
+      /* a REAL recruiter keeps the flag */
+      localStorage.setItem('gpj_role', 'recruiter');
+      fb.loadRecruiter = async () => ({ company: 'Acme', isValidated: true });
+      _gpjRecruiterAuthApply({ uid: 'recruiterY' });
+      await new Promise((res) => setTimeout(res, 120));
+      if (orig) fb.loadRecruiter = orig;
+      const recruiterKeeps = localStorage.getItem('gpj_role');
+      localStorage.removeItem('gpj_role'); window._recruiter = null;
+      return { afterWipe, afterCandidate, recruiterKeeps };
+    });
+    expect(r.afterWipe, 'sign-out wipe clears the role flag').toBeNull();
+    expect(r.afterCandidate, 'a uid with no recruiter doc clears the stale flag').toBeNull();
+    expect(r.recruiterKeeps, 'a real recruiter keeps the role').toBe('recruiter');
+  });
+
+  test('#1d: post-switch empty cache shows a restoring state, not false zeros; resolves after sync', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      lists = { applied: [], responses: [], skipped: [], viewed: [] };
+      updateStatCounters();
+      const orig = window.loadTierFromProfile; window.loadTierFromProfile = function () {};   /* hold the cloud pull */
+      try { window.gpjAuthChanged({ uid: 'switchedUser123', email: 'throwaway@test.example' }); } catch (e) {}
+      window.loadTierFromProfile = orig;
+      const during = (document.getElementById('stat-applied') || {}).textContent;
+      /* the merge lands */
+      lists.applied = [{ t: 'A', co: 'C', when: Date.now() }];
+      updateStatCounters();
+      const after = (document.getElementById('stat-applied') || {}).textContent;
+      return { during, after };
+    });
+    expect(r.during, 'restore window shows a holding state, never a false 0').toBe('…');
+    expect(r.after, 'real numbers land after the sync completes').toBe('1');
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);

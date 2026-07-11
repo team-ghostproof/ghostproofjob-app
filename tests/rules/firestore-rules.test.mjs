@@ -16,7 +16,7 @@ import {
   assertFails,
   assertSucceeds,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
 
 const PROJECT = 'gpj-rules-test';
 let env;
@@ -36,6 +36,8 @@ before(async () => {
     const db = ctx.firestore();
     await setDoc(doc(db, 'recruiters/recruiterA'), { company: 'Acme', isValidated: true, plan: 'free' });
     await setDoc(doc(db, 'recruiters/recruiterB'), { company: 'Globex', isValidated: true, plan: 'free' });
+    await setDoc(doc(db, 'recruiters/recruiterPending'), { company: 'NewCo', isValidated: false, plan: 'free' });   // v101a #2: awaiting the admin queue
+    await setDoc(doc(db, 'companies/acme.com'), { name: 'Acme', domain: 'acme.com', verifiedEmployer: false });
     await setDoc(doc(db, 'jobs/jobA'), { title: 'Ops', ownerUid: 'recruiterA', source: 'internal', isValidated: true });
     await setDoc(doc(db, 'jobs/jobB'), { title: 'Sales', ownerUid: 'recruiterB', source: 'internal', isValidated: true });
     await setDoc(doc(db, 'jobs/harvested1'), { title: 'Nurse', source: 'jobspy' });
@@ -56,6 +58,7 @@ const asRecruiterB = () => env.authenticatedContext('recruiterB', { email: 'b@gl
 const asCandC = () => env.authenticatedContext('candC', { email: 'c@x.com' }).firestore();
 const asCandD = () => env.authenticatedContext('candD', { email: 'd@x.com' }).firestore();
 const asGuest = () => env.unauthenticatedContext().firestore();
+const asAdmin = () => env.authenticatedContext('adminUser', { email: 'asosa@ghostproofjob.com' }).firestore();   // v101a #2
 
 describe('recruiter isolation', () => {
   test('recruiter CAN read applications for their OWN job', async () => {
@@ -90,6 +93,35 @@ describe('candidate isolation', () => {
   });
   test('candidate CANNOT read another candidate\'s profile', async () => {
     await assertFails(getDoc(doc(asCandD(), 'profiles/candC')));
+  });
+});
+
+// v101a #2 (founder live repro: `adminPendingRecruiters Missing or insufficient
+// permissions`): the EXACT query the admin Employer Verification Queue runs must
+// succeed for an admin and fail for everyone else. The repo rules already grant
+// it — the live console was running the pre-R0 rules (no recruiters block at
+// all → default deny), so the real fix is DEPLOYING firestore.rules; these
+// cases prove the deployed file behaves correctly.
+describe('admin verification queue (v101a #2)', () => {
+  const pendingQ = (db) => query(collection(db, 'recruiters'), where('isValidated', '==', false), limit(100));
+  test('ADMIN can run the pending-recruiters queue query', async () => {
+    const snap = await assertSucceeds(getDocs(pendingQ(asAdmin())));
+    assert.equal(snap.size, 1, 'the seeded pending recruiter is returned');
+  });
+  test('a CANDIDATE cannot list recruiters', async () => {
+    await assertFails(getDocs(pendingQ(asCandC())));
+  });
+  test('a RECRUITER cannot list other recruiters (own doc get only)', async () => {
+    await assertFails(getDocs(pendingQ(asRecruiterA())));
+  });
+  test('a GUEST cannot list recruiters', async () => {
+    await assertFails(getDocs(pendingQ(asGuest())));
+  });
+  test('ADMIN can read a recruiter doc directly (verify/reject target)', async () => {
+    await assertSucceeds(getDoc(doc(asAdmin(), 'recruiters/recruiterPending')));
+  });
+  test('ADMIN can read companies (queue shows company records)', async () => {
+    await assertSucceeds(getDoc(doc(asAdmin(), 'companies/acme.com')));
   });
 });
 
