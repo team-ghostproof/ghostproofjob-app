@@ -422,11 +422,11 @@
   .got-it-btn:active{transform:scale(.96);}
 
   /* Onboarding nudge modal */
-  .modal-scrim{position:absolute;inset:0;z-index:250;background:rgba(18,15,29,.85);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:24px;}
+  .modal-scrim{position:absolute;inset:0;z-index:250;background:rgba(18,15,29,.85);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top,0px)) 24px calc(24px + env(safe-area-inset-bottom,0px));}  /* v101b 7c: on installed-iPhone standalone the box (and its ✕) must clear the notch + home indicator; env()=0 everywhere else */
   .modal-scrim.open{display:flex;}
   /* B-TEXT-CLIP (v84): popups are DYNAMIC — content wraps in full and the box
      scrolls inside the viewport instead of clipping or overflowing offscreen. */
-  .modal-box{background:var(--plum2);border:1px solid var(--plum4);border-radius:20px;padding:22px;width:100%;max-width:340px;text-align:center;max-height:88vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--plum4) transparent;overflow-wrap:anywhere;}
+  .modal-box{background:var(--plum2);border:1px solid var(--plum4);border-radius:20px;padding:22px;width:100%;max-width:340px;text-align:center;max-height:calc(88vh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--plum4) transparent;overflow-wrap:anywhere;}  /* v101b 7c */
   body.desk #quickstart-modal .modal-box{max-width:640px;padding:26px 32px;}
   /* F-CARD (v91): desktop width parity — the expanded JOB card and the COMPANY
      card open at the same width as the expanded swipe card, so "Job
@@ -566,7 +566,7 @@
   .pref-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
 
   /* Footer */
-  #footer-nav{background:var(--plum2);border-top:1px solid var(--plum3);display:flex;flex-shrink:0;z-index:50;}
+  #footer-nav{background:var(--plum2);border-top:1px solid var(--plum3);display:flex;flex-shrink:0;z-index:50;padding-bottom:env(safe-area-inset-bottom,0px);}  /* v101b 7c: home-indicator clearance on installed iPhones */
   .nav-tab{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 2px 12px;cursor:pointer;gap:3px;}
   .nav-tab .nav-icon{font-size:21px;transition:all .2s;}
   .nav-tab .nav-label{font-size:9px;font-weight:600;color:var(--muted);text-align:center;line-height:1.2;}
@@ -1079,11 +1079,15 @@
         <div class="field-label">Company website</div>
         <input class="field-input" id="rec-website" placeholder="https://acme.com" style="margin-bottom:8px;"/>
       </div>
+      <!-- v101b A: credentials live in a real <form> so browsers/password managers
+           treat them correctly (B7 pattern, candidate auth got this in v85) -->
+      <form id="rec-auth-form" onsubmit="return false;">
       <div class="field-label">Company email</div>
-      <input class="field-input" id="rec-email" type="email" placeholder="you@yourcompany.com" oninput="validateRecruiterEmail()" style="margin-bottom:2px;"/>
+      <input class="field-input" id="rec-email" type="email" autocomplete="username" placeholder="you@yourcompany.com" oninput="validateRecruiterEmail()" style="margin-bottom:2px;"/>
       <div id="rec-email-err" style="display:none;font-size:10px;color:var(--danger);margin-bottom:6px;"></div>
       <div class="field-label" style="margin-top:6px;">Password (6+ characters)</div>
-      <input class="field-input" id="rec-pass" type="password" placeholder="••••••••" style="margin-bottom:12px;"/>
+      <input class="field-input" id="rec-pass" type="password" autocomplete="new-password" placeholder="••••••••" style="margin-bottom:12px;"/>
+      </form>
       <div class="opt-actions" style="margin-top:0;"><div class="opt-btn-go" id="rec-primary-btn" onclick="recruiterAuthPrimary()" style="flex:1;">Create employer account</div></div>
       <div style="text-align:center;font-size:12px;color:var(--muted);margin-top:10px;"><span id="rec-toggle-text">Already have an employer account?</span> <span onclick="toggleRecruiterAuthMode()" style="color:var(--cyber);font-weight:700;cursor:pointer;text-decoration:underline;">Log in</span></div>
       <div onclick="document.getElementById('recruiter-auth-modal').classList.remove('open')" style="color:var(--muted);font-size:12px;cursor:pointer;padding:8px;text-align:center;margin-top:4px;">Maybe later</div>
@@ -1417,10 +1421,13 @@
         <div onclick="document.getElementById('change-email-modal').classList.remove('open')" style="color:var(--muted);cursor:pointer;font-size:16px;">✕</div>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5;">For your security, confirm your current password to change the email you sign in with. You'll use the new email next time you log in.</div>
+      <!-- v101b A: same B7 form treatment for the change-login-email credentials -->
+      <form id="cle-form" onsubmit="return false;">
       <div class="field-label">New Login Email</div>
-      <input class="field-input" id="cle-new-email" type="email" placeholder="you@email.com" style="margin-bottom:10px;font-size:13px;"/>
+      <input class="field-input" id="cle-new-email" type="email" autocomplete="username" placeholder="you@email.com" style="margin-bottom:10px;font-size:13px;"/>
       <div class="field-label">Current Password</div>
-      <input class="field-input" id="cle-password" type="password" placeholder="Your password" style="margin-bottom:14px;font-size:13px;"/>
+      <input class="field-input" id="cle-password" type="password" autocomplete="current-password" placeholder="Your password" style="margin-bottom:14px;font-size:13px;"/>
+      </form>
       <div onclick="submitChangeLoginEmail()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;text-align:center;font-size:14px;cursor:pointer;">Update Email</div>
       <div id="cle-status" style="font-size:11px;margin-top:10px;text-align:center;"></div>
     </div>
@@ -8398,6 +8405,16 @@ window.gpjAuthChanged=function(user){
       chip.onclick=toggleProfileMenu;
       chip.title='Account menu';
     }
+    /* v101b 7b (founder live repro): the first-visit WELCOME overlay ships with
+       class 'open' in static HTML and only the ngj_returning check hides it —
+       after an account switch (sign-out wipes the marker) the restored session
+       painted the intro overlay OVER a signed-in user's app. A restored session
+       is by definition not a first visit: close it and restamp the marker. */
+    try{
+      const _ob=document.getElementById('onboard-modal');
+      if(_ob&&_ob.classList.contains('open')){ _ob.classList.remove('open'); }
+      localStorage.setItem('ngj_returning','1');
+    }catch(e){}
     /* cloud profile is the source of truth — pull it now */
     try{ if(typeof loadTierFromProfile==='function') loadTierFromProfile(user); }catch(e){}
     try{ updateStatCounters(); }catch(e){}

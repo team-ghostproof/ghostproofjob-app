@@ -237,3 +237,75 @@ The Max Distance slider was removed v97 because live job docs carry no coordinat
 2. Before any [UI-REVIEW] item: stop, propose, get OK, then code.
 3. After each build: benchmark (self-test + boot harness + handler/div checks) + end-to-end pass, then deliver PDFs (this checklist + Feature Launch Doc if a feature was added), all code/files, implementation instructions, a your-side test checklist, and any screenshots I need before the next batch.
 4. One clean, verified push per version; mirror identical; version markers bumped.
+
+
+---
+
+# v101+ INSERTS (appended 2026-07-12 from founder's checklist_inserts_v101plus.md — insert-only; reconciled against the unparked v101b tree; tags: [NEW]/[FINISH-GAP]/[VERIFY-ONLY])
+
+## FOUNDER ACTIONS (post-v101a status)
+- [x] Composite index CONFIRMED working (console: region+active 151 → merged 3147; no more "wide unscoped query failed").
+- [x] Repo `firestore.rules` deployed to the console (Load pending employers works).
+- [x] Account switch live-verified both directions (founder, 2026-07-12).
+- [ ] Recruiter test account: SIGN UP recruiter@ghostproofjob.com as employer; approve in the Verification Queue. (Signup confirmed working per founder live-test — companies write NOT client-blocked.)
+- [ ] Confirm composite index `jobs: active(Asc)+ingestedAt(Desc)` shows Enabled in the console UI.
+
+## v101b RECONCILIATION (unparked batch vs the inserts list)
+Already DONE in the unparked v101b tree (built + browser-verified + test-locked in the stabilize batch; evidence `docs/v101-screens/`):
+- [x] Sort Applied/Responses/Skipped newest→oldest in renderStatList [NEW] — DONE (in-place sort; indices valid).
+- [x] Match-to-Job modal z-index above job card [UI-REVIEW approved] — DONE (346→357).
+- [x] Genuine remote (Medtronic field/territory) [NEW/BE] — DONE (`_gpjPositiveRemote` window 16000 + phrasing; v95 IDIQ protection test-locked).
+- [x] Address toggle on visible résumé/PDF [FINISH-GAP] — DONE (single-builder consolidation; `syncProfileToResume` delegates to `_rebuildContact` with live-field fallback; end-to-end test covers full + city/state + parse preservation).
+- [x] Double-verb bullets [FINISH-GAP] — DONE (existing verb lead detected, never prepended; founder strings test-locked).
+- [x] Professional summary synthesis [NEW/BE] — DONE (`_summaryFacts()` → both prompts; 2–3 sentences; verbatim scope only).
+- [x] Skills dedupe/trim [FINISH-GAP] — DONE (paren-mashup split, word-set dedupe, title-drop, cap 15; v92 lenient rule preserved).
+
+Still OPEN (v101b sub-batches):
+- [x] A · #0-dupe re-check DONE (2026-07-12, live read-only): the named repro is GONE from the corrected pool — "Marketing Coordinator · HDR" does not exist in the true newest-3000 (the 23d-old doc was only reachable via the old RANDOM-sample fallback; index fix + 8-day harvester turnover removed it). Pool contains 166 same-title|co groups (e.g. multi-city FutureSight ×7) — exactly what the live `_gpjDedupePool` governs (city twins collapse, real cities stay). `jobKey` normalization already identical across deck/lists/saved/skipped — no key change needed; repro cannot recur.
+- [x] A · Password fields `#rec-pass` + `cle-password` into real `<form onsubmit="return false">`s (`#rec-auth-form`, `#cle-form`) + autocomplete hints — DONE, test-locked alongside the v85 candidate form.
+- [x] A · Intro/welcome overlay (7b) — DONE: the overlay ships 'open' in static HTML and only the ngj_returning check hid it; sign-out wipes that marker, so a restored session got the first-visit overlay. The auth user-branch now closes it + restamps the marker (a restored session is never a first visit); guest first-visit flow untouched. Browser before/after in `docs/v101b-screens/`.
+- [x] A · iOS PWA safe-area (7c) [UI-REVIEW approved] — CODE DONE: viewport-fit=cover + #header top inset already existed; the gaps were the modals + bottom nav. `.modal-scrim` padding now adds env(safe-area-inset-top/bottom) (every modal box AND its ✕ clears the notch), `.modal-box` max-height caps inside the safe viewport, `#footer-nav` clears the home indicator. Zero computed change where env()=0 (test-locked) + sizing matrix green at 375/768/1280. ⚠️ AWAITING founder installed-iPhone live verify — env() cannot be emulated.
+- [x] A · PWA install-banner warning — VERIFIED INTENTIONAL, no code change: the handler implements the correct custom-install pattern (preventDefault → stash → `pwaInstall()` calls `prompt()`); Chrome logs that warning for EVERY site with custom install UI. Desktop never prompts by design (mobile-first modal, ≤820px, 7-day cooldown).
+- [ ] A/B · Thin-data check on the 98%-match job [investigate] — single rec CONFIRMED correct by code; stored-data check needs the job's title+company from the founder (pre-07-06 docs self-heal by ~07-14).
+- [ ] B · AI cross-section output verify [VERIFY-ONLY→fix if fails] — Jett summary, key-duties, Match-to-Job (2–3 roles must differ), cover letter (real posting, no placeholder). Route through `_aiJobContext` if generic.
+- [ ] C · Admin "View as Employer" (11) [UI-REVIEW] — NOT BUILT; admin tapping "For Employers" errors like a normal recruiter login (no recruiters doc on the admin uid). Build isAdmin() read-only/flagged access, MASTER_EMAILS only.
+- [ ] C · Recruiters/Companies count in admin portal [NEW/FE] — count() aggregation, on-demand Count button (reads allowed by the deployed rules).
+- [ ] C · Company-card uniformity [VERIFY-ONLY] — F-CARD COMPLETE v91; confirm same format from every entry point; F-REVIEW dedup still holds.
+- [ ] C · Full interactive-element + LINK audit [NEW] — every button/handler/link (admin portal, deck, expanded card, Browse, Resume/Account/Settings, modals); clean console; no dead links.
+- [ ] D · F-METRICS — interactive no-fabrication metric elicitation [UI-REVIEW].
+- [ ] D · F-CREDITS — non-invasive AI-limit prompts (Core/Base Camp) + Booster explainer [UI-REVIEW].
+- [ ] E · v101b DELIVERY GATE = full E2E regression pass (benchmark + Playwright all quadrants ×2 + browser full-flow incl. account-switch + every button/link + rules suite + cost guard).
+
+## EMAIL — opt-out on the LIVE systems (Sprint 5; the Cloudflare Worker IS the lifecycle system — do NOT rebuild)
+- [ ] Add `worker/worker.js` to the repo from live source (byte-for-byte) + README (founder pastes into Cloudflare; not auto-deployed).
+- [ ] Unsubscribe footer at the choke points: Worker `shell()` + `/welcome` inline HTML + `sendAutomatedEmail` — EVERY email carries it.
+- [ ] `/unsubscribe` route + reason capture (got hired/not using/too many/other) + `emailUnsub` flag; ONE suppression gate honored by cron, all `/email/*`, `/welcome`, AND `sendAutomatedEmail`.
+- [ ] Audit: triggered vs defined-but-uncalled `/email/*` routes + notification types; confirm cron signup-date read resolves post-v101a.
+- [ ] Guardrail: welcome + one lifecycle email render identical except the footer. DROPPED: redundant `gpj-email-automation/` module.
+
+## RULES HARDENING (Sprint 3; pre-recruiter-R2; emulator-proven)
+- [ ] Scope `companies` signup write (founder confirmed signup completes post-deploy — lower urgency, still tighten before scale).
+- [ ] Recruiter can't self-verify own job — block changing `isValidated`/`ownerUid`/`source`/`companyId` on job update.
+- [ ] Gate candidate-projection reads (candidate_cards/match_tokens/recommended_candidates) on `isRecruiterVerified()` not bare existence — before discovery (R4).
+- [ ] Confirm `hired` docs carry no PII (any signed-in user can read).
+
+## GROWTH / MARKETING AUTOMATION (Sprint 4; free + low-effort; built, needs wiring)
+- [ ] SEO page generator (`seo-generator/`) — static city/role pages, ZERO runtime Firestore reads; company pages OFF until legal review. Implement `getSeoData()`; map `/g/*`; sitemap + cron.
+- [ ] Ghost-data content engine (`ghost-report-generator/`) + weekly content pack — auto-drafts for founder review; never auto-posts; defamation guardrails. Implement `getWeeklyGhostData()`.
+- [ ] Referral engine (`referral-engine/`) — invite→Booster; anti-abuse (self-referral block, activation-gated, cap 10, backend-written grants); [UI-REVIEW] in-app.
+- [ ] Organic launch needs NO code — founder posts from `GPJ_Marketing_Launch_Kit.md`.
+
+## F-GEO (Sprint 6 — after v101b verifies; feeds recruiter R3 reverse-match)
+- [ ] Offline US city-centroid table → lat/long on user+job docs → haversine at scope → re-enable Max Distance slider once it truly filters. [UI-REVIEW] plan first.
+
+## RECRUITER ONBOARDING — R2 additions (Sprint 7; confirmed via founder live-test)
+- [x] CONFIRMED: recruiter self-signup works (delete-and-recreate cleared the stale auth user); `companies` write NOT client-blocked.
+- [x] CONFIRMED: recruiter DASHBOARD does not exist — recruiter sign-in drops into the candidate app; R2–R4 build the employer experience.
+- [ ] R2: company name + website REQUIRED at signup [NEW].
+- [ ] R2: full company profile — contact first/last, title, description, location/address [NEW].
+- [ ] R2: account-type fork at signup ("individual or company?") [UI-REVIEW] — discoverability; must not break candidate signup.
+- [ ] Employers/Recruiters counter in admin = v101b batch C item (lands with v101b).
+
+## CROSS-CUTTING
+- D1 Firestore read-cost before R3 + before scaling growth; Blaze credit ends 2026-09-19.
+- Old truncated job docs self-heal ~2026-07-14 — confirm live after.

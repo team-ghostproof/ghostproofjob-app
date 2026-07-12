@@ -1538,6 +1538,85 @@ test.describe('[STATE-COVERAGE] v101a account-switch desync (Q2-switch quadrant)
   });
 });
 
+test.describe('[STATE-COVERAGE] v101b batch A (forms, overlay gate, safe-area)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('A: recruiter + change-email credentials live in real <form>s (B7 pattern)', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      rec: !!document.getElementById('rec-pass').closest('form'),
+      recIntercepted: ((document.getElementById('rec-pass').closest('form') || {}).getAttribute('onsubmit') || '').includes('return false'),
+      cle: !!document.getElementById('cle-password').closest('form'),
+      cleIntercepted: ((document.getElementById('cle-password').closest('form') || {}).getAttribute('onsubmit') || '').includes('return false'),
+      candidate: !!document.getElementById('auth-pass').closest('form'),
+    }));
+    expect(r.rec, '#rec-pass inside a <form>').toBe(true);
+    expect(r.recIntercepted).toBe(true);
+    expect(r.cle, '#cle-password inside a <form>').toBe(true);
+    expect(r.cleIntercepted).toBe(true);
+    expect(r.candidate, 'v85 candidate form untouched').toBe(true);
+  });
+
+  test('7b: welcome overlay closes when a session restores; still shows for true first visits', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      /* founder repro state: marker wiped by sign-out, overlay open, session restores */
+      localStorage.removeItem('ngj_returning');
+      const ob = document.getElementById('onboard-modal');
+      ob.classList.add('open');
+      const orig = window.loadTierFromProfile; window.loadTierFromProfile = function () {};
+      try { window.gpjAuthChanged({ uid: 'restoredUser', email: 'throwaway@test.example' }); } catch (e) {}
+      window.loadTierFromProfile = orig;
+      const closedOnAuth = !ob.classList.contains('open');
+      const restamped = localStorage.getItem('ngj_returning') === '1';
+      /* signed-out event must NOT re-open or stamp anything (guest first visit keeps its flow) */
+      localStorage.removeItem('ngj_returning');
+      try { window.gpjAuthChanged(null); } catch (e) {}
+      const guestUntouched = !ob.classList.contains('open');
+      return { closedOnAuth, restamped, guestUntouched };
+    });
+    expect(r.closedOnAuth, 'a restored session is not a first visit — overlay must close').toBe(true);
+    expect(r.restamped, 'returning marker restamped so reloads stay clean').toBe(true);
+    expect(r.guestUntouched).toBe(true);
+  });
+
+  test('7c: safe-area rules present; zero layout change on non-notched platforms', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const css = [...document.styleSheets].map((sh) => { try { return [...sh.cssRules].map((x) => x.cssText).join(' '); } catch (e) { return ''; } }).join(' ');
+      const scrim = document.querySelector('.modal-scrim');
+      const nav = document.getElementById('footer-nav');
+      return {
+        viewportFit: (document.querySelector('meta[name="viewport"]').getAttribute('content') || '').includes('viewport-fit=cover'),
+        scrimHasEnv: /modal-scrim[^}]*safe-area-inset-top/.test(css),
+        navHasEnv: /footer-nav[^}]*safe-area-inset-bottom/.test(css),
+        boxHasEnv: /modal-box[^}]*safe-area-inset/.test(css),
+        scrimPadTop: getComputedStyle(scrim).paddingTop,
+        navPadBottom: getComputedStyle(nav).paddingBottom,
+      };
+    });
+    expect(r.viewportFit, 'viewport-fit=cover present (env() active in standalone)').toBe(true);
+    expect(r.scrimHasEnv, 'modal scrim consumes the top inset').toBe(true);
+    expect(r.navHasEnv, 'bottom nav consumes the home-indicator inset').toBe(true);
+    expect(r.boxHasEnv, 'modal box height caps inside the safe viewport').toBe(true);
+    expect(r.scrimPadTop, 'no change where env()=0 (this test env)').toBe('24px');
+    expect(r.navPadBottom).toBe('0px');
+  });
+
+  test('7c: screen-sizing matrix — no horizontal overflow at phone/tablet/desktop widths', async ({ page }) => {
+    for (const [w, h] of [[375, 812], [768, 1024], [1280, 800]]) {
+      await page.setViewportSize({ width: w, height: h });
+      await page.waitForTimeout(300);
+      const m = await page.evaluate(() => ({
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        headerVisible: !!(document.getElementById('header') && document.getElementById('header').offsetHeight),
+      }));
+      expect(m.overflow, 'no horizontal scroll at ' + w + 'px').toBeLessThanOrEqual(0);
+      expect(m.headerVisible, 'header renders at ' + w + 'px').toBe(true);
+    }
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
