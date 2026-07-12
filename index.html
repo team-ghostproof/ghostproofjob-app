@@ -1269,7 +1269,7 @@
   </div>
 
   <!-- ===== MATCH TO JOB — gap analysis + realistic optimization ===== -->
-  <div class="modal-scrim" id="match2job-modal" style="z-index:346;">
+  <div class="modal-scrim" id="match2job-modal" style="z-index:357;"><!-- v101 #3 [UI-REVIEW approved]: was 346 — opened BEHIND the expanded job card (350); 357 sits above card + match-insight (356), below apply-flow (358) and vibe-review (360) -->
     <div class="modal-box" style="border:2px solid var(--mint);box-shadow:0 0 30px rgba(0,245,160,.25);max-height:88vh;overflow-y:auto;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
         <div style="font-size:17px;font-weight:800;">🎯 Match Your Resume to This Job</div>
@@ -2393,7 +2393,7 @@
       <!-- RECRUITER TIER (R1): employer entry -->
       <div style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v101a</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v101b</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3063,6 +3063,45 @@ function _locBadge(loc,ws){
   const L=String(loc||'').trim();
   return '📍 '+(L.length>22?((L.split(',')[0]||L).trim()):L);
 }
+/* v101 #1 (founder-approved dupe fix): the harvester keys docs as sha1(title|
+   company|region|citytoken), so ONE posting harvested under two regions
+   legitimately exists as TWO doc IDs. Dedupe every pool on title|company|CITY:
+   cosmetic location variants collapse ("Houston, TX" / "Houston, Texas, US"),
+   a country-level/remote twin folds into its city-anchored sibling, genuinely
+   different cities stay distinct cards. The richer (longer-desc) doc wins. */
+function _gpjCityToken(loc){
+  loc=String(loc||'').toLowerCase().trim();
+  if(!loc) return 'remote';
+  if(/\bremote\b/.test(loc)||/^(united states|usa|u\.?s\.?a?\.?|anywhere|nationwide)$/.test(loc)) return 'remote';
+  const city=loc.split(',')[0].trim().replace(/\s+/g,' ');
+  return city||'remote';
+}
+function _gpjDedupePool(arr){
+  try{
+    if(!Array.isArray(arr)||arr.length<2) return arr;
+    const co=r=>((typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||r.co||'');
+    const lo=r=>((typeof r.location==='string'?r.location:(r.location&&r.location.display_name))||r.loc||'');
+    const de=r=>String(r.description||r.desc||'');
+    const tc=r=>(((r.title||r.t||'')+'|'+co(r)).toLowerCase().replace(/\s+/g,' ').trim());
+    /* pass 1: title|co groups that have at least one real-city row */
+    const hasCity=new Set();
+    arr.forEach(r=>{ if(r && _gpjCityToken(lo(r))!=='remote') hasCity.add(tc(r)); });
+    /* pass 2: collapse — identical title|co|city keeps the longer desc; a broad
+       remote/country twin of a city-anchored posting is dropped (same posting). */
+    const best=new Map(); const order=[];
+    arr.forEach(r=>{
+      if(!r) return;
+      const g=tc(r); if(!g||g==='|'){ order.push({k:'@'+order.length, r:r}); return; }
+      const city=_gpjCityToken(lo(r));
+      if(city==='remote' && hasCity.has(g)) return;   /* broad twin of a city row */
+      const k=g+'|'+city;
+      const cur=best.get(k);
+      if(!cur){ best.set(k,r); order.push({k:k}); }
+      else if(de(r).length>de(cur).length){ best.set(k,r); }
+    });
+    return order.map(o=>o.r||best.get(o.k));
+  }catch(e){ return arr; }
+}
 function mapFirestoreJob(r){
   if(!r||!r.title) return null;
   const co=(typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||r.co||'Hiring Company';
@@ -3164,8 +3203,16 @@ function _gpjHybridText(v){
 /* B-FAKE-REMOTE (v95): the body POSITIVELY confirms remote work. Used to trust a
    remote flag on a job that's anchored to a specific CITY (see below). */
 function _gpjPositiveRemote(v){
-  const t=(String((v&&(v.description||v.desc))||'')+' '+String((v&&(v.requirements||v.req))||'')+' '+String((v&&v.work_setting)||'')).slice(0,4000);
-  return /\b(fully remote|100%\s*remote|work[\s-]?from[\s-]?home|\bwfh\b|telecommut|remote[\s-]first|work anywhere|anywhere in the|remote position|remote role|remote opportunity|home[\s-]based|virtual position)\b/i.test(t);
+  /* v101 #4 (Medtronic repro): (a) the scan window was slice(0,4000) — but v97+
+     stores descs up to 11000, so a confirming line deep in the posting was
+     invisible; widened to cover the full stored text. (b) field/territory-remote
+     phrasing added ("field-based", "territory", "not located at a physical
+     site", "position is remote", "work remotely"). Still only consulted for
+     city-anchored jobs ALREADY flagged remote by the source, so the v95
+     fake-remote protection (IDIQ: generic blurb, no remote text → excluded)
+     is unchanged. */
+  const t=(String((v&&(v.description||v.desc))||'')+' '+String((v&&(v.requirements||v.req))||'')+' '+String((v&&v.work_setting)||'')).slice(0,16000);
+  return /\b(fully remote|100%\s*remote|work[\s-]?from[\s-]?home|\bwfh\b|telecommut|remote[\s-]first|work anywhere|anywhere in the|remote position|remote role|remote opportunity|home[\s-]based|virtual position|field[\s-]based|territory|not located at a (?:physical|company)|no physical (?:office|site|location)|remote[\s-]based|position is remote|this is a remote|work(?:ing)? remotely|remote work environment)\b/i.test(t);
 }
 /* B-FAKE-REMOTE (v95, founder live repro): IDIQ was flagged is_remote:true but
    LinkedIn's structured field said HYBRID · Temecula, CA, and the harvested body
@@ -3345,7 +3392,7 @@ function _browseScopePillHtml(){
 }
 function _browseRescope(){
   try{
-    liveJobs=_scopeBrowsePool(_browseRawPool, _browseLastLoc).map(mapFirestoreJob).filter(Boolean);
+    liveJobs=_gpjDedupePool(_scopeBrowsePool(_browseRawPool, _browseLastLoc)).map(mapFirestoreJob).filter(Boolean);   /* v101 #1: collapse doc-ID twins */
     livePage=1; renderBrowse();
   }catch(e){}
 }
@@ -3398,7 +3445,7 @@ async function ensureBrowsePool(force){
   if(_browsePoolKey!==key) _browseScope='market';
   _browseRawPool=raw.slice(); _browseLastLoc=loc;
   raw=_scopeBrowsePool(raw, loc);
-  liveJobs=raw.map(mapFirestoreJob).filter(Boolean);
+  liveJobs=_gpjDedupePool(raw).map(mapFirestoreJob).filter(Boolean);   /* v101 #1: collapse doc-ID twins */
   _browsePoolKey=key; window._browseOwnsLive=true;
 }
 function refreshBrowse(){
@@ -3441,7 +3488,7 @@ async function searchAllJobsForKeyword(nationwide){
         showToast('No "'+kw+'" openings near you — you can search nationwide'); return;
       }
     } else { window._kwNoLocal=false; }
-    liveJobs=matches.map(mapFirestoreJob).filter(Boolean);
+    liveJobs=_gpjDedupePool(matches).map(mapFirestoreJob).filter(Boolean);   /* v101 #1: collapse doc-ID twins */
     livePage=1; _browsePoolKey='__nationwide__'; window._browseOwnsLive=true; renderBrowse();
     showToast('✅ '+liveJobs.length+' "'+kw+'" opening(s)'+(nationwide?' (nationwide)':' in your area'));
   }catch(e){ showToast('Search failed — try again'); }
@@ -4273,6 +4320,36 @@ function jettModal(opts){
   };
   scrim.addEventListener('click',function(e){ if(e.target===scrim) scrim.remove(); });
 }
+/* v101 #8: the summary rewrite only ever saw a one-line SEED, so a 10-year career
+   came back as one vague sentence — the model can't synthesize facts it was never
+   given. Build a FACTS block from the REAL résumé (years from job dates, actual
+   roles, verbatim scope/number phrases from bullets, top skills). Everything here
+   is quoted from what the user wrote — nothing invented. */
+function _summaryFacts(){
+  try{
+    const jobs=(resumeData.jobs||[]).filter(j=>j&&j.t&&j.t!=='(role)');
+    const yrs=(function(){
+      const y=((document.querySelector('.pf-years')||{}).value||'').trim();
+      if(y&&parseInt(y,10)>0) return parseInt(y,10)+'+ years';
+      const ys=[]; jobs.forEach(j=>{ String(j.d||'').replace(/\b(19|20)\d{2}\b/g,m=>{ ys.push(parseInt(m,10)); return m; }); });
+      if(ys.length){ const span=new Date().getFullYear()-Math.min.apply(null,ys); if(span>=2) return span+'+ years'; }
+      return '';
+    })();
+    const roles=jobs.slice(0,3).map(j=>j.t+(j.c?(' at '+j.c):'')).join('; ');
+    const scale=[];
+    jobs.forEach(j=>{ (String(j.b||'').split(/\n|\s·\s/)).forEach(s=>{
+      s=s.replace(/^[•\-\*\s]+/,'').trim();
+      if(s && /\d/.test(s) && s.length<=90 && scale.length<4) scale.push(s);
+    }); });
+    const sk=(resumeData.skills||'').split('·').map(s=>s.trim()).filter(Boolean).slice(0,6).join(', ');
+    const parts=[];
+    if(yrs) parts.push('YEARS OF EXPERIENCE: '+yrs);
+    if(roles) parts.push('REAL ROLES (most recent first): '+roles);
+    if(scale.length) parts.push('REAL SCOPE/NUMBERS (use these verbatim, never invent others): '+scale.join(' | '));
+    if(sk) parts.push('TOP SKILLS: '+sk);
+    return parts.length?('\nFACTS FROM THE ACTUAL RESUME:\n'+parts.join('\n')):'';
+  }catch(e){ return ''; }
+}
 async function improveSummary(){
   const el=document.getElementById('pr-summary');
   const btn=document.getElementById('summary-improve-btn');
@@ -4297,7 +4374,7 @@ async function improveSummary(){
   let _usedAI=false;
   try{
     if(window.fb && fb.smartMatch && aiImproveAllowed('summary') && aiHourlyAllowed('improve')){
-      const res=await fb.smartMatch([seed], contextKeywords, true, {avoid:((window._jettPrev&&window._jettPrev.summary)||''), jobContext:'GOAL: rewrite into a specific professional summary for a '+(title||recentRoles||'professional')+'. Use ONLY facts present in the text. Ban filler like "results-driven", "proven track record", "dynamic professional". Lead with the strongest concrete capability.'});
+      const res=await fb.smartMatch([seed], contextKeywords, true, {avoid:((window._jettPrev&&window._jettPrev.summary)||''), jobContext:'GOAL: compose a professional summary for a '+(title||recentRoles||'professional')+' by SYNTHESIZING the FACTS below — 2 to 3 substantive sentences (roughly 45-80 words) covering years of experience, domains, and real scope numbers. Never compress a long career into one vague line. Use ONLY facts listed or present in the text; quote scope numbers verbatim; never invent. Ban filler like "results-driven", "proven track record", "dynamic professional". Lead with the strongest concrete capability.'+(typeof _summaryFacts==='function'?_summaryFacts():'')});
       if(res && Array.isArray(res.finalResume) && res.finalResume[0]){
         const cand=String(res.finalResume[0]).trim();
         /* the AI sometimes echoes the input — only treat it as a rewrite if it's materially different */
@@ -4356,6 +4433,18 @@ function _leadWithVerb(b){
   const first=(t.match(/^([A-Za-z']+)/)||[])[1]||'';
   const mapped=_VERB_MAP[first.toLowerCase()];
   if(mapped){ return mapped+t.slice(first.length); }         /* "Managing X" \u2192 "Managed X" */
+  /* v101 #7 (founder repro: "Supported collaborated\u2026", "Drove ensured\u2026"): a bullet
+     that ALREADY leads with a verb we don't happen to list (collaborated,
+     utilized, ensured\u2026) must NEVER get a second verb prepended. Past-tense
+     leads keep the writer's verb; gerund leads convert to past tense when the
+     regular "-ing \u2192 -ed" form is safe, else stay as written. Prepending is now
+     ONLY for genuinely noun-led bullets. */
+  if(/^[A-Za-z']+ed$/.test(first)) return t.charAt(0).toUpperCase()+t.slice(1);
+  if(/^[A-Za-z']+ing$/.test(first) && first.length>5){
+    const base=first.slice(0,-3);                            /* collaborating → collaborat+ed */
+    const past=base+(/e$/i.test(base)?'d':'ed');
+    return past.charAt(0).toUpperCase()+past.slice(1)+t.slice(first.length);
+  }
   const v=_contentVerb(t);                                    /* noun-led \u2192 prepend a fitting strong verb */
   return v+' '+t.charAt(0).toLowerCase()+t.slice(1);
 }
@@ -6055,6 +6144,12 @@ async function _fetchLiveMarketJobs(){
        return the same posting twice (this was the repeated-card bug). Key on
        normalized company+title+location so genuine distinct roles survive. */
     (function dedupePrimary(){
+      /* v101 #1: raw title|co|loc keying let the SAME posting through twice when
+         its two doc IDs carried different location text ("Houston, TX" vs
+         "Houston, Texas, US" vs a broad "United States" twin) — both painted in
+         the same 3-card fan. _gpjDedupePool collapses on title|co|CITY and folds
+         broad twins into the city row, keeping the richer doc. */
+      if(typeof _gpjDedupePool==='function'){ results=_gpjDedupePool(results); return; }
       const seen=new Set();
       results=results.filter(r=>{
         const co=(typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'';
@@ -6534,7 +6629,7 @@ function _ratingStructure(){
 /* F-RATER (v83): the corpus miner counts every frequent posting word — but
    "including", "various" etc. are frequent WITHOUT being skills. Never surface
    (or score against) a term a person couldn't genuinely put on a resume. */
-const _SKILL_STOP=/^(including|include|includes|included|various|within|across|according|required|requirements|preferred|ability|abilities|experience|experienced|work|working|works|team|teams|will|must|other|others|ensure|ensures|ensuring|provide|provides|providing|support|supports|supporting|strong|excellent|related|applicable|knowledge|skills|skill|years|year|position|positions|candidate|candidates|company|opportunity|opportunities|benefits|please|apply|applying|using|used|based|well|good|great|high|responsibilities|duties|perform|performs|performing|maintain|maintains|maintaining|assist|assists|assisting|general|daily|weekly|monthly|between|through|throughout|during|additional|things|areas|inside|about|environment|employees|customers|while|where|when|which|every|their|those|being|under|would|should|could|business|professional|professionals|process|processes|internal|external|development|solutions|services|product|products|department|departments|organization|organizations|information|activities|procedures|functions|initiatives|objectives|individuals|effective|successful|proven|dynamic|results|driven|track|record|quality|level|levels|role|roles|needs|goals|tasks|items|execution|time|times|build|builds|building|priorities|priority|deliverables|stakeholders|standards|policies|values|mission|vision|culture)$/i;
+const _SKILL_STOP=/^(including|include|includes|included|various|within|across|according|required|requirements|preferred|ability|abilities|experience|experienced|work|working|works|team|teams|will|must|other|others|ensure|ensures|ensuring|provide|provides|providing|support|supports|supporting|strong|excellent|related|applicable|knowledge|skills|skill|years|year|position|positions|candidate|candidates|company|opportunity|opportunities|benefits|please|apply|applying|using|used|based|well|good|great|high|responsibilities|duties|perform|performs|performing|maintain|maintains|maintaining|assist|assists|assisting|general|daily|weekly|monthly|between|through|throughout|during|additional|things|areas|inside|about|environment|employees|customers|while|where|when|which|every|their|those|being|under|would|should|could|business|professional|professionals|process|processes|internal|external|development|solutions|services|product|products|department|departments|organization|organizations|information|activities|procedures|functions|initiatives|objectives|individuals|effective|successful|proven|dynamic|results|driven|track|record|quality|level|levels|role|roles|needs|goals|tasks|items|execution|time|times|build|builds|building|priorities|priority|deliverables|stakeholders|standards|policies|values|mission|vision|culture|expert|proficient|advanced|intermediate|beginner)$/i;
 /* v92: single-word SUGGESTIONS now need a POSITIVE signal — a stoplist alone is
    whack-a-mole (live repros kept leaking "Execution", "Time", "Build",
    "Services"). A lone word must be a KNOWN real skill/tool/domain to be
@@ -6662,7 +6757,7 @@ async function jettFullImprove(){
     const seed=cur||('Professional with experience as '+(title||recentRoles||'a dedicated team member')+(skills?(', skilled in '+skills):'')+'.');
     let improved=localSummaryRewrite(cur,title,recentRoles,skills,'');
     if(window.fb&&fb.smartMatch&&aiHourlyAllowed('improve')){
-      const res=await fb.smartMatch([seed],[title,recentRoles,skills].filter(Boolean).join(' · '),true,{avoid:cur,jobContext:'GOAL: COMPLETELY REWRITE this professional summary — restructure the sentences from scratch, do NOT just insert or swap keywords. Anchor on the MOST RECENT role ('+((recent&&recent.t)||title||'this profession')+'). Use ONLY facts present in the text; keep every real number. Ban filler like "results-driven", "proven track record", "dynamic professional". It must read like a sharp human wrote it.'});
+      const res=await fb.smartMatch([seed],[title,recentRoles,skills].filter(Boolean).join(' · '),true,{avoid:cur,jobContext:'GOAL: COMPLETELY REWRITE this professional summary — restructure from scratch, do NOT just insert or swap keywords. Anchor on the MOST RECENT role ('+((recent&&recent.t)||title||'this profession')+') and SYNTHESIZE the FACTS below into 2 to 3 substantive sentences (roughly 45-80 words) covering years, domains, and real scope numbers — never compress the career into one vague line. Use ONLY facts listed or present in the text; keep every real number; never invent. Ban filler like "results-driven", "proven track record", "dynamic professional". It must read like a sharp human wrote it.'+(typeof _summaryFacts==='function'?_summaryFacts():'')});
       if(res&&Array.isArray(res.finalResume)&&res.finalResume[0]){
         const c=String(res.finalResume[0]).trim();
         if(c&&(typeof _materiallyDifferent!=='function'||_materiallyDifferent(c,seed))){ improved=c; usedAI=true; }
@@ -6785,16 +6880,33 @@ function restoreResumeSnapshot(i){
    phrases always survive. Returns what was removed so the user is told. */
 function _tidySkills(str){
   const seen=new Set(); const keep=[]; const removed=[];
-  String(str||'').split('·').map(function(s){ return s.trim(); }).filter(Boolean).forEach(function(s){
+  /* v101 #9 (founder's live output): pre-normalize AI mashups BEFORE splitting —
+     parentheses become separators so "(PowerPoint · Word · Excel) Expert" and
+     "CRM (Salesforce · HubSpot)Compliance" break into their real members and
+     dedupe against skills already listed; commas/semicolons/slashes split too. */
+  const norm=String(str||'').replace(/[()]/g,' · ').replace(/[,;\/]+/g,' · ');
+  /* the user's own job titles are not skills */
+  const titles=new Set();
+  try{
+    const t0=String(resumeData.title||'').toLowerCase().trim(); if(t0) titles.add(t0);
+    (resumeData.jobs||[]).forEach(function(j){ const t=String((j&&j.t)||'').toLowerCase().trim(); if(t&&t!=='(role)') titles.add(t); });
+  }catch(e){}
+  norm.split('·').map(function(s){ return s.trim(); }).filter(Boolean).forEach(function(s){
     const k=s.toLowerCase();
-    if(seen.has(k)) return;
-    seen.add(k);
+    /* word-set key: "Retention account" duplicates "Account Retention" */
+    const kw=k.split(/\s+/).sort().join(' ');
+    if(seen.has(k)||seen.has(kw)) return;
+    seen.add(k); seen.add(kw);
+    if(titles.has(k)){ removed.push(s); return; }
     /* v92: use the LENIENT junk check for the user's OWN skills — drop only
        definite filler, never an unusual-but-real skill they entered. */
     if(typeof _isJunkSkill==='function' && _isJunkSkill(s)){ removed.push(s); return; }
     keep.push(s.charAt(0).toUpperCase()+s.slice(1));
   });
-  return {skills:keep.join(' · '), removed:removed};
+  /* cap to the ~15 strongest — input order is the user's own priority order */
+  const capped=keep.slice(0,15);
+  keep.slice(15).forEach(function(s){ removed.push(s); });
+  return {skills:capped.join(' · '), removed:removed};
 }
 /* persist a record of each optimized resume so users can find them on the account page */
 function storeOptimizedResume(title,co,added,fname){
@@ -6999,7 +7111,7 @@ async function loadDeckSameState(){
   const hidden=_deckHiddenSet();
   const inRegion=function(j){ return (loc && (loc.metro||loc.city||loc.state) && typeof jobMatchesLocation==='function') ? jobMatchesLocation(j, loc) : false; };
   const st=new RegExp('\\b'+state.replace(/[^A-Za-z ]/g,'')+'\\b','i');
-  let sameState=wide.filter(function(j){ return !inRegion(j) && st.test(String(j.location||j.loc||'')); })
+  let sameState=_gpjDedupePool(wide.filter(function(j){ return !inRegion(j) && st.test(String(j.location||j.loc||'')); }))   /* v101 #1 */
     .map(mapFirestoreJob).filter(Boolean).filter(function(j){ return !hidden.has(jobKey(j)); });
   if(!sameState.length){
     showDeckMessage('🔍','No more '+state+' roles right now','You\u2019ve seen every live '+state+' match we have. New roles post all day — or load openings in other cities.','🌎 Load jobs in other cities','loadDeckOtherCities');
@@ -7024,7 +7136,7 @@ async function loadDeckOtherCities(){
   let wide=[]; try{ wide=await fb.fetchJobs('', 8000)||[]; }catch(e){ wide=[]; }
   const hidden=_deckHiddenSet();
   const inRegion=function(j){ return (loc && (loc.metro||loc.city||loc.state) && typeof jobMatchesLocation==='function') ? jobMatchesLocation(j, loc) : false; };
-  let others=wide.filter(function(j){ return !inRegion(j); }).map(mapFirestoreJob).filter(Boolean).filter(function(j){ return !hidden.has(jobKey(j)); });
+  let others=_gpjDedupePool(wide.filter(function(j){ return !inRegion(j); })).map(mapFirestoreJob).filter(Boolean).filter(function(j){ return !hidden.has(jobKey(j)); });   /* v101 #1 */
   if(!others.length){
     showDeckMessage('🔍','That\u2019s everything for now','We\u2019ve shown you every live match we have — in and out of your region. New roles post all day, so check back soon.','','');
     return;
@@ -7804,23 +7916,22 @@ function syncProfileToResume(){
      respected. Previously this overwrote contact with ONLY the email, which is why
      the phone AND address never showed on the exported résumé. */
   try{
+    /* v101 #5 (founder-approved): DELEGATE to the one authoritative builder.
+       This block previously assembled contact with the RETIRED v97 `addressFormat`
+       pref key (the v98 toggles write `addressFull`), so it leaked the full
+       street with full-address OFF and disagreed with _rebuildContact's output —
+       the ATS preview showed an address the visible résumé/PDF didn't have.
+       _rebuildContact reads the live #acc-* fields itself (with profile
+       fallback) and honors both toggles via _addressForResume/_cityStateOf. */
     const p=(typeof getProfile==='function')?(getProfile()||{}):{};
-    const em=val('#acc-email')||val('.pf-email')||p.email||'';
-    const showPhone=!(p.preferences&&p.preferences.showPhoneOnResume===false);
-    const ph=showPhone?(val('#acc-phone')||p.phone||''):'';
-    /* Address is HIDDEN by default and controlled by its OWN pref (separate from
-       phone). showAddressOnResume must be explicitly true; addressFormat 'city'
-       shows only City, State. */
-    let ad='';
-    if(p.preferences&&p.preferences.showAddressOnResume===true){
-      const full=val('#acc-address')||p.address||'';
-      if(p.preferences.addressFormat==='city'){
-        const m=String(full).match(/([A-Za-z .'-]+),\s*([A-Za-z]{2})\b/);
-        ad=m?(m[1].trim()+', '+m[2].toUpperCase()):full;
-      } else { ad=full; }
+    if(typeof _rebuildContact==='function'){ _rebuildContact(p); }
+    else{
+      const em=val('#acc-email')||val('.pf-email')||p.email||'';
+      const showPhone=!(p.preferences&&p.preferences.showPhoneOnResume===false);
+      const ph=showPhone?(val('#acc-phone')||p.phone||''):'';
+      const parts=[em,ph].map(x=>String(x||'').trim()).filter(Boolean);
+      if(parts.length){ resumeData.contact=parts.join(' · '); }
     }
-    const parts=[em,ph,ad].map(x=>String(x||'').trim()).filter(Boolean);
-    if(parts.length){ resumeData.contact=parts.join(' · '); }
   }catch(e){ const email=val('.pf-email'); if(email) resumeData.contact=email; }
   const title=val('.pf-title')||val('#pr-title');
   if(title) resumeData.title=(typeof correctTitleTypos==='function'?correctTitleTypos(title):title);
@@ -8043,6 +8154,14 @@ function renderStatList(kind){
       const k=((r.t||'')+'|'+(r.co||'')).toLowerCase().replace(/\s+/g,' ').trim();
       if(seen.has(k)) return false; seen.add(k); return true;
     });
+  }
+  /* v101 #2: newest→oldest for Applied/Responses/Skipped — cloud merges and
+     unSkip splices had left them in storage order ("random"). Sorted IN PLACE on
+     the real array (same trick as the v41 dedupe above) so every onclick index
+     (unSkip(i), logResponse(i), lists.applied[i]._logging) stays valid. Legacy
+     rows without a `when` sort to the bottom. */
+  if((kind==='applied'||kind==='skipped'||kind==='responses') && Array.isArray(lists[kind])){
+    lists[kind].sort((a,b)=>(((b&&b.when)||0)-((a&&a.when)||0)));
   }
   const arr=lists[kind];
   if(!arr.length){
@@ -8422,9 +8541,23 @@ function _addressForResume(p){
    ONE place, so phone/address toggles stay consistent (F-ADDR v97). */
 function _rebuildContact(p){
   p=p||((typeof getProfile==='function')?getProfile():{});
+  /* v101 #5 (founder-approved consolidation): read the LIVE account fields
+     first, profile as fallback \u2014 the ATS preview path (syncProfileToResume) saw
+     the typed #acc-address while this builder only saw profile.address, so the
+     ATS preview and the visible r\u00e9sum\u00e9/PDF rendered DIFFERENT contact lines.
+     One effective source ends the disagreement. */
+  const lv=id=>{ try{ const e=document.getElementById(id); return (e&&e.value&&e.value.trim())||''; }catch(_){ return ''; } };
+  const eff=Object.assign({},p,{
+    email:lv('acc-email')||p.email||'',
+    phone:lv('acc-phone')||p.phone||'',
+    address:lv('acc-address')||p.address||''
+  });
   const pr=p.preferences||{};
-  const phone=(pr.showPhoneOnResume===false)?'':p.phone;
-  resumeData.contact=[p.email,phone,_addressForResume(p)].filter(Boolean).join(' \u00b7 ');
+  const phone=(pr.showPhoneOnResume===false)?'':eff.phone;
+  const built=[eff.email,phone,_addressForResume(eff)].filter(Boolean).join(' \u00b7 ');
+  /* never clobber a PARSED contact with an empty rebuild (fresh profile,
+     resume-only user) \u2014 only overwrite when we actually built something */
+  if(built||!resumeData.contact) resumeData.contact=built;
   return resumeData.contact;
 }
 function togglePhoneOnResume(el){
@@ -9224,8 +9357,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v101a';
+const APP_VERSION = 'v101b';
 const CHANGELOG = {
+  'v101b':['Stabilize: no more duplicate cards, newest-first lists, Match-to-Job on top, smarter remote tags, address toggle fixed, better AI rewrites'],
   'v100':['v100 smart-data finish: deck mapper full fields (was 460-char stub), company-card + ATS cap raises to v97 ceilings'],
   'v99':['R1 recruiter tier frontend'],
   'v98':['v98 (R-pre live fixes): (1) On Browse, tapping View Full Posting now opens the posting ON TOP of the job card, not hidden behind it. (2) Address on your résumé is fixed: with Full street address OFF it now correctly shows City, State only (it was leaking the street), and (3) your address choice now actually applies to the downloaded/exported résumé file. Both HTML and PDF exports rebuild your contact line from your current toggles at export time.'],
