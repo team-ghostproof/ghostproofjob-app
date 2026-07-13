@@ -1847,6 +1847,46 @@ test.describe('[STATE-COVERAGE] v101b batch D (F-METRICS + F-CREDITS)', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] v101b-fix skills render-boundary tidy (founder live repro)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('messy skills from ANY source are tidied on the rendered/exported resume', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      // the founder's EXACT messy string, set directly (not via Jett) to prove the
+      // render path tidies regardless of source — the whole point of the fix.
+      Object.assign(resumeData, {
+        name: 'Test', title: 'Program Manager', contact: 't@x.com', summary: 'x', edu: 'BBA',
+        skills: '(PowerPoint · Word · Excel) Expert · Excel · CRM (Salesforce · HubSpot)Compliance · Account Retention · Retention account · Program Manager',
+        jobs: [{ t: 'Program Manager', c: 'Acme', d: '2015 - 2024', b: 'ran programs' }], certs: [], eduExtra: [],
+      });
+      const html = buildResumeHTML(true);
+      return {
+        rawMashup: /\(PowerPoint|HubSpot\)Compliance|Retention account| Expert/.test(html),
+        hasClean: html.includes('PowerPoint') && html.includes('Salesforce') && html.includes('HubSpot') && html.includes('Compliance'),
+        titleDropped: !/Skills[\s\S]*Program Manager/.test(html.split('Experience')[1] || html),
+      };
+    });
+    expect(r.rawMashup, 'no parens / mashup / fragment / rating-word in the rendered resume').toBe(false);
+    expect(r.hasClean, 'the real skills survive, split out of the mashups').toBe(true);
+  });
+
+  test('parse output is tidied into storage + the editable field', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      // drive the resume parser with a raw skills line that has a paren mashup
+      const raw = 'John Tester\nProgram Manager\nSKILLS\n(PowerPoint · Word · Excel) Expert, CRM (Salesforce · HubSpot)Compliance, Account Retention\nEXPERIENCE\nProgram Manager - Acme (2015 - 2024)\nRan programs';
+      try { applyRealParse(raw); } catch (e) { return { err: String(e) }; }
+      return { stored: resumeData.skills };
+    });
+    if (r.err) { expect(r.err).toBeUndefined(); return; }
+    expect(r.stored, 'stored skills carry no paren fragment').not.toMatch(/[()]/);
+    expect(r.stored, 'no rating-word "Expert" stored').not.toMatch(/\bExpert\b/);
+    expect(r.stored).toContain('Excel');
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
