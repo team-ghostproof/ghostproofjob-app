@@ -1617,6 +1617,152 @@ test.describe('[STATE-COVERAGE] v101b batch A (forms, overlay gate, safe-area)',
   });
 });
 
+test.describe('[STATE-COVERAGE] v101b batch B+C (AI quality gates, admin employer tools)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('B: bare-infinitive AI leads never get a second verb (live Worker shape)', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      streamline: _leadWithVerb('Streamline event planning frameworks'),
+      collaborate: _leadWithVerb('Collaborate with operations to refine pipelines'),
+      utilize: _leadWithVerb('Utilize Salesforce to manage accounts'),
+      ensure: _leadWithVerb('Ensure audit accuracy across regions'),
+      noun: _leadWithVerb('Monthly financial reporting for leadership'),
+    }));
+    expect(r.streamline).toBe('Streamlined event planning frameworks');
+    expect(r.collaborate).toBe('Collaborated with operations to refine pipelines');
+    expect(r.utilize).toBe('Utilized Salesforce to manage accounts');
+    expect(r.ensure).toBe('Ensured audit accuracy across regions');
+    Object.values(r).forEach((b) => expect(b).not.toMatch(/^\w+\s+(streamline|collaborate|utilize|ensure)\b/i));
+    expect(r.noun, 'noun leads still get a fitting verb').toMatch(/^[A-Z][a-z]+ed\s/);
+  });
+
+  test('B: summary floor synthesizes 2-3 sentences from the real resume; quality gate rejects one-liners', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      Object.assign(resumeData, { jobs: [
+        { t: 'Marketing Specialist', c: 'BrandCo', d: '2019 – 2024', b: 'collaborated with teams on campaigns for 500+ locations' },
+        { t: 'Account Coordinator', c: 'RetailCorp', d: '2014 – 2019', b: 'supported a team of 8' }] });
+      return {
+        floor: localSummaryRewrite('', 'Marketing Specialist', 'Marketing Specialist at BrandCo; Account Coordinator at RetailCorp', 'Digital Marketing · Salesforce', ''),
+        gateShort: _gpjSummaryQuality('Experienced marketing professional.'),
+        gateGenericLine: _gpjSummaryQuality('Marketing Specialist with proven experience in driving successful marketing initiatives.'),
+        gateGood: _gpjSummaryQuality('Marketing specialist with 12+ years of experience across brand, retail, and account management. Led national campaigns for 500+ locations while coaching teams of 8. Works hands-on with Salesforce, HubSpot, and campaign analytics.'),
+      };
+    });
+    const sentences = (r.floor.match(/[.!?](\s|$)/g) || []).length;
+    expect(sentences, 'floor is 2-3 sentences, never a stub').toBeGreaterThanOrEqual(2);
+    expect(r.floor).toContain('12+ years');
+    expect(r.floor).toContain('500+ locations');
+    expect(r.floor).toContain('BrandCo');
+    expect(r.gateShort, '3-word stub rejected').toBe(false);
+    expect(r.gateGenericLine, 'one-line generic rejected').toBe(false);
+    expect(r.gateGood).toBe(true);
+  });
+
+  test('B: cover letter has no double punctuation and no placeholders (real posting)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      Object.assign(resumeData, { name: 'Test User', contact: 't@x.com', title: 'Marketing Specialist',
+        skills: 'Digital Marketing · Salesforce', jobs: [{ t: 'MS', c: 'BrandCo', b: 'ran campaigns for 500+ locations.' }], summary: 's' });
+      return tailorCoverLetter({ title: 'Marketing Manager', co: 'BrightWave', desc: 'campaigns CRM salesforce retention marketing', req: 'salesforce marketing 5+ years' }, 2);
+    });
+    expect(/\.\./.test(r), 'no double periods').toBe(false);
+    expect(r).toContain('Marketing Manager');
+    expect(r).toContain('BrightWave');
+    expect(/the this role|\[Your name|\[Add your|undefined/.test(r)).toBe(false);
+  });
+
+  test('C: admin View-as-Employer opens a READ-ONLY preview — no writes, no role, restorable', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let recruiterReads = 0, writes = 0;
+      window.fb = window.fb || {};
+      const oL = fb.loadRecruiter, oC = fb.createRecruiter, oS = fb.saveCompany;
+      fb.loadRecruiter = async () => { recruiterReads++; return null; };
+      fb.createRecruiter = async () => { writes++; return true; };
+      fb.saveCompany = async () => { writes++; return true; };
+      isAdmin = true; window._recruiter = null; localStorage.removeItem('gpj_role');
+      await openEmployer();
+      const state = {
+        viewActive: document.getElementById('view-employer').classList.contains('active'),
+        banner: getComputedStyle(document.getElementById('emp-admin-banner')).display !== 'none',
+        fieldDisabled: document.getElementById('emp-company').disabled,
+        saveHidden: document.getElementById('emp-save-btn').style.display === 'none',
+        signoutHidden: document.getElementById('emp-signout-btn').style.display === 'none',
+        role: localStorage.getItem('gpj_role'), reads: recruiterReads, writes: writes,
+      };
+      window._recruiter = { uid: 'r1', company: 'RealCo', isValidated: true };
+      renderEmployerView();
+      state.restoredEditable = !document.getElementById('emp-company').disabled &&
+        getComputedStyle(document.getElementById('emp-admin-banner')).display === 'none' &&
+        document.getElementById('emp-save-btn').style.display !== 'none';
+      window._recruiter = null; isAdmin = false;
+      if (oL) fb.loadRecruiter = oL; if (oC) fb.createRecruiter = oC; if (oS) fb.saveCompany = oS;
+      return state;
+    });
+    expect(r.viewActive, 'employer view opens for the admin').toBe(true);
+    expect(r.banner, 'admin preview banner shown').toBe(true);
+    expect(r.fieldDisabled, 'fields read-only').toBe(true);
+    expect(r.saveHidden).toBe(true);
+    expect(r.signoutHidden).toBe(true);
+    expect(r.role, 'no recruiter role set').toBeNull();
+    expect(r.reads + r.writes, 'ZERO recruiter reads/writes in preview (candidate-first)').toBe(0);
+    expect(r.restoredEditable, 'a real recruiter gets the editable dashboard back').toBe(true);
+  });
+
+  test('C: employers/companies count row wired; company card uniform from every entry point', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      isAdmin = true;
+      try { const old2 = document.getElementById('admin-panel'); if (old2) old2.remove(); } catch (e) {}
+      renderAdminPanel();
+      const row = !!document.getElementById('admin-recruiter-count');
+      const fn = typeof refreshRecruiterCount === 'function' && typeof fb.adminCountRecruiters === 'function' && typeof fb.adminCountCompanies === 'function';
+      const sections = () => {
+        const links = (document.getElementById('cm-links') || {}).innerHTML || '';
+        return { news: links.includes('RECENT COMPANY NEWS'), connect: links.includes('CONNECT WITH HIRING TEAM'), icons: (links.match(/class="social-icon"/g) || []).length, rateRow: !!document.getElementById('cm-rate') };
+      };
+      openCompanyView('Acme Corp', { title: 'Role A', url: 'https://x.example/a', desc: 'd' });
+      const e1 = sections();
+      document.getElementById('company-modal').classList.remove('open');
+      openCompanyView('Beta LLC');
+      const e2 = sections();
+      document.getElementById('company-modal').classList.remove('open');
+      isAdmin = false;
+      return { row, fn, e1, e2 };
+    });
+    expect(r.row, 'count row renders in the admin panel').toBe(true);
+    expect(r.fn, 'count functions exist on fb').toBe(true);
+    [r.e1, r.e2].forEach((e) => {
+      expect(e.news).toBe(true);
+      expect(e.connect).toBe(true);
+      expect(e.icons).toBe(4);
+      expect(e.rateRow, 'F-REVIEW dedup holds — no legacy #cm-rate row').toBe(false);
+    });
+  });
+
+  test('C: live interactive-element audit — every on* handler resolves to a real function', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const missing = new Set();
+      const KEY = /(^|[^.\w])([A-Za-z_$][\w$]*)\s*\(/g;
+      const SKIP = new Set(['if','for','while','switch','catch','function','return','typeof','var','let','const','new','void','delete','in','of','else','try','throw']);
+      document.querySelectorAll('*').forEach((el) => {
+        for (const a of el.attributes || []) {
+          if (!/^on/i.test(a.name)) continue;
+          let m; KEY.lastIndex = 0;
+          while ((m = KEY.exec(a.value))) {
+            const fn = m[2];
+            if (SKIP.has(fn)) continue;
+            if (m[1] === '.') continue;
+            if (typeof window[fn] !== 'function' && !(fn in window)) missing.add(fn);
+          }
+        }
+      });
+      return [...missing];
+    });
+    expect(r, 'no on* handler references an undefined function (live DOM)').toEqual([]);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
