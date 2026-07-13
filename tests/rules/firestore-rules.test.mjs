@@ -34,12 +34,16 @@ before(async () => {
   // seed baseline with rules DISABLED
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
-    await setDoc(doc(db, 'recruiters/recruiterA'), { company: 'Acme', isValidated: true, plan: 'free' });
-    await setDoc(doc(db, 'recruiters/recruiterB'), { company: 'Globex', isValidated: true, plan: 'free' });
-    await setDoc(doc(db, 'recruiters/recruiterPending'), { company: 'NewCo', isValidated: false, plan: 'free' });   // v101a #2: awaiting the admin queue
+    await setDoc(doc(db, 'recruiters/recruiterA'), { company: 'Acme', domain: 'acme.com', isValidated: true, plan: 'free' });
+    await setDoc(doc(db, 'recruiters/recruiterB'), { company: 'Globex', domain: 'globex.com', isValidated: true, plan: 'free' });
+    await setDoc(doc(db, 'recruiters/recruiterPending'), { company: 'NewCo', domain: 'newco.com', isValidated: false, plan: 'free' });   // v101a #2: awaiting the admin queue; v101b Sprint 3: unverified recruiter for projection-gate tests
     await setDoc(doc(db, 'companies/acme.com'), { name: 'Acme', domain: 'acme.com', verifiedEmployer: false });
     await setDoc(doc(db, 'jobs/jobA'), { title: 'Ops', ownerUid: 'recruiterA', source: 'internal', isValidated: true });
     await setDoc(doc(db, 'jobs/jobB'), { title: 'Sales', ownerUid: 'recruiterB', source: 'internal', isValidated: true });
+    // v101b Sprint 3: a DRAFT internal job (unvalidated) to test the self-verify lock
+    await setDoc(doc(db, 'jobs/jobC'), { title: 'Draft', ownerUid: 'recruiterA', source: 'internal', isValidated: false, companyId: 'acme.com' });
+    // v101b Sprint 3: an existing anonymous hired doc for read tests
+    await setDoc(doc(db, 'hired/h1'), { roleKey: 'ops', titleRaw: 'Ops', skills: ['ops'], region: 'TX', ts: 1 });
     await setDoc(doc(db, 'jobs/harvested1'), { title: 'Nurse', source: 'jobspy' });
     await setDoc(doc(db, 'profiles/candC'), { name: 'Cand C', contact: 'c@x.com' });
     await setDoc(doc(db, 'profiles/candD'), { name: 'Cand D', contact: 'd@x.com' });
@@ -55,6 +59,7 @@ after(async () => { if (env) await env.cleanup(); });
 // auth contexts
 const asRecruiterA = () => env.authenticatedContext('recruiterA', { email: 'a@acme.com' }).firestore();
 const asRecruiterB = () => env.authenticatedContext('recruiterB', { email: 'b@globex.com' }).firestore();
+const asRecruiterPending = () => env.authenticatedContext('recruiterPending', { email: 'p@newco.com' }).firestore();   // v101b Sprint 3: exists but isValidated:false
 const asCandC = () => env.authenticatedContext('candC', { email: 'c@x.com' }).firestore();
 const asCandD = () => env.authenticatedContext('candD', { email: 'd@x.com' }).firestore();
 const asGuest = () => env.unauthenticatedContext().firestore();
@@ -164,5 +169,104 @@ describe('appeals are admin-only', () => {
   });
   test('recruiter CANNOT read appeals (admin-only)', async () => {
     await assertFails(getDoc(doc(asRecruiterA(), 'appeals/ap1')));
+  });
+});
+
+// ============================================================================
+// v101b Sprint 3 — RULES HARDENING (pre-recruiter-R2 security)
+// ============================================================================
+
+describe('Sprint 3 — companies scoped write', () => {
+  test('recruiter CAN create/update ONLY their own-domain company (verifiedEmployer:false)', async () => {
+    await assertSucceeds(setDoc(doc(asRecruiterA(), 'companies/acme.com'), { name: 'Acme Renamed', domain: 'acme.com', verifiedEmployer: false }));
+  });
+  test('a PENDING (unverified) recruiter CAN still create their company at signup', async () => {
+    await assertSucceeds(setDoc(doc(asRecruiterPending(), 'companies/newco.com'), { name: 'NewCo', domain: 'newco.com', verifiedEmployer: false }));
+  });
+  test('recruiter CANNOT self-set verifiedEmployer:true', async () => {
+    await assertFails(setDoc(doc(asRecruiterA(), 'companies/acme.com'), { name: 'Acme', domain: 'acme.com', verifiedEmployer: true }));
+  });
+  test('recruiter CANNOT write another company than their domain', async () => {
+    await assertFails(setDoc(doc(asRecruiterA(), 'companies/globex.com'), { name: 'Spoof', domain: 'globex.com', verifiedEmployer: false }));
+  });
+  test('a candidate CANNOT write any company', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'companies/anything.com'), { name: 'X', verifiedEmployer: false }));
+  });
+  test('ADMIN can write any company incl. verifiedEmployer:true', async () => {
+    await assertSucceeds(setDoc(doc(asAdmin(), 'companies/acme.com'), { name: 'Acme', domain: 'acme.com', verifiedEmployer: true }));
+  });
+  test('anyone CAN read a company record (public)', async () => {
+    await assertSucceeds(getDoc(doc(asGuest(), 'companies/acme.com')));
+  });
+});
+
+describe('Sprint 3 — recruiter cannot self-verify / re-owner their job', () => {
+  const draft = (over) => Object.assign({ title: 'Draft', ownerUid: 'recruiterA', source: 'internal', isValidated: false, companyId: 'acme.com' }, over);
+  test('owner-recruiter CAN edit their draft job content (immutables unchanged)', async () => {
+    await assertSucceeds(setDoc(doc(asRecruiterA(), 'jobs/jobC'), draft({ title: 'Edited Title' })));
+  });
+  test('owner-recruiter CANNOT flip isValidated true', async () => {
+    await assertFails(setDoc(doc(asRecruiterA(), 'jobs/jobC'), draft({ isValidated: true })));
+  });
+  test('owner-recruiter CANNOT change ownerUid', async () => {
+    await assertFails(setDoc(doc(asRecruiterA(), 'jobs/jobC'), draft({ ownerUid: 'recruiterB' })));
+  });
+  test('owner-recruiter CANNOT change source', async () => {
+    await assertFails(setDoc(doc(asRecruiterA(), 'jobs/jobC'), draft({ source: 'jobspy' })));
+  });
+  test('owner-recruiter CANNOT change companyId', async () => {
+    await assertFails(setDoc(doc(asRecruiterA(), 'jobs/jobC'), draft({ companyId: 'other.com' })));
+  });
+  test('ADMIN CAN verify a job (set isValidated:true)', async () => {
+    await assertSucceeds(setDoc(doc(asAdmin(), 'jobs/jobC'), draft({ isValidated: true })));
+  });
+});
+
+describe('Sprint 3 — candidate projections require a VERIFIED recruiter', () => {
+  test('UNVERIFIED recruiter CANNOT read candidate_cards', async () => {
+    await assertFails(getDoc(doc(asRecruiterPending(), 'candidate_cards/candC')));
+  });
+  test('VERIFIED recruiter CAN read candidate_cards', async () => {
+    await assertSucceeds(getDoc(doc(asRecruiterA(), 'candidate_cards/candC')));
+  });
+  test('UNVERIFIED recruiter CANNOT read match_tokens', async () => {
+    await assertFails(getDoc(doc(asRecruiterPending(), 'match_tokens/candC')));
+  });
+  test('VERIFIED recruiter CAN read match_tokens', async () => {
+    await assertSucceeds(getDoc(doc(asRecruiterA(), 'match_tokens/candC')));
+  });
+  test('the candidate CAN still read their OWN match_tokens', async () => {
+    await assertSucceeds(getDoc(doc(asCandC(), 'match_tokens/candC')));
+  });
+  test('UNVERIFIED recruiter CANNOT read recommended_candidates', async () => {
+    await assertFails(getDoc(doc(asRecruiterPending(), 'jobs/jobA/recommended_candidates/candC')));
+  });
+  test('VERIFIED owner-recruiter CAN read their job recommended_candidates', async () => {
+    await assertSucceeds(getDoc(doc(asRecruiterA(), 'jobs/jobA/recommended_candidates/candC')));
+  });
+  test('VERIFIED recruiter who is NOT the owner CANNOT read recommended_candidates', async () => {
+    await assertFails(getDoc(doc(asRecruiterB(), 'jobs/jobA/recommended_candidates/candC')));
+  });
+});
+
+describe('Sprint 3 — hired pool is anonymous (no PII)', () => {
+  test('signed-in user CAN create an anonymous hired doc', async () => {
+    await assertSucceeds(setDoc(doc(asCandC(), 'hired/n1'), { roleKey: 'nurse', titleRaw: 'RN', skills: ['triage'], region: 'TX', ts: 2 }));
+  });
+  test('a hired doc carrying an email is REJECTED', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'hired/n2'), { roleKey: 'nurse', email: 'c@x.com', ts: 3 }));
+  });
+  test('a hired doc carrying a name is REJECTED', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'hired/n3'), { roleKey: 'nurse', name: 'Cand C', ts: 4 }));
+  });
+  test('a hired doc carrying uid/contact/phone is REJECTED', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'hired/n4'), { roleKey: 'nurse', uid: 'candC', ts: 5 }));
+  });
+  test('signed-in user CAN read the aggregate pool', async () => {
+    await assertSucceeds(getDoc(doc(asCandC(), 'hired/h1')));
+  });
+  test('a GUEST cannot create or read hired', async () => {
+    await assertFails(setDoc(doc(asGuest(), 'hired/g1'), { roleKey: 'x', ts: 6 }));
+    await assertFails(getDoc(doc(asGuest(), 'hired/h1')));
   });
 });

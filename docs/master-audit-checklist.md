@@ -284,10 +284,10 @@ Still OPEN (v101b sub-batches):
 - [ ] Guardrail: welcome + one lifecycle email render identical except the footer. DROPPED: redundant `gpj-email-automation/` module.
 
 ## RULES HARDENING (Sprint 3; pre-recruiter-R2; emulator-proven)
-- [ ] Scope `companies` signup write (founder confirmed signup completes post-deploy — lower urgency, still tighten before scale).
-- [ ] Recruiter can't self-verify own job — block changing `isValidated`/`ownerUid`/`source`/`companyId` on job update.
-- [ ] Gate candidate-projection reads (candidate_cards/match_tokens/recommended_candidates) on `isRecruiterVerified()` not bare existence — before discovery (R4).
-- [ ] Confirm `hired` docs carry no PII (any signed-in user can read).
+- [x] Scope `companies` signup write — DONE (Sprint 3): recruiter may create/update ONLY `companies/{their-domain}` (companyId == recruiter doc's `domain`) and can NEVER self-set `verifiedEmployer:true`; admin unrestricted; candidate/guest denied. Was admin-only WRITE — which silently denied recruiter-signup's `saveCompany` (swallowed in try/catch), so the company doc likely wasn't landing. Emulator cases added (own-domain create, pending-recruiter signup create, verifiedEmployer block, wrong-domain block, candidate block, admin, public read).
+- [x] Recruiter can't self-verify own job — DONE (Sprint 3): jobs `update` split from `delete`; an owner-recruiter may edit content but `isValidated`/`ownerUid`/`source`/`companyId` are immutable to them (admin/backend only) — no bypassing the Employer Verification Queue. 6 emulator cases (content edit ok; each immutable blocked; admin verify ok).
+- [x] Gate candidate-projection reads — DONE (Sprint 3): new `isRecruiterVerified()` helper (doc exists AND `isValidated==true`); `candidate_cards`/`match_tokens`/`recommended_candidates` reads now require it, not bare `isRecruiter()`. Zero live impact (no cards exist pre-R4) — preventative. 8 emulator cases (unverified denied on all three; verified allowed; non-owner verified denied on recommended; candidate self-read preserved).
+- [x] Confirm `hired` no PII — DONE (Sprint 3): verified the app payload is anonymous (`roleKey`, `titleRaw`, `skills[]`, region-state, `ts` — no name/email/uid/contact), and ADDED a rules-layer guard that REJECTS any `hired` create carrying a PII key (email/name/firstName/lastName/contact/phone/uid/userId/address); update/delete now `false`; read stays open (feature needs the aggregate). 6 emulator cases.
 
 ## GROWTH / MARKETING AUTOMATION (Sprint 4; free + low-effort; built, needs wiring)
 - [ ] SEO page generator (`seo-generator/`) — static city/role pages, ZERO runtime Firestore reads; company pages OFF until legal review. Implement `getSeoData()`; map `/g/*`; sitemap + cron.

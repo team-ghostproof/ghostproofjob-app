@@ -19,6 +19,18 @@ rules_version = '2';
 //      to put them ("alongside your current /jobs, /profiles, /bugReports").
 //      ⚠️ Verify current live `hired` writes actually succeed before relying on
 //      this — the app guards fb.logHire in try/catch, so a live denial is silent.
+//
+// v101b Sprint 3 — RULES HARDENING (pre-recruiter-R2; emulator-proven in CI):
+//   1. companies: recruiter may create/update ONLY their own-domain doc and can
+//      never self-set verifiedEmployer:true (was admin-only WRITE, which silently
+//      denied recruiter-signup's saveCompany).
+//   2. jobs update: an owner-recruiter cannot change isValidated/ownerUid/source/
+//      companyId (no self-verify past the Employer Verification Queue).
+//   3. candidate projections (candidate_cards/match_tokens/recommended_candidates):
+//      reads require isRecruiterVerified() (doc exists AND isValidated==true), not
+//      bare existence — an unreviewed recruiter sees no candidate data.
+//   4. hired: create rejected if it carries any PII key (email/name/uid/…); the
+//      pool stays read-open because the app writes only anonymous aggregates.
 // ============================================================================
 
 service cloud.firestore {
@@ -38,6 +50,18 @@ service cloud.firestore {
       return signedIn()
         && exists(/databases/$(database)/documents/recruiters/$(request.auth.uid));
     }
+    // v101b Sprint 3 (rules hardening): a VERIFIED recruiter — the doc exists AND
+    // a human/backend set isValidated:true. Candidate-projection reads gate on
+    // THIS, not bare existence, so a self-signed-up-but-unreviewed recruiter can
+    // never see candidate data before discovery (R4) ships.
+    function isRecruiterVerified() {
+      return isRecruiter()
+        && get(/databases/$(database)/documents/recruiters/$(request.auth.uid)).data.get('isValidated', false) == true;
+    }
+    // the email domain on the caller's recruiter doc (owns companies/{domain})
+    function recruiterDomain() {
+      return get(/databases/$(database)/documents/recruiters/$(request.auth.uid)).data.get('domain', '');
+    }
     function jobOwner(jobId) {
       return get(/databases/$(database)/documents/jobs/$(jobId)).data.ownerUid;
     }
@@ -51,7 +75,20 @@ service cloud.firestore {
         || (isRecruiter()
             && request.resource.data.ownerUid == request.auth.uid
             && request.resource.data.source == 'internal');
-      allow update, delete: if isAdmin()
+      // v101b Sprint 3: an owner-recruiter may edit their internal job's CONTENT
+      // but NEVER self-verify or re-owner it — isValidated / ownerUid / source /
+      // companyId are immutable to the recruiter (admin/backend only). Without
+      // this, a recruiter could flip their own isValidated:true and bypass the
+      // Employer Verification Queue, or reassign the job's owner/company.
+      allow update: if isAdmin()
+        || (isRecruiter()
+            && resource.data.ownerUid == request.auth.uid
+            && resource.data.source == 'internal'
+            && request.resource.data.ownerUid == resource.data.ownerUid
+            && request.resource.data.source == resource.data.source
+            && request.resource.data.get('isValidated', false) == resource.data.get('isValidated', false)
+            && request.resource.data.get('companyId', '') == resource.data.get('companyId', ''));
+      allow delete: if isAdmin()
         || (isRecruiter()
             && resource.data.ownerUid == request.auth.uid
             && resource.data.source == 'internal');
@@ -70,7 +107,8 @@ service cloud.firestore {
 
       // ---- NEW: recommended_candidates — backend-written; owner recruiter reads ----
       match /recommended_candidates/{candUid} {
-        allow read:  if isAdmin() || (isRecruiter() && jobOwner(jobId) == request.auth.uid);
+        // v101b Sprint 3: VERIFIED owner-recruiter only (was bare isRecruiter)
+        allow read:  if isAdmin() || (isRecruiterVerified() && jobOwner(jobId) == request.auth.uid);
         allow write: if false;   // Admin SDK only (reverse-match scorer)
       }
     }
@@ -103,9 +141,17 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow write: if false;
     }
-    // hired — any signed-in create/read (unchanged intent; restored to top level)
+    // hired — any signed-in create/read (aggregate "what got people hired" pool).
+    // v101b Sprint 3: the app payload is ANONYMOUS by design (roleKey, titleRaw,
+    // skills[], region-state, ts). Since any signed-in user can READ this pool,
+    // enforce the no-PII invariant at the rules layer: reject a create that
+    // carries any identifying key. Reads stay open (the feature needs the pool).
     match /hired/{doc} {
-      allow create, read: if request.auth != null;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && !request.resource.data.keys().hasAny(
+             ['email','name','firstName','lastName','contact','phone','uid','userId','address']);
+      allow update, delete: if false;
     }
 
     // ======================= NEW: RECRUITER TIER ============================
@@ -122,22 +168,34 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // canonical company records — public READ; reputation/verified fields backend-only
+    // canonical company records — public READ; reputation/verified fields backend-only.
+    // v101b Sprint 3: the deployed rule was admin-only WRITE, so recruiter signup's
+    // saveCompany(domain,…) was silently denied (fb.saveCompany swallows the error).
+    // Now a recruiter may create/update ONLY the company doc for THEIR OWN email
+    // domain (companyId == their recruiter doc's domain), and may NEVER self-set
+    // verifiedEmployer:true — that reputation flag stays admin/backend only.
     match /companies/{companyId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin()
+        || (isRecruiter()
+            && companyId == recruiterDomain()
+            && recruiterDomain() != ''
+            && request.resource.data.get('verifiedEmployer', false) == false);
+      allow delete: if isAdmin();
     }
 
     // recruiter-visible candidate projection — backend-written; contact only when
     // the backend confirmed consent. Clients never write.
+    // v101b Sprint 3: VERIFIED recruiters only (was bare isRecruiter) — a
+    // self-signed-up, unreviewed recruiter must not see candidate data.
     match /candidate_cards/{candUid} {
-      allow read:  if isAdmin() || isRecruiter();
+      allow read:  if isAdmin() || isRecruiterVerified();
       allow write: if false;
     }
 
-    // per-candidate match-token cache — backend-written; self/admin/recruiter read
+    // per-candidate match-token cache — backend-written; self/admin/verified-recruiter read
     match /match_tokens/{candUid} {
-      allow read:  if (request.auth != null && request.auth.uid == candUid) || isAdmin() || isRecruiter();
+      allow read:  if (request.auth != null && request.auth.uid == candUid) || isAdmin() || isRecruiterVerified();
       allow write: if false;
     }
 
