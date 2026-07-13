@@ -1763,6 +1763,90 @@ test.describe('[STATE-COVERAGE] v101b batch B+C (AI quality gates, admin employe
   });
 });
 
+test.describe('[STATE-COVERAGE] v101b batch D (F-METRICS + F-CREDITS)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('F-METRICS: questions derive from digit-less jobs; answers become bullets on the CORRECT job, literal numbers only', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      Object.keys(resumeData).forEach((k) => { delete resumeData[k]; });
+      Object.assign(resumeData, { title: 'AM', skills: 'Sales', summary: 's', certs: [], eduExtra: [],
+        jobs: [
+          /* realistic: mostly digit-less bullets so the quantified fraction < 0.3 and the nudge fires */
+          { t: 'Account Manager', c: 'BigCo', b: 'managed client relationships and renewals\nowned onboarding for new accounts\nresolved escalations and retention risks' },   /* no digits → question */
+          { t: 'Analyst', c: 'DataCo', b: 'built dashboards for 12 teams' },                              /* has digits → skipped */
+        ] });
+      const qs = _metricsQuestionsFor();
+      const st = _ratingStructure();
+      localStorage.setItem('gpj_optimized', '[]');
+      openMetricsElicit();
+      const modalOpen = !!document.getElementById('metrics-modal');
+      const input = document.querySelector('#metrics-modal input[id^="mq-"]');
+      input.value = '120';
+      submitMetricsElicit();
+      const snap = JSON.parse(localStorage.getItem('gpj_optimized') || '[]');
+      return {
+        qN: qs.length, qJi: qs[0] && qs[0].ji, needsMetrics: st.needsMetrics, modalOpen,
+        bigcoBullets: resumeData.jobs[0].b, datacoBullets: resumeData.jobs[1].b,
+        snapshotStored: !!(snap[0] && snap[0].snapshot), modalClosed: !document.getElementById('metrics-modal'),
+      };
+    });
+    expect(r.needsMetrics, 'rater flags the metrics gap').toBe(true);
+    expect(r.qN, 'one question per digit-less job').toBe(1);
+    expect(r.qJi, 'question maps to the digit-less job (index 0)').toBe(0);
+    expect(r.modalOpen).toBe(true);
+    expect(r.bigcoBullets, 'the user LITERAL answer lands on the right job').toContain('120');
+    expect(r.bigcoBullets).toMatch(/^managed client relationships/);
+    expect(r.datacoBullets, 'the other job is untouched').toBe('built dashboards for 12 teams');
+    expect(r.bigcoBullets, 'no invented outcomes (no fabricated percentages)').not.toMatch(/increased|grew|boosted|%/i);
+    expect(r.snapshotStored, 'restorable snapshot stored before the change').toBe(true);
+    expect(r.modalClosed).toBe(true);
+  });
+
+  test('F-METRICS Q4: no digit-less jobs → no card, graceful toast path', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      Object.assign(resumeData, { jobs: [{ t: 'X', c: 'Y', b: 'did 5 things' }] });
+      return { qs: _metricsQuestionsFor().length, needs: _ratingStructure().needsMetrics };
+    });
+    expect(r.qs).toBe(0);
+    expect(r.needs, 'metrics check passes → card never renders').toBe(false);
+  });
+
+  test('F-CREDITS: Core Search note is optional-toned + dismiss persists; Base Camp adds the Booster explainer; Hyper-Drive/admin never see it', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const day = 86400000;
+      const setAge = (d) => localStorage.setItem('gpj_install_date', String(Date.now() - d * day));
+      const noteText = () => { const n = document.getElementById('credits-note'); return n ? n.textContent : ''; };
+      const clear = () => { const n = document.getElementById('credits-note'); if (n) n.remove(); localStorage.removeItem('gpj_creditsnote_' + new Date().toDateString()); };
+      isAdmin = false; localStorage.setItem('gpj_tier', 'free');
+      /* Hyper-Drive (day 10): never */
+      clear(); setAge(10); _gpjCreditsNote(); const hyper = noteText();
+      /* Core Search (day 60) */
+      clear(); setAge(60); _gpjCreditsNote(); const core = noteText();
+      /* dismiss persists for the day */
+      const x = document.querySelector('#credits-note div[onclick]'); if (x) x.click();
+      _gpjCreditsNote(); const afterDismiss = noteText();
+      /* Base Camp (day 120) */
+      clear(); setAge(120); _gpjCreditsNote(); const base = noteText();
+      /* admin: never */
+      clear(); isAdmin = true; setAge(120); _gpjCreditsNote(); const admin = noteText();
+      isAdmin = false; clear(); localStorage.removeItem('gpj_install_date');
+      return { hyper, core, afterDismiss, base, admin };
+    });
+    expect(r.hyper, 'Hyper-Drive never sees the note').toBe('');
+    expect(r.core).toContain('totally optional');
+    expect(r.core).toContain('re-up free');
+    expect(r.core, 'no dark patterns: no countdown/urgency words').not.toMatch(/hurry|last chance|expires|only .* left/i);
+    expect(r.afterDismiss, 'dismissed → stays gone for the day').toBe('');
+    expect(r.base).toContain('How’s the search going?');
+    expect(r.base).toContain('Booster');
+    expect(r.base).toContain('completely optional');
+    expect(r.admin, 'admin never sees it').toBe('');
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);

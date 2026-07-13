@@ -5136,6 +5136,33 @@ function setApplyDisabled(state){
 function openEnergyModal(){ document.getElementById('energy-modal').classList.add('open'); }
 /* universal "you've hit today's limit" prompt — encouraging + dismissible.
    kind: 'apply' | 'match' | 'cl' (cover letter) */
+/* ===== F-CREDITS (v101b D, founder-approved): non-invasive AI-limit note.
+   Small DISMISSIBLE inline banner when a Core Search / Base Camp user hits an
+   AI limit — states when credits refresh, that everything else still works,
+   and that paid support is OPTIONAL (credits always re-up free). No urgency,
+   no countdowns. Hyper-Drive (day<46), paid, and admin users never see it. ===== */
+function _gpjCreditsNote(){
+  try{
+    if(typeof isAdmin!=='undefined'&&isAdmin) return;
+    if(typeof isPaid==='function'&&isPaid()) return;
+    const days=(typeof accountAgeDays==='function')?accountAgeDays():0;
+    if(days<46) return;                                        /* Hyper-Drive: unlimited, no note */
+    const key='gpj_creditsnote_'+new Date().toDateString();
+    if(localStorage.getItem(key)) return;                      /* dismissed today */
+    if(document.getElementById('credits-note')) return;        /* already showing */
+    const base=days>=91;
+    const note=document.createElement('div');
+    note.id='credits-note';
+    note.style.cssText='margin:10px 16px;background:rgba(181,95,230,.10);border:1px solid rgba(181,95,230,.35);border-radius:12px;padding:12px 13px;font-size:12px;line-height:1.6;color:var(--off);position:relative;';
+    note.innerHTML=(base
+      ? '💬 <strong>How’s the search going?</strong> You’ve used today’s free AI boosts — they refresh tomorrow (monthly rewrites on '+((typeof nextAiResetLabel==='function')?nextAiResetLabel():'the 1st')+'). Applying, browsing, and swiping stay unlimited. In a crunch? You can request a free <strong>Booster</strong> — a temporary bump back to unlimited AI for a few days — from Settings → Request a Booster. And if GPJ’s been useful, Lifetime is $12 — completely optional; your credits always re-up free.'
+      : '⚡ You’ve used today’s free AI boosts for this. They refresh tomorrow (monthly rewrites on '+((typeof nextAiResetLabel==='function')?nextAiResetLabel():'the 1st')+'). Applying, browsing, and swiping stay unlimited. Want more today? Lifetime is $12 — totally optional; credits always re-up free.')
+      +'<div onclick="try{localStorage.setItem(\''+key+'\',\'1\');}catch(e){};this.parentNode.remove();" style="position:absolute;top:8px;right:10px;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 4px;">✕</div>';
+    const view=document.querySelector('.view.active');
+    const host=(view&&view.firstElementChild)||view||document.getElementById('app');
+    if(host) host.insertAdjacentElement('afterbegin',note);
+  }catch(e){}
+}
 function openLimitReached(kind){
   const t=document.getElementById('limit-modal-title');
   const b=document.getElementById('limit-modal-body');
@@ -5153,6 +5180,7 @@ function openLimitReached(kind){
     b.textContent=line;
   }
   document.getElementById('limit-modal').classList.add('open');
+  try{ _gpjCreditsNote(); }catch(e){}   /* F-CREDITS: dismissible inline note stays after the modal closes */
 }
 /* paint the current lifecycle status everywhere it shows */
 function updateLifecycleUI(){
@@ -6716,7 +6744,7 @@ function _ratingStructure(){
   const blOk=bullets.length>=6; pts+=blOk?8:Math.round(bullets.length/6*8); items.push([blOk,bullets.length+' experience bullets (aim 6+)']);
   const qFrac=bullets.length?quantified/bullets.length:0; pts+=Math.round(Math.min(1,qFrac/0.4)*10); items.push([qFrac>=0.3,quantified+' bullets with numbers/metrics']);
   const vFrac=bullets.length?strongStart/bullets.length:0; pts+=Math.round(Math.min(1,vFrac/0.5)*6); items.push([vFrac>=0.4,strongStart+' bullets start with a strong action verb']);
-  return {pts:Math.min(45,pts), max:45, items:items};
+  return {pts:Math.min(45,pts), max:45, items:items, needsMetrics:(bullets.length>0 && qFrac<0.3)};
 }
 /* F-RATER (v83): the corpus miner counts every frequent posting word — but
    "including", "various" etc. are frequent WITHOUT being skills. Never surface
@@ -6743,6 +6771,66 @@ function _isJunkSkill(t){
   t=String(t||'').trim().toLowerCase();
   if(!t||t.split(/\s+/).length>1) return false;
   return _SKILL_STOP.test(t);
+}
+/* ===== F-METRICS (v101b D, founder-approved): interactive, no-fabrication
+   metric elicitation. Questions derive from the user's ACTUAL jobs whose
+   bullets lack digits; every answer becomes ONE bullet on the CORRECT job,
+   embedding the user's literal number — never an invented outcome. ===== */
+function _metricsQuestionsFor(){
+  const qs=[];
+  try{
+    (resumeData.jobs||[]).forEach(function(j,ji){
+      if(qs.length>=4||!j||!j.t||j.t==='(role)') return;
+      const blob=String(j.b||'').toLowerCase();
+      if(/\d/.test(blob)) return;                      /* this job already has numbers */
+      const co=j.c||j.t;
+      if(/account|client|customer|member|patient|guest/.test(blob)) qs.push({ji:ji,unit:'accounts',q:'At '+co+', roughly how many accounts, clients, or customers did you handle?'});
+      else if(/team|staff|rep|people|hir|onboard|mentor|train/.test(blob)) qs.push({ji:ji,unit:'people',q:'At '+co+', how many people were on the team you worked with or supported?'});
+      else if(/budget|revenue|sales|invoice|payment|cost/.test(blob)) qs.push({ji:ji,unit:'budget',q:'At '+co+', what budget or revenue did your work touch? (approx is fine, e.g. $80K)'});
+      else qs.push({ji:ji,unit:'volume',q:'At '+co+', what volume did you handle — orders, calls, locations, events… anything countable? (e.g. "40 events a year")'});
+    });
+  }catch(e){}
+  return qs.slice(0,4);
+}
+function openMetricsElicit(){
+  const qs=_metricsQuestionsFor();
+  if(!qs.length){ showToast('Your bullets already carry real numbers 💪'); return; }
+  const old=document.getElementById('metrics-modal'); if(old) old.remove();
+  const scrim=document.createElement('div');
+  scrim.id='metrics-modal';
+  scrim.className='modal-scrim open';
+  scrim.style.zIndex='356';
+  scrim.innerHTML='<div class="modal-box" style="text-align:left;">'
+    +'<div style="display:flex;align-items:center;margin-bottom:6px;"><div style="font-size:15px;font-weight:800;flex:1;">📊 Your real numbers</div><div onclick="document.getElementById(\'metrics-modal\').remove()" style="color:var(--muted);cursor:pointer;font-size:16px;padding:4px;">✕</div></div>'
+    +'<div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:12px;">I won\'t invent numbers — these come from you. Answer any that apply (skip the rest) and I\'ll write each one into a strong bullet on the right job.</div>'
+    +qs.map(function(x,i){ return '<div class="field-label">'+x.q.replace(/</g,'&lt;')+'</div><input class="field-input" id="mq-'+i+'" data-ji="'+x.ji+'" data-unit="'+x.unit+'" placeholder="Optional — e.g. 120, $80K, 8 people" style="margin-bottom:10px;font-size:13px;"/>'; }).join('')
+    +'<div onclick="submitMetricsElicit()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:12px;text-align:center;font-size:13px;cursor:pointer;">Write my metric bullets</div>'
+    +'<div onclick="document.getElementById(\'metrics-modal\').remove()" style="color:var(--muted);font-size:12px;text-align:center;cursor:pointer;padding:8px;margin-top:2px;">Maybe later</div>'
+    +'</div>';
+  document.getElementById('app').appendChild(scrim);
+}
+function submitMetricsElicit(){
+  const inputs=[...document.querySelectorAll('#metrics-modal input[id^="mq-"]')];
+  const answered=inputs.map(function(el){ return {ji:parseInt(el.dataset.ji,10), unit:el.dataset.unit, ans:String(el.value||'').trim().replace(/[<>]/g,'')}; }).filter(function(x){ return x.ans; });
+  if(!answered.length){ showToast('Nothing to add — every field was blank (that\'s fine!)'); return; }
+  try{ storeResumeSnapshot('My resume — before adding metrics'); }catch(e){}
+  let added=0;
+  answered.forEach(function(x){
+    const j=(resumeData.jobs||[])[x.ji]; if(!j) return;
+    /* the bullet embeds the user's LITERAL answer — no invented outcomes */
+    let b='';
+    if(x.unit==='accounts') b='Managed '+x.ans+' accounts and client relationships end-to-end';
+    else if(x.unit==='people') b='Worked with and supported a team of '+x.ans;
+    else if(x.unit==='budget') b='Owned work touching '+x.ans+' in budget/revenue';
+    else b='Handled '+x.ans+' as part of the core workload';
+    j.b=(j.b?(j.b+'\n'):'')+b;
+    try{ const ta=document.getElementById('duties-ta-'+x.ji); if(ta) ta.value=j.b; }catch(e){}
+    added++;
+  });
+  try{ renderTplPreview(); }catch(e){}
+  try{ if(typeof cloudSync==='function') cloudSync(); }catch(e){}
+  const m=document.getElementById('metrics-modal'); if(m) m.remove();
+  showToast('📊 '+added+' real-number bullet'+(added>1?'s':'')+' added — review them in your duties, then Re-rate');
 }
 async function rateResume(){
   if(!(resumeData&&(resumeData.title||resumeData.skills||(resumeData.jobs&&resumeData.jobs.length)))){
@@ -6802,6 +6890,13 @@ async function rateResume(){
     '<div style="font-size:10px;color:var(--muted);text-align:center;margin-bottom:12px;line-height:1.5;">Reads your whole resume and rewrites the summary + every job’s key duties around your most recent role (every bullet re-led with a strong action verb), plus a skills tidy-up — never invents anything. <strong>Real numbers must come from you</strong> — Jett won’t fabricate metrics. Counts as 1 Summary + 1 Key-Duties AI rewrite'+(isPaid()?'':(' · '+aiImproveLeft('summary')+' of '+AI_IMPROVE_MONTHLY+' left this month'))+'.</div>';
   html+='<div style="font-size:11px;font-weight:800;color:var(--mint);margin-bottom:6px;">✅ What’s working</div>';
   html+=st.items.map(it=>'<div style="font-size:11px;color:'+(it[0]?'var(--off)':'var(--muted)')+';margin-bottom:4px;">'+(it[0]?'✅':'⬜')+' '+it[1]+'</div>').join('');
+  /* F-METRICS (v101b D, founder-approved): the metrics flag failed — offer the
+     no-fabrication elicitation. Optional card, never auto-fires. */
+  if(st.needsMetrics && typeof _metricsQuestionsFor==='function' && _metricsQuestionsFor().length){
+    html+='<div onclick="openMetricsElicit()" style="margin-top:8px;background:rgba(0,245,160,.08);border:1px solid rgba(0,245,160,.35);border-radius:11px;padding:11px 12px;cursor:pointer;">'
+      +'<div style="font-size:12px;font-weight:800;color:var(--mint);">📊 Add your real numbers — I won\'t invent them</div>'
+      +'<div style="font-size:10px;color:var(--muted);margin-top:3px;line-height:1.5;">Answer a couple quick questions about your actual work and I\'ll turn your real numbers into strong bullets — mapped to the right job. Every question is skippable.</div></div>';
+  }
   if(!corpus||!corpus.terms||!corpus.terms.length){
     html+='<div style="font-size:10px;color:var(--muted);margin-top:10px;line-height:1.5;">📡 Live posting benchmark wasn’t available just now, so this reflects resume structure only. Set your location and re-rate to benchmark against real '+safe+' postings.</div>';
   }
@@ -6830,6 +6925,7 @@ async function jettFullImprove(){
   if(!resumeReady){ showToast('Add your resume first.'); try{ switchView('resume',document.querySelector('[data-view=resume]')); }catch(e){} return; }
   if(!(aiImproveAllowed('summary')&&aiImproveAllowed('duties'))){
     showToast('✨ You’ve used this month’s AI rewrites — they renew '+nextAiResetLabel()+'. Local polish is still free from the section buttons.');
+    try{ _gpjCreditsNote(); }catch(e){}   /* F-CREDITS */
     return;
   }
   const btn=document.getElementById('jett-full-btn');
