@@ -1,0 +1,40 @@
+name: Weekly Content Pack
+
+# Drafts a week of social posts from live ghost-job data and uploads them as an
+# artifact for the founder to review + post MANUALLY. This workflow NEVER posts
+# to any platform. Opt-in: needs the FIREBASE_SERVICE_ACCOUNT secret (same one
+# the harvester uses). Falls back to the offline fixture if the secret is absent
+# so the job still produces a sample and never hard-fails.
+on:
+  schedule:
+    - cron: '0 13 * * 1'      # Mondays 13:00 UTC
+  workflow_dispatch:
+
+jobs:
+  content:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        run: npm install
+      - name: Guardrail tests (must pass before drafting)
+        run: npm run test:growth
+      - name: Generate content pack
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            node ghost-report-generator/run.js || node ghost-report-generator/run.js --fixture
+          else
+            echo "No FIREBASE_SERVICE_ACCOUNT — producing a sample pack from the fixture."
+            node ghost-report-generator/run.js --fixture
+          fi
+      - name: Upload content pack for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-content-pack
+          path: content-packs/
+          if-no-files-found: error

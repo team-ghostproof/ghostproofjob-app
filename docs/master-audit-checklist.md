@@ -291,7 +291,7 @@ Still OPEN (v101b sub-batches):
 
 ## GROWTH / MARKETING AUTOMATION (Sprint 4; free + low-effort; built, needs wiring)
 - [ ] SEO page generator (`seo-generator/`) — static city/role pages, ZERO runtime Firestore reads; company pages OFF until legal review. Implement `getSeoData()`; map `/g/*`; sitemap + cron.
-- [ ] Ghost-data content engine (`ghost-report-generator/`) + weekly content pack — auto-drafts for founder review; never auto-posts; defamation guardrails. Implement `getWeeklyGhostData()`.
+- [x] Ghost-data content engine (`ghost-report-generator/`) — DONE (Sprint 4, built-from-spec 2026-07-13): `getWeeklyGhostData()` (jobs-stale stats LIVE + ghost_reports adapter, fixture-backed until F-GHOST) → `generateContentPack()` drafts LinkedIn/Reddit/TikTok/X/tip/green-flag (+ gated community posts). Defamation guardrails baked + unit-tested (MIN_REPORTS=3 gate, community-reported framing only, no fabricated numbers, positive green-flag balance). NEVER auto-posts — writes `content-packs/<week>.md` for review. `npm run content:sample|weekly`, `npm run test:growth` (11/11). Opt-in weekly Action uploads the pack as an artifact. DEP NOTE: live community-company posts need F-GHOST (reports are localStorage-only today) — jobs-stat posts ship now regardless.
 - [ ] Referral engine (`referral-engine/`) — invite→Booster; anti-abuse (self-referral block, activation-gated, cap 10, backend-written grants); [UI-REVIEW] in-app.
 - [ ] Organic launch needs NO code — founder posts from `GPJ_Marketing_Launch_Kit.md`.
 

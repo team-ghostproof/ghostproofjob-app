@@ -17,3 +17,6 @@ ui-debug.log
 # python bytecode
 scripts/__pycache__/
 __pycache__/
+
+# growth: generated content packs are per-run founder deliverables (Action uploads them as artifacts)
+content-packs/

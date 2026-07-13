@@ -1,0 +1,33 @@
+{
+  "_comment": "Offline sample for `node ghost-report-generator/run.js --fixture` and tests. Mirrors the shape getWeeklyGhostData receives from Firestore. reports[] simulates the F-GHOST aggregate that does NOT exist live yet — includes one company ABOVE the 3-report threshold and one BELOW, to exercise the defamation gate.",
+  "jobs": [
+    { "location": "Houston, TX", "posting_age_days": 41 },
+    { "location": "Houston, TX", "posting_age_days": 55 },
+    { "location": "Houston, TX", "posting_age_days": 12 },
+    { "location": "Houston, TX", "posting_age_days": 38 },
+    { "location": "Houston, TX", "posting_age_days": 3 },
+    { "location": "Houston, TX", "posting_age_days": 47 },
+    { "location": "Houston, TX", "posting_age_days": 9 },
+    { "location": "Houston, TX", "posting_age_days": 33 },
+    { "location": "Austin, TX", "posting_age_days": 5 },
+    { "location": "Austin, TX", "posting_age_days": 7 },
+    { "location": "Austin, TX", "posting_age_days": 60 },
+    { "location": "Austin, TX", "posting_age_days": 2 },
+    { "location": "Austin, TX", "posting_age_days": 14 },
+    { "location": "Austin, TX", "posting_age_days": 6 },
+    { "location": "Austin, TX", "posting_age_days": 4 },
+    { "location": "Austin, TX", "posting_age_days": 1 },
+    { "location": "Remote", "posting_age_days": 20 },
+    { "location": "Remote", "posting_age_days": 70 }
+  ],
+  "reports": [
+    { "company": "Vaporware Staffing", "stage": "After applying" },
+    { "company": "Vaporware Staffing", "stage": "After applying" },
+    { "company": "Vaporware Staffing", "stage": "After interview" },
+    { "company": "Vaporware Staffing", "stage": "After applying" },
+    { "company": "OneOff LLC", "stage": "After applying" }
+  ],
+  "greenFlags": [
+    { "company": "Bright Ops Co", "note": "replied to every applicant within a week" }
+  ]
+}
