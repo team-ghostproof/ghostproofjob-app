@@ -1887,6 +1887,93 @@ test.describe('[STATE-COVERAGE] v101b-fix skills render-boundary tidy (founder l
   });
 });
 
+test.describe('[STATE-COVERAGE] R2-A recruiter onboarding (fork + required website + full profile)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('signup fork shows only when creating an account; candidate stays the default path', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      showAuthModal('signup');
+      const inSignup = getComputedStyle(document.getElementById('auth-roletype')).display;
+      const candidateFieldsShown = getComputedStyle(document.getElementById('auth-signup-fields')).display;
+      showAuthModal('login');
+      const inLogin = getComputedStyle(document.getElementById('auth-roletype')).display;
+      return { inSignup, inLogin, candidateFieldsShown };
+    });
+    expect(r.inSignup, 'fork visible when creating an account').toBe('flex');
+    expect(r.inLogin, 'fork hidden on log in').toBe('none');
+    expect(r.candidateFieldsShown, 'candidate default fields still render (untouched)').toBe('block');
+  });
+
+  test('"I\'m hiring" routes to recruiter auth and closes the candidate modal; zero recruiter reads', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      let recReads = 0;
+      window.fb = window.fb || {};
+      ['loadRecruiter'].forEach((m) => { const o = fb[m]; if (typeof o === 'function') fb[m] = function () { recReads++; return o.apply(fb, arguments); }; });
+      showAuthModal('signup');
+      document.querySelector('#auth-roletype div[onclick]').click();
+      return {
+        recOpen: document.getElementById('recruiter-auth-modal').classList.contains('open'),
+        candidateClosed: !document.getElementById('auth-modal').classList.contains('open'),
+        recReads,
+      };
+    });
+    expect(r.recOpen).toBe(true);
+    expect(r.candidateClosed).toBe(true);
+    expect(r.recReads, 'the fork is pure UI — no recruiter doc read').toBe(0);
+  });
+
+  test('recruiter signup requires a valid company website (blocks before creating the account)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const toasts = [];
+      window.showToast = (m) => toasts.push(m);
+      let signUpCalls = 0;
+      window.fb = window.fb || {};
+      fb.signUp = async () => { signUpCalls++; return { user: { uid: 'x' } }; };
+      const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+      openRecruiterAuth();
+      // company + email + pass, but NO website
+      set('rec-company', 'Acme'); set('rec-website', ''); set('rec-email', 'jane@acmecorp.com'); set('rec-pass', 'secret1');
+      await recruiterSignup();
+      const blockedNoSite = signUpCalls === 0 && toasts.some((t) => /website/i.test(t));
+      // invalid website
+      set('rec-website', 'notaurl');
+      await recruiterSignup();
+      const blockedBadSite = signUpCalls === 0 && toasts.some((t) => /valid company website/i.test(t));
+      return { blockedNoSite, blockedBadSite, signUpCalls };
+    });
+    expect(r.blockedNoSite, 'missing website blocks signup').toBe(true);
+    expect(r.blockedBadSite, 'invalid website blocks signup').toBe(true);
+    expect(r.signUpCalls, 'no account created while website invalid').toBe(0);
+  });
+
+  test('employer view has + persists the full company profile (contact, title, location)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const saved = {};
+      window.fb = window.fb || {};
+      fb.createRecruiter = async (uid, d) => { Object.assign(saved, { rec: d }); return true; };
+      fb.saveCompany = async (id, d) => { Object.assign(saved, { co: d }); return true; };
+      window._recruiter = { uid: 'r1', companyId: 'acme.com', domain: 'acme.com' };
+      renderEmployerView();
+      const present = ['emp-location', 'emp-contact-first', 'emp-contact-last', 'emp-contact-title'].every((id) => !!document.getElementById(id));
+      const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+      set('emp-company', 'Acme Corp'); set('emp-website', 'https://acme.com'); set('emp-desc', 'We build things');
+      set('emp-location', 'Houston, TX'); set('emp-contact-first', 'Jane'); set('emp-contact-last', 'Doe'); set('emp-contact-title', 'TA Lead');
+      await saveCompanyProfile();
+      window._recruiter = null;
+      return { present, rec: saved.rec, co: saved.co };
+    });
+    expect(r.present, 'full-profile fields exist in the employer view').toBe(true);
+    expect(r.rec.contactFirst).toBe('Jane');
+    expect(r.rec.contactTitle).toBe('TA Lead');
+    expect(r.rec.location).toBe('Houston, TX');
+    expect(r.co.location, 'company doc carries location').toBe('Houston, TX');
+    expect(r.co.name).toBe('Acme Corp');
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);

@@ -1041,6 +1041,14 @@
     <div class="modal-box" style="text-align:left;position:relative;">
       <div style="font-size:15px;font-weight:800;margin-bottom:2px;" id="auth-title">Create your account</div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Saves your profile & resume history securely to the cloud so you never lose progress.</div>
+      <!-- R2-A account-type fork (founder-approved): only in SIGNUP mode. Candidate
+           ("job hunting") is the default/active path — its fields + flow are
+           untouched. "I'm hiring" routes to the employer signup so it's finally
+           discoverable to new users (was footer/nav only). -->
+      <div id="auth-roletype" style="display:none;gap:8px;margin-bottom:12px;">
+        <div style="flex:1;text-align:center;padding:9px 6px;border-radius:10px;font-size:12px;font-weight:800;cursor:default;background:var(--plum3);border:1px solid var(--cyber);color:var(--off);">🔍 I'm job hunting</div>
+        <div onclick="document.getElementById('auth-modal').classList.remove('open'); if(typeof openRecruiterAuth==='function') openRecruiterAuth();" style="flex:1;text-align:center;padding:9px 6px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;background:var(--plum3);border:1px solid var(--plum4);color:var(--muted);">💼 I'm hiring →</div>
+      </div>
       <div id="auth-signup-fields" style="display:none;">
         <div class="field-row">
           <div><div class="field-label">First Name</div><input class="field-input" id="auth-first" name="given-name" autocomplete="given-name" placeholder="First" style="margin-bottom:8px;"/></div>
@@ -2200,7 +2208,17 @@
         <div class="field-label">What the company does (short)</div>
         <textarea class="field-input" id="emp-desc" rows="3" placeholder="One or two lines candidates will see." style="margin-bottom:8px;resize:vertical;"></textarea>
         <div class="field-label">Team size · time zone</div>
-        <input class="field-input" id="emp-team" placeholder="e.g. 50–200 · CT (Houston)" style="margin-bottom:12px;"/>
+        <input class="field-input" id="emp-team" placeholder="e.g. 50–200 · CT (Houston)" style="margin-bottom:8px;"/>
+        <div class="field-label">Company location (city, state)</div>
+        <input class="field-input" id="emp-location" placeholder="Houston, TX" style="margin-bottom:12px;"/>
+        <!-- R2-A: the human behind the account, so employer info is real + verifiable -->
+        <div style="font-size:11px;font-weight:800;color:var(--cyber);text-transform:uppercase;letter-spacing:.5px;margin:4px 0 8px;">Your details (hiring contact)</div>
+        <div class="field-row">
+          <div><div class="field-label">First name</div><input class="field-input" id="emp-contact-first" placeholder="First" style="margin-bottom:8px;"/></div>
+          <div><div class="field-label">Last name</div><input class="field-input" id="emp-contact-last" placeholder="Last" style="margin-bottom:8px;"/></div>
+        </div>
+        <div class="field-label">Your title</div>
+        <input class="field-input" id="emp-contact-title" placeholder="e.g. Talent Acquisition Lead" style="margin-bottom:12px;"/>
         <div id="emp-save-btn" onclick="saveCompanyProfile()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;text-align:center;font-size:14px;cursor:pointer;">💾 Save company profile</div>
         <div style="margin-top:16px;font-size:11px;color:var(--muted);line-height:1.6;">Next: post your first role and see candidates matched to it (coming soon). Your jobs stay hidden until your company is verified.</div>
         <div id="emp-signout-btn" onclick="recruiterSignOut()" style="margin-top:14px;color:var(--muted);font-size:12px;text-align:center;cursor:pointer;text-decoration:underline;">Sign out of employer account</div>
@@ -2466,6 +2484,8 @@ function showAuthModal(mode){
   if(t) t.textContent=authMode==='login'?'Welcome back — log in':'Create your account';
   const sf=document.getElementById('auth-signup-fields');
   if(sf) sf.style.display=authMode==='login'?'none':'block';   /* LOG IN hides name+phone */
+  const rt=document.getElementById('auth-roletype');
+  if(rt) rt.style.display=authMode==='login'?'none':'flex';     /* R2-A: fork only when creating an account */
   const pb=document.getElementById('auth-primary-btn');
   if(pb) pb.textContent=authMode==='login'?'Log In':'Create Account';
   const tt=document.getElementById('auth-toggle-text'), tl=document.getElementById('auth-toggle-link');
@@ -2631,7 +2651,8 @@ function _renderEmployerAdminPreview(){
     const set=(id,v)=>{ const e=document.getElementById(id); if(e&&('value' in e)){ e.value=v; e.disabled=true; e.style.opacity='.7'; } };
     set('emp-company','Acme Corp (sample)'); set('emp-website','https://acme.example');
     set('emp-desc','What a verified employer’s company blurb looks like to candidates.');
-    set('emp-team','50–200 · CT (Houston)');
+    set('emp-team','50–200 · CT (Houston)'); set('emp-location','Houston, TX');
+    set('emp-contact-first','Sample'); set('emp-contact-last','Recruiter'); set('emp-contact-title','Talent Acquisition Lead');
     const hide=id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; };
     hide('emp-save-btn'); hide('emp-signout-btn');
   }catch(e){}
@@ -2647,6 +2668,9 @@ async function recruiterSignup(){
   const email=(document.getElementById('rec-email').value||'').trim();
   const pass=(document.getElementById('rec-pass').value||'').trim();
   if(!company){ showToast('Enter your company name'); return; }
+  /* R2-A: website is now REQUIRED at signup so employer info is verifiable */
+  if(!website){ showToast('Enter your company website'); return; }
+  if(!/^([a-z0-9-]+\.)+[a-z]{2,}(\/|$)/i.test(website.replace(/^https?:\/\//i,''))){ showToast('Enter a valid company website (e.g. acme.com)'); return; }
   if(!validateRecruiterEmail()){ return; }
   if(pass.length<6){ showToast('Password needs 6+ characters'); return; }
   const btn=document.getElementById('rec-primary-btn'); btn.textContent='Creating…'; btn.style.pointerEvents='none';
@@ -2688,12 +2712,13 @@ function renderEmployerView(){
   /* v101b C: leaving an admin preview — restore the real-recruiter state */
   try{
     const ab=document.getElementById('emp-admin-banner'); if(ab) ab.style.display='none';
-    ['emp-company','emp-website','emp-desc','emp-team'].forEach(id=>{ const e=document.getElementById(id); if(e){ e.disabled=false; e.style.opacity=''; } });
+    ['emp-company','emp-website','emp-desc','emp-team','emp-location','emp-contact-first','emp-contact-last','emp-contact-title'].forEach(id=>{ const e=document.getElementById(id); if(e){ e.disabled=false; e.style.opacity=''; } });
     ['emp-save-btn','emp-signout-btn'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display=''; });
   }catch(e){}
   const r=window._recruiter||{};
   const set=(id,v)=>{ const e=document.getElementById(id); if(e&&('value' in e)) e.value=v||''; };
   set('emp-company',r.company); set('emp-website',r.website); set('emp-desc',r.description); set('emp-team',r.team);
+  set('emp-location',r.location); set('emp-contact-first',r.contactFirst); set('emp-contact-last',r.contactLast); set('emp-contact-title',r.contactTitle);
   const b=document.getElementById('emp-verify-banner');
   if(b){
     if(r.isValidated){ b.style.background='rgba(0,245,160,.1)'; b.style.color='var(--mint)'; b.innerHTML='✅ Verified Employer — domain-verified + reviewed by GhostProofJob.'; }
@@ -2703,14 +2728,20 @@ function renderEmployerView(){
 async function saveCompanyProfile(){
   if(!window._recruiter){ showToast('Sign in as an employer first'); return; }
   const r=window._recruiter;
-  r.company=(document.getElementById('emp-company').value||'').trim();
-  r.website=(document.getElementById('emp-website').value||'').trim();
-  r.description=(document.getElementById('emp-desc').value||'').trim();
-  r.team=(document.getElementById('emp-team').value||'').trim();
+  const val=id=>(document.getElementById(id)||{}).value||'';
+  r.company=val('emp-company').trim();
+  r.website=val('emp-website').trim();
+  r.description=val('emp-desc').trim();
+  r.team=val('emp-team').trim();
+  r.location=val('emp-location').trim();               /* R2-A: full profile */
+  r.contactFirst=val('emp-contact-first').trim();
+  r.contactLast=val('emp-contact-last').trim();
+  r.contactTitle=val('emp-contact-title').trim();
+  if(!r.company){ showToast('Company name is required'); return; }
   try{
-    await fb.createRecruiter(r.uid,{company:r.company,website:r.website,description:r.description,team:r.team});
+    await fb.createRecruiter(r.uid,{company:r.company,website:r.website,description:r.description,team:r.team,location:r.location,contactFirst:r.contactFirst,contactLast:r.contactLast,contactTitle:r.contactTitle});
     const companyId=r.companyId||r.domain||r.uid;
-    await fb.saveCompany(companyId,{name:r.company,website:r.website,description:r.description});
+    await fb.saveCompany(companyId,{name:r.company,website:r.website,description:r.description,location:r.location});
     showToast('💾 Company profile saved');
   }catch(e){ showToast('Could not save — try again'); }
 }
