@@ -2048,6 +2048,77 @@ test.describe('[STATE-COVERAGE] R2-B recruiter job posting + listing', () => {
   });
 });
 
+test.describe('[STATE-COVERAGE] R2-C internal apply + dashboard, R2-D opt-in', () => {
+  test.use({ viewport: { width: 440, height: 900 } });
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('C: verified internal job carries id + _internal through the mapper; url empty', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const j = mapFirestoreJob({ _docId: 'JOB99', title: 'Ops Lead', company: 'Acme', location: 'Houston, TX', description: 'A real internal role description for testing purposes here.', source: 'internal', active: true, isValidated: true });
+      return { id: j.id, internal: j._internal, urlEmpty: j.url === '' };
+    });
+    expect(r.id).toBe('JOB99');
+    expect(r.internal).toBe(true);
+    expect(r.urlEmpty, 'internal jobs have no external URL — apply is in-app').toBe(true);
+  });
+
+  test('C: in-app apply writes the application; Browse card shows "Apply to this role"', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let applied = null;
+      window.fb = window.fb || {};
+      fb.applyToInternalJob = async (id, meta) => { applied = { id, meta }; return true; };
+      window.requireSignIn = () => true; window.recordSwipe = () => {}; window.reloadDeckFromQueue = () => {}; window.closeBrowseExpanded = () => {};
+      await applyInternalById('JOB99', 'Ops Lead', 'Acme');
+      await new Promise((r) => setTimeout(r, 120));
+      const html = buildBrowseExpanded({ t: 'Ops Lead', co: 'Acme', loc: 'Houston, TX', url: '', desc: 'd', summary: 'd', sal: '', ghost: 10, match: 0, posting_age_days: 1, _internal: true, id: 'JOB99' }, 0);
+      const htmlExternal = buildBrowseExpanded({ t: 'Ext Role', co: 'Beta', loc: 'Austin, TX', url: 'https://x.example/a', desc: 'd', summary: 'd', sal: '', ghost: 10, match: 0, posting_age_days: 1 }, 0);
+      return { applied, internalHasApply: /Apply to this role/.test(html), externalHasPosting: /View Full Posting/.test(htmlExternal) };
+    });
+    expect(r.applied).toEqual({ id: 'JOB99', meta: { title: 'Ops Lead', company: 'Acme' } });
+    expect(r.internalHasApply, 'internal job card -> in-app Apply').toBe(true);
+    expect(r.externalHasPosting, 'external job card unchanged -> View Full Posting').toBe(true);
+  });
+
+  test('C: recruiter dashboard shows applicant counts (count aggregation)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      fb.loadRecruiterJobs = async () => [{ id: 'JOB99', title: 'Ops Lead', location: 'Houston, TX', is_remote: false, job_type: 'Full-time', isValidated: true, active: true }];
+      fb.countJobApplicants = async (id) => (id === 'JOB99' ? 3 : 0);
+      window._recruiter = { uid: 'r1', company: 'Acme' };
+      switchView('employer'); renderEmployerView();
+      await new Promise((r) => setTimeout(r, 300));
+      return (document.getElementById('emp-jobs-list').textContent || '');
+    });
+    expect(r).toContain('3 applicants');
+  });
+
+  test('D: discoverable opt-in defaults OFF, persists top-level, reflects on reload', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      let saved = null; window.fb = window.fb || {}; fb.current = () => ({ uid: 'u1' }); fb.saveProfile = async (uid, d) => { saved = d; return true; };
+      localStorage.setItem('gpj_profile', JSON.stringify({ email: 'u@x.com' }));
+      loadNotifPrefs();
+      const t = document.getElementById('discoverable-toggle');
+      const defaultOff = !t.classList.contains('on');
+      toggleDiscoverable(t);
+      const on = t.classList.contains('on');
+      const savedOn = saved && saved.discoverable;
+      const storedTop = JSON.parse(localStorage.getItem('gpj_profile')).discoverable;
+      loadNotifPrefs();
+      const reflects = t.classList.contains('on');
+      return { exists: !!t, defaultOff, on, savedOn, storedTop, reflects };
+    });
+    expect(r.exists).toBe(true);
+    expect(r.defaultOff, 'discovery is OFF until the candidate opts in').toBe(true);
+    expect(r.on).toBe(true);
+    expect(r.savedOn, 'saved as a TOP-LEVEL discoverable field (rules/reverse-match read it)').toBe(true);
+    expect(r.storedTop).toBe(true);
+    expect(r.reflects, 'reload reflects the saved opt-in').toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);

@@ -122,7 +122,11 @@
         }catch(e){}
         const _stash=(docs)=>{ try{ if(docs&&docs.length){ const ks=Object.keys(_jobsCache); if(ks.length>3) delete _jobsCache[ks[0]]; _jobsCache[ck]={ts:Date.now(),docs:docs}; } }catch(e){} return docs; };
         const col = collection(db,'jobs');
-        const mapSnap = (snap)=>{ const out=[]; snap.forEach(d=>{ const v=d.data()||{}; if(v.title&&v.direct_apply_url) out.push(v); }); return out; };
+        /* R2-C: also admit VERIFIED employer jobs (source:'internal', no external
+           URL — they apply in-app). The query already filters active==true, so
+           only admin-approved internal jobs pass. Carry the doc id (_docId) so
+           the in-app apply can write to jobs/{id}/applications. */
+        const mapSnap = (snap)=>{ const out=[]; snap.forEach(d=>{ const v=d.data()||{}; if(v.title&&(v.direct_apply_url||v.source==='internal')) out.push(Object.assign({_docId:d.id},v)); }); return out; };
         // 1) region-scoped (active only), newest first when index allows.
         //    B-POOL-MERGE (v80): region docs are COLLECTED and MERGED with the
         //    wide pull below — never returned alone. Returning early (pre-v74)
@@ -318,6 +322,12 @@
       /* admin: internal jobs awaiting review (source:'internal' + not yet validated) */
       adminPendingJobs: async ()=>{ try{ const q=query(collection(db,'jobs'), where('source','==','internal'), limit(200)); const s=await getDocs(q); const out=[]; s.forEach(d=>{ const v=d.data()||{}; if(v.isValidated!==true) out.push(Object.assign({id:d.id},v)); }); return out; }catch(e){ console.warn('[GPJ] adminPendingJobs',e&&e.message); return []; } },
       adminVerifyJob: async (id,approved)=>{ try{ await setDoc(doc(db,'jobs',id),{isValidated:!!approved,active:!!approved,verifiedAt:Date.now()},{merge:true}); return true; }catch(e){ console.warn('[GPJ] adminVerifyJob',e&&e.message); return false; } },
+      /* ===== R2-C: internal apply. A candidate applies to an employer's internal
+         job — writes jobs/{jobId}/applications/{uid} (rules: candidate owns own
+         application). No PII in the doc; the recruiter reads applied-count and,
+         per the contact-reveal rule, an applicant's contact. ===== */
+      applyToInternalJob: async (jobId,meta)=>{ try{ const u=auth.currentUser; if(!u||!jobId) return false; await setDoc(doc(db,'jobs',jobId,'applications',u.uid),Object.assign({status:'applied',ts:Date.now()},meta||{}),{merge:true}); return true; }catch(e){ console.warn('[GPJ] applyToInternalJob',e&&e.message); return false; } },
+      countJobApplicants: async (jobId)=>{ try{ const s=await getCountFromServer(collection(db,'jobs',jobId,'applications')); return s.data().count; }catch(e){ return null; } },
       current: ()=>auth.currentUser
     };
     onAuthStateChanged(auth, u=>{ if(window.gpjAuthChanged) window.gpjAuthChanged(u); });
@@ -2423,6 +2433,16 @@
         <div class="pref-row"><div class="pref-icon" style="background:rgba(181,95,230,.12);">⭐</div><div style="flex:1;font-size:13px;font-weight:600;">Company Rating Reminders</div><div class="toggle-switch on" id="notif-ratingreminders" onclick="setNotifPref(this,'companyRatingReminders')"></div></div>
       </div>
 
+      <!-- R2-D: candidate discoverable opt-in (default OFF). Plain consent copy;
+           the toggle is the ONLY thing that lets a verified employer see your card. -->
+      <div class="pref-section" id="sec-discovery">
+        <div class="pref-section-title">Employer discovery</div>
+        <div class="pref-row"><div class="pref-icon" style="background:rgba(0,245,160,.12);">🤝</div>
+          <div style="flex:1;"><div style="font-size:13px;font-weight:600;">Let verified employers find me</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">Off by default. When on, <strong>verified</strong> employers on GhostProofJob can see your profile as a match for their roles and reach out. Your contact is shared only when you apply or accept a reach-out — <strong>never sold, never purchasable</strong>. Turn it off anytime.</div></div>
+          <div class="toggle-switch" id="discoverable-toggle" onclick="toggleDiscoverable(this)"></div></div>
+      </div>
+
       <div class="pref-section">
         <div class="pref-section-title">Privacy, Legal & Security</div>
         <div class="pref-row" onclick="contactSupport()" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(100,200,255,.12);">📨</div><div style="flex:1;font-size:13px;font-weight:600;">Contact Support / Ask a Question</div><div style="color:var(--muted);">›</div></div>
@@ -2462,7 +2482,7 @@
       <!-- RECRUITER TIER (R1): employer entry -->
       <div style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v101c</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v102</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2804,9 +2824,11 @@ async function renderMyJobs(){
     const loc=(j.is_remote?'Remote':(j.location||'—'));
     return '<div style="background:var(--plum3);border:1px solid var(--plum4);border-radius:10px;padding:10px 12px;margin-bottom:7px;">'
       +'<div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">'+String(j.title||'Role').replace(/</g,'&lt;')+'</div>'
-      +'<div style="font-size:10px;color:var(--muted);margin-top:1px;">'+String(loc).replace(/</g,'&lt;')+' · '+String(j.job_type||'').replace(/</g,'&lt;')+' · '+badge+'</div></div>'
+      +'<div style="font-size:10px;color:var(--muted);margin-top:1px;">'+String(loc).replace(/</g,'&lt;')+' · '+String(j.job_type||'').replace(/</g,'&lt;')+' · '+badge+' · <span id="jobapp-'+j.id+'" style="color:var(--cyber);font-weight:700;">— applicants</span></div></div>'
       +'<div onclick="deleteMyJob(\''+j.id+'\')" style="color:var(--danger);font-size:11px;cursor:pointer;font-weight:700;padding:4px 6px;">Delete</div></div></div>';
   }).join('');
+  /* R2-C: fill applicant counts (count() aggregation — not per-doc reads) */
+  jobs.forEach(async j=>{ try{ if(window.fb&&fb.countJobApplicants){ const n=await fb.countJobApplicants(j.id); const el=document.getElementById('jobapp-'+j.id); if(el) el.textContent=(n==null?'—':n)+' applicant'+(n===1?'':'s'); } }catch(e){} });
 }
 async function deleteMyJob(id){
   if(!id) return;
@@ -3328,6 +3350,8 @@ function mapFirestoreJob(r){
       }
       return ws;
     })(),
+    id:r._docId||r.id||'',                 /* R2-C: doc id for in-app apply */
+    _internal:(r.source==='internal'),     /* R2-C: employer job → in-app apply */
     last_ping_status:'ok'
   };
 }
@@ -3744,7 +3768,9 @@ function buildBrowseExpanded(j,i){
       '<div onclick="copyOptLive('+i+',event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">\u2728 Cover Letter</div>'+
     '</div>'+
     '<div onclick="fullCompanyLive('+i+')" style="margin-top:8px;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">\u2b50 Full company profile, vibe &amp; reviews \u2192</div>'+
-    (url?('<div onclick="applyVia(\''+url+'\',\''+t+'\',\''+co+'\')" style="margin-top:8px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:12px;text-align:center;font-size:13px;cursor:pointer;">View Full Posting \u2197</div>'):'')+
+    ((j._internal&&j.id)
+      ?('<div onclick="applyInternalById(\''+j.id+'\',\''+t+'\',\''+co+'\')" style="margin-top:8px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:12px;text-align:center;font-size:13px;cursor:pointer;">\ud83d\udce8 Apply to this role</div>')   /* R2-C: in-app apply for employer jobs */
+      :(url?('<div onclick="applyVia(\''+url+'\',\''+t+'\',\''+co+'\')" style="margin-top:8px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:12px;text-align:center;font-size:13px;cursor:pointer;">View Full Posting \u2197</div>'):''))+
     '<div style="display:flex;gap:8px;margin-top:8px;">'+
       '<div onclick="saveLive('+i+',event)" style="flex:1;background:rgba(0,245,160,.08);border:1px solid rgba(0,245,160,.3);color:var(--mint);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">\ud83d\udd16 Save</div>'+
       '<div onclick="notInterestedLive('+i+',event);closeBrowseExpanded()" style="flex:1;background:rgba(255,77,106,.12);border:1px solid rgba(255,77,106,.35);color:var(--danger);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">\ud83d\udeab Not Interested</div>'+
@@ -6437,6 +6463,8 @@ async function _fetchLiveMarketJobs(){
       }
       return ws;
     })(),
+      id:r._docId||r.id||'',                 /* R2-C: doc id for in-app apply */
+      _internal:(r.source==='internal'),     /* R2-C */
       last_ping_status:'ok'
     }));
     /* DATA METADATA: stale postings (90+ days) get high-risk ghost flags */
@@ -8386,6 +8414,8 @@ function _currentTopJob(){
 function applyTopJob(ev, fallbackUrl, fallbackCo){
   if(ev){ try{ ev.stopPropagation(); }catch(_){ } }
   const j=(typeof _currentTopJob==='function'?_currentTopJob():null);
+  /* R2-C: an employer's internal job has no external URL — apply IN-APP. */
+  if(j&&j._internal&&j.id){ applyInternal(j); return; }
   const url=(j&&j.url)||fallbackUrl||'';
   if(!url) return;
   /* B-THISROLE (v74): carry the REAL job title into the apply path — passing ''
@@ -8421,6 +8451,23 @@ function _gpjAdminDeviceLine(){
    strip them at every write so a phantom "this role · X" row can never be created. */
 function _realTitle(t){ t=String(t||'').trim(); return /^this role$/i.test(t)?'':t; }
 function _realCo(c){ c=String(c||'').trim(); return /^the (hiring )?company$/i.test(c)?'':c; }
+/* R2-C: apply IN-APP to an employer's internal job (no external redirect). Writes
+   the application, records it to Applied, and advances the deck. */
+async function applyInternal(j){
+  if(!j||!j.id){ return; }
+  if(typeof requireSignIn==='function' && !requireSignIn('apply to this role')) return;
+  if(!(window.fb&&fb.applyToInternalJob)){ showToast('Apply unavailable right now'); return; }
+  showToast('📨 Sending your application…');
+  const ok=await fb.applyToInternalJob(j.id,{title:_realTitle(j.t)||j.t||'',company:_realCo(j.co)||j.co||''});
+  if(ok){
+    try{ recordSwipe('right', j); }catch(e){}
+    try{ if(typeof reloadDeckFromQueue==='function') reloadDeckFromQueue(); }catch(e){}
+    try{ if(typeof closeBrowseExpanded==='function') closeBrowseExpanded(); }catch(e){}
+    showToast('✅ Applied — the employer can see your application');
+  } else { showToast('Could not send your application — try again'); }
+}
+/* R2-C: apply to an internal job by id from a card button (Browse/deck) */
+function applyInternalById(id,t,co){ if(id) applyInternal({id:id,t:t,co:co,url:''}); }
 function recordSwipe(dir,job){
   /* B-SKIP-APPLY (v87): keep the job's url+loc on the row so opening it later
      from Applied/Skipped can rebuild a fully wired JOB card. */
@@ -9402,6 +9449,22 @@ function loadNotifPrefs(){
     const el=document.getElementById(map[k]);
     if(el && typeof prefs[k]==='boolean'){ el.classList.toggle('on',prefs[k]); }
   });
+  /* R2-D: reflect the discoverable opt-in (top-level field, default OFF) */
+  try{ const dt=document.getElementById('discoverable-toggle'); if(dt){ const p=(getProfile&&getProfile())||{}; dt.classList.toggle('on', p.discoverable===true); } }catch(e){}
+}
+/* R2-D: candidate opt-in to employer discovery. `discoverable` is a TOP-LEVEL
+   profile field (the reverse-match engine + security rules read it, not the
+   notification prefs). Default OFF; nothing surfaces a candidate without it. */
+function toggleDiscoverable(el){
+  el.classList.toggle('on');
+  const on=el.classList.contains('on');
+  try{
+    const p=(typeof getProfile==='function')?getProfile():{};
+    p.discoverable=on;
+    localStorage.setItem('gpj_profile',JSON.stringify(p));
+    if(window.fb&&fb.current&&fb.current()) fb.saveProfile(fb.current().uid,{discoverable:on,discoverableEditedAt:Date.now()});
+  }catch(e){}
+  showToast(on?'🤝 Verified employers can now find you — turn off anytime':'🔒 You’re hidden from employer discovery');
 }
 /* ---- NOTIFICATION WIRING ----
    These toggles previously saved a preference that nothing read. This PWA has no
@@ -9691,8 +9754,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v101c';
+const APP_VERSION = 'v102';
 const CHANGELOG = {
+  'v102':['Employers can now sign up, complete a company profile, and post roles (reviewed before they go live). Candidates can apply to those roles in-app, and opt in (off by default) to be found by verified employers. Skills on your résumé always render clean now.'],
   'v101c':['Résumé skills now always show clean — the (PowerPoint · Word · Excel) Expert / CRM(...)Compliance mashups are de-duped and split on the résumé + export, from every source. Re-run “Improve My Whole Resume with Jett” for a fuller 2–3 sentence summary.'],
   'v101b':['Stabilize: no more duplicate cards, newest-first lists, Match-to-Job on top, smarter remote tags, address toggle fixed, better AI rewrites'],
   'v100':['v100 smart-data finish: deck mapper full fields (was 460-char stub), company-card + ATS cap raises to v97 ceilings'],
