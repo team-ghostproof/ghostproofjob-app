@@ -52,6 +52,7 @@ before(async () => {
     await setDoc(doc(db, 'candidate_cards/candC'), { matchPct: 88, skills: ['ops'] });
     await setDoc(doc(db, 'match_tokens/candC'), { title: 'ops', skills: ['ops'] });   // candC is DISCOVERABLE (token exists) + applied to jobA
     await setDoc(doc(db, 'reachouts/ro1'), { fromRecruiterUid: 'recruiterA', toCandidateUid: 'candC', jobId: 'jobA', kind: 'reachout', status: 'sent', ts: 1 });
+    await setDoc(doc(db, 'reachouts/roRej'), { fromRecruiterUid: 'recruiterA', toCandidateUid: 'candC', jobId: 'jobA', kind: 'rejection', status: 'sent', ts: 1 });
   });
 });
 
@@ -342,5 +343,22 @@ describe('R5 — outreach is consent-gated + anti-ghost audited', () => {
     await assertFails(setDoc(doc(asCandC(), 'reachouts/ro1'), { fromRecruiterUid: 'candC', toCandidateUid: 'candC', jobId: 'jobA', kind: 'reachout', status: 'interested', ts: 1 }));
     await assertFails(deleteDoc(doc(asCandC(), 'reachouts/ro1')));
     await assertFails(deleteDoc(doc(asRecruiterA(), 'reachouts/ro1')));
+  });
+  // R7: accepting a proposed interview slot
+  test('R7: recipient CAN accept a proposed interview slot (acceptedTime), bounded', async () => {
+    await assertSucceeds(setDoc(doc(asCandC(), 'reachouts/ro1'), ro({ status: 'interested', acceptedTime: 'Tue 2pm CT', respondedAt: 3 }), { merge: true }));
+    await assertFails(setDoc(doc(asCandC(), 'reachouts/ro1'), ro({ status: 'interested', acceptedTime: 'x'.repeat(300) }), { merge: true }));
+  });
+  // R5 appeal: only against a rejection, bounded, and only by the recipient
+  test('R5 appeal: recipient CAN appeal a REJECTION but NOT a plain reach-out', async () => {
+    await assertSucceeds(setDoc(doc(asCandC(), 'reachouts/roRej'), { fromRecruiterUid: 'recruiterA', toCandidateUid: 'candC', jobId: 'jobA', kind: 'rejection', status: 'appealed', appealMessage: 'Please reconsider — I have the exact ATS stack.', appealedAt: 4 }, { merge: true }));
+    // appealing a non-rejection reach-out is rejected by rules
+    await assertFails(setDoc(doc(asCandC(), 'reachouts/ro1'), ro({ status: 'appealed', appealMessage: 'reconsider' }), { merge: true }));
+  });
+  test('R5 appeal: an over-long appeal message is rejected', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'reachouts/roRej'), { fromRecruiterUid: 'recruiterA', toCandidateUid: 'candC', jobId: 'jobA', kind: 'rejection', status: 'appealed', appealMessage: 'x'.repeat(500) }, { merge: true }));
+  });
+  test('R5 appeal: a non-recipient cannot appeal on a candidate’s behalf', async () => {
+    await assertFails(setDoc(doc(asCandD(), 'reachouts/roRej'), { fromRecruiterUid: 'recruiterA', toCandidateUid: 'candC', jobId: 'jobA', kind: 'rejection', status: 'appealed', appealMessage: 'let me in' }, { merge: true }));
   });
 });

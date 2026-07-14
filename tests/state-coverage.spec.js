@@ -2332,6 +2332,77 @@ test.describe('[STATE-COVERAGE] R5 outreach + anti-ghosting, R6 candidate tray',
     });
     expect(r).toBe('none');
   });
+
+  test('R7: proposed interview slots render; picking one records acceptedTime + interested', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let responded = null;
+      window.fb = window.fb || {}; fb.current = () => ({ uid: 'c1' });
+      fb.respondReachout = async (id, st, extra) => { responded = { id, st, extra }; return true; };
+      fb.loadMyReachouts = async () => [{ id: 'ro7', kind: 'reachout', company: 'Acme', jobTitle: 'Ops', status: 'sent', proposedTimes: ['Tue 2pm CT', 'Thu 10am CT'] }];
+      await renderMyReachouts();
+      await new Promise((r) => setTimeout(r, 150));
+      const txt = document.getElementById('reachouts-list').textContent || '';
+      const hasPrompt = /Pick an interview time/.test(txt), bothSlots = /Tue 2pm CT/.test(txt) && /Thu 10am CT/.test(txt);
+      document.querySelector('#reachouts-list div[onclick*="pickInterviewSlot"]').click();
+      await new Promise((r) => setTimeout(r, 150));
+      return { hasPrompt, bothSlots, responded };
+    });
+    expect(r.hasPrompt, 'R7 is a real slot exchange, not free text').toBe(true);
+    expect(r.bothSlots).toBe(true);
+    expect(r.responded.st).toBe('interested');
+    expect(r.responded.extra.acceptedTime).toBe('Tue 2pm CT');
+  });
+
+  test('R5 appeal: a rejection can be respectfully appealed (anti-ghosting accountability)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let appealed = null;
+      window.fb = window.fb || {}; fb.current = () => ({ uid: 'c1' });
+      fb.appealReachout = async (id, msg) => { appealed = { id, msg }; return true; };
+      fb.loadMyReachouts = async () => [{ id: 'ro2', kind: 'rejection', company: 'Beta', jobTitle: 'Analyst', status: 'sent' }];
+      await renderMyReachouts();
+      await new Promise((r) => setTimeout(r, 150));
+      const hasAppeal = /Respectfully appeal/.test(document.getElementById('reachouts-list').textContent || '');
+      document.querySelector('#reachouts-list div[onclick*="appealReachoutUI"]').click();
+      await new Promise((r) => setTimeout(r, 200));
+      return { hasAppeal, appealed };
+    });
+    expect(r.hasAppeal, 'a declined candidate can push back').toBe(true);
+    expect(r.appealed && r.appealed.id).toBe('ro2');
+  });
+
+  test('R5/R7 recruiter inbox: responses (interested + slot + appeal) surface; unanswered are hidden', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {}; window._recruiter = { uid: 'r1', company: 'Acme' };
+      fb.loadSentReachouts = async () => [
+        { id: 'a', status: 'interested', candidateName: 'Jane', jobTitle: 'Ops', acceptedTime: 'Tue 2pm CT' },
+        { id: 'b', status: 'appealed', candidateName: 'Sam', jobTitle: 'Analyst', appealMessage: 'Please reconsider' },
+        { id: 'c', status: 'sent', candidateName: 'Pending Pat' }];
+      await renderRecruiterResponses();
+      const box = document.getElementById('emp-responses');
+      return { shown: getComputedStyle(box).display !== 'none', txt: box.textContent || '' };
+    });
+    expect(r.shown).toBe(true);
+    expect(r.txt).toMatch(/Jane/);
+    expect(r.txt, 'accepted interview time surfaces to the recruiter').toMatch(/Tue 2pm CT/);
+    expect(r.txt, 'an appeal is visible so the recruiter can reconsider').toMatch(/Sam/);
+    expect(r.txt).toMatch(/appealed/i);
+    expect(r.txt, 'a not-yet-answered reach-out is not a "response"').not.toMatch(/Pending Pat/);
+  });
+
+  test('Worker verdict: app reads {isAILimitHit,reason} so it tells auth-failure from a real cap', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      noToken: _workerNoAI({ isAILimitHit: true, reason: 'no_token', finalResume: ['x'] }),
+      rateLimited: _workerNoAI({ isAILimitHit: true, reason: 'rate_limited' }),
+      genericCap: _workerNoAI({ isAILimitHit: true, reason: 'daily_limit' }),
+      ranAI: _workerNoAI({ isAILimitHit: false, finalResume: ['rewritten'] }),
+      nullRes: _workerNoAI(null),
+    }));
+    expect(r.noToken, 'token failure = live AI unreachable, not a cap').toBe('unavailable');
+    expect(r.rateLimited).toBe('throttle');
+    expect(r.genericCap).toBe('cap');
+    expect(r.ranAI, 'AI actually ran -> no fallback reason').toBe('');
+    expect(r.nullRes).toBe('unavailable');
+  });
 });
 
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
