@@ -8,7 +8,7 @@
 //   (starts the Firestore emulator; needs Java + firebase-tools. Runs in CI via
 //    .github/workflows/rules.yml. Local Windows dev without Java: run in CI.)
 // ============================================================================
-import { test, before, after, describe } from 'node:test';
+import { test, before, beforeEach, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
@@ -21,17 +21,11 @@ import { doc, getDoc, setDoc, deleteDoc, collection, query, where, limit, getDoc
 const PROJECT = 'gpj-rules-test';
 let env;
 
-before(async () => {
-  env = await initializeTestEnvironment({
-    projectId: PROJECT,
-    firestore: {
-      rules: readFileSync('firestore.rules', 'utf8'),
-      host: '127.0.0.1',
-      port: 8080,
-    },
-  });
-
-  // seed baseline with rules DISABLED
+// Seed the baseline fixtures with rules DISABLED. Called once at startup AND before
+// every test — tests mutate shared docs (jobC admin-approval, ro1/roRej responses,
+// etc.), so without a per-test reset one describe's writes leak into the next and
+// cause false failures (this is what silently broke CI from v102 onward).
+async function seedBaseline() {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     await setDoc(doc(db, 'recruiters/recruiterA'), { company: 'Acme', domain: 'acme.com', isValidated: true, plan: 'free' });
@@ -54,6 +48,29 @@ before(async () => {
     await setDoc(doc(db, 'reachouts/ro1'), { fromRecruiterUid: 'recruiterA', toCandidateUid: 'candC', jobId: 'jobA', kind: 'reachout', status: 'sent', ts: 1 });
     await setDoc(doc(db, 'reachouts/roRej'), { fromRecruiterUid: 'recruiterA', toCandidateUid: 'candC', jobId: 'jobA', kind: 'rejection', status: 'sent', ts: 1 });
   });
+}
+
+before(async () => {
+  env = await initializeTestEnvironment({
+    projectId: PROJECT,
+    firestore: {
+      rules: readFileSync('firestore.rules', 'utf8'),
+      host: '127.0.0.1',
+      port: 8080,
+    },
+  });
+  await seedBaseline();
+});
+
+// Per-test reset: OVERWRITE the baseline docs back to their seeded state before each
+// test, so a test that mutates a shared seeded doc (e.g. admin approving jobC, or a
+// candidate responding to ro1/roRej) can't leak into a later test. We deliberately do
+// NOT clearFirestore() — a few describes (F-GHOST gr1) intentionally create a doc in
+// one test and assert its immutability/readability in the next, which a wipe would
+// turn into an allowed create and break. Re-seeding is idempotent and touches only
+// baseline docs, leaving those intentional cross-test creations intact.
+beforeEach(async () => {
+  await seedBaseline();
 });
 
 after(async () => { if (env) await env.cleanup(); });

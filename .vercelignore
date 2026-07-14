@@ -1,0 +1,22 @@
+# ---------------------------------------------------------------------------
+# Vercel deployment excludes.
+#
+# THE IMPORTANT ONE: api/match/ holds the reverse-match NIGHTLY PIPELINE
+# (buildMatchTokens.js, runReverseMatch.js, runNightly.js) + the pure scorer
+# module (reverseMatch.js). These are NOT HTTP endpoints — they run in GitHub
+# Actions (.github/workflows/reverse_match.yml) against the repo checkout, and
+# in the `node --test` suite. Vercel otherwise turns every api/**/*.js into a
+# Serverless Function; on the Hobby plan the cap is 12, and these 4 pushed the
+# count to 13 → "No more than 12 Serverless Functions" build failure.
+# Nothing in the deployed runtime imports api/match/* (verified), so excluding
+# the directory is safe and drops the function count to 9.
+api/match/
+
+# Repo assets Vercel never serves or executes — keeps the upload lean.
+tests/
+docs/
+ghost-report-generator/
+scripts/
+playwright.config.js
+playwright-report/
+test-results/
