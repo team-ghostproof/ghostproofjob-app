@@ -47,6 +47,10 @@ async function seedBaseline() {
     await setDoc(doc(db, 'match_tokens/candC'), { title: 'ops', skills: ['ops'] });   // candC is DISCOVERABLE (token exists) + applied to jobA
     await setDoc(doc(db, 'reachouts/ro1'), { fromRecruiterUid: 'recruiterA', toCandidateUid: 'candC', jobId: 'jobA', kind: 'reachout', status: 'sent', ts: 1 });
     await setDoc(doc(db, 'reachouts/roRej'), { fromRecruiterUid: 'recruiterA', toCandidateUid: 'candC', jobId: 'jobA', kind: 'rejection', status: 'sent', ts: 1 });
+    // referral docs start ABSENT each test (they're keyed by the invitee uid, so a
+    // prior test's create would otherwise turn the next "create" into an update).
+    try { await deleteDoc(doc(db, 'referrals/candC')); } catch (e) { /* not present */ }
+    try { await deleteDoc(doc(db, 'referrals/candD')); } catch (e) { /* not present */ }
   });
 }
 
@@ -377,5 +381,32 @@ describe('R5 — outreach is consent-gated + anti-ghost audited', () => {
   });
   test('R5 appeal: a non-recipient cannot appeal on a candidate’s behalf', async () => {
     await assertFails(setDoc(doc(asCandD(), 'reachouts/roRej'), { fromRecruiterUid: 'recruiterA', toCandidateUid: 'candC', jobId: 'jobA', kind: 'rejection', status: 'appealed', appealMessage: 'let me in' }, { merge: true }));
+  });
+});
+
+describe('Referral engine — invitee-owned, no self-referral', () => {
+  const rec = (over) => Object.assign({ referrerCode: 'candD', inviteeUid: 'candC', onboarded: false, ts: 2 }, over);
+  test('a new invitee CAN record who referred them (their own uid doc)', async () => {
+    await assertSucceeds(setDoc(doc(asCandC(), 'referrals/candC'), rec()));
+  });
+  test('you CANNOT refer yourself', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'referrals/candC'), rec({ referrerCode: 'candC' })));
+  });
+  test('you CANNOT create a referral doc under someone else’s uid', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'referrals/candD'), rec({ inviteeUid: 'candD' })));
+  });
+  test('a referral cannot be created pre-onboarded (must earn the reward)', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'referrals/candC'), rec({ onboarded: true })));
+  });
+  test('the invitee CAN flip their own referral to onboarded, but NOT change the referrer', async () => {
+    await assertSucceeds(setDoc(doc(asCandC(), 'referrals/candC'), rec()));                                   // create first
+    await assertSucceeds(setDoc(doc(asCandC(), 'referrals/candC'), rec({ onboarded: true }), { merge: true }));
+    await assertFails(setDoc(doc(asCandC(), 'referrals/candC'), rec({ referrerCode: 'candX', onboarded: true }), { merge: true }));
+  });
+  test('the referrer CAN read referrals bearing their code; others cannot; no deletes', async () => {
+    await assertSucceeds(setDoc(doc(asCandC(), 'referrals/candC'), rec()));   // candC referred by candD
+    await assertSucceeds(getDoc(doc(asCandD(), 'referrals/candC')));          // candD is the referrerCode
+    await assertFails(getDoc(doc(asRecruiterB(), 'referrals/candC')));
+    await assertFails(deleteDoc(doc(asCandC(), 'referrals/candC')));
   });
 });

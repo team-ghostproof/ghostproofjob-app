@@ -272,6 +272,29 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ---- Referral engine (v107): one doc per invitee, keyed by their uid --------
+    // The invitee owns their record. referrerCode is the referrer's uid. Reads are
+    // allowed to the invitee (own doc) and the referrer (query where referrerCode ==
+    // their uid). No self-referral; onboarded only flips true; no deletes.
+    match /referrals/{inviteeUid} {
+      allow read: if request.auth != null
+        && (resource.data.inviteeUid == request.auth.uid
+            || resource.data.referrerCode == request.auth.uid);
+      allow create: if request.auth != null
+        && inviteeUid == request.auth.uid
+        && request.resource.data.inviteeUid == request.auth.uid
+        && request.resource.data.referrerCode is string
+        && request.resource.data.referrerCode != request.auth.uid           // no self-referral
+        && request.resource.data.get('onboarded', false) == false
+        && request.resource.data.keys().hasAll(['referrerCode','inviteeUid','onboarded','ts']);
+      allow update: if request.auth != null
+        && inviteeUid == request.auth.uid
+        && request.resource.data.inviteeUid == resource.data.inviteeUid
+        && request.resource.data.referrerCode == resource.data.referrerCode  // code immutable
+        && request.resource.data.onboarded == true;                          // only ever flips to onboarded
+      allow delete: if false;
+    }
+
     // default deny (implicit — no catch-all needed; unmatched paths are denied)
   }
 }

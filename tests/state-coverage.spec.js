@@ -2462,6 +2462,56 @@ test.describe('[STATE-COVERAGE] F-GEO distance filter (offline centroids + haver
   });
 });
 
+test.describe('[STATE-COVERAGE] Referral engine (invite -> Booster)', () => {
+  test('captures ?ref, builds the link, blocks self-referral, records a real one', async ({ page }) => {
+    await page.goto('/index.html?ref=abc123uid', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      localStorage.removeItem('gpj_ref_pending');
+      _gpjCaptureRef();
+      out.captured = localStorage.getItem('gpj_ref_pending');
+      window.fb = window.fb || {};
+      fb.current = () => ({ uid: 'myUID999', email: 'me@x.com' });
+      fb.myReferralStats = async () => ({ total: 3, onboarded: 2 });
+      out.link = _referralLink();
+      await renderReferral();
+      out.sectionShown = getComputedStyle(document.getElementById('sec-referral')).display !== 'none';
+      out.statsHtml = document.getElementById('ref-stats').innerHTML;
+      let recordedWith;
+      fb.recordReferral = async (code) => { recordedWith = code; return true; };
+      localStorage.setItem('gpj_ref_pending', 'myUID999');           // self
+      await _gpjRecordReferralIfPending();
+      out.selfBlocked = recordedWith === undefined && localStorage.getItem('gpj_ref_pending') === null;
+      localStorage.setItem('gpj_ref_pending', 'abc123uid');          // real
+      await _gpjRecordReferralIfPending();
+      out.recordedReal = recordedWith;
+      out.clearedAfter = localStorage.getItem('gpj_ref_pending');
+      return out;
+    });
+    expect(r.captured).toBe('abc123uid');
+    expect(r.link).toMatch(/[?&]ref=myUID999$/);
+    expect(r.sectionShown, 'referral section shows for signed-in users').toBe(true);
+    expect(r.statsHtml).toMatch(/Friends joined/);
+    expect(r.statsHtml, 'a claim button appears once a referral onboarded').toMatch(/Claim/);
+    expect(r.selfBlocked, 'you cannot refer yourself').toBe(true);
+    expect(r.recordedReal).toBe('abc123uid');
+    expect(r.clearedAfter, 'pending ref is cleared once recorded').toBeNull();
+  });
+
+  test('referral section is hidden for a signed-out visitor (no link)', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {}; fb.current = () => null;
+      await renderReferral();
+      return { link: _referralLink(), shown: getComputedStyle(document.getElementById('sec-referral')).display };
+    });
+    expect(r.link, 'no uid -> no referral link').toBe('');
+    expect(r.shown).toBe('none');
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
