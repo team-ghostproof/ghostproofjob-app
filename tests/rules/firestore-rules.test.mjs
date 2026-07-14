@@ -50,7 +50,8 @@ before(async () => {
     await setDoc(doc(db, 'jobs/jobA/applications/candC'), { status: 'applied' });
     await setDoc(doc(db, 'jobs/jobA/recommended_candidates/candC'), { score: 88 });
     await setDoc(doc(db, 'candidate_cards/candC'), { matchPct: 88, skills: ['ops'] });
-    await setDoc(doc(db, 'match_tokens/candC'), { title: 'ops', skills: ['ops'] });
+    await setDoc(doc(db, 'match_tokens/candC'), { title: 'ops', skills: ['ops'] });   // candC is DISCOVERABLE (token exists) + applied to jobA
+    await setDoc(doc(db, 'reachouts/ro1'), { fromRecruiterUid: 'recruiterA', toCandidateUid: 'candC', jobId: 'jobA', kind: 'reachout', status: 'sent', ts: 1 });
   });
 });
 
@@ -310,5 +311,36 @@ describe('F-GHOST — cross-user ghost reports (shape-locked, no free-text)', ()
   test('reports are immutable — no update or delete', async () => {
     await assertFails(setDoc(doc(asCandC(), 'ghost_reports/gr1'), Object.assign({}, ok, { stage: 'edited' })));
     await assertFails(deleteDoc(doc(asCandC(), 'ghost_reports/gr1')));
+  });
+});
+
+describe('R5 — outreach is consent-gated + anti-ghost audited', () => {
+  const ro = (over) => Object.assign({ fromRecruiterUid: 'recruiterA', toCandidateUid: 'candC', jobId: 'jobA', kind: 'reachout', status: 'sent', ts: 2 }, over);
+  test('VERIFIED recruiter CAN reach a DISCOVERABLE/applied candidate for their job', async () => {
+    await assertSucceeds(setDoc(doc(asRecruiterA(), 'reachouts/r2new'), ro()));
+  });
+  test('VERIFIED recruiter can send a REJECTION to an applicant (anti-ghosting)', async () => {
+    await assertSucceeds(setDoc(doc(asRecruiterA(), 'reachouts/r2rej'), ro({ kind: 'rejection' })));
+  });
+  test('recruiter CANNOT reach a candidate who is neither discoverable nor applied', async () => {
+    // candD has a profile but NO match_token and NO application
+    await assertFails(setDoc(doc(asRecruiterA(), 'reachouts/r2bad'), ro({ toCandidateUid: 'candD' })));
+  });
+  test('an UNVERIFIED recruiter CANNOT reach out', async () => {
+    await assertFails(setDoc(doc(asRecruiterPending(), 'reachouts/r2unv'), ro({ fromRecruiterUid: 'recruiterPending' })));
+  });
+  test('cannot spoof the sender or create pre-answered', async () => {
+    await assertFails(setDoc(doc(asRecruiterA(), 'reachouts/r2spoof'), ro({ fromRecruiterUid: 'recruiterB' })));
+    await assertFails(setDoc(doc(asRecruiterA(), 'reachouts/r2pre'), ro({ status: 'interested' })));
+  });
+  test('the recipient candidate CAN read + respond (status only); others cannot read', async () => {
+    await assertSucceeds(getDoc(doc(asCandC(), 'reachouts/ro1')));
+    await assertSucceeds(setDoc(doc(asCandC(), 'reachouts/ro1'), ro({ status: 'interested', respondedAt: 3 }), { merge: true }));
+    await assertFails(getDoc(doc(asCandD(), 'reachouts/ro1')));
+  });
+  test('the candidate CANNOT rewrite the sender/job, and NO ONE deletes (audit)', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'reachouts/ro1'), { fromRecruiterUid: 'candC', toCandidateUid: 'candC', jobId: 'jobA', kind: 'reachout', status: 'interested', ts: 1 }));
+    await assertFails(deleteDoc(doc(asCandC(), 'reachouts/ro1')));
+    await assertFails(deleteDoc(doc(asRecruiterA(), 'reachouts/ro1')));
   });
 });

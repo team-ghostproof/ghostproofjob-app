@@ -233,6 +233,37 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // R5 — recruiter → candidate OUTREACH (reach-outs + rejection notices).
+    // Consent enforced AT WRITE: a verified recruiter may only reach a candidate
+    // who is discoverable (a match_token exists → opted in) OR who applied to the
+    // job. The candidate reads their own + sets the status (interested/declined);
+    // the recruiter reads what they sent. Nobody deletes (anti-ghosting audit).
+    function candidateReachable(cand, jobId) {
+      return exists(/databases/$(database)/documents/match_tokens/$(cand))
+        || exists(/databases/$(database)/documents/jobs/$(jobId)/applications/$(cand));
+    }
+    match /reachouts/{id} {
+      allow read: if isAdmin()
+        || (request.auth != null
+            && (resource.data.toCandidateUid == request.auth.uid
+                || resource.data.fromRecruiterUid == request.auth.uid));
+      allow create: if isRecruiterVerified()
+        && request.resource.data.fromRecruiterUid == request.auth.uid
+        && request.resource.data.keys().hasAll(['fromRecruiterUid','toCandidateUid','jobId','kind','status','ts'])
+        && request.resource.data.status == 'sent'
+        && (request.resource.data.kind == 'reachout' || request.resource.data.kind == 'rejection')
+        && request.resource.data.get('message', '').size() <= 800
+        && candidateReachable(request.resource.data.toCandidateUid, request.resource.data.jobId);
+      // ONLY the recipient candidate may respond, and only the status/respondedAt change
+      allow update: if request.auth != null
+        && resource.data.toCandidateUid == request.auth.uid
+        && request.resource.data.toCandidateUid == resource.data.toCandidateUid
+        && request.resource.data.fromRecruiterUid == resource.data.fromRecruiterUid
+        && request.resource.data.jobId == resource.data.jobId
+        && request.resource.data.status in ['interested', 'declined'];
+      allow delete: if false;
+    }
+
     // default deny (implicit — no catch-all needed; unmatched paths are denied)
   }
 }

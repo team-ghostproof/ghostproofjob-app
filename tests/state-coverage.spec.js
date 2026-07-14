@@ -2198,6 +2198,142 @@ test.describe('[STATE-COVERAGE] R4 recruiter matched-candidates dashboard', () =
   });
 });
 
+test.describe('[STATE-COVERAGE] v104 double-verb repair + AI transparency (founder live repro)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('stored double-verb bullets are repaired; legit compounds untouched', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      supColl: _healDoubleVerb('Supported collaborated with operations to refine pipelines.'),
+      supUtil: _healDoubleVerb('Supported utilized Salesforce and CRM systems to manage accounts.'),
+      supAdv: _healDoubleVerb('Supported & swiftly addressed complex client escalations under pressure.'),
+      droveEnsured: _healDoubleVerb('Drove ensured data integrity and compliance with revenue targets.'),
+      ledAnd: _healDoubleVerb('Led and mentored a high-performing team of 8+ Account Managers.'),
+      designedAnd: _healDoubleVerb('Designed and implemented technical training procedures.'),
+      droveStrategy: _healDoubleVerb('Drove client success strategy and revenue growth for 500+ locations.'),
+    }));
+    expect(r.supColl).toBe('Collaborated with operations to refine pipelines.');
+    expect(r.supUtil).toBe('Utilized Salesforce and CRM systems to manage accounts.');
+    expect(r.supAdv).toBe('Swiftly addressed complex client escalations under pressure.');
+    expect(r.droveEnsured, 'the founder\'s "skipped" Revention bullet').toBe('Ensured data integrity and compliance with revenue targets.');
+    expect(r.ledAnd, 'legit compound left alone').toBe('Led and mentored a high-performing team of 8+ Account Managers.');
+    expect(r.designedAnd).toBe('Designed and implemented technical training procedures.');
+    expect(r.droveStrategy).toBe('Drove client success strategy and revenue growth for 500+ locations.');
+  });
+
+  test('exported resume self-heals stored double-verb bullets at the render boundary', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      Object.assign(resumeData, { jobs: [{ t: 'Senior AM', c: 'Revention', d: '2015-2016', b: 'Drove ensured data integrity and compliance.\nSupported collaborated with operations to refine pipelines.' }] });
+      const html = buildResumeHTML(true);
+      return { badGone: !/Drove ensured|Supported collaborated/.test(html), good: /Ensured data integrity/.test(html) && /Collaborated with operations/.test(html) };
+    });
+    expect(r.badGone, 'no double-verb survives to the exported resume').toBe(true);
+    expect(r.good).toBe(true);
+  });
+
+  test('AI transparency: fallback reason + honest copy when live AI is skipped', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.fb = window.fb || {}; fb.smartMatch = () => {}; isAdmin = false;
+      window.aiImproveAllowed = () => false;                  // monthly cap hit
+      const capReason = _aiFallbackReason('summary', 'improve');
+      window.aiImproveAllowed = () => true; window.aiHourlyAllowed = () => false;   // hourly throttle
+      const throttleReason = _aiFallbackReason('summary', 'improve');
+      window.aiHourlyAllowed = () => true;
+      const okReason = _aiFallbackReason('summary', 'improve');   // available
+      isAdmin = true; window.aiImproveAllowed = () => false;
+      const adminReason = _aiFallbackReason('summary', 'improve'); // admin bypass
+      isAdmin = false;
+      return { capReason, throttleReason, okReason, adminReason,
+        capNote: _aiFallbackNote('cap'), throttleNote: _aiFallbackNote('throttle'), qualityNote: _aiFallbackNote('quality') };
+    });
+    expect(r.capReason).toBe('cap');
+    expect(r.throttleReason).toBe('throttle');
+    expect(r.okReason, 'live AI available -> no fallback reason').toBe('');
+    expect(r.adminReason, 'admins bypass the caps').toBe('');
+    expect(r.capNote, 'cap note says when live AI returns').toMatch(/renew|live-AI/i);
+    expect(r.capNote, 'and is transparent about smart templates').toMatch(/smart templates/i);
+    expect(r.throttleNote).toMatch(/rate-limited/i);
+    expect(r.qualityNote).toMatch(/too thin/i);
+  });
+});
+
+test.describe('[STATE-COVERAGE] R5 outreach + anti-ghosting, R6 candidate tray', () => {
+  test.use({ viewport: { width: 440, height: 900 } });
+  test.beforeEach(async ({ page }) => {
+    page.on('dialog', (d) => d.accept('Hi, open to a chat?'));
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('R5: matched card offers reach-out + (applicant) kind decline; sends the right kind', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let sent = null;
+      window.fb = window.fb || {};
+      fb.sendReachOut = async (uid, jobId, data) => { sent = { uid, jobId, data }; return 'ro1'; };
+      fb.loadRecommendedCandidates = async () => [{ uid: 'c1', score: 88, matched: ['ops'], market: 'Houston, TX', applied: true, displayName: 'Jane Doe', contact: 'jane@x.com' }];
+      window._recruiter = { uid: 'r1', company: 'Acme', isValidated: true };
+      await openJobMatches('JOB1', 'Operations Manager');
+      await new Promise((r) => setTimeout(r, 200));
+      const inner = document.getElementById('matches-body').innerHTML;
+      const hasReach = /Reach out/.test(inner), hasDecline = /Send kind decline/.test(inner);
+      document.querySelector('#matches-body div[onclick*="reachOutTo"][onclick*="reachout"]').click();
+      await new Promise((r) => setTimeout(r, 150));
+      return { hasReach, hasDecline, sentKind: sent && sent.data && sent.data.kind, sentTo: sent && sent.uid, hasMessage: !!(sent && sent.data && sent.data.message) };
+    });
+    expect(r.hasReach).toBe(true);
+    expect(r.hasDecline, 'an applicant can be respectfully declined (anti-ghosting)').toBe(true);
+    expect(r.sentKind).toBe('reachout');
+    expect(r.sentTo).toBe('c1');
+    expect(r.hasMessage, 'reach-out carries a message (also serves R7 scheduling)').toBe(true);
+  });
+
+  test('R5: Anti-Ghosting Badge is earned once the recruiter has replied to enough candidates', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {}; window._recruiter = { uid: 'r1', company: 'Acme' };
+      fb.countMyReachouts = async () => 6; await renderResponsiveness();
+      const earned = document.getElementById('emp-responsiveness').textContent;
+      fb.countMyReachouts = async () => 0; await renderResponsiveness();
+      const none = document.getElementById('emp-responsiveness').textContent;
+      return { earned, none };
+    });
+    expect(r.earned).toMatch(/Anti-Ghosting Badge earned/);
+    expect(r.none, 'no replies yet -> a nudge, not the badge').toMatch(/earn the/i);
+  });
+
+  test('R6: candidate tray shows reach-outs + respectful declines; Interested responds', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let responded = null;
+      window.fb = window.fb || {}; fb.current = () => ({ uid: 'c1' });
+      fb.respondReachout = async (id, st) => { responded = { id, st }; return true; };
+      fb.loadMyReachouts = async () => [
+        { id: 'ro1', kind: 'reachout', company: 'Acme', jobTitle: 'Operations Manager', message: 'You look great', status: 'sent' },
+        { id: 'ro2', kind: 'rejection', company: 'Beta', jobTitle: 'Analyst', message: 'moving forward with others', status: 'sent' }];
+      await renderMyReachouts();
+      await new Promise((r) => setTimeout(r, 200));
+      const shown = getComputedStyle(document.getElementById('sec-reachouts')).display !== 'none';
+      const txt = document.getElementById('reachouts-list').textContent || '';
+      document.querySelector('#reachouts-list div[onclick*="interested"]').click();
+      await new Promise((r) => setTimeout(r, 150));
+      return { shown, hasReach: /Acme reached out/.test(txt), hasDecline: /instead of ghosting/.test(txt), responded };
+    });
+    expect(r.shown, 'tray shows when there are messages').toBe(true);
+    expect(r.hasReach).toBe(true);
+    expect(r.hasDecline, 'a respectful decline is surfaced, not silence').toBe(true);
+    expect(r.responded).toEqual({ id: 'ro1', st: 'interested' });
+  });
+
+  test('R6: empty tray stays hidden (no employer messages yet)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {}; fb.current = () => ({ uid: 'c1' }); fb.loadMyReachouts = async () => [];
+      await renderMyReachouts();
+      return getComputedStyle(document.getElementById('sec-reachouts')).display;
+    });
+    expect(r).toBe('none');
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
