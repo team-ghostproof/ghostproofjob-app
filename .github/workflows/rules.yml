@@ -13,8 +13,12 @@ on:
       - 'tests/rules/**'
       - 'tests/match/**'
       - 'tests/recruiter/**'
+      - 'tests/growth/**'
+      - 'tests/email/**'
       - 'api/match/**'
       - 'api/recruiter/**'
+      - 'api/notifications/**'
+      - 'ghost-report-generator/**'
       - '.github/workflows/rules.yml'
   pull_request:
   workflow_dispatch:
@@ -40,6 +44,12 @@ jobs:
 
       - name: Backend unit tests — reverse-match + recruiter domain-check (no emulator)
         run: npm run test:match
+
+      - name: Growth content-engine tests (defamation guardrails)
+        run: npm run test:growth
+
+      - name: Email opt-out tests (CAN-SPAM suppression + footer)
+        run: npm run test:email
 
       - name: Rules isolation tests (Firestore emulator)
         run: npm run test:rules

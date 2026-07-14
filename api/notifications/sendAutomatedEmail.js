@@ -25,6 +25,46 @@ function isAllowed(preferences, type) {
   return preferences[key] === true;
 }
 
+/* ── Opt-out / CAN-SPAM layer (Sprint 5) ──────────────────────────────────────
+   A GLOBAL suppression flag beats every per-type preference: once a user
+   unsubscribes (emailUnsub:true), no automated email of any kind is sent. Every
+   email also carries a working unsubscribe link. This is the same gate the
+   Cloudflare Worker (/welcome, /email/*, cron) must honor — see README. */
+const SITE = process.env.SITE_URL || 'https://ghostproofjob.com';
+
+/** true when the user has globally opted out of automated email. */
+function isSuppressed(user) {
+  return !!(user && (user.emailUnsub === true || (user.preferences && user.preferences.emailUnsub === true)));
+}
+
+/** the unsubscribe URL for a recipient. Includes a lightweight token when
+ *  UNSUB_SECRET is set so a link can't be forged for another address. */
+function unsubToken(idOrEmail) {
+  const secret = process.env.UNSUB_SECRET;
+  if (!secret) return '';
+  try {
+    return require('crypto').createHmac('sha256', secret).update(String(idOrEmail || '')).digest('hex').slice(0, 24);
+  } catch (e) { return ''; }
+}
+function unsubUrl(user) {
+  const id = (user && (user.uid || user.email)) || '';
+  const t = unsubToken(id);
+  return SITE.replace(/\/$/, '') + '/api/unsubscribe?u=' + encodeURIComponent(id) + (t ? ('&t=' + t) : '');
+}
+
+/** append the required unsubscribe footer to an email body. */
+function withUnsubFooter(html, user) {
+  const url = unsubUrl(user);
+  const footer =
+    '<hr style="border:none;border-top:1px solid #e5e0ee;margin:28px 0 12px"/>' +
+    '<p style="font:12px/1.6 -apple-system,Segoe UI,Arial,sans-serif;color:#8a85a0;margin:0">' +
+    'You’re getting this from GhostProofJob. ' +
+    '<a href="' + url + '" style="color:#8a85a0;text-decoration:underline">Unsubscribe</a> anytime — ' +
+    'you can also manage every notification in the app under Settings → Notifications.' +
+    '</p>';
+  return String(html || '') + footer;
+}
+
 async function sendViaResend(apiKey, payload) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -57,11 +97,12 @@ async function sendViaSendGrid(apiKey, fromAddr, to, subject, html) {
  */
 async function sendAutomatedEmail(user, type, content) {
   if (!user || !user.email) return { sent: false, reason: 'no_recipient' };
+  if (isSuppressed(user)) return { sent: false, reason: 'unsubscribed' };   // global opt-out wins
   if (!isAllowed(user.preferences, type)) return { sent: false, reason: 'pref_disabled' };
 
   const from = process.env.EMAIL_FROM || 'GhostProofJob <noreply@ghostproofjob.com>';
   const subject = (content && content.subject) || 'GhostProofJob';
-  const html = (content && content.html) || '';
+  const html = withUnsubFooter((content && content.html) || '', user);   // every email carries the opt-out
 
   try {
     if (process.env.RESEND_API_KEY) {
@@ -87,7 +128,7 @@ async function sendBatch(users, type, contentFor) {
   const list = Array.isArray(users) ? users : [];
   const results = { attempted: 0, sent: 0, skipped: 0 };
   for (const u of list) {
-    if (!isAllowed(u.preferences, type)) { results.skipped++; continue; }
+    if (isSuppressed(u) || !isAllowed(u.preferences, type)) { results.skipped++; continue; }
     results.attempted++;
     const content = typeof contentFor === 'function' ? contentFor(u) : contentFor;
     const r = await sendAutomatedEmail(u, type, content);
@@ -96,4 +137,4 @@ async function sendBatch(users, type, contentFor) {
   return results;
 }
 
-module.exports = { sendAutomatedEmail, sendBatch, isAllowed, PREF_FOR_TYPE };
+module.exports = { sendAutomatedEmail, sendBatch, isAllowed, isSuppressed, withUnsubFooter, unsubUrl, unsubToken, PREF_FOR_TYPE };

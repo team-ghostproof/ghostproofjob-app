@@ -14,6 +14,7 @@
     "report": "playwright show-report",
     "test:match": "node --test tests/match/reverseMatch.test.mjs tests/recruiter/domainCheck.test.mjs",
     "test:growth": "node --test tests/growth/ghostContent.test.mjs",
+    "test:email": "node --test tests/email/optout.test.mjs",
     "test:rules": "firebase emulators:exec --only firestore \"node --test tests/rules/firestore-rules.test.mjs\"",
     "content:weekly": "node ghost-report-generator/run.js",
     "content:sample": "node ghost-report-generator/run.js --fixture"
