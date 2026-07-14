@@ -328,6 +328,10 @@
          per the contact-reveal rule, an applicant's contact. ===== */
       applyToInternalJob: async (jobId,meta)=>{ try{ const u=auth.currentUser; if(!u||!jobId) return false; await setDoc(doc(db,'jobs',jobId,'applications',u.uid),Object.assign({status:'applied',ts:Date.now()},meta||{}),{merge:true}); return true; }catch(e){ console.warn('[GPJ] applyToInternalJob',e&&e.message); return false; } },
       countJobApplicants: async (jobId)=>{ try{ const s=await getCountFromServer(collection(db,'jobs',jobId,'applications')); return s.data().count; }catch(e){ return null; } },
+      /* R4: a VERIFIED owner-recruiter reads the backend-written recommendations
+         for their job (rules gate to isRecruiterVerified + jobOwner). Read-light:
+         one bounded query per job, only when the recruiter opens matches. */
+      loadRecommendedCandidates: async (jobId)=>{ try{ const s=await getDocs(query(collection(db,'jobs',jobId,'recommended_candidates'), limit(50))); const out=[]; s.forEach(d=>out.push(Object.assign({uid:d.id},d.data()))); out.sort((a,b)=>((b.applied?1:0)-(a.applied?1:0))||((b.score||0)-(a.score||0))); return out; }catch(e){ console.warn('[GPJ] loadRecommendedCandidates',e&&e.message); return []; } },
       /* ===== F-GHOST: aggregate ghost reports to Firestore so "another hunter
          reported this" + the content engine work cross-user. Minimal, NO PII, NO
          free-text stored server-side (the comment stays device-local). Counts use
@@ -1129,6 +1133,16 @@
       <div style="text-align:center;font-size:12px;color:var(--muted);margin-top:10px;"><span id="rec-toggle-text">Already have an employer account?</span> <span onclick="toggleRecruiterAuthMode()" style="color:var(--cyber);font-weight:700;cursor:pointer;text-decoration:underline;">Log in</span></div>
       <div onclick="document.getElementById('recruiter-auth-modal').classList.remove('open')" style="color:var(--muted);font-size:12px;cursor:pointer;padding:8px;text-align:center;margin-top:4px;">Maybe later</div>
       <div onclick="document.getElementById('recruiter-auth-modal').classList.remove('open')" style="position:absolute;top:12px;right:14px;color:var(--muted);cursor:pointer;font-size:16px;">✕</div>
+    </div>
+  </div>
+
+  <!-- R4: matched-candidates viewer for a recruiter's job (verified owner only) -->
+  <div class="modal-scrim" id="matches-modal" style="z-index:344;">
+    <div class="modal-box" style="text-align:left;position:relative;max-width:440px;">
+      <div style="display:flex;align-items:center;margin-bottom:4px;"><div style="font-size:15px;font-weight:800;flex:1;" id="matches-title">👥 Matched candidates</div>
+        <div onclick="document.getElementById('matches-modal').classList.remove('open')" style="color:var(--muted);cursor:pointer;font-size:16px;padding:4px;">✕</div></div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:12px;">Candidates who <strong>opted in</strong> to be found, ranked by fit to this role. Contact is shared because they consented — <strong>never sold, never purchasable</strong>. Applicants show first.</div>
+      <div id="matches-body"><div style="font-size:12px;color:var(--muted);">Loading…</div></div>
     </div>
   </div>
 
@@ -2488,7 +2502,7 @@
       <!-- RECRUITER TIER (R1): employer entry -->
       <div style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v103</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v104</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2831,7 +2845,9 @@ async function renderMyJobs(){
     return '<div style="background:var(--plum3);border:1px solid var(--plum4);border-radius:10px;padding:10px 12px;margin-bottom:7px;">'
       +'<div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">'+String(j.title||'Role').replace(/</g,'&lt;')+'</div>'
       +'<div style="font-size:10px;color:var(--muted);margin-top:1px;">'+String(loc).replace(/</g,'&lt;')+' · '+String(j.job_type||'').replace(/</g,'&lt;')+' · '+badge+' · <span id="jobapp-'+j.id+'" style="color:var(--cyber);font-weight:700;">— applicants</span></div></div>'
-      +'<div onclick="deleteMyJob(\''+j.id+'\')" style="color:var(--danger);font-size:11px;cursor:pointer;font-weight:700;padding:4px 6px;">Delete</div></div></div>';
+      +'<div onclick="deleteMyJob(\''+j.id+'\')" style="color:var(--danger);font-size:11px;cursor:pointer;font-weight:700;padding:4px 6px;">Delete</div></div>'
+      +(live?('<div onclick="openJobMatches(\''+j.id+'\',\''+String(j.title||'this role').replace(/[\\'<]/g,'')+'\')" style="margin-top:8px;background:rgba(181,95,230,.14);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:8px;padding:8px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">👥 View matched candidates</div>'):'')
+      +'</div>';
   }).join('');
   /* R2-C: fill applicant counts (count() aggregation — not per-doc reads) */
   jobs.forEach(async j=>{ try{ if(window.fb&&fb.countJobApplicants){ const n=await fb.countJobApplicants(j.id); const el=document.getElementById('jobapp-'+j.id); if(el) el.textContent=(n==null?'—':n)+' applicant'+(n===1?'':'s'); } }catch(e){} });
@@ -2840,6 +2856,32 @@ async function deleteMyJob(id){
   if(!id) return;
   if(typeof confirm==='function' && !confirm('Delete this role? This cannot be undone.')) return;
   if(window.fb&&fb.deleteRecruiterJob){ const ok=await fb.deleteRecruiterJob(id); showToast(ok?'Role deleted':'Could not delete — try again'); renderMyJobs(); }
+}
+/* R4: open the matched-candidates viewer for one live job */
+async function openJobMatches(jobId,title){
+  if(!jobId) return;
+  const tEl=document.getElementById('matches-title'); if(tEl) tEl.textContent='👥 Matches — '+(title||'this role');
+  const body=document.getElementById('matches-body'); if(body) body.innerHTML='<div style="font-size:12px;color:var(--muted);">Loading…</div>';
+  document.getElementById('matches-modal').classList.add('open');
+  const recs=(window.fb&&fb.loadRecommendedCandidates)?await fb.loadRecommendedCandidates(jobId):[];
+  if(!body) return;
+  if(!recs.length){
+    body.innerHTML='<div style="font-size:12px;color:var(--muted);line-height:1.6;">No matched candidates yet. Matches are computed from opted-in candidates in your market and refresh daily — check back soon. Anyone who <strong>applies</strong> will also appear here.</div>';
+    return;
+  }
+  body.innerHTML=recs.map(c=>{
+    const dt=s=>String(s==null?'':s).replace(/</g,'&lt;');
+    const pct=Math.max(5,Math.min(98,parseInt(c.score,10)||0));
+    const badge=c.applied?'<span style="color:var(--mint);font-weight:800;">✅ Applied to this role</span>':'<span style="color:var(--cyber);font-weight:800;">🔎 Open to offers</span>';
+    const skills=(c.matched||[]).slice(0,6).map(s=>'<span style="display:inline-block;background:var(--plum3);border-radius:7px;padding:3px 8px;margin:0 5px 5px 0;font-size:11px;font-weight:600;text-transform:capitalize;">'+dt(s)+'</span>').join('');
+    const contact=c.contact?('<div style="font-size:11px;color:var(--off);margin-top:6px;">📇 '+dt(c.contact)+'</div>'):'<div style="font-size:10px;color:var(--muted);margin-top:6px;">Contact shared once they opt in or apply.</div>';
+    return '<div style="background:var(--plum3);border:1px solid var(--plum4);border-radius:11px;padding:12px 13px;margin-bottom:8px;">'
+      +'<div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">'+dt(c.displayName||'Candidate')+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);margin-top:1px;">'+dt(c.market||'')+' · '+badge+'</div></div>'
+      +'<div style="background:linear-gradient(90deg,rgba(0,245,160,.18),rgba(181,95,230,.18));border:1px solid rgba(0,245,160,.4);color:var(--mint);font-size:12px;font-weight:800;padding:3px 9px;border-radius:8px;">🎯 '+pct+'%</div></div>'
+      +(skills?('<div style="margin-top:8px;">'+skills+'</div>'):'')
+      +contact+'</div>';
+  }).join('');
 }
 async function saveCompanyProfile(){
   if(!window._recruiter){ showToast('Sign in as an employer first'); return; }
@@ -9762,8 +9804,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v103';
+const APP_VERSION = 'v104';
 const CHANGELOG = {
+  'v104':['Employers now see candidates matched to their roles — ranked by fit, applicants first, contact shared only for candidates who opted in. Matching runs nightly on opted-in candidates only, never sold.'],
   'v103':['Ghost reports now count across all hunters (community reports), and every automated email carries a one-click unsubscribe. Behind the scenes: a dead email function was fixed.'],
   'v102':['Employers can now sign up, complete a company profile, and post roles (reviewed before they go live). Candidates can apply to those roles in-app, and opt in (off by default) to be found by verified employers. Skills on your résumé always render clean now.'],
   'v101c':['Résumé skills now always show clean — the (PowerPoint · Word · Excel) Expert / CRM(...)Compliance mashups are de-duped and split on the résumé + export, from every source. Re-run “Improve My Whole Resume with Jett” for a fuller 2–3 sentence summary.'],

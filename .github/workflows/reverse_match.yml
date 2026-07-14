@@ -1,0 +1,27 @@
+name: Reverse Match (nightly)
+
+# Recomputes employer-job → candidate recommendations from the OPTED-IN pool.
+# Backend/async only — never runs on the candidate hot path. Reads are bounded
+# by caps in the runner (D1-conscious). Needs the same FIREBASE_SERVICE_ACCOUNT
+# secret the harvester uses. Safe no-op if the secret is absent.
+on:
+  schedule:
+    - cron: '30 6 * * *'      # 06:30 UTC daily (after the 05:00 harvest)
+  workflow_dispatch:
+
+jobs:
+  reverse-match:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        run: npm install
+      - name: Pipeline unit tests (must pass before writing)
+        run: npm run test:match
+      - name: Run reverse match
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node api/match/runNightly.js

@@ -2149,6 +2149,55 @@ test.describe('[STATE-COVERAGE] F-GHOST report aggregation to Firestore', () => 
   });
 });
 
+test.describe('[STATE-COVERAGE] R4 recruiter matched-candidates dashboard', () => {
+  test.use({ viewport: { width: 440, height: 900 } });
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('live job shows "View matches"; modal ranks applied first + shows consented contact', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let readJob = null;
+      window.fb = window.fb || {};
+      fb.loadRecruiterJobs = async () => [{ id: 'JOB1', title: 'Operations Manager', location: 'Houston, TX', is_remote: false, job_type: 'Full-time', isValidated: true, active: true }];
+      fb.countJobApplicants = async () => 2;
+      fb.loadRecommendedCandidates = async (jobId) => { readJob = jobId; return [
+        { uid: 'c1', score: 88, matched: ['logistics', 'inventory'], market: 'Houston, TX', applied: true, displayName: 'Jane Doe', contact: 'jane@x.com' },
+        { uid: 'c2', score: 64, matched: ['operations'], market: 'Houston, TX', applied: false, displayName: 'Sam Lee', contact: 'sam@x.com' }]; };
+      window._recruiter = { uid: 'r1', company: 'Acme', isValidated: true };
+      switchView('employer'); renderEmployerView();
+      await new Promise((r) => setTimeout(r, 300));
+      const hasBtn = /View matched candidates/.test(document.getElementById('emp-jobs-list').textContent || '');
+      await openJobMatches('JOB1', 'Operations Manager');
+      await new Promise((r) => setTimeout(r, 250));
+      const body = document.getElementById('matches-body').textContent || '';
+      return { hasBtn, readJob, open: document.getElementById('matches-modal').classList.contains('open'),
+        appliedFirst: body.indexOf('Jane Doe') < body.indexOf('Sam Lee'), pct: /88%/.test(body),
+        appliedBadge: /Applied to this role/.test(body), openBadge: /Open to offers/.test(body), contact: /jane@x\.com/.test(body) };
+    });
+    expect(r.hasBtn, 'live jobs offer a matches view').toBe(true);
+    expect(r.readJob, 'reads recommendations for the right job').toBe('JOB1');
+    expect(r.open).toBe(true);
+    expect(r.appliedFirst, 'applicants rank first').toBe(true);
+    expect(r.pct).toBe(true);
+    expect(r.appliedBadge).toBe(true);
+    expect(r.openBadge).toBe(true);
+    expect(r.contact, 'consented contact shown (discoverable pool)').toBe(true);
+  });
+
+  test('empty recommendations -> honest empty state, no crash', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {}; fb.loadRecommendedCandidates = async () => [];
+      window._recruiter = { uid: 'r1', company: 'Acme', isValidated: true };
+      await openJobMatches('JOBX', 'Role');
+      await new Promise((r) => setTimeout(r, 150));
+      return document.getElementById('matches-body').textContent || '';
+    });
+    expect(r).toMatch(/No matched candidates yet/);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);
