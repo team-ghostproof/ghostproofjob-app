@@ -328,6 +328,12 @@
          per the contact-reveal rule, an applicant's contact. ===== */
       applyToInternalJob: async (jobId,meta)=>{ try{ const u=auth.currentUser; if(!u||!jobId) return false; await setDoc(doc(db,'jobs',jobId,'applications',u.uid),Object.assign({status:'applied',ts:Date.now()},meta||{}),{merge:true}); return true; }catch(e){ console.warn('[GPJ] applyToInternalJob',e&&e.message); return false; } },
       countJobApplicants: async (jobId)=>{ try{ const s=await getCountFromServer(collection(db,'jobs',jobId,'applications')); return s.data().count; }catch(e){ return null; } },
+      /* ===== F-GHOST: aggregate ghost reports to Firestore so "another hunter
+         reported this" + the content engine work cross-user. Minimal, NO PII, NO
+         free-text stored server-side (the comment stays device-local). Counts use
+         count() aggregation — NOT per-doc reads — so this stays D1-friendly. ===== */
+      fileGhostReport: async (company,stage)=>{ try{ const u=auth.currentUser; const co=String(company||'').trim(); if(!u||!co) return false; const companyKey=co.toLowerCase().replace(/\s+/g,' ').trim(); const ref=doc(collection(db,'ghost_reports')); await setDoc(ref,{company:co,companyKey:companyKey,stage:String(stage||'').slice(0,60),ts:Date.now(),reporterUid:u.uid}); return true; }catch(e){ console.warn('[GPJ] fileGhostReport',e&&e.message); return false; } },
+      countGhostReports: async (company)=>{ try{ const companyKey=String(company||'').toLowerCase().replace(/\s+/g,' ').trim(); if(!companyKey) return null; const s=await getCountFromServer(query(collection(db,'ghost_reports'), where('companyKey','==',companyKey))); return s.data().count; }catch(e){ return null; } },
       current: ()=>auth.currentUser
     };
     onAuthStateChanged(auth, u=>{ if(window.gpjAuthChanged) window.gpjAuthChanged(u); });
@@ -9621,6 +9627,7 @@ function submitGhostReport(){
   ghostReports[co].push({stage:stage,comment:comment,when:Date.now()});
   communityGhost[co]=Math.min(95,(communityGhost[co]!==undefined?communityGhost[co]:ghostRiskFor(co))+6);
   try{ localStorage.setItem('gpj_reports',JSON.stringify(ghostReports)); }catch(e){}
+  try{ if(window.fb&&fb.fileGhostReport) fb.fileGhostReport(co,stage); }catch(e){}   /* F-GHOST: aggregate cross-user (no comment/PII stored) */
   document.getElementById('ghost-report-modal').classList.remove('open');
   document.getElementById('gr-company').value=''; document.getElementById('gr-comment').value=''; document.getElementById('gr-stage').value='';
   renderUserReports();
@@ -9634,6 +9641,7 @@ function fileGhostReport(co,note){
   ghostReports[co].push({stage:'After applying',comment:note||'No response reported',when:Date.now()});
   communityGhost[co]=Math.min(95,(communityGhost[co]!==undefined?communityGhost[co]:ghostRiskFor(co))+6);
   try{ localStorage.setItem('gpj_reports',JSON.stringify(ghostReports)); }catch(e){}
+  try{ if(window.fb&&fb.fileGhostReport) fb.fileGhostReport(co,'After applying'); }catch(e){}   /* F-GHOST */
   try{ renderUserReports(); applySwipeFilters(); }catch(e){}
 }
 function renderUserReports(){

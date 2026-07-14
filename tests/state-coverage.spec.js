@@ -2119,6 +2119,36 @@ test.describe('[STATE-COVERAGE] R2-C internal apply + dashboard, R2-D opt-in', (
   });
 });
 
+test.describe('[STATE-COVERAGE] F-GHOST report aggregation to Firestore', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('filing a ghost report also writes a shape-locked Firestore doc (no comment/PII)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let wrote = null;
+      window.fb = window.fb || {};
+      fb.current = () => ({ uid: 'u1' });
+      fb.fileGhostReport = async (co, stage) => { wrote = { co, stage }; return true; };
+      // drive the in-app report modal path
+      document.getElementById('gr-company').value = 'Vaporware Staffing';
+      document.getElementById('gr-stage').value = 'After application — never heard back';
+      document.getElementById('gr-comment').value = 'they never replied and it felt like a scam';
+      submitGhostReport();
+      await new Promise((r) => setTimeout(r, 100));
+      // programmatic path too
+      let wrote2 = null; fb.fileGhostReport = async (co, stage) => { wrote2 = { co, stage }; return true; };
+      fileGhostReport('Acme Corp', 'note');
+      await new Promise((r) => setTimeout(r, 100));
+      return { wrote, wrote2 };
+    });
+    expect(r.wrote, 'submit path forwards company + stage to Firestore').toEqual({ co: 'Vaporware Staffing', stage: 'After application — never heard back' });
+    expect(r.wrote2, 'programmatic path forwards too').toEqual({ co: 'Acme Corp', stage: 'After applying' });
+    // note: the comment is NOT passed to fb.fileGhostReport — it stays device-local
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);

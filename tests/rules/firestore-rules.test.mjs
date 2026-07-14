@@ -16,7 +16,7 @@ import {
   assertFails,
   assertSucceeds,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
 
 const PROJECT = 'gpj-rules-test';
 let env;
@@ -287,5 +287,28 @@ describe('Sprint 3 — hired pool is anonymous (no PII)', () => {
   test('a GUEST cannot create or read hired', async () => {
     await assertFails(setDoc(doc(asGuest(), 'hired/g1'), { roleKey: 'x', ts: 6 }));
     await assertFails(getDoc(doc(asGuest(), 'hired/h1')));
+  });
+});
+
+describe('F-GHOST — cross-user ghost reports (shape-locked, no free-text)', () => {
+  const ok = { company: 'Vaporware Staffing', companyKey: 'vaporware staffing', stage: 'After applying', ts: 1, reporterUid: 'candC' };
+  test('signed-in user CAN file a shape-valid report as themselves', async () => {
+    await assertSucceeds(setDoc(doc(asCandC(), 'ghost_reports/gr1'), ok));
+  });
+  test('a report with a free-text comment key is REJECTED (no defamation stored)', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'ghost_reports/gr2'), Object.assign({}, ok, { comment: 'they are a scam' })));
+  });
+  test('a report spoofing another reporterUid is REJECTED', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'ghost_reports/gr3'), Object.assign({}, ok, { reporterUid: 'candD' })));
+  });
+  test('a GUEST cannot file a report', async () => {
+    await assertFails(setDoc(doc(asGuest(), 'ghost_reports/gr4'), ok));
+  });
+  test('signed-in user CAN read (for the count aggregation)', async () => {
+    await assertSucceeds(getDoc(doc(asCandC(), 'ghost_reports/gr1')));
+  });
+  test('reports are immutable — no update or delete', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'ghost_reports/gr1'), Object.assign({}, ok, { stage: 'edited' })));
+    await assertFails(deleteDoc(doc(asCandC(), 'ghost_reports/gr1')));
   });
 });

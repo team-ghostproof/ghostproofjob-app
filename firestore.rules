@@ -148,6 +148,20 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow write: if false;
     }
+    // F-GHOST — cross-user ghost-report aggregate. Signed-in users file a report
+    // with NO free-text and NO PII beyond their own uid; the shape is locked so a
+    // defamatory comment can never be stored server-side. Reads are for count()
+    // aggregation ("N hunters reported this") + the backend content engine.
+    match /ghost_reports/{id} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['company','companyKey','stage','ts','reporterUid'])
+        && request.resource.data.reporterUid == request.auth.uid
+        && request.resource.data.company is string
+        && request.resource.data.company.size() <= 120;
+      allow update, delete: if false;
+    }
+
     // hired — any signed-in create/read (aggregate "what got people hired" pool).
     // v101b Sprint 3: the app payload is ANONYMOUS by design (roleKey, titleRaw,
     // skills[], region-state, ts). Since any signed-in user can READ this pool,
