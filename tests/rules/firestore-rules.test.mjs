@@ -163,6 +163,25 @@ describe('jobs write scope', () => {
   });
 });
 
+describe('R2-B — internal jobs are created HIDDEN, verified only by admin', () => {
+  test('recruiter CAN create an internal job with active:false + isValidated:false', async () => {
+    await assertSucceeds(setDoc(doc(asRecruiterA(), 'jobs/r2new'), { title: 'Ops', ownerUid: 'recruiterA', source: 'internal', active: false, isValidated: false }));
+  });
+  test('recruiter CANNOT create a job pre-activated (active:true)', async () => {
+    await assertFails(setDoc(doc(asRecruiterA(), 'jobs/r2active'), { title: 'Ops', ownerUid: 'recruiterA', source: 'internal', active: true, isValidated: false }));
+  });
+  test('recruiter CANNOT create a job pre-validated (isValidated:true)', async () => {
+    await assertFails(setDoc(doc(asRecruiterA(), 'jobs/r2val'), { title: 'Ops', ownerUid: 'recruiterA', source: 'internal', active: false, isValidated: true }));
+  });
+  test('recruiter CANNOT self-activate their draft job (active false->true)', async () => {
+    // jobC seeded { ownerUid: recruiterA, source: internal, isValidated: false } (no active -> defaults false)
+    await assertFails(setDoc(doc(asRecruiterA(), 'jobs/jobC'), { title: 'Draft', ownerUid: 'recruiterA', source: 'internal', isValidated: false, companyId: 'acme.com', active: true }));
+  });
+  test('ADMIN CAN approve a job -> active:true + isValidated:true', async () => {
+    await assertSucceeds(setDoc(doc(asAdmin(), 'jobs/jobC'), { title: 'Draft', ownerUid: 'recruiterA', source: 'internal', isValidated: true, companyId: 'acme.com', active: true }));
+  });
+});
+
 describe('appeals are admin-only', () => {
   test('recruiter CAN file an appeal they own', async () => {
     await assertSucceeds(setDoc(doc(asRecruiterA(), 'appeals/ap1'), { ownerUid: 'recruiterA', reason: 'not_applicant' }));

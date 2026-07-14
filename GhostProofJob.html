@@ -309,6 +309,15 @@
          (same pattern as countJobs); reads allowed by the deployed rules. */
       adminCountRecruiters: async ()=>{ try{ const all=await getCountFromServer(collection(db,'recruiters')); const ver=await getCountFromServer(query(collection(db,'recruiters'), where('isValidated','==',true))); return {total:all.data().count, verified:ver.data().count}; }catch(e){ console.warn('[GPJ] adminCountRecruiters',e&&e.message); return null; } },
       adminCountCompanies: async ()=>{ try{ const s=await getCountFromServer(collection(db,'companies')); return {total:s.data().count}; }catch(e){ console.warn('[GPJ] adminCountCompanies',e&&e.message); return null; } },
+      /* ===== R2-B: recruiter jobs — create/list/delete OWN internal jobs. Created
+         HIDDEN (active:false, isValidated:false) so they never hit the candidate
+         deck until an admin verifies. Rules enforce ownerUid/source/hidden. ===== */
+      createRecruiterJob: async (job)=>{ try{ const u=auth.currentUser; if(!u) return null; const ref=doc(collection(db,'jobs')); const rec=Object.assign({},job,{ownerUid:u.uid, source:'internal', isValidated:false, active:false, ingestedAt:Date.now(), createdAt:Date.now()}); await setDoc(ref,rec); return ref.id; }catch(e){ console.warn('[GPJ] createRecruiterJob',e&&e.message); return null; } },
+      loadRecruiterJobs: async (uid)=>{ try{ const q=query(collection(db,'jobs'), where('ownerUid','==',uid), limit(200)); const s=await getDocs(q); const out=[]; s.forEach(d=>out.push(Object.assign({id:d.id},d.data()))); out.sort((a,b)=>((b.createdAt||0)-(a.createdAt||0))); return out; }catch(e){ console.warn('[GPJ] loadRecruiterJobs',e&&e.message); return []; } },
+      deleteRecruiterJob: async (id)=>{ try{ await deleteDoc(doc(db,'jobs',id)); return true; }catch(e){ console.warn('[GPJ] deleteRecruiterJob',e&&e.message); return false; } },
+      /* admin: internal jobs awaiting review (source:'internal' + not yet validated) */
+      adminPendingJobs: async ()=>{ try{ const q=query(collection(db,'jobs'), where('source','==','internal'), limit(200)); const s=await getDocs(q); const out=[]; s.forEach(d=>{ const v=d.data()||{}; if(v.isValidated!==true) out.push(Object.assign({id:d.id},v)); }); return out; }catch(e){ console.warn('[GPJ] adminPendingJobs',e&&e.message); return []; } },
+      adminVerifyJob: async (id,approved)=>{ try{ await setDoc(doc(db,'jobs',id),{isValidated:!!approved,active:!!approved,verifiedAt:Date.now()},{merge:true}); return true; }catch(e){ console.warn('[GPJ] adminVerifyJob',e&&e.message); return false; } },
       current: ()=>auth.currentUser
     };
     onAuthStateChanged(auth, u=>{ if(window.gpjAuthChanged) window.gpjAuthChanged(u); });
@@ -2220,8 +2229,37 @@
         <div class="field-label">Your title</div>
         <input class="field-input" id="emp-contact-title" placeholder="e.g. Talent Acquisition Lead" style="margin-bottom:12px;"/>
         <div id="emp-save-btn" onclick="saveCompanyProfile()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;text-align:center;font-size:14px;cursor:pointer;">💾 Save company profile</div>
-        <div style="margin-top:16px;font-size:11px;color:var(--muted);line-height:1.6;">Next: post your first role and see candidates matched to it (coming soon). Your jobs stay hidden until your company is verified.</div>
-        <div id="emp-signout-btn" onclick="recruiterSignOut()" style="margin-top:14px;color:var(--muted);font-size:12px;text-align:center;cursor:pointer;text-decoration:underline;">Sign out of employer account</div>
+        <!-- R2-B: post + list the recruiter's own roles -->
+        <div style="border-top:1px solid var(--plum3);margin:18px 0 0;padding-top:16px;"></div>
+        <div style="font-size:11px;font-weight:800;color:var(--cyber);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Post a role</div>
+        <div class="field-label">Job title</div>
+        <input class="field-input" id="job-title" placeholder="e.g. Operations Manager" style="margin-bottom:8px;"/>
+        <div class="field-row">
+          <div style="flex:1;"><div class="field-label">Location</div><input class="field-input" id="job-location" placeholder="Houston, TX" style="margin-bottom:8px;"/></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--off);margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="job-remote" style="accent-color:var(--mint);width:15px;height:15px;"/> This role is remote</label>
+        <div class="field-label">Description</div>
+        <textarea class="field-input" id="job-desc" rows="4" placeholder="What the role does, day to day." style="margin-bottom:8px;resize:vertical;"></textarea>
+        <div class="field-label">Requirements</div>
+        <textarea class="field-input" id="job-req" rows="3" placeholder="Must-haves, skills, experience." style="margin-bottom:8px;resize:vertical;"></textarea>
+        <div class="field-row">
+          <div style="flex:1;"><div class="field-label">Salary min (optional)</div><input class="field-input" id="job-sal-min" type="number" inputmode="numeric" placeholder="60000" style="margin-bottom:8px;"/></div>
+          <div style="flex:1;"><div class="field-label">Salary max (optional)</div><input class="field-input" id="job-sal-max" type="number" inputmode="numeric" placeholder="80000" style="margin-bottom:8px;"/></div>
+        </div>
+        <div class="field-label">Employment type</div>
+        <select class="field-input" id="job-type" style="margin-bottom:12px;">
+          <option value="Full-time">Full-time</option>
+          <option value="Part-time">Part-time</option>
+          <option value="Contract">Contract</option>
+          <option value="Temporary">Temporary</option>
+          <option value="Internship">Internship</option>
+        </select>
+        <div id="job-post-btn" onclick="postRecruiterJob()" style="background:linear-gradient(135deg,var(--cyber),#7E3FF2);color:#fff;font-weight:800;border-radius:12px;padding:13px;text-align:center;font-size:14px;cursor:pointer;">📋 Post role (pending review)</div>
+        <div style="margin-top:8px;font-size:10px;color:var(--muted);line-height:1.6;">New roles are reviewed by GhostProofJob before they go live to candidates — this keeps the board free of ghost jobs. You’ll see the status below.</div>
+        <div style="font-size:11px;font-weight:800;color:var(--cyber);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px;">Your roles</div>
+        <div id="emp-jobs-list" style="margin-bottom:8px;"><div style="font-size:12px;color:var(--muted);">No roles yet — post your first above.</div></div>
+        <div style="margin-top:8px;font-size:11px;color:var(--muted);line-height:1.6;">Candidate matching to your roles arrives with reverse-match — for now, verified roles appear in the candidate job board and applicants show under each role.</div>
+        <div id="emp-signout-btn" onclick="recruiterSignOut()" style="margin-top:16px;color:var(--muted);font-size:12px;text-align:center;cursor:pointer;text-decoration:underline;">Sign out of employer account</div>
       </div>
     </div>
 
@@ -2724,6 +2762,56 @@ function renderEmployerView(){
     if(r.isValidated){ b.style.background='rgba(0,245,160,.1)'; b.style.color='var(--mint)'; b.innerHTML='✅ Verified Employer — domain-verified + reviewed by GhostProofJob.'; }
     else { b.style.background='rgba(255,179,71,.1)'; b.style.color='var(--warn)'; b.innerHTML='⏳ Pending review — your company email domain is checked and a human reviews the first cohort. Your jobs stay hidden until verified.'; }
   }
+  try{ renderMyJobs(); }catch(e){}
+}
+/* R2-B: create one internal job from the employer form (hidden until verified) */
+async function postRecruiterJob(){
+  if(!window._recruiter){ showToast('Sign in as an employer first'); return; }
+  if(!(window.fb&&fb.createRecruiterJob)){ showToast('Posting unavailable right now'); return; }
+  const v=id=>((document.getElementById(id)||{}).value||'').trim();
+  const remote=!!(document.getElementById('job-remote')||{}).checked;
+  const title=v('job-title'), loc=v('job-location'), desc=v('job-desc');
+  if(!title){ showToast('Add a job title'); return; }
+  if(!loc && !remote){ showToast('Add a location or mark it remote'); return; }
+  if(desc.length<20){ showToast('Add a short description (20+ characters)'); return; }
+  const r=window._recruiter;
+  const smin=parseInt(v('job-sal-min'),10)||0, smax=parseInt(v('job-sal-max'),10)||0;
+  const job={ title:title, location:remote?'Remote':loc, is_remote:remote, description:desc, requirements:v('job-req'),
+    salary_min:smin||null, salary_max:smax||null, job_type:v('job-type')||'Full-time',
+    company:r.company||'', companyId:r.companyId||r.domain||r.uid, region:remote?'Remote':loc };
+  const btn=document.getElementById('job-post-btn'); if(btn){ btn.textContent='Posting…'; btn.style.pointerEvents='none'; }
+  const id=await fb.createRecruiterJob(job);
+  if(btn){ btn.textContent='📋 Post role (pending review)'; btn.style.pointerEvents='auto'; }
+  if(id){
+    ['job-title','job-location','job-desc','job-req','job-sal-min','job-sal-max'].forEach(x=>{ const e=document.getElementById(x); if(e) e.value=''; });
+    const rc=document.getElementById('job-remote'); if(rc) rc.checked=false;
+    showToast('📋 Role posted — pending review before it goes live');
+    renderMyJobs();
+  } else { showToast('Could not post the role — try again'); }
+}
+/* R2-B: list the recruiter's own roles with status */
+async function renderMyJobs(){
+  const box=document.getElementById('emp-jobs-list');
+  if(!box) return;
+  const r=window._recruiter;
+  if(!(r&&r.uid&&window.fb&&fb.loadRecruiterJobs)){ box.innerHTML='<div style="font-size:12px;color:var(--muted);">No roles yet — post your first above.</div>'; return; }
+  box.innerHTML='<div style="font-size:12px;color:var(--muted);">Loading your roles…</div>';
+  const jobs=await fb.loadRecruiterJobs(r.uid);
+  if(!jobs.length){ box.innerHTML='<div style="font-size:12px;color:var(--muted);">No roles yet — post your first above.</div>'; return; }
+  box.innerHTML=jobs.map(j=>{
+    const live=j.isValidated===true && j.active===true;
+    const badge=live?'<span style="color:var(--mint);font-weight:800;">✅ Live</span>':'<span style="color:var(--warn);font-weight:800;">⏳ Pending review</span>';
+    const loc=(j.is_remote?'Remote':(j.location||'—'));
+    return '<div style="background:var(--plum3);border:1px solid var(--plum4);border-radius:10px;padding:10px 12px;margin-bottom:7px;">'
+      +'<div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">'+String(j.title||'Role').replace(/</g,'&lt;')+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);margin-top:1px;">'+String(loc).replace(/</g,'&lt;')+' · '+String(j.job_type||'').replace(/</g,'&lt;')+' · '+badge+'</div></div>'
+      +'<div onclick="deleteMyJob(\''+j.id+'\')" style="color:var(--danger);font-size:11px;cursor:pointer;font-weight:700;padding:4px 6px;">Delete</div></div></div>';
+  }).join('');
+}
+async function deleteMyJob(id){
+  if(!id) return;
+  if(typeof confirm==='function' && !confirm('Delete this role? This cannot be undone.')) return;
+  if(window.fb&&fb.deleteRecruiterJob){ const ok=await fb.deleteRecruiterJob(id); showToast(ok?'Role deleted':'Could not delete — try again'); renderMyJobs(); }
 }
 async function saveCompanyProfile(){
   if(!window._recruiter){ showToast('Sign in as an employer first'); return; }
@@ -11970,6 +12058,9 @@ function renderAdminPanel(){
     '<div style="height:1px;background:var(--plum4);margin:8px 0;"></div>'+
     '<div style="font-size:12px;font-weight:800;color:var(--cyber);margin-bottom:6px;">💼 Employer Verification Queue</div>'+
     '<div id="admin-verify-queue" style="font-size:11px;color:var(--muted);"><span class="buzz-add" onclick="renderVerifyQueue(this)">↻ Load pending employers</span></div>'+
+    '<div style="height:1px;background:var(--plum4);margin:8px 0;"></div>'+
+    '<div style="font-size:12px;font-weight:800;color:var(--cyber);margin-bottom:6px;">📋 Employer Jobs Awaiting Review</div>'+
+    '<div id="admin-jobs-queue" style="font-size:11px;color:var(--muted);"><span class="buzz-add" onclick="renderJobsQueue(this)">↻ Load pending jobs</span></div>'+
     '</div></div>');
   showToast('👑 Admin mode active');
   dbg('admin portal revealed');
@@ -11999,6 +12090,32 @@ async function adminDecideRecruiter(uid,approved,btn){
   try{ if(window.fb&&fb.adminVerifyRecruiter) await fb.adminVerifyRecruiter(uid,approved); }catch(e){}
   showToast(approved?'✅ Employer verified':'✕ Employer rejected');
   try{ renderVerifyQueue(); }catch(e){}
+}
+/* R2-B: admin queue of employer-posted jobs awaiting review. Verify → the job
+   goes live (active:true + isValidated:true) into the candidate board. */
+async function renderJobsQueue(btn){
+  if(!isAdmin){ return; }
+  const box=document.getElementById('admin-jobs-queue'); if(!box) return;
+  box.innerHTML='Loading…';
+  let pend=[]; try{ if(window.fb&&fb.adminPendingJobs) pend=await fb.adminPendingJobs(); }catch(e){}
+  if(!pend.length){ box.innerHTML='<span style="color:var(--muted);">No employer jobs awaiting review.</span>'; return; }
+  box.innerHTML=pend.map(j=>{
+    const dt=(s)=>String(s==null?'':s).replace(/</g,'&lt;');
+    return '<div style="background:var(--plum3);border:1px solid var(--plum4);border-radius:9px;padding:9px 11px;margin-bottom:7px;">'+
+      '<div style="font-size:12px;font-weight:700;">'+dt(j.title||'Role')+'</div>'+
+      '<div style="font-size:10px;color:var(--muted);margin:2px 0 7px;">'+dt(j.company||'')+' · '+dt(j.is_remote?'Remote':(j.location||''))+' · '+dt(j.job_type||'')+'</div>'+
+      '<div style="display:flex;gap:8px;">'+
+        '<div class="buzz-add" style="background:rgba(0,245,160,.12);color:var(--mint);" onclick="adminDecideJob(\''+dt(j.id)+'\',true,this)">✓ Approve → Live</div>'+
+        '<div class="buzz-add" style="background:rgba(255,77,106,.12);color:var(--danger);" onclick="adminDecideJob(\''+dt(j.id)+'\',false,this)">✕ Reject</div>'+
+      '</div></div>';
+  }).join('');
+}
+async function adminDecideJob(id,approved,btn){
+  if(!isAdmin||!id){ return; }
+  if(btn){ btn.textContent='…'; btn.style.pointerEvents='none'; }
+  try{ if(window.fb&&fb.adminVerifyJob) await fb.adminVerifyJob(id,approved); }catch(e){}
+  showToast(approved?'✅ Job approved — now live':'✕ Job rejected');
+  try{ renderJobsQueue(); }catch(e){}
 }
 /* v101b C: employers + companies counter (mirrors refreshJobCount) */
 async function refreshRecruiterCount(btn){

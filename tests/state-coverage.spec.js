@@ -1974,6 +1974,80 @@ test.describe('[STATE-COVERAGE] R2-A recruiter onboarding (fork + required websi
   });
 });
 
+test.describe('[STATE-COVERAGE] R2-B recruiter job posting + listing', () => {
+  test.use({ viewport: { width: 440, height: 900 } });
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
+  });
+
+  test('recruiter posts a role -> correct payload, list shows Pending, form clears', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let created = null;
+      window.fb = window.fb || {};
+      fb.createRecruiterJob = async (job) => { created = job; return 'job123'; };
+      fb.loadRecruiterJobs = async () => [{ id: 'job123', title: 'Operations Manager', location: 'Houston, TX', is_remote: false, job_type: 'Full-time', isValidated: false, active: false }];
+      window._recruiter = { uid: 'r1', company: 'Acme Corp', companyId: 'acme.com', domain: 'acme.com', isValidated: true };
+      switchView('employer'); renderEmployerView();
+      const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+      set('job-title', 'Operations Manager'); set('job-location', 'Houston, TX');
+      set('job-desc', 'Oversee warehouse operations and vendor logistics for the region.'); set('job-req', '5 years ops');
+      set('job-sal-min', '60000'); set('job-sal-max', '80000'); document.getElementById('job-type').value = 'Full-time';
+      await postRecruiterJob(); await new Promise((r) => setTimeout(r, 250));
+      const listText = (document.getElementById('emp-jobs-list').textContent || '');
+      return { created, listShowsJob: listText.includes('Operations Manager'), pending: /Pending review/.test(listText), cleared: document.getElementById('job-title').value === '' };
+    });
+    expect(r.created.title).toBe('Operations Manager');
+    expect(r.created.source).toBeUndefined();   // source/active/isValidated stamped by fb, not the form
+    expect(r.created.salary_min).toBe(60000);
+    expect(r.created.job_type).toBe('Full-time');
+    expect(r.created.company).toBe('Acme Corp');
+    expect(r.listShowsJob).toBe(true);
+    expect(r.pending, 'unverified job shows Pending review').toBe(true);
+    expect(r.cleared, 'form resets after posting').toBe(true);
+  });
+
+  test('posting validates title + location/remote + description length', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const toasts = []; window.showToast = (m) => toasts.push(m);
+      let calls = 0; window.fb = window.fb || {}; fb.createRecruiterJob = async () => { calls++; return 'x'; };
+      window._recruiter = { uid: 'r1', company: 'Acme', companyId: 'acme.com' };
+      switchView('employer'); renderEmployerView();
+      const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+      await postRecruiterJob();                                   // empty -> blocked (no title)
+      set('job-title', 'Ops'); document.getElementById('job-remote').checked = false; set('job-location', '');
+      await postRecruiterJob();                                   // no location, not remote -> blocked
+      set('job-location', 'Houston, TX'); set('job-desc', 'too short');
+      await postRecruiterJob();                                   // desc < 20 -> blocked
+      return { calls, toasts };
+    });
+    expect(r.calls, 'no job created while inputs are invalid').toBe(0);
+    expect(r.toasts.some((t) => /title/i.test(t))).toBe(true);
+    expect(r.toasts.some((t) => /location|remote/i.test(t))).toBe(true);
+  });
+
+  test('admin pending-jobs queue lists internal jobs and approves them live', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      fb.adminPendingJobs = async () => [{ id: 'job123', title: 'Operations Manager', company: 'Acme Corp', location: 'Houston, TX', job_type: 'Full-time' }];
+      let verified = null; fb.adminVerifyJob = async (id, ap) => { verified = { id, ap }; return true; };
+      isAdmin = true;
+      try { const old = document.getElementById('admin-panel'); if (old) old.remove(); } catch (e) {}
+      renderAdminPanel();
+      const hasQueue = !!document.getElementById('admin-jobs-queue');
+      await renderJobsQueue();
+      const shows = document.getElementById('admin-jobs-queue').textContent.includes('Operations Manager');
+      document.querySelector('#admin-jobs-queue div[onclick*="adminDecideJob"]').click();
+      await new Promise((r) => setTimeout(r, 150));
+      isAdmin = false;
+      return { hasQueue, shows, verified };
+    });
+    expect(r.hasQueue).toBe(true);
+    expect(r.shows).toBe(true);
+    expect(r.verified, 'approve calls adminVerifyJob(id, true) -> flips active+isValidated live').toEqual({ id: 'job123', ap: true });
+  });
+});
+
 test.describe('[STATE-COVERAGE] Q3 failed network', () => {
   test('shell survives a Firestore + Worker outage', async ({ page }) => {
     await mockNetworkFailure(page, FIRESTORE_URLS);

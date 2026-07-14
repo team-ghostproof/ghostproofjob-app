@@ -71,10 +71,16 @@ service cloud.firestore {
       allow read: if true;
       // (A) was `if false`. Now scoped: admin, or a recruiter creating/editing
       // ONLY their own internal job. Harvested jobs stay untouchable.
+      // R2-B: a recruiter creates their internal job HIDDEN — active:false +
+      // isValidated:false — so it never enters the candidate `active==true` deck
+      // query until an admin verifies it. (They also can't self-verify/activate
+      // on update; see below.)
       allow create: if isAdmin()
         || (isRecruiter()
             && request.resource.data.ownerUid == request.auth.uid
-            && request.resource.data.source == 'internal');
+            && request.resource.data.source == 'internal'
+            && request.resource.data.get('isValidated', false) == false
+            && request.resource.data.get('active', false) == false);
       // v101b Sprint 3: an owner-recruiter may edit their internal job's CONTENT
       // but NEVER self-verify or re-owner it — isValidated / ownerUid / source /
       // companyId are immutable to the recruiter (admin/backend only). Without
@@ -87,6 +93,7 @@ service cloud.firestore {
             && request.resource.data.ownerUid == resource.data.ownerUid
             && request.resource.data.source == resource.data.source
             && request.resource.data.get('isValidated', false) == resource.data.get('isValidated', false)
+            && request.resource.data.get('active', false) == resource.data.get('active', false)   /* R2-B: no self-activate */
             && request.resource.data.get('companyId', '') == resource.data.get('companyId', ''));
       allow delete: if isAdmin()
         || (isRecruiter()
