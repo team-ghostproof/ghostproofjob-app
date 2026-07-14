@@ -1029,12 +1029,20 @@ test.describe('[STATE-COVERAGE] v97 F-ADDR + fuller storage caps + dedup', () =>
     expect(r.hasRateBtn, 'rating lives in the reviews panel via the unified vibe flow').toBe(true);
   });
 
-  test('Q1: Max Distance slider removed (F-GEO logged)', async ({ page }) => {
+  test('Q1: Max Distance re-enabled as a real filter (F-GEO v106), salary intact', async ({ page }) => {
     const r = await page.evaluate(() => {
       switchView('browse');
-      return { gone: !document.getElementById('f-dist'), salaryStays: !!document.getElementById('f-salary') };
+      const el = document.getElementById('f-dist');
+      return {
+        present: !!el,
+        isSelect: !!el && el.tagName === 'SELECT',
+        defaultAny: !!el && (parseInt(el.value, 10) || 0) === 0,   // default = Any (no regression)
+        salaryStays: !!document.getElementById('f-salary'),
+      };
     });
-    expect(r.gone, 'dead distance slider removed').toBe(true);
+    expect(r.present, 'F-GEO re-added the distance control').toBe(true);
+    expect(r.isSelect).toBe(true);
+    expect(r.defaultAny, 'defaults to Any so nothing is filtered until opted in').toBe(true);
     expect(r.salaryStays, 'salary slider still present').toBe(true);
   });
 });
@@ -2402,6 +2410,55 @@ test.describe('[STATE-COVERAGE] R5 outreach + anti-ghosting, R6 candidate tray',
     expect(r.genericCap).toBe('cap');
     expect(r.ranAI, 'AI actually ran -> no fallback reason').toBe('');
     expect(r.nullRes).toBe('unavailable');
+  });
+});
+
+test.describe('[STATE-COVERAGE] F-GEO distance filter (offline centroids + haversine)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+  });
+
+  test('distance math + suburb rollup + remote/unknown pass; default Any = no filtering', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_loc', 'Houston, TX');
+      const pass = (j, maxMi) => { const d = _jobDistanceMiles(j); return !(maxMi > 0 && d !== null && d > maxMi); };
+      return {
+        houstonDallas: Math.round(_haversineMiles(GPJ_CENTROIDS['houston, tx'], GPJ_CENTROIDS['dallas, tx'])),
+        suburbRollup: _geoPoint('Missouri City, TX')[0] === GPJ_CENTROIDS['houston, tx'][0],
+        sugarLand0: Math.round(_jobDistanceMiles({ loc: 'Sugar Land, TX' })),
+        remoteNull: _jobDistanceMiles({ loc: 'x', work_setting: 'remote' }),
+        unknownNull: _jobDistanceMiles({ loc: 'Podunk, ZZ' }),
+        defaultMaxMi: _maxDistanceMi(),
+        passDallasAny: pass({ loc: 'Dallas, TX' }, 0),      // Any -> everything passes
+        passDallas100: pass({ loc: 'Dallas, TX' }, 100),    // 225mi > 100 -> excluded
+        passHouston100: pass({ loc: 'Houston, TX' }, 100),
+        passRemote10: pass({ loc: 'x', work_setting: 'remote' }, 10),
+        passUnknown10: pass({ loc: 'Podunk, ZZ' }, 10),
+      };
+    });
+    expect(r.houstonDallas).toBeGreaterThan(200);
+    expect(r.houstonDallas).toBeLessThan(260);
+    expect(r.suburbRollup, 'a suburb rolls up to its metro centroid').toBe(true);
+    expect(r.sugarLand0, 'a same-metro job is ~0 mi').toBeLessThanOrEqual(30);
+    expect(r.remoteNull, 'remote jobs are never distance-filtered').toBeNull();
+    expect(r.unknownNull, 'unknown city = unmeasurable = passes').toBeNull();
+    expect(r.defaultMaxMi, 'default is Any (0) = no regression').toBe(0);
+    expect(r.passDallasAny).toBe(true);
+    expect(r.passDallas100, 'a job past the cap is excluded').toBe(false);
+    expect(r.passHouston100).toBe(true);
+    expect(r.passRemote10).toBe(true);
+    expect(r.passUnknown10).toBe(true);
+  });
+
+  test('no saved home city -> filter no-ops (every job passes)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.removeItem('gpj_loc');
+      const pass = (j, maxMi) => { const d = _jobDistanceMiles(j); return !(maxMi > 0 && d !== null && d > maxMi); };
+      return { dist: _jobDistanceMiles({ loc: 'Dallas, TX' }), passes: pass({ loc: 'Dallas, TX' }, 10) };
+    });
+    expect(r.dist, 'no home city -> distance unmeasurable').toBeNull();
+    expect(r.passes, 'without a home city the filter cannot hide anything').toBe(true);
   });
 });
 

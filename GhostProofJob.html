@@ -1753,10 +1753,18 @@
         <div class="toggle-row" style="margin-bottom:8px;"><div style="font-size:13px;font-weight:600;">💰 Only show jobs with posted salary</div><div class="toggle-switch" id="f-hassal" onclick="this.classList.toggle('on');livePage=1;refreshBrowse()"></div></div>
         <div class="field-label">Min Salary: <span id="f-sal-out" style="color:var(--mint);">Any</span></div>
         <input type="range" class="range-input" id="f-salary" min="0" max="250" step="5" value="0" oninput="livePage=1;refreshBrowse()"/>
-        <!-- F-GEO (v97): Max Distance slider REMOVED — live job docs carry no
-             coordinates, so it could never filter by distance (dead/misleading
-             control). Re-added in a later candidate version once F-GEO lands
-             lat/long on user+job docs (bundled US city-centroid table + haversine). -->
+        <!-- F-GEO (v106): Max Distance re-enabled. Pure client-side filter over the
+             already-loaded pool (zero extra Firestore reads) using a bundled US
+             city-centroid table + haversine — no coordinates needed on the job docs.
+             Default "Any" = no change; remote + unknown-city jobs always pass. -->
+        <div class="field-label" style="margin-top:10px;">📍 Max Distance <span style="color:var(--muted);font-weight:400;">(from your saved city)</span></div>
+        <select class="field-input" id="f-dist" onchange="livePage=1;refreshBrowse()" style="margin-bottom:8px;font-size:13px;">
+          <option value="0">Any distance</option>
+          <option value="10">Within 10 mi</option>
+          <option value="25">Within 25 mi</option>
+          <option value="50">Within 50 mi</option>
+          <option value="100">Within 100 mi</option>
+        </select>
       </div>
       <div id="browse-results"></div>
     </div>
@@ -2526,7 +2534,7 @@
       <!-- RECRUITER TIER (R1): employer entry -->
       <div style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v105</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v106</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3996,9 +4004,13 @@ function renderBrowse(){
     const typeVal=(document.getElementById('f-type')||{}).value||'';
     const indVal=(document.getElementById('f-industry')||{}).value||'';
     const lvlVal=(document.getElementById('f-lvl')||{}).value||'';
+    const maxMi=_maxDistanceMi();   /* F-GEO (v106): 0 = Any */
     const _seen=seenJobKeys();
     let hits=liveJobs.filter(j=>{
       if(_seen.has(jobKey(j))) return false;   /* unified: hide applied/skipped/saved */
+      /* F-GEO: distance cap over the loaded pool. null distance (remote / unknown
+         city on either side) always passes — we never hide a role we can't measure. */
+      if(maxMi>0){ const d=_jobDistanceMiles(j); if(d!==null && d>maxMi) return false; }
       if(hasSal&&!(j.salMax>0)) return false;
       if(salL&&j.salMax&&Math.round(j.salMax/1000)<salL) return false;
       /* keyword filters live cards by title/company/description */
@@ -4041,7 +4053,7 @@ function renderBrowse(){
     /* SAFETY NET: a filter must never blank the screen. If it would, show all
        live jobs with an honest note instead of an empty list. Live feeds rarely
        tag remote/salary, so strict filtering would otherwise wipe everything. */
-    const filtersActive=(hasSal||salL||kw||(styVal&&styVal!=='Any')||(typeVal&&typeVal!=='Any')||(indVal&&indVal!=='All')||lvlVal);
+    const filtersActive=(hasSal||salL||kw||(styVal&&styVal!=='Any')||(typeVal&&typeVal!=='Any')||(indVal&&indVal!=='All')||lvlVal||maxMi);
     let noteText, showJobs=hits;
     if(filtersActive && hits.length===0){
       if(kw){
@@ -6410,6 +6422,76 @@ function resolveLocation(input){
   return res;
 }
 function cap(s){ return (s||'').replace(/\b\w/g,c=>c.toUpperCase()); }
+
+/* ===== F-GEO (v106): offline distance filter =====================================
+   A bundled US city-centroid table + haversine so "Max Distance" works with ZERO
+   extra Firestore reads and NO coordinates on the job docs. Keys are lowercase
+   "city, st" (matching resolveLocation().metro). Suburbs already roll up to their
+   metro via METRO_MAP, so "Missouri City, TX" resolves to the Houston centroid.
+   Honesty rule: if EITHER side's city is unknown, or the job is remote, distance is
+   null and the job PASSES — we never hide a role we can't actually measure. */
+const GPJ_CENTROIDS={
+  'houston, tx':[29.76,-95.37],'dallas, tx':[32.78,-96.80],'fort worth, tx':[32.76,-97.33],
+  'austin, tx':[30.27,-97.74],'san antonio, tx':[29.42,-98.49],'el paso, tx':[31.76,-106.49],
+  'los angeles, ca':[34.05,-118.24],'san francisco, ca':[37.77,-122.42],'san diego, ca':[32.72,-117.16],
+  'san jose, ca':[37.34,-121.89],'sacramento, ca':[38.58,-121.49],'fresno, ca':[36.74,-119.77],
+  'new york, ny':[40.71,-74.01],'buffalo, ny':[42.89,-78.88],'chicago, il':[41.88,-87.63],
+  'boston, ma':[42.36,-71.06],'phoenix, az':[33.45,-112.07],'tucson, az':[32.22,-110.97],
+  'philadelphia, pa':[39.95,-75.17],'pittsburgh, pa':[40.44,-79.996],'atlanta, ga':[33.75,-84.39],
+  'seattle, wa':[47.61,-122.33],'denver, co':[39.74,-104.99],'miami, fl':[25.76,-80.19],
+  'orlando, fl':[28.54,-81.38],'tampa, fl':[27.95,-82.46],'jacksonville, fl':[30.33,-81.66],
+  'washington, dc':[38.90,-77.04],'detroit, mi':[42.33,-83.05],'minneapolis, mn':[44.98,-93.27],
+  'portland, or':[45.52,-122.68],'las vegas, nv':[36.17,-115.14],'charlotte, nc':[35.23,-80.84],
+  'raleigh, nc':[35.78,-78.64],'nashville, tn':[36.16,-86.78],'memphis, tn':[35.15,-90.05],
+  'columbus, oh':[39.96,-83.00],'cleveland, oh':[41.50,-81.69],'cincinnati, oh':[39.10,-84.51],
+  'indianapolis, in':[39.77,-86.16],'kansas city, mo':[39.10,-94.58],'st louis, mo':[38.63,-90.20],
+  'st. louis, mo':[38.63,-90.20],'baltimore, md':[39.29,-76.61],'milwaukee, wi':[43.04,-87.91],
+  'salt lake city, ut':[40.76,-111.89],'oklahoma city, ok':[35.47,-97.52],'louisville, ky':[38.25,-85.76],
+  'new orleans, la':[29.95,-90.07],'richmond, va':[37.54,-77.44],'virginia beach, va':[36.85,-75.98],
+  'albuquerque, nm':[35.08,-106.65],'birmingham, al':[33.52,-86.81],'boise, id':[43.62,-116.20],
+  'des moines, ia':[41.59,-93.62],'omaha, ne':[41.26,-95.93],'hartford, ct':[41.76,-72.67],
+  'providence, ri':[41.82,-71.41],'charleston, sc':[32.78,-79.93],'columbia, sc':[34.00,-81.03],
+  'little rock, ar':[34.75,-92.29],'wichita, ks':[37.69,-97.34],'honolulu, hi':[21.31,-157.86],
+  'anchorage, ak':[61.22,-149.90],'portland, me':[43.66,-70.26],'manchester, nh':[42.99,-71.46],
+  'burlington, vt':[44.48,-73.21],'billings, mt':[45.79,-108.50],'cheyenne, wy':[41.14,-104.82],
+  'sioux falls, sd':[43.55,-96.70],'fargo, nd':[46.88,-96.79],'jackson, ms':[32.30,-90.18]
+};
+function _haversineMiles(a,b){
+  if(!a||!b) return null;
+  const toRad=d=>d*Math.PI/180, R=3958.8;
+  const dLat=toRad(b[0]-a[0]), dLng=toRad(b[1]-a[1]);
+  const s=Math.sin(dLat/2)**2 + Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(s)));
+}
+/* resolve any "City, ST"/suburb string to a centroid [lat,lng], or null if unknown */
+function _geoPoint(where){
+  if(!where) return null;
+  try{
+    const r=resolveLocation(where);
+    const m=(r.metro||'').toLowerCase().trim();
+    if(m && GPJ_CENTROIDS[m]) return GPJ_CENTROIDS[m];
+    const c=(r.city||'').toLowerCase().trim();
+    if(c && r.state && GPJ_CENTROIDS[c+', '+r.state.toLowerCase()]) return GPJ_CENTROIDS[c+', '+r.state.toLowerCase()];
+  }catch(e){}
+  return null;
+}
+function _jobIsRemote(j){
+  if(!j) return false;
+  if(j.is_remote===true) return true;
+  if(((j.work_setting||j.style||'')+'').toLowerCase()==='remote') return true;
+  return /\bremote\b/i.test((j.loc||j.location||j.region||'')+'');
+}
+/* miles from the user's SAVED city (gpj_loc) to a job. null = "don't filter this
+   one": remote, or either city unknown. */
+function _jobDistanceMiles(j){
+  if(_jobIsRemote(j)) return null;
+  let home=''; try{ home=(localStorage.getItem('gpj_loc')||'').trim(); }catch(e){}
+  const a=_geoPoint(home); if(!a) return null;              /* no known home city → filter no-ops */
+  const b=_geoPoint(j.loc||j.location||j.region||''); if(!b) return null;
+  return _haversineMiles(a,b);
+}
+/* current Max Distance selection in miles (0 = Any) */
+function _maxDistanceMi(){ const el=document.getElementById('f-dist'); return el?(parseInt(el.value,10)||0):0; }
 
 /* does a job (with .region/.loc/.location) belong to the resolved location, by
    hierarchy: metro → state → country? Lenient so suburbs match metro inventory. */
@@ -10045,7 +10127,7 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v105';
+const APP_VERSION = 'v106';
 const CHANGELOG = {
   'v104':['Employers now see candidates matched to their roles — ranked by fit, applicants first, contact shared only for candidates who opted in. Matching runs nightly on opted-in candidates only, never sold.'],
   'v103':['Ghost reports now count across all hunters (community reports), and every automated email carries a one-click unsubscribe. Behind the scenes: a dead email function was fixed.'],
