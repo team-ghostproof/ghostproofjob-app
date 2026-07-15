@@ -93,7 +93,10 @@ service cloud.firestore {
             && request.resource.data.ownerUid == resource.data.ownerUid
             && request.resource.data.source == resource.data.source
             && request.resource.data.get('isValidated', false) == resource.data.get('isValidated', false)
-            && request.resource.data.get('active', false) == resource.data.get('active', false)   /* R2-B: no self-activate */
+            // R2-B: no self-ACTIVATE. R9-D: an owner MAY close their own live role
+            // (active true->false) but never activate one (false->true).
+            && (request.resource.data.get('active', false) == resource.data.get('active', false)
+                || (resource.data.get('active', false) == true && request.resource.data.get('active', false) == false))
             && request.resource.data.get('companyId', '') == resource.data.get('companyId', ''));
       allow delete: if isAdmin()
         || (isRecruiter()

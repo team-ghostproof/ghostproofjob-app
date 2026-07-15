@@ -2085,7 +2085,10 @@ test.describe('[STATE-COVERAGE] R2-C internal apply + dashboard, R2-D opt-in', (
       const htmlExternal = buildBrowseExpanded({ t: 'Ext Role', co: 'Beta', loc: 'Austin, TX', url: 'https://x.example/a', desc: 'd', summary: 'd', sal: '', ghost: 10, match: 0, posting_age_days: 1 }, 0);
       return { applied, internalHasApply: /Apply to this role/.test(html), externalHasPosting: /View Full Posting/.test(htmlExternal) };
     });
-    expect(r.applied).toEqual({ id: 'JOB99', meta: { title: 'Ops Lead', company: 'Acme' } });
+    expect(r.applied.id).toBe('JOB99');
+    expect(r.applied.meta.title).toBe('Ops Lead');
+    expect(r.applied.meta.company).toBe('Acme');
+    expect(r.applied.meta).toHaveProperty('resume');   // v110 R9-C: résumé snapshot rides along (consent-to-share)
     expect(r.internalHasApply, 'internal job card -> in-app Apply').toBe(true);
     expect(r.externalHasPosting, 'external job card unchanged -> View Full Posting').toBe(true);
   });
@@ -2509,6 +2512,84 @@ test.describe('[STATE-COVERAGE] v109 R9-A employer nav visibility + desktop reac
   });
 });
 
+test.describe('[STATE-COVERAGE] v110 R9 recruiter tab reskin', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+  });
+
+  const mockRec = async (page) => page.evaluate(async () => {
+    window.fb = window.fb || {};
+    fb.current = () => ({ uid: 'r1', email: 'r@acme.com' });
+    fb.loadRecruiterJobs = async () => [{ id: 'j1', title: 'Operations Manager', location: 'Houston, TX', isValidated: true, active: true }, { id: 'j2', title: 'Analyst', is_remote: true, isValidated: false }];
+    fb.countJobApplicants = async () => 2;
+    fb.loadRecommendedCandidates = async () => [{ uid: 'c1', score: 88, matched: ['ops'], market: 'Houston, TX', applied: true }];
+    fb.loadJobApplicants = async () => [{ uid: 'a1', match: 91, resume: { name: 'Jane Doe', title: 'Ops Lead', summary: 'Ten years in ops.', skills: 'Ops · Excel', roles: [{ t: 'Ops Lead', c: 'Acme', b: 'Ran ops.' }], contact: 'jane@x.com' }, coverLetter: 'I would love this role.' }];
+    fb.countGhostReports = async () => 1;
+    window._recruiter = { uid: 'r1', company: 'Acme Talent', isValidated: true, plan: 'free', website: 'acme.com' };
+    _gpjApplyRecruiterSkin();
+    await new Promise((r) => setTimeout(r, 120));
+  });
+
+  test('every tab reskins to real recruiter content; nav relabels', async ({ page }) => {
+    await mockRec(page);
+    const r = await page.evaluate(async () => {
+      const render = async (view, id) => { _gpjRenderRecPanel(view); await new Promise((r) => setTimeout(r, 120)); return document.getElementById(id).textContent; };
+      return {
+        recModeAll: ['swipe', 'browse', 'resume', 'ghost', 'profile', 'account'].every((v) => document.getElementById('view-' + v).classList.contains('rec-mode')),
+        labels: [...document.querySelectorAll('#footer-nav .nav-tab .nav-label')].map((l) => l.textContent),
+        company: (await render('profile', 'rec-profile')).includes('Company Profile'),
+        listings: (await render('resume', 'rec-resume')).includes('Operations Manager'),
+        settings: (await render('account', 'rec-account')).includes('$149'),
+        candidates: (await render('swipe', 'rec-swipe')).includes('88%'),
+        applicants: (await render('browse', 'rec-browse')).includes('Applicants'),
+        reviews: (await render('ghost', 'rec-ghost')).includes('Ghost-risk'),
+      };
+    });
+    expect(r.recModeAll, 'all 6 views enter recruiter mode').toBe(true);
+    expect(r.labels).toEqual(['Candidates', 'Applicants', 'Listings', 'Reviews', 'Company']);
+    expect(r.company).toBe(true);
+    expect(r.listings, 'listings shows the recruiter’s real posted role').toBe(true);
+    expect(r.settings, 'settings shows the recruiter plan pricing').toBe(true);
+    expect(r.candidates, 'candidate matches show a real match %').toBe(true);
+    expect(r.applicants).toBe(true);
+    expect(r.reviews).toBe(true);
+  });
+
+  test('Candidate Card shows the applicant resume + cover letter', async ({ page }) => {
+    await mockRec(page);
+    const r = await page.evaluate(() => {
+      window._recApps = { j1: [{ uid: 'a1', match: 91, resume: { name: 'Jane Doe', title: 'Ops Lead', summary: 'Ten years in ops.', skills: 'Ops · Excel', roles: [{ t: 'Ops Lead', c: 'Acme', b: 'Ran ops.' }], contact: 'jane@x.com' }, coverLetter: 'I would love this role.' }] };
+      openCandidateCard('j1', 0);
+      const cc = document.getElementById('candcard-scrim');
+      return { opens: !!cc, hasResume: cc ? cc.textContent.includes('Jane Doe') && cc.textContent.includes('Ten years in ops') : false, hasCover: cc ? cc.textContent.includes('I would love this role') : false };
+    });
+    expect(r.opens).toBe(true);
+    expect(r.hasResume).toBe(true);
+    expect(r.hasCover, 'the cover letter (snapshotted at apply) is shown').toBe(true);
+  });
+
+  test('NO candidate regression: skin off restores candidate content + labels + hides rec panels', async ({ page }) => {
+    await mockRec(page);
+    const r = await page.evaluate(async () => {
+      window._recruiter = null; fb.current = () => ({ uid: 'c1' });
+      _gpjApplyRecruiterSkin();
+      await new Promise((r) => setTimeout(r, 100));
+      const swipeKids = [...document.getElementById('view-swipe').children].filter((c) => !c.classList.contains('rec-panel'));
+      return {
+        cleared: ['swipe', 'browse', 'resume', 'ghost', 'profile', 'account'].every((v) => !document.getElementById('view-' + v).classList.contains('rec-mode')),
+        labels: [...document.querySelectorAll('#footer-nav .nav-tab .nav-label')].map((l) => l.textContent),
+        candidateVisible: swipeKids.some((c) => getComputedStyle(c).display !== 'none'),
+        recPanelHidden: getComputedStyle(document.getElementById('rec-swipe')).display === 'none',
+      };
+    });
+    expect(r.cleared, 'recruiter mode fully clears').toBe(true);
+    expect(r.labels).toEqual(['Swipe', 'Browse', 'Resume', 'Ghosts', 'Employers']);
+    expect(r.candidateVisible, 'candidate content shows again').toBe(true);
+    expect(r.recPanelHidden).toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] v108 recruiter auto-route + Stripe plan buttons', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
@@ -2531,7 +2612,7 @@ test.describe('[STATE-COVERAGE] v108 recruiter auto-route + Stripe plan buttons'
       window.switchView = origSwitch;
       return { switched, recruiterSet: !!(window._recruiter && window._recruiter.company === 'Acme'), roleFlag: localStorage.getItem('gpj_role') };
     });
-    expect(r.switched, 'sign-in takes a recruiter to the employer view (was render-only)').toBe('employer');
+    expect(r.switched, 'sign-in takes a recruiter to their recruiter home (v110: the reskinned Candidates/Swipe tab)').toBe('swipe');
     expect(r.recruiterSet, 'the recruiter doc is loaded and applied').toBe(true);
     expect(r.roleFlag, 'the local role flag is set for subsequent loads').toBe('recruiter');
   });

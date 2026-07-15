@@ -36,6 +36,8 @@ async function seedBaseline() {
     await setDoc(doc(db, 'jobs/jobB'), { title: 'Sales', ownerUid: 'recruiterB', source: 'internal', isValidated: true });
     // v101b Sprint 3: a DRAFT internal job (unvalidated) to test the self-verify lock
     await setDoc(doc(db, 'jobs/jobC'), { title: 'Draft', ownerUid: 'recruiterA', source: 'internal', isValidated: false, companyId: 'acme.com' });
+    // R9-D: a LIVE internal job (active:true) owned by recruiterA, to test close/deactivate
+    await setDoc(doc(db, 'jobs/jobLive'), { title: 'Live Role', ownerUid: 'recruiterA', source: 'internal', isValidated: true, active: true, companyId: 'acme.com' });
     // v101b Sprint 3: an existing anonymous hired doc for read tests
     await setDoc(doc(db, 'hired/h1'), { roleKey: 'ops', titleRaw: 'Ops', skills: ['ops'], region: 'TX', ts: 1 });
     await setDoc(doc(db, 'jobs/harvested1'), { title: 'Nurse', source: 'jobspy' });
@@ -198,6 +200,12 @@ describe('R2-B — internal jobs are created HIDDEN, verified only by admin', ()
   });
   test('recruiter CANNOT self-activate their draft job (active false->true)', async () => {
     // jobC seeded { ownerUid: recruiterA, source: internal, isValidated: false } (no active -> defaults false)
+    await assertFails(setDoc(doc(asRecruiterA(), 'jobs/jobC'), { title: 'Draft', ownerUid: 'recruiterA', source: 'internal', isValidated: false, companyId: 'acme.com', active: true }));
+  });
+  test('R9-D: owner CAN close a live role (active true->false) but NOT self-activate (false->true)', async () => {
+    // close a live role
+    await assertSucceeds(setDoc(doc(asRecruiterA(), 'jobs/jobLive'), { title: 'Live Role', ownerUid: 'recruiterA', source: 'internal', isValidated: true, active: false, filled: true, companyId: 'acme.com' }));
+    // cannot flip a draft live (self-activate)
     await assertFails(setDoc(doc(asRecruiterA(), 'jobs/jobC'), { title: 'Draft', ownerUid: 'recruiterA', source: 'internal', isValidated: false, companyId: 'acme.com', active: true }));
   });
   test('ADMIN CAN approve a job -> active:true + isValidated:true', async () => {
