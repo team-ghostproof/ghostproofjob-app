@@ -2462,6 +2462,53 @@ test.describe('[STATE-COVERAGE] F-GEO distance filter (offline centroids + haver
   });
 });
 
+test.describe('[STATE-COVERAGE] v109 R9-A employer nav visibility + desktop reachability', () => {
+  test('"For Employers" hides for a signed-in individual, shows for guest/recruiter', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    const r = await page.evaluate(() => {
+      window.fb = window.fb || {};
+      const disp = () => getComputedStyle(document.getElementById('footer-employer-link')).display;
+      // guest
+      fb.current = () => null; window._recruiter = null; window.isAdmin = false;
+      _gpjSyncEmployerNav(); const guest = disp();
+      // signed-in individual
+      fb.current = () => ({ uid: 'c1' });
+      _gpjSyncEmployerNav(); const individual = disp();
+      // recruiter
+      window._recruiter = { uid: 'r1', company: 'Acme' };
+      _gpjSyncEmployerNav(); const recruiter = disp();
+      return { guest, individual, recruiter };
+    });
+    expect(r.guest, 'guests see the employer marketing entry').not.toBe('none');
+    expect(r.individual, 'a signed-in individual is not an employer -> hidden').toBe('none');
+    expect(r.recruiter, 'a recruiter keeps their dashboard entry').not.toBe('none');
+  });
+
+  test('desktop: the employer view lives in the workspace and renders (was invisible)', async ({ page }) => {
+    await page.setViewportSize({ width: 1300, height: 850 });
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1800);
+    const r = await page.evaluate(async () => {
+      const ve = document.getElementById('view-employer');
+      const inMain = !!(ve && ve.closest('#desk-main'));
+      window._recruiter = { uid: 'r1', company: 'Acme Talent', isValidated: true, plan: 'free' };
+      window.fb = window.fb || {};
+      fb.current = () => ({ uid: 'r1' });
+      fb.loadRecruiterJobs = async () => []; fb.countMyReachouts = async () => 0; fb.loadSentReachouts = async () => [];
+      switchView('employer');
+      await new Promise((r) => setTimeout(r, 250));
+      const rect = ve.getBoundingClientRect();
+      return { isDesk: document.body.classList.contains('desk'), inMain, shown: getComputedStyle(ve).display, sized: rect.width > 200 && rect.height > 100, company: (document.getElementById('emp-company') || {}).value };
+    });
+    expect(r.isDesk, 'desktop grid active at 1300px').toBe(true);
+    expect(r.inMain, 'employer view is inside the desktop workspace panel').toBe(true);
+    expect(r.shown).toBe('block');
+    expect(r.sized, 'employer view actually occupies the workspace (not clipped to 0)').toBe(true);
+    expect(r.company).toBe('Acme Talent');
+  });
+});
+
 test.describe('[STATE-COVERAGE] v108 recruiter auto-route + Stripe plan buttons', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
