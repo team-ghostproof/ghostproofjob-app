@@ -2462,6 +2462,75 @@ test.describe('[STATE-COVERAGE] F-GEO distance filter (offline centroids + haver
   });
 });
 
+test.describe('[STATE-COVERAGE] v108 recruiter auto-route + Stripe plan buttons', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+  });
+
+  test('a recruiter is auto-routed to the employer view on sign-in via the cloud role marker', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      localStorage.removeItem('gpj_role');
+      window._recruiter = null;
+      let switched = '';
+      const origSwitch = window.switchView;
+      window.switchView = function (v) { switched = v; try { return origSwitch.apply(window, arguments); } catch (e) {} };
+      window.fb = window.fb || {};
+      fb.loadProfile = async () => ({ role: 'recruiter' });   // cloud marker
+      fb.loadRecruiter = async () => ({ company: 'Acme', isValidated: true, plan: 'free' });
+      fb.saveProfile = async () => true;
+      _gpjRecruiterAuthApply({ uid: 'rec1' });
+      await new Promise((r) => setTimeout(r, 250));
+      window.switchView = origSwitch;
+      return { switched, recruiterSet: !!(window._recruiter && window._recruiter.company === 'Acme'), roleFlag: localStorage.getItem('gpj_role') };
+    });
+    expect(r.switched, 'sign-in takes a recruiter to the employer view (was render-only)').toBe('employer');
+    expect(r.recruiterSet, 'the recruiter doc is loaded and applied').toBe(true);
+    expect(r.roleFlag, 'the local role flag is set for subsequent loads').toBe('recruiter');
+  });
+
+  test('candidate-first preserved: no role marker -> no recruiter doc read', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      localStorage.removeItem('gpj_role');
+      window._recruiter = null;
+      let recReads = 0;
+      window.fb = window.fb || {};
+      fb.loadProfile = async () => ({});               // a pure candidate: no role
+      fb.loadRecruiter = async () => { recReads++; return null; };
+      _gpjRecruiterAuthApply({ uid: 'cand1' });
+      await new Promise((r) => setTimeout(r, 200));
+      return { recReads, recruiter: window._recruiter };
+    });
+    expect(r.recReads, 'a candidate must never trigger a recruiter doc read').toBe(0);
+    expect(r.recruiter).toBeNull();
+  });
+
+  test('Stripe plan buttons exist and link to the correct recruiter checkout URLs', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      let opened = '';
+      const origOpen = window.open;
+      window.open = (u) => { opened = u; return null; };
+      openRecruiterCheckout('pro'); const proUrl = opened;
+      openRecruiterCheckout('premium'); const premiumUrl = opened;
+      window.open = origOpen;
+      const view = document.getElementById('view-employer').innerHTML;
+      return {
+        proUrl, premiumUrl,
+        proConst: CHECKOUT_REC_PRO_URL, premiumConst: CHECKOUT_REC_PREMIUM_URL,
+        hasProBtn: /openRecruiterCheckout\('pro'\)/.test(view),
+        hasPremiumBtn: /openRecruiterCheckout\('premium'\)/.test(view),
+        showsPrices: /\$149/.test(view) && /\$79/.test(view),
+      };
+    });
+    expect(r.proUrl).toBe('https://buy.stripe.com/cNi9AU5rL4ngcUy0qpak004');
+    expect(r.premiumUrl).toBe('https://buy.stripe.com/aFafZi3jD1b4g6K8WVak003');
+    expect(r.proConst).toBe(r.proUrl);
+    expect(r.premiumConst).toBe(r.premiumUrl);
+    expect(r.hasProBtn && r.hasPremiumBtn, 'both plan buttons are in the employer view').toBe(true);
+    expect(r.showsPrices, 'both prices are shown').toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] Referral engine (invite -> Booster)', () => {
   test('captures ?ref, builds the link, blocks self-referral, records a real one', async ({ page }) => {
     await page.goto('/index.html?ref=abc123uid', { waitUntil: 'domcontentloaded' });

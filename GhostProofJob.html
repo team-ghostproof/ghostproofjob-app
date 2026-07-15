@@ -2320,6 +2320,30 @@
         <div style="font-size:11px;font-weight:800;color:var(--cyber);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px;">Your roles</div>
         <div id="emp-jobs-list" style="margin-bottom:8px;"><div style="font-size:12px;color:var(--muted);">No roles yet — post your first above.</div></div>
         <div style="margin-top:8px;font-size:11px;color:var(--muted);line-height:1.6;">Candidate matching to your roles arrives with reverse-match — for now, verified roles appear in the candidate job board and applicants show under each role.</div>
+        <!-- R8 billing (v108): plan card + Stripe upgrade buttons -->
+        <div style="border-top:1px solid var(--plum3);margin:20px 0 0;padding-top:16px;"></div>
+        <div style="font-size:11px;font-weight:800;color:var(--cyber);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Plan</div>
+        <div id="emp-plan-status" style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">You’re on the <strong style="color:var(--off);">Free</strong> plan — post up to <strong>5 live roles</strong>, matched candidates, outreach + anti-ghosting, all included. Upgrade for more roles and priority placement.</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="background:var(--plum2);border:1px solid var(--plum3);border-radius:13px;padding:14px;">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;">
+              <div style="font-size:15px;font-weight:800;color:var(--off);">Recruiter Premium</div>
+              <div style="font-size:15px;font-weight:800;color:var(--mint);">$79<span style="font-size:11px;color:var(--muted);font-weight:600;">/mo</span></div>
+            </div>
+            <div style="font-size:11.5px;color:var(--muted);line-height:1.6;margin:5px 0 10px;">More live roles + candidate matching. For steady hiring.</div>
+            <div onclick="openRecruiterCheckout('premium')" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:11px;text-align:center;font-size:13px;cursor:pointer;">Choose Premium →</div>
+          </div>
+          <div style="background:var(--plum2);border:1px solid rgba(181,95,230,.45);border-radius:13px;padding:14px;position:relative;">
+            <div style="position:absolute;top:-9px;right:12px;background:var(--cyber);color:#fff;font-size:9px;font-weight:800;letter-spacing:.4px;padding:3px 8px;border-radius:7px;">MOST HIRING POWER</div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;">
+              <div style="font-size:15px;font-weight:800;color:var(--off);">Recruiter Pro</div>
+              <div style="font-size:15px;font-weight:800;color:var(--cyber);">$149<span style="font-size:11px;color:var(--muted);font-weight:600;">/mo</span></div>
+            </div>
+            <div style="font-size:11.5px;color:var(--muted);line-height:1.6;margin:5px 0 10px;">Highest role limit + priority placement + full reverse-match reach.</div>
+            <div onclick="openRecruiterCheckout('pro')" style="background:linear-gradient(135deg,var(--cyber),#7E3FF2);color:#fff;font-weight:800;border-radius:10px;padding:11px;text-align:center;font-size:13px;cursor:pointer;">Choose Pro →</div>
+          </div>
+        </div>
+        <div style="margin-top:9px;font-size:10px;color:var(--muted);line-height:1.6;text-align:center;">Secure checkout via Stripe · cancel anytime. Candidate contact stays consent-gated on every plan — never sold, never purchasable.</div>
         <div id="emp-signout-btn" onclick="recruiterSignOut()" style="margin-top:16px;color:var(--muted);font-size:12px;text-align:center;cursor:pointer;text-decoration:underline;">Sign out of employer account</div>
       </div>
     </div>
@@ -2553,7 +2577,7 @@
       <!-- RECRUITER TIER (R1): employer entry -->
       <div style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v107</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v108</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2582,10 +2606,18 @@
 const CHECKOUT_MONTHLY_URL  = 'https://buy.stripe.com/7sY7sMg6p8Dw2fUfljak002';  /* $0.99/mo Maintenance Plan */
 const CHECKOUT_LIFETIME_URL = 'https://buy.stripe.com/6oUeVe1bv2f81bQ6ONak001';  /* $12.00 Lifetime Pass */
 const TIPJAR_URL            = 'https://donate.stripe.com/00w4gA07r6vo3jY3CBak000'; /* Donation Tip Jar */
+/* R8 recruiter billing (v108) — founder's Stripe payment links. Buttons open
+   Stripe's hosted checkout in a new tab; card data is entered on Stripe, never here. */
+const CHECKOUT_REC_PRO_URL     = 'https://buy.stripe.com/cNi9AU5rL4ngcUy0qpak004';  /* Recruiter Pro $149/mo */
+const CHECKOUT_REC_PREMIUM_URL = 'https://buy.stripe.com/aFafZi3jD1b4g6K8WVak003';  /* Recruiter Premium $79/mo */
 
 function openCheckout(plan){
   const url = plan==='month' ? CHECKOUT_MONTHLY_URL : CHECKOUT_LIFETIME_URL;
   window.open(url,'_blank','noopener');  /* _blank protects in-progress form data */
+}
+function openRecruiterCheckout(tier){
+  const url = tier==='pro' ? CHECKOUT_REC_PRO_URL : CHECKOUT_REC_PREMIUM_URL;
+  window.open(url,'_blank','noopener');
 }
 function openTipJar(){
   window.open(TIPJAR_URL,'_blank','noopener');
@@ -2766,7 +2798,7 @@ async function openEmployer(el){
   const u=(window.fb&&fb.current&&fb.current())||null;
   if(u && fb.loadRecruiter){
     const rec=await fb.loadRecruiter(u.uid);
-    if(rec){ window._recruiter=Object.assign({uid:u.uid},rec); try{localStorage.setItem('gpj_role','recruiter');}catch(e){} switchView('employer', el||document.getElementById('nav-employer')); renderEmployerView(); return; }
+    if(rec){ window._recruiter=Object.assign({uid:u.uid},rec); try{localStorage.setItem('gpj_role','recruiter');}catch(e){} try{ fb.saveProfile(u.uid,{role:'recruiter'}); }catch(e){}   /* v108: backfill the cloud role marker for accounts created before v108 → future sign-ins auto-route */ switchView('employer', el||document.getElementById('nav-employer')); renderEmployerView(); return; }
   }
   openRecruiterAuth();
 }
@@ -2813,6 +2845,7 @@ async function recruiterSignup(){
     await fb.saveCompany(companyId,{name:company,website,domain,verifiedEmployer:false,createdAt:Date.now()});
     window._recruiter=Object.assign({uid,companyId},rec);
     try{localStorage.setItem('gpj_role','recruiter');}catch(e){}
+    try{ fb.saveProfile(uid,{role:'recruiter'}); }catch(e){}   /* v108: cloud role marker → sign-in auto-routes to the employer view on ANY device */
     document.getElementById('recruiter-auth-modal').classList.remove('open');
     switchView('employer',document.getElementById('nav-employer')); renderEmployerView();
     showToast('💼 Employer account created — pending verification');
@@ -2831,6 +2864,7 @@ async function recruiterLogin(){
     if(!rec){ showToast('That account isn’t an employer account. Use Sign up.'); btn.textContent='Log in'; btn.style.pointerEvents='auto'; return; }
     window._recruiter=Object.assign({uid:cred.user.uid},rec);
     try{localStorage.setItem('gpj_role','recruiter');}catch(e){}
+    try{ fb.saveProfile(cred.user.uid,{role:'recruiter'}); }catch(e){}   /* v108: cloud role marker */
     document.getElementById('recruiter-auth-modal').classList.remove('open');
     switchView('employer',document.getElementById('nav-employer')); renderEmployerView();
     showToast('💼 Welcome back');
@@ -2913,7 +2947,7 @@ async function postRecruiterJob(){
      the product is free, so this only paces posting, it never charges. */
   const _plan=(window._recruiter&&window._recruiter.plan)||'free';
   const FREE_JOB_LIMIT=5;
-  if(_plan==='free' && (window._myJobCount||0)>=FREE_JOB_LIMIT){ showToast('Free tier posts up to '+FREE_JOB_LIMIT+' roles. More roles + priority placement are coming with paid plans — reach out to keep posting.'); return; }
+  if(_plan==='free' && (window._myJobCount||0)>=FREE_JOB_LIMIT){ showToast('Free tier posts up to '+FREE_JOB_LIMIT+' live roles. Upgrade under Plan (below) for more roles + priority placement.'); try{ const pc=document.getElementById('emp-plan-status'); if(pc) pc.scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){} return; }
   const r=window._recruiter;
   const smin=parseInt(v('job-sal-min'),10)||0, smax=parseInt(v('job-sal-max'),10)||0;
   const job={ title:title, location:remote?'Remote':loc, is_remote:remote, description:desc, requirements:v('job-req'),
@@ -3060,10 +3094,28 @@ function recruiterSignOut(){
    main candidate handler) clobbers. `_gpjRecruiterAuthApply` holds the logic. */
 function _gpjRecruiterAuthApply(u){
   try{
+    if(!u){ window._recruiter=null; return; }
     let role=''; try{ role=localStorage.getItem('gpj_role')||''; }catch(e){}
-    if(u && role==='recruiter' && window.fb && fb.loadRecruiter){
-      fb.loadRecruiter(u.uid).then(rec=>{ if(rec){ window._recruiter=Object.assign({uid:u.uid},rec); try{ renderEmployerView(); }catch(e){} } else { window._recruiter=null; try{ localStorage.removeItem('gpj_role'); }catch(e){} } });   /* v101a #1c: a CANDIDATE signing in after a recruiter used this device must not inherit the recruiter role */
-    } else if(!u){ window._recruiter=null; }
+    /* v108: a detected recruiter is TAKEN to their dashboard on sign-in (was
+       render-only → they landed on the candidate view and looked like an applicant). */
+    const _apply=(rec)=>{
+      if(rec){
+        window._recruiter=Object.assign({uid:u.uid},rec);
+        try{ localStorage.setItem('gpj_role','recruiter'); }catch(e){}
+        try{ switchView('employer', document.getElementById('nav-employer')); }catch(e){}
+        try{ renderEmployerView(); }catch(e){}
+      } else { window._recruiter=null; try{ localStorage.removeItem('gpj_role'); }catch(e){} }
+    };
+    if(role==='recruiter' && window.fb && fb.loadRecruiter){
+      fb.loadRecruiter(u.uid).then(_apply);   /* v101a #1c: a stale-flag device with no recruiter doc falls back to candidate */
+    } else if(window.fb && fb.loadProfile && fb.loadRecruiter){
+      /* v108: not flagged on THIS device — the CLOUD profile role marker tells us
+         they're a recruiter WITHOUT a recruiters read for candidates. `profiles`
+         is not the recruiter collection, so the candidate-first invariant (zero
+         recruiter-doc reads for candidates) is preserved: loadRecruiter fires only
+         when the profile marker says recruiter. */
+      fb.loadProfile(u.uid).then(p=>{ if(p && p.role==='recruiter'){ fb.loadRecruiter(u.uid).then(_apply); } });
+    }
   }catch(e){}
 }
 
@@ -10212,7 +10264,7 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v107';
+const APP_VERSION = 'v108';
 const CHANGELOG = {
   'v104':['Employers now see candidates matched to their roles — ranked by fit, applicants first, contact shared only for candidates who opted in. Matching runs nightly on opted-in candidates only, never sold.'],
   'v103':['Ghost reports now count across all hunters (community reports), and every automated email carries a one-click unsubscribe. Behind the scenes: a dead email function was fixed.'],
