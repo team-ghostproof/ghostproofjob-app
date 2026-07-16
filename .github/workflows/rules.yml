@@ -21,6 +21,8 @@ on:
       - 'ghost-report-generator/**'
       - 'seo-generator/**'
       - 'tests/seo/**'
+      - 'tests/billing/**'
+      - 'api/stripe-webhook.js'
       - '.github/workflows/rules.yml'
   pull_request:
   workflow_dispatch:
@@ -55,6 +57,9 @@ jobs:
 
       - name: SEO page tests (honesty rules + zero runtime reads)
         run: npm run test:seo
+
+      - name: Billing tests (Stripe entitlement grant/revoke)
+        run: npm run test:billing
 
       - name: Rules isolation tests (Firestore emulator)
         run: npm run test:rules

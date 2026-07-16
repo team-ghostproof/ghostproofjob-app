@@ -401,6 +401,29 @@ describe('R5 — outreach is consent-gated + anti-ghost audited', () => {
   });
 });
 
+describe('v113 SECURITY — a user cannot buy themselves a tier for free', () => {
+  // profiles allowed the owner to write ANY field, and isPaid() reads profiles.tier —
+  // so a user could simply write tier:'life' and unlock the paywall. Entitlement +
+  // money fields are now backend-only (Stripe webhook uses the admin SDK).
+  test('a user CANNOT self-grant a paid tier on create or update', async () => {
+    await assertFails(setDoc(doc(asCandD(), 'profiles/candD'), { name: 'D', tier: 'life' }));
+    await assertFails(setDoc(doc(asCandC(), 'profiles/candC'), { tier: 'life' }, { merge: true }));
+    await assertFails(setDoc(doc(asCandC(), 'profiles/candC'), { tier: 'month' }, { merge: true }));
+  });
+  test('a user CANNOT self-extend paidUntil or self-grant booster days', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'profiles/candC'), { paidUntil: Date.now() + 9e9 }, { merge: true }));
+    await assertFails(setDoc(doc(asCandC(), 'profiles/candC'), { bonusDays: 999 }, { merge: true }));
+    await assertFails(setDoc(doc(asCandC(), 'profiles/candC'), { stripeCustomerId: 'cus_hack' }, { merge: true }));
+  });
+  test('normal profile edits still work (name, prefs, discoverable, booster REQUEST)', async () => {
+    await assertSucceeds(setDoc(doc(asCandC(), 'profiles/candC'), { name: 'Cand C', discoverable: true, pending_boost: true }, { merge: true }));
+  });
+  test('an ADMIN can still grant a tier (the manual path), and the user can still delete their profile', async () => {
+    await assertSucceeds(setDoc(doc(asAdmin(), 'profiles/candC'), { tier: 'life' }, { merge: true }));
+    await assertSucceeds(deleteDoc(doc(asCandD(), 'profiles/candD')));
+  });
+});
+
 describe('v112 SECURITY — recruiter create cannot self-escalate', () => {
   // Pre-v112 `allow create` had NO field restrictions, so a crafted create could
   // self-set isValidated:true and gain verified-recruiter powers (candidate data!).

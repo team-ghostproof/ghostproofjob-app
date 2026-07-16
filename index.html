@@ -2620,7 +2620,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v113</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v114</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2654,13 +2654,28 @@ const TIPJAR_URL            = 'https://donate.stripe.com/00w4gA07r6vo3jY3CBak000
 const CHECKOUT_REC_PRO_URL     = 'https://buy.stripe.com/cNi9AU5rL4ngcUy0qpak004';  /* Recruiter Pro $149/mo */
 const CHECKOUT_REC_PREMIUM_URL = 'https://buy.stripe.com/aFafZi3jD1b4g6K8WVak003';  /* Recruiter Premium $79/mo */
 
+/* v113: tag every checkout with WHO is paying and WHAT they bought, so the Stripe
+   webhook can grant the right entitlement to the right account without guessing from
+   an email. Stripe payment links accept ?client_reference_id=<string>. */
+function _gpjCheckoutRef(key){
+  let uid=''; try{ uid=(window.fb&&fb.current&&fb.current()&&fb.current().uid)||''; }catch(e){}
+  return uid?(encodeURIComponent(uid+':'+key)):'';
+}
+function _gpjCheckoutUrl(base,key){
+  const ref=_gpjCheckoutRef(key);
+  if(!ref) return base;                       /* signed out: still let them pay; admin can grant */
+  return base+(base.indexOf('?')>=0?'&':'?')+'client_reference_id='+ref;
+}
 function openCheckout(plan){
-  const url = plan==='month' ? CHECKOUT_MONTHLY_URL : CHECKOUT_LIFETIME_URL;
-  window.open(url,'_blank','noopener');  /* _blank protects in-progress form data */
+  const key = plan==='month' ? 'month' : 'life';
+  const base = plan==='month' ? CHECKOUT_MONTHLY_URL : CHECKOUT_LIFETIME_URL;
+  if(!_gpjCheckoutRef(key)){ showToast('Sign in first so we can unlock your account the moment you pay.'); try{ openAuth(); }catch(e){} return; }
+  window.open(_gpjCheckoutUrl(base,key),'_blank','noopener');  /* _blank protects in-progress form data */
 }
 function openRecruiterCheckout(tier){
-  const url = tier==='pro' ? CHECKOUT_REC_PRO_URL : CHECKOUT_REC_PREMIUM_URL;
-  window.open(url,'_blank','noopener');
+  const key = tier==='pro' ? 'pro' : 'premium';
+  const base = tier==='pro' ? CHECKOUT_REC_PRO_URL : CHECKOUT_REC_PREMIUM_URL;
+  window.open(_gpjCheckoutUrl(base,key),'_blank','noopener');
 }
 function openTipJar(){
   window.open(TIPJAR_URL,'_blank','noopener');
@@ -3227,7 +3242,12 @@ function _gpjApplyRecruiterSkin(){
    tip jar, and none of the candidate-only menu items (Viewed Jobs / Request Booster
    / I Got Hired all mean nothing to an employer). */
 function _recPlanLabel(){
-  const p=String((window._recruiter&&window._recruiter.plan)||'free').toLowerCase();
+  const r=window._recruiter||{};
+  /* v113: same expiry guard as the candidate side — a cancelled/lapsed employer plan
+     reads as Free (the webhook downgrades on cancel/failed payment; this is the
+     backstop if we ever miss the event). planUntil is null on an active grant. */
+  if(r.planUntil && Date.now()>r.planUntil) return 'Free';
+  const p=String(r.plan||'free').toLowerCase();
   return p==='pro'?'Pro':(p==='premium'?'Premium':'Free');
 }
 function _gpjApplyRecruiterChrome(on){
@@ -3464,7 +3484,8 @@ async function postRecJob(){
   if(!title){ showToast('Add a job title'); return; }
   if(!loc&&!remote){ showToast('Add a location or mark it remote'); return; }
   if(desc.length<20){ showToast('Add a short description (20+ characters)'); return; }
-  if(((window._recruiter.plan)||'free')==='free' && (window._myJobCount||0)>=5){ showToast('Free tier posts up to 5 live roles — upgrade under Settings for more.'); return; }
+  /* v113: via _recPlanLabel so a LAPSED plan is treated as Free (auto-downgrade) */
+  if(_recPlanLabel()==='Free' && (window._myJobCount||0)>=5){ showToast('Free tier posts up to 5 live roles — upgrade under Settings for more.'); return; }
   const r=window._recruiter;
   const job={title:title,location:remote?'Remote':loc,is_remote:remote,description:desc,requirements:v('rl-req'),salary_min:parseInt(v('rl-smin'),10)||null,salary_max:parseInt(v('rl-smax'),10)||null,companyId:r.companyId||'',company:r.company||''};
   const ok=await fb.createRecruiterJob(job);
@@ -3484,7 +3505,7 @@ function renderRecSettings(){
   box.innerHTML='<div style="font-size:20px;font-weight:800;margin-bottom:2px;">⚙️ Employer Settings</div>'
     +'<div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Your plan and account. GhostProofJob never sells candidate contact — on any plan.</div>'
     +'<div class="rec-sec-title">Plan</div>'
-    +'<div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">You’re on the <strong style="color:var(--off);">'+(((window._recruiter&&window._recruiter.plan)||'free')==='free'?'Free':_esc(window._recruiter.plan))+'</strong> plan — up to <strong>5 live roles</strong>, matched candidates, outreach + anti-ghosting included.</div>'
+    +'<div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">You’re on the <strong style="color:var(--off);">'+_recPlanLabel()+'</strong> plan'+(_recPlanLabel()==='Free'?' — up to <strong>5 live roles</strong>, matched candidates, outreach + anti-ghosting included.':' — thank you. Employer plans are what keep GhostProofJob free for hunters.')+'</div>'
     +'<div class="rec-card"><div style="display:flex;justify-content:space-between;align-items:baseline;"><div style="font-size:15px;font-weight:800;">Recruiter Premium</div><div style="font-size:15px;font-weight:800;color:var(--mint);">$79<span style="font-size:11px;color:var(--muted);">/mo</span></div></div><div style="font-size:11.5px;color:var(--muted);margin:5px 0 10px;">More live roles + candidate matching.</div><div onclick="openRecruiterCheckout(\'premium\')" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:11px;text-align:center;font-size:13px;cursor:pointer;">Choose Premium →</div></div>'
     +'<div class="rec-card" style="border-color:rgba(181,95,230,.45);"><div style="display:flex;justify-content:space-between;align-items:baseline;"><div style="font-size:15px;font-weight:800;">Recruiter Pro</div><div style="font-size:15px;font-weight:800;color:var(--cyber);">$149<span style="font-size:11px;color:var(--muted);">/mo</span></div></div><div style="font-size:11.5px;color:var(--muted);margin:5px 0 10px;">Highest role limit + priority placement + full reverse-match reach.</div><div onclick="openRecruiterCheckout(\'pro\')" style="background:linear-gradient(135deg,var(--cyber),#7E3FF2);color:#fff;font-weight:800;border-radius:10px;padding:11px;text-align:center;font-size:13px;cursor:pointer;">Choose Pro →</div></div>'
     +'<div style="font-size:10px;color:var(--muted);text-align:center;margin:8px 0 16px;">Secure checkout via Stripe · cancel anytime.</div>'
@@ -10772,7 +10793,7 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v113';
+const APP_VERSION = 'v114';
 const CHANGELOG = {
   'v104':['Employers now see candidates matched to their roles — ranked by fit, applicants first, contact shared only for candidates who opted in. Matching runs nightly on opted-in candidates only, never sold.'],
   'v103':['Ghost reports now count across all hunters (community reports), and every automated email carries a one-click unsubscribe. Behind the scenes: a dead email function was fixed.'],
@@ -11584,7 +11605,19 @@ function dbg(m){
 if(DEBUG) dbg('🟢 debug mode active — applications stay local, no external API endpoints are hit');
 
 /* ---------- TIER METADATA FRAMEWORK ---------- */
-function userTier(){ try{return localStorage.getItem('gpj_tier')||'free';}catch(e){return 'free';} }
+/* v113: paid access EXPIRES. The Stripe webhook downgrades on cancel/failed-payment,
+   but this is the belt-and-braces: if paidUntil has passed we read as free no matter
+   what the cached tier says, so a lapsed subscription can never linger as paid
+   (e.g. a webhook we never received). A lifetime pass stores no paidUntil. */
+function _gpjPaidUntil(){ try{ const v=parseInt(localStorage.getItem('gpj_paid_until')||'0',10); return v>0?v:0; }catch(e){ return 0; } }
+function _gpjPaidLapsed(){ const u=_gpjPaidUntil(); return u>0 && Date.now()>u; }
+function userTier(){
+  try{
+    const t=localStorage.getItem('gpj_tier')||'free';
+    if(t!=='free' && _gpjPaidLapsed()) return 'free';   /* subscription ran out */
+    return t;
+  }catch(e){ return 'free'; }
+}
 /* v90: admin accounts test with unlimited AI. NOTE the try/catch — isAdmin is a
    `let` declared LATER in the script, and isPaid() runs during BOOT: a bare (or
    even typeof) read throws a TDZ ReferenceError and halts the whole app (the
@@ -13836,6 +13869,13 @@ async function loadTierFromProfile(u){
     if(!u||!(window.fb&&fb.loadProfile)) return;
     const p=await fb.loadProfile(u.uid);
     if(!p) return;
+    /* v113: carry the entitlement WINDOW too — the Stripe webhook writes paidUntil
+       alongside tier, and userTier() reads as free once it passes. Cleared when the
+       backend has no expiry (a lifetime pass) so it can never wrongly expire. */
+    try{
+      if(p.paidUntil) localStorage.setItem('gpj_paid_until',String(p.paidUntil));
+      else localStorage.removeItem('gpj_paid_until');
+    }catch(e){}
     /* TIER */
     if(p.tier){
       localStorage.setItem('gpj_tier',p.tier);

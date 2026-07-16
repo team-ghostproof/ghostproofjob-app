@@ -1,0 +1,138 @@
+// ============================================================================
+// Stripe webhook — entitlement grant/revoke logic.   npm run test:billing
+//
+// This is the money path: before it existed, a customer could pay and keep the
+// paywall, and a cancellation never went back to free. These tests pin BOTH
+// directions for BOTH sides of the marketplace, against a fake Firestore.
+// ============================================================================
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const { handleEvent, KEYS } = require('../../api/stripe-webhook.js');
+
+/** minimal in-memory stand-in for the admin Firestore surface we use */
+function fakeDb(seed = {}) {
+  const data = JSON.parse(JSON.stringify(seed));
+  return {
+    _data: data,
+    collection(c) {
+      data[c] = data[c] || {};
+      return {
+        doc(id) {
+          return {
+            async get() { return { exists: !!data[c][id], data: () => data[c][id] }; },
+            async set(v, opts) {
+              data[c][id] = (opts && opts.merge) ? Object.assign({}, data[c][id] || {}, v) : v;
+            },
+          };
+        },
+      };
+    },
+  };
+}
+
+const session = (ref, over = {}) => ({
+  type: 'checkout.session.completed',
+  data: { object: Object.assign({ client_reference_id: ref, customer: 'cus_1' }, over) },
+});
+
+describe('checkout.session.completed — grants the right thing to the right account', () => {
+  test('candidate LIFETIME: tier=life, no expiry, and it is a profiles write', async () => {
+    const fs = fakeDb();
+    const r = await handleEvent(fs, session('uidA:life'));
+    assert.equal(r.ok, true);
+    assert.equal(fs._data.profiles.uidA.tier, 'life');
+    assert.equal(fs._data.profiles.uidA.paidUntil, null, 'a lifetime pass never expires');
+    assert.equal(fs._data.profiles.uidA.stripeCustomerId, 'cus_1');
+  });
+  test('recruiter PRO: writes plan on the RECRUITER doc, not the profile', async () => {
+    const fs = fakeDb();
+    await handleEvent(fs, session('r1:pro'));
+    assert.equal(fs._data.recruiters.r1.plan, 'pro');
+    assert.ok(!fs._data.profiles || !fs._data.profiles.r1, 'a recruiter plan must not land on profiles');
+  });
+  test('recruiter PREMIUM maps to premium', async () => {
+    const fs = fakeDb();
+    await handleEvent(fs, session('r2:premium'));
+    assert.equal(fs._data.recruiters.r2.plan, 'premium');
+  });
+  test('a uid containing ":" still parses (we split on the LAST colon)', async () => {
+    const fs = fakeDb();
+    await handleEvent(fs, session('weird:uid:life'));
+    assert.equal(fs._data.profiles['weird:uid'].tier, 'life');
+  });
+  test('a customer -> user mapping is stored so later subscription events resolve', async () => {
+    const fs = fakeDb();
+    await handleEvent(fs, session('uidA:month'));
+    assert.deepEqual(
+      { uid: fs._data.stripe_customers.cus_1.uid, kind: fs._data.stripe_customers.cus_1.kind, key: fs._data.stripe_customers.cus_1.key },
+      { uid: 'uidA', kind: 'candidate', key: 'month' }
+    );
+  });
+  test('an unusable/absent client_reference_id grants NOTHING (never guess)', async () => {
+    const fs = fakeDb();
+    assert.equal((await handleEvent(fs, session(''))).ok, false);
+    assert.equal((await handleEvent(fs, session('uidA:bogus'))).ok, false);
+    assert.deepEqual(fs._data.profiles || {}, {});
+  });
+});
+
+describe('cancel / non-payment — auto-downgrade to free (both sides)', () => {
+  const seeded = () => fakeDb({
+    stripe_customers: { cus_1: { uid: 'uidA', kind: 'candidate', key: 'month' }, cus_2: { uid: 'r1', kind: 'recruiter', key: 'pro' } },
+    profiles: { uidA: { tier: 'month', paidUntil: Date.now() + 8.64e7 } },
+    recruiters: { r1: { plan: 'pro', planUntil: Date.now() + 8.64e7 } },
+  });
+  test('subscription.deleted -> candidate back to free', async () => {
+    const fs = seeded();
+    await handleEvent(fs, { type: 'customer.subscription.deleted', data: { object: { customer: 'cus_1' } } });
+    assert.equal(fs._data.profiles.uidA.tier, 'free');
+    assert.equal(fs._data.profiles.uidA.paidUntil, null);
+  });
+  test('subscription.deleted -> recruiter back to free', async () => {
+    const fs = seeded();
+    await handleEvent(fs, { type: 'customer.subscription.deleted', data: { object: { customer: 'cus_2' } } });
+    assert.equal(fs._data.recruiters.r1.plan, 'free');
+  });
+  test('invoice.payment_failed -> back to free', async () => {
+    const fs = seeded();
+    await handleEvent(fs, { type: 'invoice.payment_failed', data: { object: { customer: 'cus_1' } } });
+    assert.equal(fs._data.profiles.uidA.tier, 'free');
+  });
+  test('subscription.updated to canceled/unpaid -> free; still active -> keeps the plan + new period end', async () => {
+    let fs = seeded();
+    await handleEvent(fs, { type: 'customer.subscription.updated', data: { object: { customer: 'cus_2', status: 'canceled' } } });
+    assert.equal(fs._data.recruiters.r1.plan, 'free');
+
+    fs = seeded();
+    const end = Math.floor(Date.now() / 1000) + 2592000;
+    await handleEvent(fs, { type: 'customer.subscription.updated', data: { object: { customer: 'cus_2', status: 'active', current_period_end: end } } });
+    assert.equal(fs._data.recruiters.r1.plan, 'pro', 'an active renewal must not downgrade');
+    assert.equal(fs._data.recruiters.r1.planUntil, end * 1000, 'the entitlement window rolls forward');
+  });
+  test('an event for an UNKNOWN customer changes nothing', async () => {
+    const fs = seeded();
+    const r = await handleEvent(fs, { type: 'customer.subscription.deleted', data: { object: { customer: 'cus_nope' } } });
+    assert.equal(r.ok, false);
+    assert.equal(fs._data.profiles.uidA.tier, 'month', 'untouched');
+  });
+  test('unrelated events are ignored safely', async () => {
+    const fs = seeded();
+    const r = await handleEvent(fs, { type: 'charge.refunded', data: { object: {} } });
+    assert.equal(r.ok, true);
+    assert.equal(r.ignored, 'charge.refunded');
+  });
+});
+
+describe('the key map covers exactly the four things we sell', () => {
+  test('life/month are candidate, premium/pro are recruiter', () => {
+    assert.equal(KEYS.life.kind, 'candidate');
+    assert.equal(KEYS.month.kind, 'candidate');
+    assert.equal(KEYS.premium.kind, 'recruiter');
+    assert.equal(KEYS.pro.kind, 'recruiter');
+    assert.equal(KEYS.life.recurring, false, 'lifetime is one-time');
+    assert.equal(KEYS.month.recurring && KEYS.premium.recurring && KEYS.pro.recurring, true);
+  });
+});

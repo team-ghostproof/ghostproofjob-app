@@ -137,8 +137,24 @@ service cloud.firestore {
     match /profiles/{userId} {
       allow read: if isAdmin()
         || (request.auth != null && request.auth.uid == userId);
-      allow write: if isAdmin()
-        || (request.auth != null && request.auth.uid == userId);
+      // v113 SECURITY: `allow write` let the owner set ANY field — including `tier`,
+      // which is exactly what isPaid() reads. A user could simply write tier:'life'
+      // onto their own profile and unlock the paywall for free. Entitlement + money
+      // fields are now BACKEND-ONLY: the Stripe webhook writes them with the admin
+      // SDK (bypasses rules), or an admin grants them. Everything else on the profile
+      // stays freely user-writable (name, prefs, discoverable, pending_boost, …).
+      allow create: if isAdmin()
+        || (request.auth != null && request.auth.uid == userId
+            && request.resource.data.get('tier', 'free') == 'free'
+            && !request.resource.data.keys().hasAny(['paidUntil', 'bonusDays', 'stripeCustomerId']));
+      allow update: if isAdmin()
+        || (request.auth != null && request.auth.uid == userId
+            && request.resource.data.get('tier', 'free') == resource.data.get('tier', 'free')
+            && request.resource.data.get('paidUntil', 0) == resource.data.get('paidUntil', 0)
+            && request.resource.data.get('bonusDays', 0) == resource.data.get('bonusDays', 0)
+            && request.resource.data.get('stripeCustomerId', '') == resource.data.get('stripeCustomerId', ''));
+      allow delete: if isAdmin()
+        || (request.auth != null && request.auth.uid == userId);   // wipeProfile
     }
 
     // 3. Bug reports / contact (unchanged from live)
