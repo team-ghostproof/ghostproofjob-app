@@ -304,6 +304,16 @@
          are untouched; these run ONLY from the recruiter flow, never the deck. ===== */
       createRecruiter: async (uid,data)=>{ try{ await setDoc(doc(db,'recruiters',uid),data,{merge:true}); return true; }catch(e){ console.warn('[GPJ] createRecruiter',e&&e.message); return false; } },
       loadRecruiter: async (uid)=>{ try{ const s=await getDoc(doc(db,'recruiters',uid)); return s.exists()?s.data():null; }catch(e){ return null; } },
+      /* ===== v112 company team: invites + members. The invite doc is the ONLY grant
+         of a companyId/role/inherited-verification (enforced in rules), and only the
+         invited email address can redeem it. Company admin is company-scoped and is
+         never site admin. ===== */
+      createCompanyInvite: async (data)=>{ try{ const u=auth.currentUser; if(!u) return null; const ref=doc(collection(db,'company_invites')); await setDoc(ref,Object.assign({invitedBy:u.uid,status:'pending',ts:Date.now()},data||{})); return ref.id; }catch(e){ console.warn('[GPJ] createCompanyInvite',e&&e.message); return null; } },
+      loadCompanyInvites: async (companyId)=>{ try{ const s=await getDocs(query(collection(db,'company_invites'), where('companyId','==',companyId), limit(50))); const out=[]; s.forEach(d=>out.push(Object.assign({id:d.id},d.data()))); return out.filter(i=>i.status!=='accepted'); }catch(e){ console.warn('[GPJ] loadCompanyInvites',e&&e.message); return []; } },
+      revokeCompanyInvite: async (id)=>{ try{ await deleteDoc(doc(db,'company_invites',id)); return true; }catch(e){ console.warn('[GPJ] revokeCompanyInvite',e&&e.message); return false; } },
+      loadCompanyMembers: async (companyId)=>{ try{ const s=await getDocs(query(collection(db,'recruiters'), where('companyId','==',companyId), limit(50))); const out=[]; s.forEach(d=>out.push(Object.assign({uid:d.id},d.data()))); return out; }catch(e){ console.warn('[GPJ] loadCompanyMembers',e&&e.message); return []; } },
+      loadInvite: async (id)=>{ try{ const s=await getDoc(doc(db,'company_invites',id)); return s.exists()?Object.assign({id:s.id},s.data()):null; }catch(e){ return null; } },
+      acceptCompanyInvite: async (inv)=>{ try{ await setDoc(doc(db,'company_invites',inv.id),{email:inv.email,companyId:inv.companyId,role:inv.role,status:'accepted',acceptedAt:Date.now()},{merge:true}); return true; }catch(e){ console.warn('[GPJ] acceptCompanyInvite',e&&e.message); return false; } },
       saveCompany: async (companyId,data)=>{ try{ await setDoc(doc(db,'companies',companyId),data,{merge:true}); return true; }catch(e){ console.warn('[GPJ] saveCompany',e&&e.message); return false; } },
       loadCompany: async (companyId)=>{ try{ const s=await getDoc(doc(db,'companies',companyId)); return s.exists()?s.data():null; }catch(e){ return null; } },
       /* admin verification queue: recruiters awaiting review (isValidated==false) */
@@ -2610,7 +2620,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v111</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v112</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2874,7 +2884,9 @@ async function recruiterSignup(){
     const uid=cred.user.uid;
     const domain=(email.split('@')[1]||'').toLowerCase();
     const companyId=domain||uid;
-    const rec={company,website,email,domain,role:'recruiter',plan:'free',isValidated:false,createdAt:Date.now()};
+    /* v112: role is the COMPANY-scoped role ('owner' = created the account). Never
+       site-admin. companyId anchors the team (invited seats inherit it). */
+    const rec={company,website,email,domain,companyId:companyId,role:'owner',plan:'free',isValidated:false,createdAt:Date.now()};
     await fb.createRecruiter(uid,rec);
     await fb.saveCompany(companyId,{name:company,website,domain,verifiedEmployer:false,createdAt:Date.now()});
     window._recruiter=Object.assign({uid,companyId},rec);
@@ -3129,6 +3141,10 @@ function recruiterSignOut(){
 function _gpjRecruiterAuthApply(u){
   try{
     if(!u){ window._recruiter=null; try{ _gpjSyncEmployerNav(); }catch(e){} return; }
+    /* v112: an invited teammate redeems their company seat on first sign-in. Only the
+       invited address can redeem it (checked here AND at the rules layer). */
+    let _pendInv=''; try{ _pendInv=localStorage.getItem('gpj_invite_pending')||''; }catch(e){}
+    if(_pendInv){ try{ _gpjRedeemInviteIfPending(); }catch(e){} }
     let role=''; try{ role=localStorage.getItem('gpj_role')||''; }catch(e){}
     /* v108: a detected recruiter is TAKEN to their dashboard on sign-in (was
        render-only → they landed on the candidate view and looked like an applicant). */
@@ -3278,7 +3294,120 @@ function renderRecCompany(){
     +'<div class="rec-sec-title" style="margin-top:12px;">Hiring contact</div>'
     +'<div class="field-row"><div><div class="field-label">First</div>'+inp('rc-cfirst','First',r.contactFirst||'')+'</div><div><div class="field-label">Last</div>'+inp('rc-clast','Last',r.contactLast||'')+'</div></div>'
     +'<div class="field-label">Your title</div>'+inp('rc-ctitle','e.g. Talent Acquisition Lead',r.contactTitle||'')
-    +'<div onclick="saveRecCompany()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;text-align:center;font-size:14px;cursor:pointer;margin-top:6px;">💾 Save company profile</div>';
+    +(_recIsCompanyAdmin()
+      ? '<div onclick="saveRecCompany()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;text-align:center;font-size:14px;cursor:pointer;margin-top:6px;">💾 Save company profile</div>'
+      : '<div style="background:var(--plum3);border:1px solid var(--plum4);color:var(--muted);border-radius:12px;padding:11px;text-align:center;font-size:11.5px;line-height:1.5;margin-top:6px;">Company details are managed by your company admins. You can post roles and hire.</div>')
+    +'<div id="rec-team" style="margin-top:20px;"></div>';
+  /* v112: standard members see the company info read-only */
+  if(!_recIsCompanyAdmin()){ ['rc-company','rc-website','rc-desc','rc-team','rc-location','rc-cfirst','rc-clast','rc-ctitle'].forEach(id=>{ const e=document.getElementById(id); if(e){ e.disabled=true; e.style.opacity='.7'; } }); }
+  try{ renderRecTeam(); }catch(e){}
+}
+/* v112 company team ------------------------------------------------------- */
+/* 'recruiter' is the LEGACY value written by pre-v112 signups — it means the person
+   who created the account, i.e. the owner. Never lock a real owner out. */
+function _recRole(){ const r=String((window._recruiter&&window._recruiter.role)||'owner').toLowerCase(); return (r===''||r==='recruiter')?'owner':r; }
+function _recIsCompanyAdmin(){ const r=_recRole(); return r==='owner'||r==='admin'; }
+/* seats scale with the plan (founder-approved): Free 1, Premium 5, Pro unlimited */
+function _recSeatLimit(){ const p=_recPlanLabel(); return p==='Pro'?Infinity:(p==='Premium'?5:1); }
+function _recCompanyId(){ const r=window._recruiter||{}; return r.companyId||(String(r.email||'').split('@')[1])||r.uid||''; }
+async function renderRecTeam(){
+  const box=document.getElementById('rec-team'); if(!box||!window._recruiter) return;
+  const cid=_recCompanyId(), admin=_recIsCompanyAdmin(), lim=_recSeatLimit();
+  box.innerHTML='<div class="rec-sec-title">Team</div><div id="rt-body"><div style="font-size:12px;color:var(--muted);">Loading team…</div></div>';
+  const body=document.getElementById('rt-body');
+  let members=[], invites=[];
+  try{ if(window.fb&&fb.loadCompanyMembers) members=await fb.loadCompanyMembers(cid); }catch(e){}
+  try{ if(admin&&window.fb&&fb.loadCompanyInvites) invites=await fb.loadCompanyInvites(cid); }catch(e){}
+  if(!members.length) members=[{uid:window._recruiter.uid,role:_recRole(),email:window._recruiter.email||'',contactFirst:window._recruiter.contactFirst,contactLast:window._recruiter.contactLast}];
+  const used=members.length+invites.length;
+  const seatTxt=(lim===Infinity)?(used+' on the team · unlimited seats'):(used+' of '+lim+' seat'+(lim===1?'':'s')+' used');
+  const roleChip=r=>{ const t=(r==='owner')?'Owner':(r==='admin'?'Company admin':'Standard');
+    const c=(r==='standard')?'var(--muted)':'var(--cyber)';
+    return '<span style="background:rgba(181,95,230,.13);color:'+c+';border-radius:6px;padding:2px 7px;font-size:10px;font-weight:800;">'+t+'</span>'; };
+  const row=(name,sub,r,extra)=>'<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--plum3);"><div style="width:30px;height:30px;border-radius:50%;background:var(--plum3);display:grid;place-items:center;font-size:14px;">🧑</div><div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:var(--off);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_esc(name)+'</div><div style="font-size:11px;color:var(--muted);">'+_esc(sub)+'</div></div>'+roleChip(r)+(extra||'')+'</div>';
+  let h='<div style="font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:8px;">'+seatTxt+'. Company admins can edit company info, list roles and hire. Standard members can list roles and hire.</div>';
+  h+=members.map(m=>row(([m.contactFirst,m.contactLast].filter(Boolean).join(' ')||m.email||'Teammate'), m.email||'', String(m.role||'owner').toLowerCase(),'')).join('');
+  h+=invites.map(i=>row(i.email,'Invite sent · awaiting sign-up',String(i.role||'standard'),
+      '<span onclick="revokeInvite(\''+_esc(i.id)+'\')" title="Revoke invite" style="margin-left:8px;color:var(--danger);cursor:pointer;font-size:12px;">✕</span>')).join('');
+  if(admin){
+    if(used>=lim && lim!==Infinity){
+      h+='<div style="margin-top:12px;background:rgba(255,179,71,.1);border:1px solid rgba(255,179,71,.3);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:11.5px;line-height:1.6;">You’ve used all '+lim+' seat'+(lim===1?'':'s')+' on <strong>'+_recPlanLabel()+'</strong>. Upgrade for more teammates — Premium includes 5, Pro is unlimited.</div>';
+    } else {
+      h+='<div style="margin-top:12px;"><div class="field-label">Invite a colleague</div>'
+        +'<input class="field-input" id="rt-email" placeholder="colleague@'+_esc(cid||'yourcompany.com')+'" style="margin-bottom:8px;"/>'
+        +'<select class="field-input" id="rt-role" style="margin-bottom:8px;font-size:13px;"><option value="standard">Standard — list roles + hire</option><option value="admin">Company admin — also edits company info</option></select>'
+        +'<div onclick="inviteTeammate()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:11px;text-align:center;font-size:13px;cursor:pointer;">✉️ Send invite</div>'
+        +'<div style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5;">They’ll get an email to create their account. Only that address can use the invite.</div></div>';
+    }
+  }
+  body.innerHTML=h;
+}
+async function inviteTeammate(){
+  if(!_recIsCompanyAdmin()){ showToast('Only company admins can invite'); return; }
+  const email=((document.getElementById('rt-email')||{}).value||'').trim().toLowerCase();
+  const role=((document.getElementById('rt-role')||{}).value||'standard');
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ showToast('Enter a valid work email'); return; }
+  const r=window._recruiter, cid=_recCompanyId();
+  const id=await fb.createCompanyInvite({
+    companyId:cid, company:r.company||'', email:email, role:role,
+    inheritValidated:!!r.isValidated,          /* verified company -> teammate can post right away */
+    plan:String(r.plan||'free'),
+    invitedByName:[r.contactFirst,r.contactLast].filter(Boolean).join(' ')||r.company||''
+  });
+  if(!id){ showToast('Could not create the invite — try again'); return; }
+  /* email it via the Worker (fire-and-forget: the invite exists either way) */
+  try{
+    if(typeof WORKER_URL!=='undefined' && WORKER_URL){
+      fetch(WORKER_URL.replace(/\/jobs.*$/,'').replace(/\/$/,'')+'/email/company-invite',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:email,company:r.company||'',role:role,inviteId:id,
+          invitedByName:[r.contactFirst,r.contactLast].filter(Boolean).join(' ')||''})
+      }).catch(()=>{});
+    }
+  }catch(e){}
+  showToast('✉️ Invite sent to '+email);
+  renderRecTeam();
+}
+async function revokeInvite(id){
+  if(!(window.fb&&fb.revokeCompanyInvite)) return;
+  const ok=await fb.revokeCompanyInvite(id);
+  showToast(ok?'Invite revoked':'Could not revoke — try again');
+  if(ok) renderRecTeam();
+}
+/* capture ?invite= before signup (same pattern as the referral link) */
+function _gpjCaptureInvite(){
+  try{
+    const m=(location.search||'').match(/[?&]invite=([^&]+)/);
+    if(m){ const id=decodeURIComponent(m[1]).trim().slice(0,80); if(id) localStorage.setItem('gpj_invite_pending',id); }
+  }catch(e){}
+}
+/* after an invited teammate signs up, redeem the invite into a recruiter seat */
+async function _gpjRedeemInviteIfPending(){
+  try{
+    const id=(localStorage.getItem('gpj_invite_pending')||'').trim();
+    if(!id||!(window.fb&&fb.loadInvite&&fb.current&&fb.current())) return false;
+    const u=fb.current();
+    const inv=await fb.loadInvite(id);
+    if(!inv||inv.status==='accepted'){ localStorage.removeItem('gpj_invite_pending'); return false; }
+    if(String(inv.email||'').toLowerCase()!==String(u.email||'').toLowerCase()){
+      showToast('That invite was sent to '+inv.email+' — sign in with that address to join.');
+      return false;
+    }
+    const rec={company:inv.company||'',companyId:inv.companyId,role:inv.role,plan:String(inv.plan||'free'),
+      isValidated:!!inv.inheritValidated, inviteId:id, email:u.email||'',
+      domain:String(u.email||'').split('@')[1]||'', createdAt:Date.now()};
+    const ok=await fb.createRecruiter(u.uid,rec);
+    if(ok===false) return false;
+    try{ await fb.acceptCompanyInvite(inv); }catch(e){}
+    try{ fb.saveProfile(u.uid,{role:'recruiter'}); }catch(e){}
+    try{ localStorage.setItem('gpj_role','recruiter'); }catch(e){}
+    localStorage.removeItem('gpj_invite_pending');
+    window._recruiter=Object.assign({uid:u.uid},rec);
+    try{ _gpjApplyRecruiterSkin(); }catch(e){}
+    try{ switchView('swipe',document.querySelector('[data-view=swipe]')); }catch(e){}
+    showToast('🏢 You’ve joined '+(inv.company||'the team')+' as '+(inv.role==='admin'?'a company admin':'a team member'));
+    return true;
+  }catch(e){ return false; }
 }
 async function saveRecCompany(){
   const r=window._recruiter; if(!r){ showToast('Sign in as an employer first'); return; }
@@ -9485,7 +9614,8 @@ async function authSignIn(){
 async function authSignOut(){ if(window.fb){ try{await fb.signOut();}catch(e){} showToast('Signed out — starting fresh. Sign in anytime to restore everything.'); /* HARDEN (v43): guarantee a "new"/first-visit state on every platform — wipe all per-user local data AND the returning flag BEFORE reload, so the demo/onboarding shows and no prior resume, jobs, or location lingers, regardless of auth-event timing. The cloud profile restores it all on next sign-in. */ try{ if(window.gpjWipeLocalUserData) window.gpjWipeLocalUserData(); }catch(e){} try{ localStorage.removeItem('gpj_owner_uid'); localStorage.removeItem('ngj_returning'); localStorage.removeItem('gpj_recent_search'); }catch(e){} setTimeout(function(){ try{ location.reload(); }catch(e){} }, 700); } }
 window.gpjAuthChanged=function(user){
   window._gpjAuthResolved=true;   /* v101a #1a: getInstallDate may latch a fresh guest date only AFTER this */
-  try{ _gpjCaptureRef(); }catch(e){}   /* v107: capture ?ref= as early as auth resolves */
+  try{ _gpjCaptureRef(); }catch(e){}      /* v107: capture ?ref= as early as auth resolves */
+  try{ _gpjCaptureInvite(); }catch(e){}   /* v112: capture ?invite= (company team seat) */
   const chip=document.getElementById('auth-chip');
   if(user){
     try{ _gpjRecordReferralIfPending(); if(typeof resumeReady!=='undefined'&&resumeReady) _gpjMarkReferralOnboarded(); }catch(e){}  /* v107 referral backstops */
@@ -10624,7 +10754,7 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v111';
+const APP_VERSION = 'v112';
 const CHANGELOG = {
   'v104':['Employers now see candidates matched to their roles — ranked by fit, applicants first, contact shared only for candidates who opted in. Matching runs nightly on opted-in candidates only, never sold.'],
   'v103':['Ghost reports now count across all hunters (community reports), and every automated email carries a one-click unsubscribe. Behind the scenes: a dead email function was fixed.'],

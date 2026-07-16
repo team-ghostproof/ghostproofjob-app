@@ -31,6 +31,12 @@ async function seedBaseline() {
     await setDoc(doc(db, 'recruiters/recruiterA'), { company: 'Acme', domain: 'acme.com', isValidated: true, plan: 'free' });
     await setDoc(doc(db, 'recruiters/recruiterB'), { company: 'Globex', domain: 'globex.com', isValidated: true, plan: 'free' });
     await setDoc(doc(db, 'recruiters/recruiterPending'), { company: 'NewCo', domain: 'newco.com', isValidated: false, plan: 'free' });   // v101a #2: awaiting the admin queue; v101b Sprint 3: unverified recruiter for projection-gate tests
+    // v112 team: a STANDARD member at acme.com + a pending invite. recruiterA is a
+    // LEGACY owner doc (no companyId/role) on purpose — it must still count as admin.
+    await setDoc(doc(db, 'recruiters/standardS'), { company: 'Acme', domain: 'acme.com', companyId: 'acme.com', role: 'standard', isValidated: true, plan: 'free' });
+    await setDoc(doc(db, 'company_invites/inv1'), { companyId: 'acme.com', company: 'Acme', email: 'newhire@acme.com', role: 'standard', invitedBy: 'recruiterA', status: 'pending', ts: 1, inheritValidated: true, plan: 'free' });
+    try { await deleteDoc(doc(db, 'recruiters/newHireU')); } catch (e) { /* fresh each test */ }
+    try { await deleteDoc(doc(db, 'recruiters/strangerU')); } catch (e) { /* fresh each test */ }
     await setDoc(doc(db, 'companies/acme.com'), { name: 'Acme', domain: 'acme.com', verifiedEmployer: false });
     await setDoc(doc(db, 'jobs/jobA'), { title: 'Ops', ownerUid: 'recruiterA', source: 'internal', isValidated: true });
     await setDoc(doc(db, 'jobs/jobB'), { title: 'Sales', ownerUid: 'recruiterB', source: 'internal', isValidated: true });
@@ -85,6 +91,9 @@ after(async () => { if (env) await env.cleanup(); });
 const asRecruiterA = () => env.authenticatedContext('recruiterA', { email: 'a@acme.com' }).firestore();
 const asRecruiterB = () => env.authenticatedContext('recruiterB', { email: 'b@globex.com' }).firestore();
 const asRecruiterPending = () => env.authenticatedContext('recruiterPending', { email: 'p@newco.com' }).firestore();   // v101b Sprint 3: exists but isValidated:false
+const asStandard = () => env.authenticatedContext('standardS', { email: 's@acme.com' }).firestore();                   // v112: standard teammate
+const asNewHire = () => env.authenticatedContext('newHireU', { email: 'newhire@acme.com' }).firestore();               // v112: the invited address
+const asStranger = () => env.authenticatedContext('strangerU', { email: 'x@evil.com' }).firestore();                   // v112: not invited
 const asCandC = () => env.authenticatedContext('candC', { email: 'c@x.com' }).firestore();
 const asCandD = () => env.authenticatedContext('candD', { email: 'd@x.com' }).firestore();
 const asGuest = () => env.unauthenticatedContext().firestore();
@@ -389,6 +398,80 @@ describe('R5 — outreach is consent-gated + anti-ghost audited', () => {
   });
   test('R5 appeal: a non-recipient cannot appeal on a candidate’s behalf', async () => {
     await assertFails(setDoc(doc(asCandD(), 'reachouts/roRej'), { fromRecruiterUid: 'recruiterA', toCandidateUid: 'candC', jobId: 'jobA', kind: 'rejection', status: 'appealed', appealMessage: 'let me in' }, { merge: true }));
+  });
+});
+
+describe('v112 SECURITY — recruiter create cannot self-escalate', () => {
+  // Pre-v112 `allow create` had NO field restrictions, so a crafted create could
+  // self-set isValidated:true and gain verified-recruiter powers (candidate data!).
+  const base = (over) => Object.assign({ company: 'Evil', domain: 'evil.com', plan: 'free', isValidated: false }, over);
+  test('a crafted create CANNOT self-verify (the hole this closed)', async () => {
+    await assertFails(setDoc(doc(asStranger(), 'recruiters/strangerU'), base({ isValidated: true })));
+  });
+  test('a crafted create CANNOT self-assign a paid plan', async () => {
+    await assertFails(setDoc(doc(asStranger(), 'recruiters/strangerU'), base({ plan: 'pro' })));
+  });
+  test('a crafted create CANNOT claim ANOTHER company’s domain (would grant companies/{domain} writes)', async () => {
+    await assertFails(setDoc(doc(asStranger(), 'recruiters/strangerU'), base({ domain: 'acme.com', companyId: 'acme.com' })));
+  });
+  test('a crafted create CANNOT self-create as admin or standard (only invites grant roles)', async () => {
+    await assertFails(setDoc(doc(asStranger(), 'recruiters/strangerU'), base({ role: 'admin' })));
+    await assertFails(setDoc(doc(asStranger(), 'recruiters/strangerU'), base({ role: 'standard' })));
+  });
+  test('an HONEST employer signup still works (own domain, unverified, free, owner)', async () => {
+    await assertSucceeds(setDoc(doc(asStranger(), 'recruiters/strangerU'), base({ domain: 'evil.com', companyId: 'evil.com', role: 'owner' })));
+  });
+  test('a teammate CANNOT self-escalate their role on update', async () => {
+    await assertFails(setDoc(doc(asStandard(), 'recruiters/standardS'), { role: 'admin' }, { merge: true }));
+    await assertFails(setDoc(doc(asStandard(), 'recruiters/standardS'), { isValidated: true, plan: 'pro' }, { merge: true }));
+  });
+  test('a teammate CANNOT re-point their companyId at another company', async () => {
+    await assertFails(setDoc(doc(asStandard(), 'recruiters/standardS'), { companyId: 'globex.com' }, { merge: true }));
+  });
+});
+
+describe('v112 company team — invites are the only grant', () => {
+  const inv = (over) => Object.assign({ companyId: 'acme.com', company: 'Acme', email: 'newhire@acme.com', role: 'standard', invitedBy: 'recruiterA', status: 'pending', ts: 2 }, over);
+  test('a company admin (legacy owner doc) CAN invite; a STANDARD teammate cannot', async () => {
+    await assertSucceeds(setDoc(doc(asRecruiterA(), 'company_invites/i2'), inv()));
+    await assertFails(setDoc(doc(asStandard(), 'company_invites/i3'), Object.assign(inv(), { invitedBy: 'standardS' })));
+  });
+  test('an UNVERIFIED recruiter cannot invite, and nobody can invite into ANOTHER company', async () => {
+    await assertFails(setDoc(doc(asRecruiterPending(), 'company_invites/i4'), Object.assign(inv(), { invitedBy: 'recruiterPending' })));
+    await assertFails(setDoc(doc(asRecruiterB(), 'company_invites/i5'), Object.assign(inv(), { invitedBy: 'recruiterB' })));   // recruiterB is globex.com
+  });
+  test('an invite can never grant OWNER, and cannot be pre-accepted', async () => {
+    await assertFails(setDoc(doc(asRecruiterA(), 'company_invites/i6'), inv({ role: 'owner' })));
+    await assertFails(setDoc(doc(asRecruiterA(), 'company_invites/i7'), inv({ status: 'accepted' })));
+  });
+  test('ONLY the invited address may accept — a stranger with the link cannot', async () => {
+    await assertFails(setDoc(doc(asStranger(), 'company_invites/inv1'), { email: 'newhire@acme.com', companyId: 'acme.com', role: 'standard', status: 'accepted' }, { merge: true }));
+    await assertSucceeds(setDoc(doc(asNewHire(), 'company_invites/inv1'), { email: 'newhire@acme.com', companyId: 'acme.com', role: 'standard', status: 'accepted' }, { merge: true }));
+  });
+  test('the invited teammate CAN claim exactly the seat they were given', async () => {
+    await assertSucceeds(setDoc(doc(asNewHire(), 'recruiters/newHireU'), {
+      company: 'Acme', companyId: 'acme.com', role: 'standard', plan: 'free',
+      isValidated: true, inviteId: 'inv1', domain: 'acme.com',
+    }));
+  });
+  test('the invited teammate CANNOT upgrade the seat they were given', async () => {
+    const claim = (over) => Object.assign({ company: 'Acme', companyId: 'acme.com', role: 'standard', plan: 'free', isValidated: true, inviteId: 'inv1', domain: 'acme.com' }, over);
+    await assertFails(setDoc(doc(asNewHire(), 'recruiters/newHireU'), claim({ role: 'admin' })));      // invite said standard
+    await assertFails(setDoc(doc(asNewHire(), 'recruiters/newHireU'), claim({ plan: 'pro' })));        // invite said free
+    await assertFails(setDoc(doc(asNewHire(), 'recruiters/newHireU'), claim({ companyId: 'globex.com' })));
+  });
+  test('a stranger CANNOT redeem someone else’s invite id', async () => {
+    await assertFails(setDoc(doc(asStranger(), 'recruiters/strangerU'), {
+      company: 'Acme', companyId: 'acme.com', role: 'standard', plan: 'free', isValidated: true, inviteId: 'inv1', domain: 'evil.com',
+    }));
+  });
+  test('company INFO is admin-scoped: admin can write it, a standard teammate cannot', async () => {
+    await assertSucceeds(setDoc(doc(asRecruiterA(), 'companies/acme.com'), { name: 'Acme Renamed', verifiedEmployer: false }, { merge: true }));
+    await assertFails(setDoc(doc(asStandard(), 'companies/acme.com'), { name: 'Standard Was Here', verifiedEmployer: false }, { merge: true }));
+  });
+  test('teammates can see each other; an outside recruiter cannot', async () => {
+    await assertSucceeds(getDoc(doc(asRecruiterA(), 'recruiters/standardS')));
+    await assertFails(getDoc(doc(asRecruiterB(), 'recruiters/standardS')));
   });
 });
 

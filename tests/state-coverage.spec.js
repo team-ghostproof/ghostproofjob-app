@@ -2512,6 +2512,82 @@ test.describe('[STATE-COVERAGE] v109 R9-A employer nav visibility + desktop reac
   });
 });
 
+test.describe('[STATE-COVERAGE] v112 company team — seats + roles', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+  });
+
+  const mock = async (page) => page.evaluate(() => {
+    window.fb = window.fb || {};
+    fb.current = () => ({ uid: 'r1', email: 'owner@acme.com' });
+    fb.loadCompanyMembers = async () => ([
+      { uid: 'r1', role: 'owner', email: 'owner@acme.com', contactFirst: 'Aaliyah', contactLast: 'Sosa' },
+      { uid: 's1', role: 'standard', email: 'sam@acme.com', contactFirst: 'Sam', contactLast: 'R' },
+    ]);
+    fb.loadCompanyInvites = async () => ([{ id: 'i9', email: 'newhire@acme.com', role: 'admin', status: 'pending' }]);
+    window.__created = null;
+    fb.createCompanyInvite = async (d) => { window.__created = d; return 'inv-new'; };
+    window.__wait = async (id, needle) => { for (let i = 0; i < 60; i++) { const el = document.getElementById(id); if (el && (el.textContent || '').includes(needle)) return true; await new Promise((r) => setTimeout(r, 50)); } return false; };
+  });
+
+  test('seats scale with the plan; an admin can invite (never as owner)', async ({ page }) => {
+    await mock(page);
+    const r = await page.evaluate(async () => {
+      window._recruiter = { uid: 'r1', company: 'Acme Talent', companyId: 'acme.com', role: 'owner', isValidated: true, plan: 'free', email: 'owner@acme.com' };
+      _gpjApplyRecruiterSkin(); renderRecCompany(); await window.__wait('rec-team', 'seat');
+      const freeTxt = document.getElementById('rec-team').textContent;
+      const free = { limit: _recSeatLimit(), capped: /used all 1 seat/i.test(freeTxt), members: /Aaliyah Sosa/.test(freeTxt) && /Sam R/.test(freeTxt), pending: /awaiting sign-up/i.test(freeTxt) };
+      window._recruiter.plan = 'premium'; const premium = _recSeatLimit();
+      window._recruiter.plan = 'pro'; const pro = _recSeatLimit();
+      renderRecCompany(); await window.__wait('rec-team', 'Invite a colleague');
+      const roleOpts = [...document.getElementById('rt-role').options].map((o) => o.value);
+      document.getElementById('rt-email').value = 'newhire@acme.com';
+      document.getElementById('rt-role').value = 'admin';
+      await inviteTeammate();
+      return { free, premium, pro: pro === Infinity, roleOpts, created: window.__created };
+    });
+    expect(r.free.limit, 'Free = 1 seat').toBe(1);
+    expect(r.free.capped, 'a full Free team is told to upgrade, not silently blocked').toBe(true);
+    expect(r.free.members, 'the team list shows real members').toBe(true);
+    expect(r.free.pending, 'pending invites are visible + revocable').toBe(true);
+    expect(r.premium, 'Premium = 5 seats').toBe(5);
+    expect(r.pro, 'Pro = unlimited').toBe(true);
+    expect(r.roleOpts, 'you can only ever invite admin/standard — never owner').toEqual(['standard', 'admin']);
+    expect(r.created.email).toBe('newhire@acme.com');
+    expect(r.created.role).toBe('admin');
+    expect(r.created.companyId).toBe('acme.com');
+    expect(r.created.inheritValidated, 'a verified company vouches for its invitee').toBe(true);
+  });
+
+  test('a STANDARD member can list + hire but cannot edit company info or invite', async ({ page }) => {
+    await mock(page);
+    const r = await page.evaluate(async () => {
+      window._recruiter = { uid: 's1', company: 'Acme Talent', companyId: 'acme.com', role: 'standard', isValidated: true, plan: 'pro', email: 'sam@acme.com' };
+      _gpjApplyRecruiterSkin(); renderRecCompany(); await window.__wait('rec-team', 'Team');
+      return {
+        canSave: !!document.querySelector('#rec-profile div[onclick="saveRecCompany()"]'),
+        readOnlyNote: /managed by your company admins/i.test(document.getElementById('rec-profile').textContent),
+        fieldsDisabled: document.getElementById('rc-company').disabled,
+        hasInviteForm: !!document.getElementById('rt-email'),
+      };
+    });
+    expect(r.canSave, 'no save button for a standard member').toBe(false);
+    expect(r.fieldsDisabled, 'company fields are read-only').toBe(true);
+    expect(r.readOnlyNote, 'and we say why, honestly').toBe(true);
+    expect(r.hasInviteForm, 'standard members cannot invite').toBe(false);
+  });
+
+  test('a LEGACY owner doc (role:"recruiter") still counts as a company admin', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window._recruiter = { uid: 'r1', company: 'Acme', companyId: 'acme.com', role: 'recruiter', isValidated: true, plan: 'pro' };
+      return { isAdmin: _recIsCompanyAdmin(), role: _recRole() };
+    });
+    expect(r.isAdmin, 'pre-v112 owners must never be locked out of their own company').toBe(true);
+    expect(r.role).toBe('owner');
+  });
+});
+
 test.describe('[STATE-COVERAGE] v111 recruiter header chrome (identity, menu, plan)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });

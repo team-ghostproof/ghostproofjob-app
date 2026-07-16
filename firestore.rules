@@ -62,6 +62,16 @@ service cloud.firestore {
     function recruiterDomain() {
       return get(/databases/$(database)/documents/recruiters/$(request.auth.uid)).data.get('domain', '');
     }
+    // v112: the caller's COMPANY-SCOPED role. 'owner' = created the account,
+    // 'admin' = invited with admin rights, 'standard' = list + hire only.
+    // This is never site-admin (see isAdmin()) — a company admin only ever governs
+    // their own company record.
+    function recruiterRole() {
+      return get(/databases/$(database)/documents/recruiters/$(request.auth.uid)).data.get('role', 'owner');
+    }
+    function recruiterCompanyId() {
+      return get(/databases/$(database)/documents/recruiters/$(request.auth.uid)).data.get('companyId', '');
+    }
     function jobOwner(jobId) {
       return get(/databases/$(database)/documents/jobs/$(jobId)).data.ownerUid;
     }
@@ -179,16 +189,77 @@ service cloud.firestore {
     }
 
     // ======================= NEW: RECRUITER TIER ============================
+    // v112 helpers — a company_invite is the ONLY way to be granted a companyId,
+    // a role, or inherited verification. The invite is created by an already-verified
+    // company admin (rules below), so its fields are trustworthy.
+    function inviteData(id) {
+      return get(/databases/$(database)/documents/company_invites/$(id)).data;
+    }
+    function grantMatchesInvite(d) {
+      return d.get('inviteId', '') != ''
+        && exists(/databases/$(database)/documents/company_invites/$(d.inviteId))
+        && inviteData(d.inviteId).email == request.auth.token.email      // only the invited ADDRESS
+        && inviteData(d.inviteId).companyId == d.get('companyId', '')
+        && inviteData(d.inviteId).role == d.get('role', '')
+        && inviteData(d.inviteId).get('inheritValidated', false) == d.get('isValidated', false)
+        && inviteData(d.inviteId).get('plan', 'free') == d.get('plan', 'free');
+    }
+    // is the caller an owner/admin of this company? (company-scoped only — NEVER site admin)
+    function isCompanyAdmin(companyId) {
+      return isRecruiterVerified()
+        // legacy pre-v112 owner docs have no companyId — fall back to their own domain
+        && ( recruiterCompanyId() == companyId
+             || ( recruiterCompanyId() == '' && recruiterDomain() == companyId && companyId != '' ) )
+        && recruiterRole() in ['owner', 'admin', 'recruiter'];   // 'recruiter' = LEGACY owner docs (pre-v112)
+    }
     match /recruiters/{rId} {
-      allow read:   if (request.auth != null && request.auth.uid == rId) || isAdmin();
-      allow create: if request.auth != null && request.auth.uid == rId;
-      // a recruiter may edit their own profile but NOT self-flip verification/plan
+      // own doc, site admin, or a teammate at the SAME company (so the Team list works).
+      // Legacy pre-v112 owner docs have no companyId — fall back to their own domain,
+      // exactly like isCompanyAdmin, so an existing owner can still see their team.
+      allow read:   if (request.auth != null && request.auth.uid == rId) || isAdmin()
+        || (isRecruiter()
+            && resource.data.get('companyId', '') != ''
+            && ( resource.data.get('companyId', '') == recruiterCompanyId()
+                 || ( recruiterCompanyId() == '' && resource.data.get('companyId', '') == recruiterDomain() ) ));
+      // v112 SECURITY FIX: create had NO field restrictions, so a crafted create could
+      // self-set isValidated:true and gain verified-recruiter powers (the update rule
+      // blocked self-flipping, but create never did). Plain signup is now forced to
+      // unverified/free/no-company/no-admin; the ONLY escalation path is a matching
+      // company invite addressed to the caller's own email.
+      allow create: if request.auth != null && request.auth.uid == rId
+        && (
+             // (a) plain employer signup: unverified, free, owner-only, and BOTH domain
+             //     and companyId bound to the caller's OWN verified email domain — so
+             //     nobody can create a recruiter doc claiming another company's domain
+             //     (which would otherwise grant writes on companies/{thatDomain}).
+             ( request.resource.data.get('isValidated', false) == false
+               && request.resource.data.get('plan', 'free') == 'free'
+               && !( request.resource.data.get('role', 'owner') in ['admin', 'standard'] )
+               && request.resource.data.get('domain', '') == request.auth.token.email.split('@')[1]
+               && ( request.resource.data.get('companyId', '') == ''
+                    || request.resource.data.get('companyId', '') == request.auth.token.email.split('@')[1] ) )
+             // (b) invited teammate: every granted field must match an invite addressed
+             //     to this caller's own email (the invite was made by a verified admin)
+             || grantMatchesInvite(request.resource.data)
+           );
+      // a recruiter may edit their own profile but NOT self-flip verification/plan,
+      // and (v112) NOT self-escalate their company role — otherwise a 'standard'
+      // teammate could simply write role:'admin' onto their own doc.
       allow update: if isAdmin()
         || (request.auth != null && request.auth.uid == rId
             && !( 'isValidated' in request.resource.data
                   && request.resource.data.isValidated != resource.data.get('isValidated', false) )
             && !( 'plan' in request.resource.data
-                  && request.resource.data.plan != resource.data.get('plan', 'free') ));
+                  && request.resource.data.plan != resource.data.get('plan', 'free') )
+            && !( 'role' in request.resource.data
+                  && request.resource.data.role != resource.data.get('role', 'owner') )
+            // companyId may be back-filled ONCE from empty to your OWN email domain
+            // (legacy pre-v112 owner docs), but never re-pointed at another company.
+            && ( !('companyId' in request.resource.data)
+                 || request.resource.data.companyId == resource.data.get('companyId', '')
+                 || ( resource.data.get('companyId', '') == ''
+                      && request.resource.data.companyId == recruiterDomain()
+                      && recruiterDomain() != '' ) ));
       allow delete: if isAdmin();
     }
 
@@ -200,10 +271,14 @@ service cloud.firestore {
     // verifiedEmployer:true — that reputation flag stays admin/backend only.
     match /companies/{companyId} {
       allow read: if true;
+      // v112: company INFO is admin-scoped. A 'standard' teammate can list roles and
+      // hire, but may not rewrite the company record — only the owner/admins can.
+      // (Company admin is company-scoped and is never site admin.)
       allow create, update: if isAdmin()
         || (isRecruiter()
             && companyId == recruiterDomain()
             && recruiterDomain() != ''
+            && recruiterRole() in ['owner', 'admin', 'recruiter']   // 'recruiter' = LEGACY owner docs (pre-v112)
             && request.resource.data.get('verifiedEmployer', false) == false);
       allow delete: if isAdmin();
     }
@@ -273,6 +348,36 @@ service cloud.firestore {
         // an appeal is only valid against a rejection notice (anti-ghosting accountability)
         && (request.resource.data.status != 'appealed' || resource.data.kind == 'rejection');
       allow delete: if false;
+    }
+
+    // ---- Company team invites (v112) -------------------------------------------
+    // A company admin/owner invites a colleague by email. The invite is the ONLY
+    // grant of a companyId / role / inherited verification (see grantMatchesInvite).
+    // The doc id IS the secret (it rides in the emailed link), and acceptance is
+    // additionally gated on the caller's own verified email matching the invite —
+    // so a leaked link still can't be redeemed by anyone else.
+    match /company_invites/{inviteId} {
+      // the inviting company can list its own invites; the invited address can read theirs
+      allow read: if isAdmin()
+        || (request.auth != null
+            && (resource.data.email == request.auth.token.email
+                || isCompanyAdmin(resource.data.companyId)));
+      allow create: if isCompanyAdmin(request.resource.data.companyId)
+        && request.resource.data.keys().hasAll(['companyId','email','role','invitedBy','status','ts'])
+        && request.resource.data.invitedBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.role in ['admin', 'standard']      // never 'owner', never site-admin
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 160;
+      // only the invited ADDRESS may accept, and only into 'accepted'
+      allow update: if request.auth != null
+        && resource.data.email == request.auth.token.email
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.companyId == resource.data.companyId
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.status == 'accepted';
+      // an admin of the company may revoke a pending seat
+      allow delete: if isAdmin() || isCompanyAdmin(resource.data.companyId);
     }
 
     // ---- Referral engine (v107): one doc per invitee, keyed by their uid --------
