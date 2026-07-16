@@ -2512,6 +2512,95 @@ test.describe('[STATE-COVERAGE] v109 R9-A employer nav visibility + desktop reac
   });
 });
 
+test.describe('[STATE-COVERAGE] v111 recruiter header chrome (identity, menu, plan)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+  });
+
+  const snap = () => ({
+    chip: document.getElementById('auth-chip').textContent,
+    profileRow: document.getElementById('pm-profile').textContent.trim(),
+    viewed: getComputedStyle(document.getElementById('pm-viewed')).display,
+    booster: getComputedStyle(document.getElementById('pm-booster')).display,
+    hired: getComputedStyle(document.getElementById('pm-hired')).display,
+    trigger: document.getElementById('upgrade-trigger').textContent,
+    dayPill: document.getElementById('grace-full').textContent,
+    candMenu: getComputedStyle(document.getElementById('upgrade-candidate')).display,
+    recMenu: getComputedStyle(document.getElementById('upgrade-rec')).display,
+    planOpts: document.getElementById('rec-plan-opts').textContent.replace(/\s+/g, ' ').trim(),
+  });
+
+  test('company identity + plan replace the candidate chrome; candidate-only rows hidden', async ({ page }) => {
+    const r = await page.evaluate(async (snapSrc) => {
+      const snap = eval('(' + snapSrc + ')');
+      window.fb = window.fb || {};
+      fb.current = () => ({ uid: 'r1', email: 'r@acme.com' });
+      fb.loadRecruiterJobs = async () => []; fb.countJobApplicants = async () => 0;
+      fb.loadRecommendedCandidates = async () => []; fb.countGhostReports = async () => 0;
+      fb.loadSentReachouts = async () => []; fb.countMyReachouts = async () => 0;
+      // the page's real auth listener can resolve LATE and repaint the chip, so
+      // settle on the expected state instead of assuming a fixed delay.
+      const settle = async (want) => {
+        for (let i = 0; i < 60; i++) {
+          _gpjApplyRecruiterSkin();
+          if ((document.getElementById('auth-chip').textContent || '').startsWith(want)) break;
+          await new Promise((r) => setTimeout(r, 50));
+        }
+      };
+      window._recruiter = { uid: 'r1', company: 'Acme Talent Partners', isValidated: true, plan: 'free' };
+      await settle('🏢');
+      const free = snap();
+      window._recruiter.plan = 'pro';
+      await settle('🏢');
+      const pro = snap();
+      return { free, pro };
+    }, snap.toString());
+
+    // 1) identity = company name + the company-card emoji (not a person)
+    expect(r.free.chip).toBe('🏢 Acme Talent Partners');
+    expect(r.free.profileRow).toBe('🏢 Company Profile');
+    // 2) candidate-only menu rows are gone for an employer
+    expect(r.free.viewed).toBe('none');
+    expect(r.free.booster, 'Request Booster is meaningless to a company').toBe('none');
+    expect(r.free.hired, '"I Got Hired" is meaningless to a company').toBe('none');
+    // 3) tip jar -> plan
+    expect(r.free.trigger).toBe('Free plan ▾');
+    expect(r.free.candMenu).toBe('none');
+    expect(r.free.recMenu).toBe('block');
+    expect(r.free.planOpts).toMatch(/\$79/);
+    expect(r.free.planOpts).toMatch(/\$149/);
+    // 4) day counter -> plan
+    expect(r.free.dayPill).toBe('🏢 Free plan');
+    // and the plan is reflected once upgraded
+    expect(r.pro.trigger).toBe('Pro plan ▾');
+    expect(r.pro.dayPill).toBe('🚀 Pro plan');
+    expect(r.pro.planOpts).toMatch(/top plan/i);
+  });
+
+  test('NO regression: candidate chrome restores when the recruiter session ends', async ({ page }) => {
+    const r = await page.evaluate(async (snapSrc) => {
+      const snap = eval('(' + snapSrc + ')');
+      window.fb = window.fb || {};
+      fb.current = () => ({ uid: 'r1' });
+      fb.loadRecruiterJobs = async () => []; fb.loadRecommendedCandidates = async () => [];
+      fb.countGhostReports = async () => 0; fb.loadSentReachouts = async () => []; fb.countMyReachouts = async () => 0;
+      window._recruiter = { uid: 'r1', company: 'Acme', isValidated: true, plan: 'free' };
+      _gpjApplyRecruiterSkin(); await new Promise((r) => setTimeout(r, 60));
+      window._recruiter = null; fb.current = () => ({ uid: 'c1', email: 'jane@x.com' });
+      _gpjApplyRecruiterSkin(); await new Promise((r) => setTimeout(r, 60));
+      return snap();
+    }, snap.toString());
+    expect(r.profileRow).toBe('🙂 Account / Profile');
+    expect(r.viewed).toBe('flex');
+    expect(r.booster).toBe('flex');
+    expect(r.hired).toBe('flex');
+    expect(r.trigger).toBe('Support Us ▾');
+    expect(r.candMenu).toBe('block');
+    expect(r.recMenu).toBe('none');
+  });
+});
+
 test.describe('[STATE-COVERAGE] v110 R9 recruiter tab reskin', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
@@ -2534,16 +2623,27 @@ test.describe('[STATE-COVERAGE] v110 R9 recruiter tab reskin', () => {
   test('every tab reskins to real recruiter content; nav relabels', async ({ page }) => {
     await mockRec(page);
     const r = await page.evaluate(async () => {
-      const render = async (view, id) => { _gpjRenderRecPanel(view); await new Promise((r) => setTimeout(r, 120)); return document.getElementById(id).textContent; };
+      // the panel renderers are async (they await fb reads) and _gpjRenderRecPanel
+      // does not return the promise — so POLL for the expected text instead of
+      // guessing a fixed delay (that was flaky on mobile under parallel load).
+      const render = async (view, id, needle) => {
+        _gpjRenderRecPanel(view);
+        const el = document.getElementById(id);
+        for (let i = 0; i < 60; i++) {
+          if (needle ? (el.textContent || '').includes(needle) : (el.textContent || '').trim()) break;
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        return el.textContent;
+      };
       return {
         recModeAll: ['swipe', 'browse', 'resume', 'ghost', 'profile', 'account'].every((v) => document.getElementById('view-' + v).classList.contains('rec-mode')),
         labels: [...document.querySelectorAll('#footer-nav .nav-tab .nav-label')].map((l) => l.textContent),
-        company: (await render('profile', 'rec-profile')).includes('Company Profile'),
-        listings: (await render('resume', 'rec-resume')).includes('Operations Manager'),
-        settings: (await render('account', 'rec-account')).includes('$149'),
-        candidates: (await render('swipe', 'rec-swipe')).includes('88%'),
-        applicants: (await render('browse', 'rec-browse')).includes('Applicants'),
-        reviews: (await render('ghost', 'rec-ghost')).includes('Ghost-risk'),
+        company: (await render('profile', 'rec-profile', 'Company Profile')).includes('Company Profile'),
+        listings: (await render('resume', 'rec-resume', 'Operations Manager')).includes('Operations Manager'),
+        settings: (await render('account', 'rec-account', '$149')).includes('$149'),
+        candidates: (await render('swipe', 'rec-swipe', '88%')).includes('88%'),
+        applicants: (await render('browse', 'rec-browse', 'Applicants')).includes('Applicants'),
+        reviews: (await render('ghost', 'rec-ghost', 'Ghost-risk')).includes('Ghost-risk'),
       };
     });
     expect(r.recModeAll, 'all 6 views enter recruiter mode').toBe(true);

@@ -804,12 +804,12 @@
         <div style="position:relative;">
           <div id="auth-chip" onclick="toggleProfileMenu()" style="background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.35);color:var(--cyber);font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:pointer;">Sign In</div>
           <div id="profile-menu" style="display:none;position:fixed;right:10px;top:60px;z-index:400;background:var(--plum2);border:1px solid var(--plum4);border-radius:14px;padding:6px;min-width:200px;box-shadow:0 12px 34px rgba(0,0,0,.6);">
-            <div class="pm-item" onclick="pmGo('profile')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">🙂 Account / Profile</div>
+            <div class="pm-item" id="pm-profile" onclick="pmGo('profile')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">🙂 Account / Profile</div>
             <div class="pm-item" onclick="pmGo('account')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">⚙️ Settings</div>
-            <div class="pm-item" onclick="pmViewedJobs()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">👀 Viewed Jobs <span id="pm-viewed-count" style="margin-left:auto;background:var(--plum4);border-radius:8px;padding:1px 7px;font-size:11px;color:var(--muted);">0</span></div>
+            <div class="pm-item" id="pm-viewed" onclick="pmViewedJobs()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">👀 Viewed Jobs <span id="pm-viewed-count" style="margin-left:auto;background:var(--plum4);border-radius:8px;padding:1px 7px;font-size:11px;color:var(--muted);">0</span></div>
             <div class="pm-item" onclick="openContactModal()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">📬 Contact Us</div>
-            <div class="pm-item" onclick="openBoosterModal()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--mint);">💚 Request Booster</div>
-            <div class="pm-item" onclick="document.getElementById('profile-menu').style.display='none';openHired()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--cyber);">🎉 I Got Hired!</div>
+            <div class="pm-item" id="pm-booster" onclick="openBoosterModal()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--mint);">💚 Request Booster</div>
+            <div class="pm-item" id="pm-hired" onclick="document.getElementById('profile-menu').style.display='none';openHired()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--cyber);">🎉 I Got Hired!</div>
             <div class="pm-item" id="pm-selftest" onclick="document.getElementById('profile-menu').style.display='none';openSelfTest()" style="display:none;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">🧪 Run Self-Test</div>
             <div style="height:1px;background:var(--plum4);margin:4px 8px;"></div>
             <div class="pm-item" onclick="pmSignOut()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--danger);">🚪 Sign Out</div>
@@ -819,12 +819,22 @@
       </div>
     </div>
     <div id="upgrade-menu">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;">YOU'RE FREE UNTIL YOU'RE HIRED</div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Full access for 90 days or until you land a job — whichever comes first. If you want to keep us after that:</div>
-      <div class="upgrade-btn" onclick="openCheckout('life')" style="position:relative;">⚡ Lifetime — $12 once<div style="font-size:9px;font-weight:600;opacity:.8;">Best value · never pay again</div></div>
-      <div onclick="openCheckout('month')" style="background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:10px;padding:9px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">🪙 Just $0.99 / month<div style="font-size:9px;font-weight:600;opacity:.8;">Cancel anytime, zero pressure</div></div>
-      <div class="coffee-btn" onclick="openTipJar()">Buy Us a Coffee ☕</div>
-      <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:8px;">No ads. No data selling. Ever.</div>
+      <div id="upgrade-candidate">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;">YOU'RE FREE UNTIL YOU'RE HIRED</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Full access for 90 days or until you land a job — whichever comes first. If you want to keep us after that:</div>
+        <div class="upgrade-btn" onclick="openCheckout('life')" style="position:relative;">⚡ Lifetime — $12 once<div style="font-size:9px;font-weight:600;opacity:.8;">Best value · never pay again</div></div>
+        <div onclick="openCheckout('month')" style="background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:10px;padding:9px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">🪙 Just $0.99 / month<div style="font-size:9px;font-weight:600;opacity:.8;">Cancel anytime, zero pressure</div></div>
+        <div class="coffee-btn" onclick="openTipJar()">Buy Us a Coffee ☕</div>
+        <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:8px;">No ads. No data selling. Ever.</div>
+      </div>
+      <!-- v111: recruiters get their PLAN here instead of the candidate tip-jar —
+           current tier on top, the upgrade paths under it. -->
+      <div id="upgrade-rec" style="display:none;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;">YOUR PLAN</div>
+        <div id="rec-plan-current" style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5;"></div>
+        <div id="rec-plan-opts"></div>
+        <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:8px;">Candidate contact is never sold. Ever.</div>
+      </div>
     </div>
   </div>
 
@@ -2600,7 +2610,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v110</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v111</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3189,8 +3199,57 @@ function _gpjApplyRecruiterSkin(){
   const on=_gpjRecruiterMode();
   _REC_TABS.forEach(v=>{ const el=document.getElementById('view-'+v); if(el) el.classList.toggle('rec-mode', on); });
   _gpjRelabelNav(on);
+  try{ _gpjApplyRecruiterChrome(on); }catch(e){}
   try{ _gpjSyncEmployerNav(); }catch(e){}
   if(on){ try{ _gpjRenderRecPanel(_gpjCurrentView()); }catch(e){} }
+}
+/* v111: the header chrome a company sees — their company name + 🏢 (the company-card
+   emoji) instead of a person, their PLAN instead of the candidate day-counter and
+   tip jar, and none of the candidate-only menu items (Viewed Jobs / Request Booster
+   / I Got Hired all mean nothing to an employer). */
+function _recPlanLabel(){
+  const p=String((window._recruiter&&window._recruiter.plan)||'free').toLowerCase();
+  return p==='pro'?'Pro':(p==='premium'?'Premium':'Free');
+}
+function _gpjApplyRecruiterChrome(on){
+  const chip=document.getElementById('auth-chip');
+  if(on && chip && window._recruiter){
+    chip.textContent='🏢 '+String(window._recruiter.company||'Company').slice(0,24);
+    chip.onclick=toggleProfileMenu; chip.title='Company menu';
+  } else if(!on && chip && window.fb && fb.current && fb.current()){
+    try{ chip.textContent='🙂 '+profileDisplayName(fb.current()); }catch(e){}
+  }
+  /* candidate-only menu rows */
+  ['pm-viewed','pm-booster','pm-hired'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display=on?'none':'flex'; });
+  const pp=document.getElementById('pm-profile'); if(pp) pp.textContent=on?'🏢 Company Profile':'🙂 Account / Profile';
+  /* tier button + menu */
+  const trg=document.getElementById('upgrade-trigger');
+  const uc=document.getElementById('upgrade-candidate'), ur=document.getElementById('upgrade-rec');
+  if(uc) uc.style.display=on?'none':'block';
+  if(ur) ur.style.display=on?'block':'none';
+  if(trg) trg.textContent=on?(_recPlanLabel()+' plan ▾'):'Support Us ▾';
+  if(on) _renderRecPlanMenu();
+  /* the 45-day counter means nothing to a company — show their plan instead */
+  if(on){
+    const l=_recPlanLabel(), ic=(l==='Pro'?'🚀':(l==='Premium'?'⭐':'🏢'));
+    const gf=document.getElementById('grace-full'), gs=document.getElementById('grace-short');
+    if(gf) gf.textContent=ic+' '+l+' plan';
+    if(gs) gs.textContent=ic+' '+l;
+  }
+}
+function _renderRecPlanMenu(){
+  const cur=document.getElementById('rec-plan-current'), opts=document.getElementById('rec-plan-opts');
+  const l=_recPlanLabel();
+  if(cur) cur.innerHTML = (l==='Free')
+    ? 'You’re on the <strong style="color:var(--off);">Free</strong> plan — up to 5 live roles, matched candidates, outreach + anti-ghosting included.'
+    : 'You’re on <strong style="color:var(--mint);">Recruiter '+l+'</strong>. Thank you — employer plans are what keep GhostProofJob free for hunters.';
+  if(!opts) return;
+  const btn=(tier,name,price,note,css)=>'<div onclick="openRecruiterCheckout(\''+tier+'\')" style="'+css+'border-radius:10px;padding:9px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">'+name+' — '+price+'<div style="font-size:9px;font-weight:600;opacity:.8;">'+note+'</div></div>';
+  let h='';
+  if(l==='Free') h+=btn('premium','⭐ Premium','$79 / mo','More live roles + candidate matching','background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);');
+  if(l!=='Pro') h+=btn('pro','🚀 Pro','$149 / mo','Highest role limit + priority placement','background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.4);color:var(--cyber);');
+  if(!h) h='<div style="font-size:11px;color:var(--mint);text-align:center;padding:6px 0;">You’re on our top plan — thank you.</div>';
+  opts.innerHTML=h;
 }
 function _gpjRenderRecPanel(view){
   if(!_gpjRecruiterMode()) return;
@@ -10565,7 +10624,7 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v110';
+const APP_VERSION = 'v111';
 const CHANGELOG = {
   'v104':['Employers now see candidates matched to their roles — ranked by fit, applicants first, contact shared only for candidates who opted in. Matching runs nightly on opted-in candidates only, never sold.'],
   'v103':['Ghost reports now count across all hunters (community reports), and every automated email carries a one-click unsubscribe. Behind the scenes: a dead email function was fixed.'],
