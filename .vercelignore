@@ -13,9 +13,12 @@
 api/match/
 
 # Repo assets Vercel never serves or executes — keeps the upload lean.
+# NOTE: the GENERATOR is excluded; its OUTPUT (seo/*.html, sitemap.xml, robots.txt)
+# is committed and MUST ship — that's the whole point of the static SEO pages.
 tests/
 docs/
 ghost-report-generator/
+seo-generator/
 scripts/
 playwright.config.js
 playwright-report/

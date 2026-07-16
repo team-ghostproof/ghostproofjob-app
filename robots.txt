@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Generated SEO landing pages (static, zero runtime reads) — see seo-generator/
+Sitemap: https://ghostproofjob.com/sitemap.xml
