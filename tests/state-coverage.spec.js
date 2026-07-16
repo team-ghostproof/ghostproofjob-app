@@ -2466,7 +2466,7 @@ test.describe('[STATE-COVERAGE] F-GEO distance filter (offline centroids + haver
 });
 
 test.describe('[STATE-COVERAGE] v109 R9-A employer nav visibility + desktop reachability', () => {
-  test('"For Employers" hides for a signed-in individual, shows for guest/recruiter', async ({ page }) => {
+  test('"For Employers" shows only to guests/admins — hidden for signed-in individuals AND recruiters', async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1500);
     const r = await page.evaluate(() => {
@@ -2485,7 +2485,9 @@ test.describe('[STATE-COVERAGE] v109 R9-A employer nav visibility + desktop reac
     });
     expect(r.guest, 'guests see the employer marketing entry').not.toBe('none');
     expect(r.individual, 'a signed-in individual is not an employer -> hidden').toBe('none');
-    expect(r.recruiter, 'a recruiter keeps their dashboard entry').not.toBe('none');
+    // v112: a recruiter is ALREADY inside a company account — the six tabs are the
+    // employer experience, so the marketing entry is noise. Hidden for them too.
+    expect(r.recruiter, 'an employer should not be offered "For Employers"').toBe('none');
   });
 
   test('desktop: the employer view lives in the workspace and renders (was invisible)', async ({ page }) => {
@@ -2652,6 +2654,39 @@ test.describe('[STATE-COVERAGE] v111 recruiter header chrome (identity, menu, pl
     expect(r.pro.trigger).toBe('Pro plan ▾');
     expect(r.pro.dayPill).toBe('🚀 Pro plan');
     expect(r.pro.planOpts).toMatch(/top plan/i);
+  });
+
+  test('v112 fix: the day-counter cannot repaint over a recruiter plan; employer footer is role-correct', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      fb.current = () => ({ uid: 'r1', email: 'owner@acme.com' });
+      fb.loadCompanyMembers = async () => []; fb.loadCompanyInvites = async () => [];
+      fb.loadRecruiterJobs = async () => []; fb.loadRecommendedCandidates = async () => [];
+      fb.countGhostReports = async () => 0; fb.loadSentReachouts = async () => []; fb.countMyReachouts = async () => 0;
+      window.isAdmin = false;
+      window._recruiter = { uid: 'r1', company: 'Acme Talent', companyId: 'acme.com', role: 'owner', isValidated: true, plan: 'free', email: 'owner@acme.com' };
+      _gpjApplyRecruiterSkin();
+      await new Promise((r) => setTimeout(r, 80));
+      const before = document.getElementById('grace-full').textContent;
+      refreshGraceDisplays();          // the exact call that used to clobber it
+      refreshGraceDisplays();
+      const after = document.getElementById('grace-full').textContent;
+      const rec = { before, after, footerLink: getComputedStyle(document.getElementById('footer-employer-link')).display, promise: document.getElementById('footer-promise').textContent };
+      window._recruiter = null; fb.current = () => ({ uid: 'c1', email: 'jane@x.com' });
+      _gpjApplyRecruiterSkin(); refreshGraceDisplays();
+      await new Promise((r) => setTimeout(r, 60));
+      const cand = { pill: document.getElementById('grace-full').textContent, promise: document.getElementById('footer-promise').textContent };
+      fb.current = () => null; _gpjSyncEmployerNav();
+      const guestLink = getComputedStyle(document.getElementById('footer-employer-link')).display;
+      return { rec, cand, guestLink };
+    });
+    expect(r.rec.before).toBe('🏢 Free plan');
+    expect(r.rec.after, 'refreshGraceDisplays must NOT repaint the candidate day-counter over a company plan').toBe('🏢 Free plan');
+    expect(r.rec.footerLink, 'an employer should not be offered "For Employers"').toBe('none');
+    expect(r.rec.promise, 'the footer promise speaks to employers').toMatch(/never sold/i);
+    expect(r.cand.pill, 'candidates keep their day counter').toMatch(/Day/);
+    expect(r.cand.promise, 'candidates keep the free-until-hired promise').toMatch(/Free until/i);
+    expect(r.guestLink, 'guests still get the employer marketing entry').not.toBe('none');
   });
 
   test('NO regression: candidate chrome restores when the recruiter session ends', async ({ page }) => {
