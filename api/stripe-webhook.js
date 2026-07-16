@@ -86,11 +86,14 @@ async function handleEvent(fs, event) {
   const o = event.data && event.data.object ? event.data.object : {};
 
   if (event.type === 'checkout.session.completed') {
-    // client_reference_id = "<uid>:<key>" (key = life|month|premium|pro)
+    // client_reference_id = "<uid>__<key>" (key = life|month|premium|pro).
+    // NOT a colon: Stripe payment links only accept [A-Za-z0-9_-] here and would
+    // reject/drop the reference, leaving a paying customer with nothing. Split on the
+    // LAST '__' so a uid is never mis-parsed.
     const ref = String(o.client_reference_id || '');
-    const i = ref.lastIndexOf(':');
+    const i = ref.lastIndexOf('__');
     const uid = i > 0 ? ref.slice(0, i) : '';
-    const key = i > 0 ? ref.slice(i + 1) : '';
+    const key = i > 0 ? ref.slice(i + 2) : '';
     const map = KEYS[key];
     if (!uid || !map) {
       console.warn('[stripe] unusable client_reference_id:', ref);

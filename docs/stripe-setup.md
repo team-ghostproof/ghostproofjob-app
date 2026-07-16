@@ -52,14 +52,14 @@ Copy the **Signing secret** (`whsec_…`) into `STRIPE_WEBHOOK_SECRET` on Vercel
 > could POST a fake "you paid" event and grant themselves a tier. If the secret is
 > wrong the endpoint returns 400 and grants nothing.
 
-## 3. Turn ON "client reference ID" on all four payment links
+## 3. The payment links need NO changes
 
-This is the bit that tells us **who** paid. The app appends
-`?client_reference_id=<uid>:<key>` to every checkout URL, but **Stripe payment links
-ignore it unless the field is enabled on the link**.
+**Nothing to toggle.** There is no "Client reference ID" setting on a payment link —
+Stripe accepts it natively as a **URL query parameter**, and the app appends it for you:
 
-For **each** of the four links → Stripe → **Payment links** → open the link → **⋯ →
-Edit** → under *Options / Advanced*, enable **"Client reference ID"**:
+```
+https://buy.stripe.com/…?client_reference_id=<uid>__<key>
+```
 
 | Link | key the app sends |
 |---|---|
@@ -68,8 +68,14 @@ Edit** → under *Options / Advanced*, enable **"Client reference ID"**:
 | Recruiter Premium — $79/mo | `premium` |
 | Recruiter Pro — $149/mo | `pro` |
 
-If it's off, the payment still succeeds but the webhook can't tell who paid — it logs
-`unusable client_reference_id` and grants nothing (deliberately: we never guess).
+**Format matters:** Stripe only accepts `[A-Za-z0-9_-]` in `client_reference_id`, so
+the separator is `__` (a colon is rejected and the reference would be silently dropped,
+leaving a paying customer with nothing). The webhook splits on the **last** `__`.
+If the reference is missing or unusable, the webhook logs it and grants **nothing** —
+we never guess who paid from an email.
+
+Keep the links' own settings as they are. "Collect customer names" / phone are fine and
+unrelated.
 
 ## 4. Test it before you trust it
 

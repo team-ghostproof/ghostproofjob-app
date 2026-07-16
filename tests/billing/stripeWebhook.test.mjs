@@ -41,7 +41,7 @@ const session = (ref, over = {}) => ({
 describe('checkout.session.completed — grants the right thing to the right account', () => {
   test('candidate LIFETIME: tier=life, no expiry, and it is a profiles write', async () => {
     const fs = fakeDb();
-    const r = await handleEvent(fs, session('uidA:life'));
+    const r = await handleEvent(fs, session('uidA__life'));
     assert.equal(r.ok, true);
     assert.equal(fs._data.profiles.uidA.tier, 'life');
     assert.equal(fs._data.profiles.uidA.paidUntil, null, 'a lifetime pass never expires');
@@ -49,23 +49,32 @@ describe('checkout.session.completed — grants the right thing to the right acc
   });
   test('recruiter PRO: writes plan on the RECRUITER doc, not the profile', async () => {
     const fs = fakeDb();
-    await handleEvent(fs, session('r1:pro'));
+    await handleEvent(fs, session('r1__pro'));
     assert.equal(fs._data.recruiters.r1.plan, 'pro');
     assert.ok(!fs._data.profiles || !fs._data.profiles.r1, 'a recruiter plan must not land on profiles');
   });
   test('recruiter PREMIUM maps to premium', async () => {
     const fs = fakeDb();
-    await handleEvent(fs, session('r2:premium'));
+    await handleEvent(fs, session('r2__premium'));
     assert.equal(fs._data.recruiters.r2.plan, 'premium');
   });
-  test('a uid containing ":" still parses (we split on the LAST colon)', async () => {
+  test('the reference is Stripe-LEGAL: [A-Za-z0-9_-] only — a colon would be rejected', async () => {
+    // Stripe payment links only accept alphanumerics/dash/underscore in
+    // client_reference_id. A colon separator would be dropped and a paying customer
+    // would get nothing — so the format itself is pinned here.
+    const ref = 'uidA__life';
+    assert.match(ref, /^[A-Za-z0-9_-]+$/, 'reference must be Stripe-legal');
     const fs = fakeDb();
-    await handleEvent(fs, session('weird:uid:life'));
-    assert.equal(fs._data.profiles['weird:uid'].tier, 'life');
+    assert.equal((await handleEvent(fs, session('uidA:life'))).ok, false, 'a colon form must never be honoured');
+  });
+  test('a uid containing "_" still parses (we split on the LAST "__")', async () => {
+    const fs = fakeDb();
+    await handleEvent(fs, session('weird_uid__life'));
+    assert.equal(fs._data.profiles['weird_uid'].tier, 'life');
   });
   test('a customer -> user mapping is stored so later subscription events resolve', async () => {
     const fs = fakeDb();
-    await handleEvent(fs, session('uidA:month'));
+    await handleEvent(fs, session('uidA__month'));
     assert.deepEqual(
       { uid: fs._data.stripe_customers.cus_1.uid, kind: fs._data.stripe_customers.cus_1.kind, key: fs._data.stripe_customers.cus_1.key },
       { uid: 'uidA', kind: 'candidate', key: 'month' }
@@ -74,7 +83,8 @@ describe('checkout.session.completed — grants the right thing to the right acc
   test('an unusable/absent client_reference_id grants NOTHING (never guess)', async () => {
     const fs = fakeDb();
     assert.equal((await handleEvent(fs, session(''))).ok, false);
-    assert.equal((await handleEvent(fs, session('uidA:bogus'))).ok, false);
+    assert.equal((await handleEvent(fs, session('uidA__bogus'))).ok, false, 'unknown product key');
+    assert.equal((await handleEvent(fs, session('uidAlife'))).ok, false, 'no separator');
     assert.deepEqual(fs._data.profiles || {}, {});
   });
 });
