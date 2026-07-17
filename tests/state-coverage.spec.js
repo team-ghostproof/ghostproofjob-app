@@ -2638,6 +2638,110 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
   });
 });
 
+test.describe('[STATE-COVERAGE] v118 founder live-test bug batch', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._cityStateOf === 'function'
+      && typeof window.loadTierFromProfile === 'function' && typeof window.updateProgress === 'function',
+    null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(500);
+  });
+
+  test('City/State extraction covers every address shape (was: no-comma address showed NOTHING)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_loc', 'Houston, TX');
+      return {
+        comma: _cityStateOf('123 Main St, Houston, TX 77081'),
+        noComma: _cityStateOf('5606 Main St Houston TX 77081'),
+        cityState: _cityStateOf('Houston TX'),
+        bareCity: _cityStateOf('Katy'),
+        multiWord: _cityStateOf('900 Alamo Plaza, San Antonio, TX 78205'),
+        garbage: _cityStateOf('77081'),
+        empty: _cityStateOf(''),
+        honorsToggles: _addressForResume({ address: '5606 Main St Houston TX 77081', preferences: { showAddressOnResume: true, addressFull: false } })
+      };
+    });
+    expect(r.comma).toBe('Houston, TX');
+    expect(r.noComma, 'the founder-repro shape must yield City, ST — never empty').toBe('Houston, TX');
+    expect(r.cityState).toBe('Houston, TX');
+    expect(r.bareCity).toBe('Katy');
+    expect(r.multiWord).toBe('San Antonio, TX');
+    expect(r.garbage, 'unusable address falls back to the saved market, not blank').toBe('Houston, TX');
+    expect(r.empty).toBe('');
+    expect(r.honorsToggles, 'full-address OFF must still show City, State').toBe('Houston, TX');
+    expect(r.noComma.includes('Main'), 'the street must never leak').toBe(false);
+  });
+
+  test('discoverable opt-in survives sign-in hydration (was: reset OFF every login)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      fb.loadProfile = async () => ({ discoverable: true, createdAt: 1700000000000, account: { first: 'Aal' }, accountEditedAt: 5 });
+      fb.saveProfile = async () => true;
+      fb.current = () => ({ uid: 'u1' });
+      localStorage.removeItem('gpj_profile');            // fresh device / post-signout
+      await loadTierFromProfile({ uid: 'u1' });
+      const lp = JSON.parse(localStorage.getItem('gpj_profile') || '{}');
+      const dt = document.getElementById('discoverable-toggle');
+      return { stored: lp.discoverable, toggleOn: !!(dt && dt.classList.contains('on')) };
+    });
+    expect(r.stored, 'cloud discoverable:true lands in the local profile').toBe(true);
+    expect(r.toggleOn, 'the Settings toggle reflects it').toBe(true);
+  });
+
+  test('metric elicitation never writes twin bullets for two same-unit jobs', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.resumeData = window.resumeData || {};
+      resumeData.jobs = [
+        { t: 'Account Manager', c: 'Acme', b: 'Handled client accounts daily' },
+        { t: 'Account Exec', c: 'Beta', b: 'Grew customer accounts steadily' }
+      ];
+      const qs = _metricsQuestionsFor();
+      openMetricsElicit();
+      document.getElementById('mq-0').value = '500+';
+      document.getElementById('mq-1').value = '50';
+      submitMetricsElicit();
+      const b0 = String(resumeData.jobs[0].b).split('\n').pop();
+      const b1 = String(resumeData.jobs[1].b).split('\n').pop();
+      const shape = (s) => s.replace(/[\d+$,.]+/g, '#');
+      return { units: qs.map((q) => q.unit), b0, b1, sameShape: shape(b0) === shape(b1) };
+    });
+    expect(r.units).toEqual(['accounts', 'accounts']);
+    expect(r.b0).toContain('500+');
+    expect(r.b1).toContain('50');
+    expect(r.sameShape, 'two answers of the same unit must use DIFFERENT wording (was: identical twins)').toBe(false);
+  });
+
+  test('optimizer zero-state reads as a sentence (was: "Found all done 🎉 — all optional")', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      optPrompts.length = 0; optState.length = 0;   // empty state: nothing to upgrade
+      renderOptimizer();
+      const blurb = (document.getElementById('opt-blurb') || {}).textContent || '';
+      return { blurb };
+    });
+    expect(r.blurb).not.toMatch(/Found all done/);
+    expect(r.blurb).toMatch(/nothing to upgrade/i);
+  });
+
+  test('Years + Education are optional boosters — everything else complete = 100%', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+      set('pr-name', 'Aaliyah Sosa'); set('pr-title', 'Marketing Specialist');
+      set('pr-years', ''); set('pr-edu', '');
+      window.resumeData = window.resumeData || {};
+      resumeData.jobs = [{ t: 'Marketing Specialist', c: 'USA Industries', b: 'Ran campaigns' }];
+      resumeData.skills = 'Marketing · CRM';
+      const pct = updateProgress();
+      const hint = (document.getElementById('resume-missing') || {}).textContent || '';
+      return { pct, hint };
+    });
+    expect(r.pct, 'no Years/Education must not hold the meter under 100').toBe(100);
+    expect(r.hint).toMatch(/Optional boosters/);
+    expect(r.hint).toMatch(/Years experience|Education/);
+  });
+});
+
 test.describe('[STATE-COVERAGE] v116 notification centre', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });

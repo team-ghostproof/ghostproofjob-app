@@ -159,6 +159,20 @@
           }
           return out;
         };
+        /* v118: employer-posted roles are FEW but must NEVER be buried. The wide
+           newest-3000 pull turns over in hours at 11-20k harvested docs/day, and
+           pre-v118 internal docs carry no harvester region — so a live, admin-
+           approved employer job could vanish from every candidate view the same
+           day it was posted (founder live repro: "Marketing Manager" @ GPJ).
+           Pull ALL live internal jobs (bounded, tiny, equality-only = no index)
+           and merge them into every return path. */
+        let internalDocs=[];
+        try{
+          const qi=query(col, where('source','==','internal'), where('active','==',true), limit(300));
+          const si=await getDocs(qi);
+          internalDocs=mapSnap(si);
+          if(internalDocs.length) console.log('[GPJ] Firestore jobs (employer internal):',internalDocs.length);
+        }catch(e){ console.warn('[GPJ] internal jobs query failed:',e&&e.message); }
         // 2) unscoped pull (region empty, OR the exact `region` string the harvester
         //    wrote didn't match what resolveLocation() produced client-side — a single
         //    formatting difference, e.g. "Houston, TX" vs "houston-tx", makes the
@@ -171,7 +185,7 @@
         try{
           const q3 = query(col, where('active','==',true), orderBy('ingestedAt','desc'), limit(wideCap));
           const s3 = await getDocs(q3);
-          const r3 = mergeDocs(regionDocs, mapSnap(s3));   /* v80: region docs guaranteed present */
+          const r3 = mergeDocs(mergeDocs(regionDocs, internalDocs), mapSnap(s3));   /* v80: region docs guaranteed present · v118: + employer jobs */
           console.log('[GPJ] Firestore jobs (region '+regionDocs.length+' + wide, merged):',r3.length,'— if 0, check Security Rules allow reading the "jobs" collection');
           return _stash(r3);
         }catch(e){
@@ -180,10 +194,10 @@
           try{
             const q4 = query(col, limit(wideCap));
             const s4 = await getDocs(q4);
-            const r4 = mergeDocs(regionDocs, mapSnap(s4));
+            const r4 = mergeDocs(mergeDocs(regionDocs, internalDocs), mapSnap(s4));
             console.log('[GPJ] Firestore jobs (region + plain, merged):',r4.length);
             return _stash(r4);
-          }catch(e2){ console.warn('[GPJ] jobs collection READ BLOCKED — likely Security Rules:',e2&&e2.message); return regionDocs; }
+          }catch(e2){ console.warn('[GPJ] jobs collection READ BLOCKED — likely Security Rules:',e2&&e2.message); return mergeDocs(regionDocs, internalDocs); }
         }
       },
       /* ---- ADMIN (founder) methods. These read/write across profiles, which
@@ -250,21 +264,36 @@
           try{ snap=await getDocs(query(col, where('active','==',true), orderBy('ingestedAt','desc'), limit(maxJobs||1200))); }
           catch(e){ snap=await getDocs(query(col, limit(maxJobs||1200))); }
           const roleWords=(roleTitle||'').toLowerCase().split(/\s+/).filter(w=>w.length>2);
+          /* v118: generic role NOUNS must not define the field. "Marketing
+             Specialist" was matching every "*Specialist" posting (Customer
+             Support Specialist, Data Entry Specialist…), so the benchmark —
+             and the score — followed whatever mix the newest batch held
+             (founder repro: 50 one visit, 90+ another; gaps full of support
+             terms). A posting must share a FIELD word; only an all-generic
+             title ("Office Manager" has field word "office") falls back to
+             requiring every word. */
+          const _GENERIC_ROLE=new Set(['specialist','manager','coordinator','assistant','associate','representative','analyst','director','supervisor','consultant','technician','administrator','executive','officer','agent','clerk','lead','senior','junior','intern','staff','level','entry']);
+          const fieldWords=roleWords.filter(w=>!_GENERIC_ROLE.has(w));
+          const titleMatches=fieldWords.length
+            ? (t)=>fieldWords.some(w=>t.includes(w))
+            : (t)=>roleWords.every(w=>t.includes(w));
           const STOP=new Set(['the','and','for','with','you','our','are','will','your','this','that','have','from','their','about','what','who','all','can','job','role','work','team','must','plus','etc','they','was','has','its','not','but','out','use','per','via','able','help','need','want','also','more','than','then','them','these','those','into','over','such','only','very','just','each','both','any','may','our','we','a','an','to','of','in','on','as','is','or','be','by','at','it','if']);
           const freq={};
           let matched=0;
           snap.forEach(d=>{
             const v=d.data()||{};
             const t=(v.title||'').toLowerCase();
-            /* only count postings whose title shares a word with the role */
-            if(!roleWords.some(w=>t.includes(w))) return;
+            /* only count postings whose title shares a FIELD word with the role (v118) */
+            if(!titleMatches(t)) return;
             matched++;
             const text=((v.description||'')+' '+(v.title||'')).toLowerCase();
             const words=text.replace(/[^a-z0-9\s+#.]/g,' ').split(/\s+/);
             const seen=new Set();
             words.forEach(w=>{ if(w.length>3 && !STOP.has(w) && !seen.has(w)){ seen.add(w); freq[w]=(freq[w]||0)+1; } });
-            /* also count 2-word phrases for skills like "project management" */
-            for(let i=0;i<words.length-1;i++){ const a=words[i],b=words[i+1]; if(a.length>3&&b.length>3&&!STOP.has(a)&&!STOP.has(b)){ const ph=a+' '+b; freq[ph]=(freq[ph]||0)+1; } }
+            /* also count 2-word phrases for skills like "project management" —
+               v118: dedupe per posting like the singles, else a phrase repeated
+               in one description inflates past 100% ("social media 274%") */
+            for(let i=0;i<words.length-1;i++){ const a=words[i],b=words[i+1]; if(a.length>3&&b.length>3&&!STOP.has(a)&&!STOP.has(b)){ const ph=a+' '+b; if(!seen.has(ph)){ seen.add(ph); freq[ph]=(freq[ph]||0)+1; } } }
           });
           /* rank by frequency; return top terms with their prevalence % */
           const ranked=Object.keys(freq).map(k=>({term:k,count:freq[k],pct:matched?Math.round(freq[k]/matched*100):0}))
@@ -2072,7 +2101,7 @@
         </div>
         <div class="section-card fade-in-up" id="card-optimizer" style="display:block;">
           <div style="font-size:14px;font-weight:800;margin-bottom:2px;">🧠 Resume Optimizer</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">We compared your bullets against what companies <strong style="color:var(--mint);">actively hiring right now</strong> reward. Found <span id="opt-count" style="color:var(--warn);font-weight:800;">3 upgrades</span> — all optional, all explained.</div>
+          <div id="opt-blurb" style="font-size:11px;color:var(--muted);margin-bottom:12px;">We compared your bullets against what companies <strong style="color:var(--mint);">actively hiring right now</strong> reward. Found <span id="opt-count" style="color:var(--warn);font-weight:800;">3 upgrades</span> — all optional, all explained.</div>
           <div id="opt-cards"></div>
         </div>
 
@@ -2641,7 +2670,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v117</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v118</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3521,7 +3550,10 @@ async function postRecJob(){
   if(!loc&&!remote){ showToast('Add a location or mark it remote'); return; }
   if(desc.length<20){ showToast('Add a short description (20+ characters)'); return; }
   const r=window._recruiter;
-  const job={title:title,location:remote?'Remote':loc,is_remote:remote,description:desc,requirements:v('rl-req'),salary_min:parseInt(v('rl-smin'),10)||null,salary_max:parseInt(v('rl-smax'),10)||null,companyId:r.companyId||'',company:r.company||''};
+  /* v118: carry `region` (same "City, ST" shape the harvester writes) so the
+     region-scoped candidate query can also find employer roles — belt to the
+     fetchJobs internal-merge suspenders. Content field; rules allow on edit too. */
+  const job={title:title,location:remote?'Remote':loc,is_remote:remote,region:remote?'Remote':loc,description:desc,requirements:v('rl-req'),salary_min:parseInt(v('rl-smin'),10)||null,salary_max:parseInt(v('rl-smax'),10)||null,companyId:r.companyId||'',company:r.company||''};
   /* v117: the SAME form edits an existing role. Rules keep ownerUid/source/isValidated
      immutable, so this can only ever change content — and the seat cap must not fire
      on an edit (you're not adding a role). */
@@ -5356,14 +5388,19 @@ function updateProgress(){
   const pp=document.getElementById('profile-progress'); if(pp) pp.style.width=pct+'%';
   const pt=document.getElementById('progress-pct'); if(pt) pt.textContent=pct+'%';
 
-  /* ---- pinned completeness bar + what's-missing hint ---- */
+  /* ---- pinned completeness bar + what's-missing hint ----
+     v118 (founder-directed): Years experience + Education are RECOMMENDED, not
+     required — many jobs don't ask for them, so they no longer hold the meter
+     under 100%. They still get a gentle nudge below. */
   const checks=[
     {label:'Name',ok:!!(document.getElementById('pr-name')||{}).value},
     {label:'Recent title',ok:!!(document.getElementById('pr-title')||{}).value},
-    {label:'Years experience',ok:!!(document.getElementById('pr-years')||{}).value},
-    {label:'Education',ok:!!(document.getElementById('pr-edu')||{}).value},
     {label:'At least one past job',ok:(resumeData.jobs||[]).some(j=>j.t&&j.c)},
     {label:'Skills',ok:!!(resumeData.skills&&resumeData.skills.length)}
+  ];
+  const recommended=[
+    {label:'Years experience',ok:!!(document.getElementById('pr-years')||{}).value},
+    {label:'Education',ok:!!(document.getElementById('pr-edu')||{}).value}
   ];
   const done=checks.filter(c=>c.ok).length;
   const wpct=Math.round((done/checks.length)*100);
@@ -5376,7 +5413,11 @@ function updateProgress(){
   const missEl=document.getElementById('resume-missing');
   if(missEl){
     const missing=checks.filter(c=>!c.ok).map(c=>c.label);
-    missEl.textContent=missing.length?('Still add: '+missing.join(', ')):'All set — looking great! Tap Save when ready.';
+    const nudge=recommended.filter(c=>!c.ok).map(c=>c.label);
+    missEl.textContent=missing.length
+      ? ('Still add: '+missing.join(', '))
+      : (nudge.length?('All set! Optional boosters: '+nudge.join(', ')+' — some employers like seeing them.')
+                     :'All set — looking great! Tap Save when ready.');
     missEl.style.color=missing.length?'var(--muted)':'var(--mint)';
   }
   const bPct=document.getElementById('studio-badge-pct'); if(bPct) bPct.textContent=wpct+'%';
@@ -6120,7 +6161,18 @@ function renderOptimizer(){
   if(!wrap) return;
   renderTitleOptimizer();   /* keep the title suggestions in sync */
   const remaining=optState.filter(s=>!s.done&&!s.skipped).length;
-  document.getElementById('opt-count').textContent=remaining?remaining+' upgrade'+(remaining>1?'s':''):'all done 🎉';
+  /* v118: the zero case used to inject "all done 🎉" into the count slot,
+     producing "Found all done 🎉 — all optional, all explained" (nonsense,
+     founder screenshot). Rewrite the WHOLE sentence per state instead. */
+  const _blurb=document.getElementById('opt-blurb');
+  if(_blurb){
+    _blurb.innerHTML = remaining
+      ? 'We compared your bullets against what companies <strong style="color:var(--mint);">actively hiring right now</strong> reward. Found <span id="opt-count" style="color:var(--warn);font-weight:800;">'+remaining+' upgrade'+(remaining>1?'s':'')+'</span> — all optional, all explained.'
+      : 'Your bullets already match what companies <strong style="color:var(--mint);">actively hiring right now</strong> reward — nothing to upgrade. 🎉';
+  } else {
+    const oc=document.getElementById('opt-count');
+    if(oc) oc.textContent=remaining?remaining+' upgrade'+(remaining>1?'s':''):'0';
+  }
   wrap.innerHTML=optPrompts.map((p,i)=>{
     const st=optState[i];
     if(st.done){
@@ -8139,14 +8191,36 @@ function submitMetricsElicit(){
   if(!answered.length){ showToast('Nothing to add — every field was blank (that\'s fine!)'); return; }
   try{ storeResumeSnapshot('My resume — before adding metrics'); }catch(e){}
   let added=0;
+  /* v118: VARIANT BANK — one template per unit produced near-identical twins
+     when two jobs shared a unit ("Managed 500+ accounts…" / "Managed 50
+     accounts…", founder repro). Rotate variants per unit so no two generated
+     bullets read the same; the number is still the user's literal answer —
+     no invented outcomes, ever. */
+  const _MT={
+    accounts:[function(a){return 'Managed '+a+' accounts and client relationships end-to-end';},
+              function(a){return 'Served as the primary point of contact for '+a+' clients and customers';},
+              function(a){return 'Owned the day-to-day for a portfolio of '+a+' active accounts';},
+              function(a){return 'Built and maintained working relationships across '+a+' clients';}],
+    people:[function(a){return 'Worked with and supported a team of '+a;},
+            function(a){return 'Collaborated daily across a '+a+'-person team';},
+            function(a){return 'Partnered with '+a+' teammates to keep work moving';},
+            function(a){return 'Coordinated hands-on with a team of '+a;}],
+    budget:[function(a){return 'Owned work touching '+a+' in budget/revenue';},
+            function(a){return 'Handled responsibilities tied to '+a+' in budget or revenue';},
+            function(a){return 'Supported operations spanning '+a+' in business value';},
+            function(a){return 'Managed processes behind '+a+' of budget/revenue';}],
+    volume:[function(a){return 'Handled '+a+' as part of the core workload';},
+            function(a){return 'Processed '+a+' consistently and accurately';},
+            function(a){return 'Kept '+a+' moving on schedule end-to-end';},
+            function(a){return 'Delivered '+a+' with direct ownership';}]
+  };
+  const _mtUsed={};
   answered.forEach(function(x){
     const j=(resumeData.jobs||[])[x.ji]; if(!j) return;
     /* the bullet embeds the user's LITERAL answer — no invented outcomes */
-    let b='';
-    if(x.unit==='accounts') b='Managed '+x.ans+' accounts and client relationships end-to-end';
-    else if(x.unit==='people') b='Worked with and supported a team of '+x.ans;
-    else if(x.unit==='budget') b='Owned work touching '+x.ans+' in budget/revenue';
-    else b='Handled '+x.ans+' as part of the core workload';
+    const bank=_MT[x.unit]||_MT.volume;
+    const k=_mtUsed[x.unit]||0; _mtUsed[x.unit]=k+1;
+    const b=bank[k%bank.length](x.ans);
     j.b=(j.b?(j.b+'\n'):'')+b;
     try{ const ta=document.getElementById('duties-ta-'+x.ji); if(ta) ta.value=j.b; }catch(e){}
     added++;
@@ -10106,8 +10180,29 @@ function _cityStateOf(addr){
   if(parts.length>=2) return parts.slice(-2).join(', ');
   if(parts.length===1){
     const m=parts[0].match(/^(.+?)[\s,]+([A-Za-z]{2})$/);   /* "Houston TX" → City, ST */
-    return m ? (m[1].trim()+', '+m[2].toUpperCase()) : parts[0];
+    if(m && !/^\d/.test(parts[0])) return m[1].trim()+', '+m[2].toUpperCase();
   }
+  /* v118: a NO-COMMA address ("5606 Main St Houston TX 77081") collapsed to one
+     street-leading part that the digit filter dropped → the resume showed
+     NOTHING instead of "Houston, TX" (founder live repro). Parse the tail of
+     the de-zipped string (up to 2 words + state, shedding street suffixes),
+     then fall back to the saved market — never the street, never empty when we
+     know their market. */
+  try{
+    const flat=addr.replace(/,/g,' ').replace(/\s*\d{5}(-\d{4})?\s*$/,'').replace(/\s+/g,' ').trim();
+    const tm=flat.match(/([A-Za-z][A-Za-z.'-]*(?:\s[A-Za-z][A-Za-z.'-]*)?)\s+([A-Za-z]{2})$/);
+    if(tm){
+      const SUF=/^(st|ave|rd|blvd|dr|ln|ct|pkwy|hwy|way|cir|pl|ter|street|avenue|road|drive|lane|court|place|circle|suite|ste|apt|unit)\.?$/i;
+      const cw=tm[1].split(/\s+/);
+      while(cw.length>1 && SUF.test(cw[0])) cw.shift();
+      if(cw.length && !SUF.test(cw[0]) && !/^\d/.test(cw[0])) return cw.join(' ')+', '+tm[2].toUpperCase();
+    }
+  }catch(e){}
+  if(parts.length===1) return parts[0];   /* a bare city stays itself */
+  try{
+    const home=(localStorage.getItem('gpj_loc')||'').trim();
+    if(/^[^,]+,\s*[A-Za-z]{2}/.test(home)) return home.split(',').slice(0,2).map(s=>s.trim()).join(', ');
+  }catch(e){}
   return '';   /* nothing recognizable → show nothing rather than the street */
 }
 /* the address string to put on the r\u00e9sum\u00e9, honoring both F-ADDR toggles */
@@ -11088,8 +11183,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v117';
+const APP_VERSION = 'v118';
 const CHANGELOG = {
+  'v118':['Founder live-test bug batch: employer-job pool, discoverable persistence, City/State, rater corpus, optimizer copy, metric variety, completeness'],
   'v117':['Listings edit + verified fill-source capture'],
   'v104':['Employers now see candidates matched to their roles — ranked by fit, applicants first, contact shared only for candidates who opted in. Matching runs nightly on opted-in candidates only, never sold.'],
   'v103':['Ghost reports now count across all hunters (community reports), and every automated email carries a one-click unsubscribe. Behind the scenes: a dead email function was fixed.'],
@@ -14251,6 +14347,19 @@ async function loadTierFromProfile(u){
         if(typeof loadAccount==='function') loadAccount();
         try{ const chip=document.getElementById('auth-chip'); if(chip&&u) chip.textContent='🙂 '+profileDisplayName(u); }catch(e2){}
         dbg('profile merged (cloudT='+cloudT+' localT='+localT+')');
+      }catch(e){}
+    }
+    /* v118: restore the TOP-LEVEL `discoverable` opt-in. The account merge above
+       rebuilds gpj_profile from account fields, and sign-out clears local state —
+       so this flag silently reset to OFF every login, keeping every opted-in
+       candidate OUT of the employer match pool (founder live repro). */
+    if(typeof p.discoverable!=='undefined'){
+      try{
+        const lp=(typeof getProfile==='function')?getProfile():{};
+        lp.discoverable=(p.discoverable===true);
+        localStorage.setItem('gpj_profile',JSON.stringify(lp));
+        const dt=document.getElementById('discoverable-toggle');
+        if(dt) dt.classList.toggle('on', p.discoverable===true);
       }catch(e){}
     }
     /* MATCH PREFERENCES — restore into DOM so account page shows them */
