@@ -145,6 +145,19 @@ async function handleEvent(fs, event) {
     return { ok: true, downgraded: c.uid };
   }
 
+  // REFUNDS + CHARGEBACKS. This is the ONLY revoke signal for a LIFETIME pass —
+  // there's no subscription to cancel, so without this a refunded $12 customer would
+  // keep unlimited access forever. A PARTIAL refund is left alone (they still paid).
+  if (event.type === 'charge.refunded' || event.type === 'charge.dispute.created') {
+    const c = await lookupCustomer(fs, o.customer);
+    if (!c) return { ok: false, reason: 'unknown_customer' };
+    const partial = event.type === 'charge.refunded' && o.refunded === false;
+    if (partial) return { ok: true, ignored: 'partial_refund' };
+    await applyEntitlement(fs, { uid: c.uid, kind: c.kind, tier: 'free', plan: 'free', paidUntil: null });
+    console.log('[stripe] revoked', c.uid, 'via', event.type);
+    return { ok: true, revoked: c.uid, reason: event.type };
+  }
+
   return { ok: true, ignored: event.type };
 }
 

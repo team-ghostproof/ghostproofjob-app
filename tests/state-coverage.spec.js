@@ -2514,6 +2514,87 @@ test.describe('[STATE-COVERAGE] v109 R9-A employer nav visibility + desktop reac
   });
 });
 
+test.describe('[STATE-COVERAGE] v116 notification centre', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => { localStorage.removeItem('gpj_notif_seen'); localStorage.removeItem('gpj_notif_marks'); localStorage.removeItem('gpj_paid_until'); });
+  });
+
+  test('candidate: employer activity + plan expiry, unread badge, click routes + marks read', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {}; window._recruiter = null;
+      fb.current = () => ({ uid: 'c1', email: 'jane@x.com' });
+      fb.loadMyReachouts = async () => ([
+        { id: 'ro1', kind: 'reachout', company: 'Medtronic', jobTitle: 'Ops Manager', status: 'sent', ts: 3 },
+        { id: 'ro2', kind: 'reachout', company: 'Acme', jobTitle: 'Analyst', status: 'sent', proposedTimes: ['Tue 2pm CT'], ts: 2 },
+        { id: 'ro3', kind: 'rejection', company: 'Beta', jobTitle: 'Coordinator', status: 'sent', ts: 1 },
+        { id: 'ro4', kind: 'reachout', company: 'Old', jobTitle: 'X', status: 'interested', ts: 0 },
+      ]);
+      localStorage.setItem('gpj_paid_until', String(Date.now() + 3 * 86400000));
+      await _gpjNotifLoad();
+      const titles = (window._notifs || []).map((n) => n.title);
+      const badge = document.getElementById('notif-badge').textContent;
+      const first = window._notifs[0];
+      notifGo(first.id);
+      const afterClick = document.getElementById('notif-badge').textContent;
+      markAllNotifRead();
+      return { titles, badge, afterClick, badgeGone: getComputedStyle(document.getElementById('notif-badge')).display === 'none', read: _notifSeen().has(first.id) };
+    });
+    expect(r.titles.some((t) => /wants you for Ops Manager/.test(t)), 'a reach-out is a hot match').toBe(true);
+    expect(r.titles.some((t) => /proposed interview times/.test(t)), 'R7 slots surface').toBe(true);
+    expect(r.titles.some((t) => /sent an update/.test(t)), 'a respectful decline surfaces').toBe(true);
+    expect(r.titles.some((t) => /renews in 3 days/.test(t)), 'plan expiry warns a week out').toBe(true);
+    expect(r.titles.some((t) => /Old/.test(t)), 'an ALREADY-answered reach-out must not nag').toBe(false);
+    expect(r.badge).toBe('4');
+    expect(r.afterClick, 'clicking marks that one read').toBe('3');
+    expect(r.read).toBe(true);
+    expect(r.badgeGone, 'mark-all clears the badge').toBe(true);
+  });
+
+  test('recruiter: applicants/matches/reviews/responses route to the right tab; no repeat nag', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      window._recruiter = { uid: 'r1', company: 'Acme Talent', companyId: 'acme.com', role: 'owner', isValidated: true, plan: 'pro', planUntil: Date.now() + 5 * 86400000 };
+      fb.current = () => ({ uid: 'r1', email: 'r@acme.com' });
+      fb.loadSentReachouts = async () => ([
+        { id: 's1', status: 'interested', candidateName: 'Jane D.', jobTitle: 'Ops', acceptedTime: 'Tue 2pm CT', respondedAt: 9 },
+        { id: 's2', status: 'appealed', candidateName: 'Sam R.', jobTitle: 'Analyst', respondedAt: 8 },
+        { id: 's3', status: 'sent', candidateName: 'Nobody' },
+      ]);
+      fb.loadRecruiterJobs = async () => ([{ id: 'j1', title: 'Ops Manager', isValidated: true }]);
+      fb.countJobApplicants = async () => 3;
+      fb.loadRecommendedCandidates = async () => ([{ uid: 'c1' }, { uid: 'c2' }]);
+      fb.countGhostReports = async () => 2;
+      await _gpjNotifLoad();
+      const byTitle = {}; (window._notifs || []).forEach((n) => { byTitle[n.title] = n.view; });
+      const titles = Object.keys(byTitle);
+      await _gpjNotifLoad();                       // second pass: rollups must not repeat
+      const second = (window._notifs || []).map((n) => n.title);
+      return { byTitle, titles, second };
+    });
+    const find = (re) => Object.keys(r.byTitle).find((t) => re.test(t));
+    expect(r.byTitle[find(/new applicants/)], 'applicants -> Applicants tab').toBe('browse');
+    expect(r.byTitle[find(/new matches/)], 'matches -> Candidates tab').toBe('swipe');
+    expect(r.byTitle[find(/review activity/)], 'reviews -> Reviews tab').toBe('ghost');
+    expect(r.byTitle[find(/is interested/)], 'a response -> Candidates tab').toBe('swipe');
+    expect(find(/appealed your decline/), 'appeals surface to the recruiter').toBeTruthy();
+    expect(find(/Pro plan renews in 5 days/), 'employer plan expiry warns too').toBeTruthy();
+    expect(r.titles.some((t) => /Nobody/.test(t)), 'an unanswered reach-out is not a response').toBe(false);
+    expect(r.second.some((t) => /new applicants/.test(t)), 'the same count must not nag twice').toBe(false);
+  });
+
+  test('signed out: no bell at all', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {}; fb.current = () => null; window._recruiter = null;
+      await _gpjNotifLoad();
+      return { bell: getComputedStyle(document.getElementById('notif-bell')).display, count: (window._notifs || []).length };
+    });
+    expect(r.bell).toBe('none');
+    expect(r.count).toBe(0);
+  });
+});
+
 test.describe('[STATE-COVERAGE] v112 company team — seats + roles', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });

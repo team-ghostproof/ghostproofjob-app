@@ -122,6 +122,30 @@ describe('cancel / non-payment — auto-downgrade to free (both sides)', () => {
     assert.equal(fs._data.recruiters.r1.plan, 'pro', 'an active renewal must not downgrade');
     assert.equal(fs._data.recruiters.r1.planUntil, end * 1000, 'the entitlement window rolls forward');
   });
+  test('REFUND of a LIFETIME pass revokes it (the only revoke signal — no sub to cancel)', async () => {
+    const fs = fakeDb({
+      stripe_customers: { cus_3: { uid: 'uidL', kind: 'candidate', key: 'life' } },
+      profiles: { uidL: { tier: 'life', paidUntil: null } },
+    });
+    await handleEvent(fs, { type: 'charge.refunded', data: { object: { customer: 'cus_3', refunded: true } } });
+    assert.equal(fs._data.profiles.uidL.tier, 'free', 'a refunded lifetime pass must not stay unlimited forever');
+  });
+  test('REFUND on the recruiter side revokes the plan too', async () => {
+    const fs = seeded();
+    await handleEvent(fs, { type: 'charge.refunded', data: { object: { customer: 'cus_2', refunded: true } } });
+    assert.equal(fs._data.recruiters.r1.plan, 'free');
+  });
+  test('a PARTIAL refund is left alone (they still paid)', async () => {
+    const fs = seeded();
+    const r = await handleEvent(fs, { type: 'charge.refunded', data: { object: { customer: 'cus_1', refunded: false } } });
+    assert.equal(r.ignored, 'partial_refund');
+    assert.equal(fs._data.profiles.uidA.tier, 'month', 'untouched');
+  });
+  test('a CHARGEBACK (dispute) revokes access', async () => {
+    const fs = seeded();
+    await handleEvent(fs, { type: 'charge.dispute.created', data: { object: { customer: 'cus_1' } } });
+    assert.equal(fs._data.profiles.uidA.tier, 'free');
+  });
   test('an event for an UNKNOWN customer changes nothing', async () => {
     const fs = seeded();
     const r = await handleEvent(fs, { type: 'customer.subscription.deleted', data: { object: { customer: 'cus_nope' } } });
@@ -130,9 +154,10 @@ describe('cancel / non-payment — auto-downgrade to free (both sides)', () => {
   });
   test('unrelated events are ignored safely', async () => {
     const fs = seeded();
-    const r = await handleEvent(fs, { type: 'charge.refunded', data: { object: {} } });
+    const r = await handleEvent(fs, { type: 'customer.created', data: { object: {} } });
     assert.equal(r.ok, true);
-    assert.equal(r.ignored, 'charge.refunded');
+    assert.equal(r.ignored, 'customer.created');
+    assert.equal(fs._data.profiles.uidA.tier, 'month', 'nothing touched');
   });
 });
 

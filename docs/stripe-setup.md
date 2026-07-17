@@ -18,6 +18,10 @@ the 5-role cap in place.
 | `customer.subscription.updated` | roll `paidUntil` forward, or downgrade if canceled/unpaid |
 | `customer.subscription.deleted` | **back to free** |
 | `invoice.payment_failed` | **back to free** |
+| `charge.refunded` (full) | **back to free** — the only revoke signal for a **lifetime** pass |
+| `charge.dispute.created` | **back to free** (chargeback) |
+
+A **partial** refund is deliberately ignored — they still paid.
 
 Plus a belt-and-braces guard in the app: if `paidUntil` has passed, the account reads
 as **free** regardless of the cached tier — so a lapsed plan can never linger as paid
@@ -40,11 +44,13 @@ even if a webhook is ever missed.
 **Stripe → Developers → Webhooks → Add endpoint**
 
 - **URL:** `https://ghostproofjob.com/api/stripe-webhook`
-- **Events to send** (exactly these four):
+- **Events to send** (exactly these six):
   - `checkout.session.completed`
   - `customer.subscription.updated`
   - `customer.subscription.deleted`
   - `invoice.payment_failed`
+  - `charge.refunded`
+  - `charge.dispute.created`
 
 Copy the **Signing secret** (`whsec_…`) into `STRIPE_WEBHOOK_SECRET` on Vercel.
 
@@ -98,8 +104,9 @@ Use Stripe **test mode** (test keys + a test webhook endpoint), then:
   in first, otherwise there's no account to unlock. (Previously they could pay into
   the void.)
 - **Lifetime never expires** — it stores no `paidUntil`.
-- **Refunds** aren't wired (`charge.refunded` is ignored). If you refund someone,
-  cancel their subscription too, or drop their tier from the admin panel.
+- **Refunds ARE wired.** A full refund or a chargeback drops the account to free —
+  including a **lifetime** pass, which has no subscription to cancel and would
+  otherwise keep unlimited access forever. Partial refunds are left alone.
 - **Existing manual grants keep working** — an admin can still set a tier by hand, and
   that path is unchanged.
 - **`stripe_customers/{customerId}`** maps a Stripe customer back to a uid on first

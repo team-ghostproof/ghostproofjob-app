@@ -825,6 +825,20 @@
             <div class="pm-item" onclick="pmSignOut()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--danger);">🚪 Sign Out</div>
           </div>
         </div>
+        <!-- v116 notification centre: sits between the account chip and the plan
+             button. Unread badge; everything it shows is derived from data we
+             already read (reach-outs, applicants, matches, reviews, plan expiry) —
+             no new collection, no per-swipe reads. -->
+        <div style="position:relative;" id="notif-wrap">
+          <div id="notif-bell" onclick="toggleNotif()" title="Notifications" style="display:none;background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.35);color:var(--cyber);font-size:13px;font-weight:700;padding:5px 9px;border-radius:10px;cursor:pointer;line-height:1.3;">🔔<span id="notif-badge" style="display:none;position:absolute;top:-5px;right:-5px;background:var(--danger);color:#fff;font-size:9px;font-weight:800;min-width:15px;height:15px;border-radius:8px;padding:0 4px;line-height:15px;text-align:center;">0</span></div>
+          <div id="notif-panel" style="display:none;position:fixed;right:10px;top:60px;z-index:400;background:var(--plum2);border:1px solid var(--plum4);border-radius:14px;padding:6px;width:min(340px,calc(100vw - 20px));max-height:min(460px,70vh);overflow-y:auto;box-shadow:0 12px 34px rgba(0,0,0,.6);">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px 6px;">
+              <div style="font-size:12px;font-weight:800;color:var(--off);">Notifications</div>
+              <div id="notif-readall" onclick="markAllNotifRead()" style="font-size:10.5px;color:var(--cyber);cursor:pointer;font-weight:700;">Mark all read</div>
+            </div>
+            <div id="notif-list"></div>
+          </div>
+        </div>
         <div id="upgrade-trigger" onclick="toggleUpgrade()" style="background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.3);color:var(--mint);font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:pointer;">Support Us ▾</div>
       </div>
     </div>
@@ -2620,7 +2634,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v115</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v116</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3619,6 +3633,169 @@ function fileReviewDispute(){
   try{ if(window.fb&&fb.current&&fb.current()){ const u=fb.current(); fb.saveProfile(u.uid+'_dispute_'+Date.now(),{collection:'review_disputes',company:(window._recruiter&&window._recruiter.company)||'',uid:u.uid,message:String(why).slice(0,1000),ts:Date.now()}); } }catch(e){}
   showToast('🚩 Dispute sent — a human at GhostProofJob will review it.');
 }
+
+/* ============================================================================
+   v116 — NOTIFICATION CENTRE
+   One bell for everything that happened TO you. Deliberately derived from data we
+   ALREADY read (reach-outs, applicants, matches, reviews) plus the plan window we
+   already store — no notifications collection, no writes per event, and nothing on
+   the candidate hot path. Loads once per session and on demand when opened, so it
+   costs a couple of bounded queries per session (D1-conscious).
+   Unread state is per-device in localStorage, keyed by a stable id per event.
+   ============================================================================ */
+const NOTIF_SEEN_KEY='gpj_notif_seen';
+const NOTIF_MARK_KEY='gpj_notif_marks';   /* last-seen counters for "N new …" rollups */
+function _notifSeen(){ try{ return new Set(JSON.parse(localStorage.getItem(NOTIF_SEEN_KEY)||'[]')); }catch(e){ return new Set(); } }
+function _notifSaveSeen(set){ try{ localStorage.setItem(NOTIF_SEEN_KEY, JSON.stringify([...set].slice(-300))); }catch(e){} }
+function _notifMarks(){ try{ return JSON.parse(localStorage.getItem(NOTIF_MARK_KEY)||'{}'); }catch(e){ return {}; } }
+function _notifSaveMarks(m){ try{ localStorage.setItem(NOTIF_MARK_KEY, JSON.stringify(m)); }catch(e){} }
+function _daysLeft(ts){ return Math.ceil((ts-Date.now())/86400000); }
+
+/* plan-expiry warning (both sides) — pure math on data we already hold, zero reads */
+function _notifPlanExpiry(){
+  const out=[];
+  try{
+    if(_gpjRecruiterMode()){
+      const u=(window._recruiter&&window._recruiter.planUntil)||0;
+      if(u){ const d=_daysLeft(u);
+        if(d<=7&&d>=0) out.push({id:'planrec:'+u,icon:'⏳',title:'Your '+_recPlanLabel()+' plan renews in '+d+' day'+(d===1?'':'s'),body:'If it lapses your company drops to Free (5 live roles).',ts:Date.now(),view:'account'});
+        else if(d<0) out.push({id:'planrecx:'+u,icon:'🔌',title:'Your employer plan has ended',body:'You’re on Free — up to 5 live roles. Upgrade anytime.',ts:Date.now(),view:'account'});
+      }
+    } else {
+      const u=_gpjPaidUntil();
+      if(u){ const d=_daysLeft(u);
+        if(d<=7&&d>=0) out.push({id:'plan:'+u,icon:'⏳',title:'Your membership renews in '+d+' day'+(d===1?'':'s'),body:'Nothing to do — this is just a heads-up so it’s never a surprise.',ts:Date.now(),view:'account'});
+        else if(d<0) out.push({id:'planx:'+u,icon:'🔌',title:'Your membership has ended',body:'You’re back on the free track — applications are still unlimited.',ts:Date.now(),view:'account'});
+      }
+    }
+  }catch(e){}
+  return out;
+}
+/* CANDIDATE: what employers did to you (reuses the R6 tray query) */
+async function _notifCandidate(){
+  const out=[];
+  try{
+    if(!(window.fb&&fb.loadMyReachouts)) return out;
+    const list=await fb.loadMyReachouts();
+    (list||[]).forEach(r=>{
+      const co=r.company||'An employer', jt=r.jobTitle||'a role';
+      if(r.kind==='rejection'){
+        if(r.status==='sent') out.push({id:'ro:'+r.id+':rej',icon:'💬',title:co+' sent an update on '+jt,body:'They told you instead of ghosting you. You can respectfully appeal.',ts:r.ts||0,view:'account'});
+      } else if(r.status==='sent'){
+        if(Array.isArray(r.proposedTimes)&&r.proposedTimes.length)
+          out.push({id:'ro:'+r.id+':slots',icon:'📅',title:co+' proposed interview times',body:'Pick a time that works for '+jt+'.',ts:r.ts||0,view:'account'});
+        else
+          out.push({id:'ro:'+r.id+':new',icon:'🔥',title:co+' wants you for '+jt,body:'A hot match — they reached out to you directly.',ts:r.ts||0,view:'account'});
+      }
+    });
+  }catch(e){}
+  return out;
+}
+/* RECRUITER: responses, new applicants, new matches, review activity */
+async function _notifRecruiter(){
+  const out=[]; const marks=_notifMarks(); let dirty=false;
+  try{
+    if(window.fb&&fb.loadSentReachouts){
+      const sent=await fb.loadSentReachouts();
+      (sent||[]).filter(r=>r.status&&r.status!=='sent').forEach(r=>{
+        const who=r.candidateName||'A candidate';
+        if(r.status==='interested') out.push({id:'resp:'+r.id+':int',icon:'👍',title:who+' is interested',body:(r.acceptedTime?('Interview time: '+r.acceptedTime):('In '+(r.jobTitle||'your role')+'.')),ts:r.respondedAt||r.ts||0,view:'swipe'});
+        else if(r.status==='appealed') out.push({id:'resp:'+r.id+':app',icon:'⤴',title:who+' appealed your decline',body:'A quick reconsider-or-reaffirm keeps your responsiveness high.',ts:r.respondedAt||r.ts||0,view:'swipe'});
+      });
+    }
+    const r=window._recruiter||{};
+    if(window.fb&&fb.loadRecruiterJobs&&r.uid){
+      const jobs=await fb.loadRecruiterJobs(r.uid);
+      for(const j of (jobs||[])){
+        if(fb.countJobApplicants){
+          const n=await fb.countJobApplicants(j.id);
+          const k='app:'+j.id, prev=marks[k]||0;
+          if(typeof n==='number'&&n>prev){
+            out.push({id:k+':'+n,icon:'📥',title:(n-prev)+' new applicant'+((n-prev)===1?'':'s')+' · '+(j.title||'your role'),body:'Open their Candidate Card to see the résumé + cover letter.',ts:Date.now(),view:'browse'});
+            marks[k]=n; dirty=true;
+          }
+        }
+        if(fb.loadRecommendedCandidates && j.isValidated && !j.filled){
+          const cs=await fb.loadRecommendedCandidates(j.id);
+          const n=(cs||[]).length, k='mat:'+j.id, prev=marks[k]||0;
+          if(n>prev){
+            out.push({id:k+':'+n,icon:'🎯',title:(n-prev)+' new match'+((n-prev)===1?'':'es')+' · '+(j.title||'your role'),body:'Anonymous until they accept — send them the role.',ts:Date.now(),view:'swipe'});
+            marks[k]=n; dirty=true;
+          }
+        }
+      }
+    }
+    if(window.fb&&fb.countGhostReports&&r.company){
+      const n=await fb.countGhostReports(r.company);
+      const k='rev:'+String(r.company).toLowerCase(), prev=marks[k]||0;
+      if(typeof n==='number'&&n>prev){
+        out.push({id:k+':'+n,icon:'⭐',title:'New review activity for '+r.company,body:(n-prev)+' new report'+((n-prev)===1?'':'s')+'. You can dispute anything inaccurate.',ts:Date.now(),view:'ghost'});
+        marks[k]=n; dirty=true;
+      }
+    }
+  }catch(e){}
+  if(dirty) _notifSaveMarks(marks);
+  return out;
+}
+async function _gpjNotifLoad(){
+  let list=[];
+  try{
+    if(!(window.fb&&fb.current&&fb.current())) { window._notifs=[]; _gpjNotifPaint(); return []; }
+    const role=_gpjRecruiterMode()?await _notifRecruiter():await _notifCandidate();
+    list=_notifPlanExpiry().concat(role);
+    list.sort((a,b)=>(b.ts||0)-(a.ts||0));
+  }catch(e){}
+  window._notifs=list;
+  _gpjNotifPaint();
+  return list;
+}
+function _gpjNotifPaint(){
+  const bell=document.getElementById('notif-bell'); if(!bell) return;
+  const signedIn=!!(window.fb&&fb.current&&fb.current());
+  bell.style.display=signedIn?'block':'none';
+  const seen=_notifSeen();
+  const unread=(window._notifs||[]).filter(n=>!seen.has(n.id)).length;
+  const badge=document.getElementById('notif-badge');
+  if(badge){ badge.style.display=unread?'block':'none'; badge.textContent=unread>9?'9+':String(unread); }
+}
+function renderNotifPanel(){
+  const box=document.getElementById('notif-list'); if(!box) return;
+  const list=window._notifs||[], seen=_notifSeen();
+  if(!list.length){ box.innerHTML='<div style="padding:20px 12px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7;">🔕 Nothing new.<br>Matches, messages and plan reminders land here.</div>'; return; }
+  box.innerHTML=list.map(n=>{
+    const unread=!seen.has(n.id);
+    return '<div onclick="notifGo(\''+_esc(n.id).replace(/'/g,'')+'\')" style="display:flex;gap:10px;padding:10px 11px;border-radius:10px;cursor:pointer;background:'+(unread?'rgba(181,95,230,.10)':'transparent')+';margin-bottom:2px;">'
+      +'<div style="font-size:15px;line-height:1.3;">'+n.icon+'</div>'
+      +'<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:'+(unread?'800':'600')+';color:var(--off);line-height:1.4;">'+_esc(n.title)+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-top:2px;">'+_esc(n.body)+'</div></div>'
+      +(unread?'<div style="width:7px;height:7px;border-radius:50%;background:var(--cyber);flex:none;margin-top:5px;"></div>':'')+'</div>';
+  }).join('');
+}
+async function toggleNotif(){
+  const p=document.getElementById('notif-panel'); if(!p) return;
+  const open=p.style.display!=='none';
+  if(open){ p.style.display='none'; return; }
+  try{ const pm=document.getElementById('profile-menu'); if(pm) pm.style.display='none'; }catch(e){}
+  p.style.display='block';
+  renderNotifPanel();                 /* paint what we have instantly */
+  await _gpjNotifLoad();              /* then refresh in place */
+  renderNotifPanel();
+}
+/* clicking a notification marks it read AND takes you where it lives */
+function notifGo(id){
+  const n=(window._notifs||[]).find(x=>x.id===id); if(!n) return;
+  const seen=_notifSeen(); seen.add(id); _notifSaveSeen(seen);
+  try{ document.getElementById('notif-panel').style.display='none'; }catch(e){}
+  try{ switchView(n.view, document.querySelector('[data-view='+n.view+']')); }catch(e){}
+  _gpjNotifPaint();
+}
+function markAllNotifRead(){
+  const seen=_notifSeen(); (window._notifs||[]).forEach(n=>seen.add(n.id)); _notifSaveSeen(seen);
+  _gpjNotifPaint(); renderNotifPanel();
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#notif-wrap')){ const p=document.getElementById('notif-panel'); if(p) p.style.display='none'; }
+});
 
 /* ===== UPGRADE MENU ===== */
 function toggleUpgrade(){ document.getElementById('upgrade-menu').classList.toggle('open'); }
@@ -10799,7 +10976,7 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v115';
+const APP_VERSION = 'v116';
 const CHANGELOG = {
   'v104':['Employers now see candidates matched to their roles — ranked by fit, applicants first, contact shared only for candidates who opted in. Matching runs nightly on opted-in candidates only, never sold.'],
   'v103':['Ghost reports now count across all hunters (community reports), and every automated email carries a one-click unsubscribe. Behind the scenes: a dead email function was fixed.'],
@@ -13860,6 +14037,10 @@ window.gpjAuthChanged=function(u){
   const sync=()=>{ try{applyTierState();}catch(e){} try{refreshGraceDisplays();}catch(e){} try{updateEnergyMeter();}catch(e){} };
   sync();
   setTimeout(sync, 900);   /* re-sync after the cloud profile/tier finishes loading */
+  /* v116: load the notification centre ONCE per sign-in, deferred so it never sits on
+     the boot/hot path. It refreshes again whenever the bell is opened. */
+  try{ _gpjNotifPaint(); }catch(e){}
+  if(u) setTimeout(()=>{ try{ _gpjNotifLoad(); }catch(e){} }, 1600);
 };
 /* RECRUITER role-detection on auth — chained LAST so it survives the candidate
    handler's bare reassignment (index.html §auth). Gated on gpj_role==='recruiter'
