@@ -1,14 +1,37 @@
 # GhostProofJob — Master Audit Checklist & Roadmap
 
-**Frontend benchmark:** v101a (2026-07-11: §5 all-pass · boot RAN TO COMPLETION · div delta 0 · mirror byte-identical · Playwright 138/138 ×2 = 130 v100 benchmark held + 4 new v101a account-switch tests · browser before/after evidence `docs/v101a-screens/`). NOTE: the v101 stabilize batch (dupes/sort/z/remote/F-ADDR/AI-quality, 146/146-verified) is PARKED on branch `v101b-staged` — ships as v101b AFTER v101a live-verifies. Prior: v100 (2026-07-10: §5 all-pass · boot harness RAN TO COMPLETION · div delta 0 · mirror byte-identical · duplicate DOM ids 0 · handler audit 0 missing · Playwright 130/130 ×2 = 126 candidate benchmark held + 4 new v100 smart-data tests). Candidate CONFIRMED benchmark = v96. Prior: v99, v97, v67.
+**Current build: v117** (2026-07-17). Benchmark green: §4 all-pass (JS syntax · boot harness RAN TO COMPLETION · div delta 0/2140 balanced · mirror byte-identical · duplicate DOM ids 0 of 445 · handler audit 0 missing of 161) · **Playwright 293/293 ×3** · **Firestore rules emulator 103/103** · backend suites 84/84 (match 36 · billing 18 · seo 13 · growth 11 · email 6). Candidate CONFIRMED benchmark = v96; the candidate suite has held with zero regression through the whole recruiter build.
 
-## SPRINT R9 — RECRUITER FULL VIEW (IN PROGRESS, started 2026-07-14, [UI-REVIEW] approved)
-**Current live build: v108.** Architecture (founder-approved): **reskin the existing 6 tabs by account role** — one `_gpjRecruiterMode()` check drives each tab's content + nav labels; the current `#view-employer` decomposes into the tabs. Reuses the nav shell (mobile footer + desktop rail) → also fixes the **desktop "For Employers" bug** (root cause: `buildDesktopGrid` never moved `#view-employer` into `#desk-main`, so the view rendered outside the clipped grid → clicking did nothing).
-Tab map (candidate → recruiter): **Swipe** → anonymous candidate matches (match% + local + role-fit; send job = R5 outreach; candidate sees a 🔥 hot match in the R6 tray) · **Browse** → applicants-by-job → **Candidate Card** (🧑) · **Resume** → **Listings** (post/edit/mark-filled/remove) · **Ghosts** → **Reviews** (view + dispute-to-admin) · **Account/Profile** → **Company Profile** · **Settings** → recruiter verbiage + recruiter Plan card (v108 Stripe tiers).
-Founder decisions (all confirmed): reskin-by-role · Swipe **anonymous until accept** · Candidate Card resume/cover **snapshot at apply time** (applying = consent; needs a small rules tweak — applications currently store only `{status,ts,title,company}`) · Reviews **view+dispute-to-admin now**, public replies later.
-Visibility: "For Employers" **hidden for signed-in individuals**, shown for guests + admins (testing) + as the recruiter home.
-Increments (each: benchmark + Playwright + rules-emulator + mobile&desktop verify, no candidate regression): **R9-A** role router + nav relabel + visibility + desktop reachability + reroute · **R9-B** recruiter Swipe (anonymous matches + send) · **R9-C** Browse applicants + Candidate Card + apply-time resume snapshot + rules · **R9-D** Listings edit/mark-filled + Reviews view/dispute + Company Profile tab + Settings verbiage.
-**Feature status (founder asked to verify):** F-GEO ✅ v106 (tested) · Referral ✅ v107 (tested, emulator 82/82) · **SEO page generator ❌ NOT BUILT** (still backlog — was mis-tracked) · D1 read-cost = LAST (after all features + marketing).
+## SPRINT R9 — RECRUITER FULL VIEW — **COMPLETE (v109–v117)**
+Architecture (founder-approved, shipped): **reskin the existing 6 tabs by account role** — `_gpjRecruiterMode()` drives each tab's content + nav labels via a `.rec-mode` class and per-view `.rec-panel`s, so **zero candidate regression by construction** (the candidate views are never touched). This also fixed the **desktop "For Employers" bug** (root cause: `buildDesktopGrid` never moved `#view-employer` into `#desk-main`, so the view rendered outside the clipped grid → clicking did nothing).
+
+Tab map (candidate → recruiter): **Swipe** → anonymous candidate matches · **Browse** → applicants-by-job → **Candidate Card** (🧑) · **Resume** → **Listings** (post / **edit** / close-filled / remove) · **Ghosts** → **Reviews** (view + dispute-to-admin) · **Account** → **Company Profile** + team · **Settings** → recruiter verbiage + recruiter Plan card.
+
+### Employer side — full flow audit (2026-07-17, browser-verified end to end)
+| Flow | State |
+|---|---|
+| Account creation (corporate-domain gate, admin verify queue) | ✅ |
+| Edit company profile | ✅ |
+| Add company contacts (email-bound invites, seats by plan) | ✅ |
+| Post a role | ✅ |
+| **Edit a live role in place** | ✅ **v117** — previously delete + re-post, which threw away applicants |
+| Review résumé + cover letter (Candidate Card) | ✅ |
+| See matches (anonymous until accept) | ✅ |
+| Communicate with candidates (reach-out / respectful decline / appeal) | ✅ |
+| Schedule an interview (propose up to 3 slots → candidate picks) | ✅ minimal-real: free-text slots, no calendar integration |
+| **Close / fill a role + how it was filled** | ✅ **v117** — GPJ / elsewhere / cancelled |
+| Account levels (owner / admin / standard · free / premium / pro · pending / verified) | ✅ enforced in UI **and** rules |
+
+**Permission matrix (verified in-browser):** owner + admin → edit company, invite teammates, `_recIsCompanyAdmin()` true. standard → **no invite, no Save on company profile** (rules also deny the write). Seats: Free 1 · Premium 5 · Pro unlimited. A **lapsed** plan reads as Free everywhere (`_recPlanLabel()` / `_gpjPaidLapsed()`).
+
+### Gaps found by the audit (nothing blocking, all disclosed)
+1. **Verified-hire data is captured but not surfaced.** v117 starts recording `filledVia` and logs an anonymous proof-point on a GPJ hire — but no view aggregates it yet. "N roles filled through GhostProofJob" needs a screen before it can be used as a public claim. **Do not claim it publicly until the aggregate exists and has real numbers.**
+2. **Messaging is not a thread.** One reach-out + one structured response (interested / not now / slot / appeal). No back-and-forth inbox. Framed honestly in-product; not an ATS.
+3. **Scheduling is free-text slots** via a prompt, not calendar integration. Honest as-is.
+4. **Polish:** a `standard` member sees company-profile fields that look editable but has no Save button and no note explaining why.
+
+**Feature status:** F-GEO ✅ v106 · Referral ✅ v107 · SEO generator ✅ (61 city pages + sitemap; Search Console reports 63 discovered) · Billing automation ✅ v114–v116 (grant **and** revoke) · Notification centre ✅ v116 · **D1 read-cost = LAST**, by founder instruction — the site gets completed and tested first, so there is less read/write to optimize.
+
 
 ## SPRINT R-pre — STATUS RECONCILIATION (2026-07-06, audited vs live code)
 - **F-CARD** — [x] job card uniform everywhere (v91); company-card review-control **dedup done v97** (#4). COMPLETE.

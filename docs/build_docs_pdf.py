@@ -34,8 +34,8 @@ STOP = colors.HexColor("#C22C48")
 INK = colors.HexColor("#1B1526")
 MUTED = colors.HexColor("#5F5977")
 
-BUILD = "v110"
-DATE = "2026-07-16"
+BUILD = "v117"
+DATE = "2026-07-17"
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 ss = getSampleStyleSheet()
@@ -157,8 +157,13 @@ def build_checklist():
         ("DONE", "R6 Candidate tray", "Reach-outs + declines in Settings; Interested / Not now."),
         ("DONE", "R7 Interview scheduling", "Recruiter proposes up to 3 slots; candidate picks one; confirmed time returns to the recruiter inbox."),
         ("DONE", "R8 Plan caps + Stripe", "Free tier = 5 live roles. Recruiter Premium $79/mo + Pro $149/mo wired to Stripe hosted checkout."),
+        ("DONE", "Billing automation (v114-v116)", "Stripe webhook GRANTS and REVOKES on both sides: checkout grants; cancel / non-payment / full refund / chargeback auto-drop to free. A lapsed paidUntil reads as free even if a webhook is ever missed."),
+        ("DONE", "Company team (v112)", "Owner / admin / standard roles; email-bound invites redeem a company seat on first sign-in; seats by plan (Free 1 / Premium 5 / Pro unlimited)."),
+        ("DONE", "Notification centre (v116)", "Bell + unread badge between the account chip and the plan button; reuses existing data (no new reads); click-through lands on the right tab."),
+        ("DONE", "Listings EDIT in place (v117)", "The same form edits a live role - previously it could only be deleted and re-posted, which threw away its applicants. The seat cap does not fire on an edit. A repaint mid-edit no longer eats unsaved typing."),
+        ("DONE", "Verified fill-source (v117)", "Closing a role asks HOW it was filled: hired via GhostProofJob / filled elsewhere / cancelled. A GPJ hire logs an anonymous aggregate proof-point; 'filled elsewhere' deliberately does NOT count as our hire."),
         ("DONE", "R9 Full recruiter view (v109-v110)", "All 6 tabs reskin by role with real functionality. Fixed the desktop 'For Employers' bug. Zero candidate regression by construction."),
-        ("DONE", "Security rules", "Scoped writes, no self-verify, verified-recruiter gates, consent-gated outreach. Emulator-proven 83/83."),
+        ("DONE", "Security rules", "Scoped writes, no self-verify, verified-recruiter gates, consent-gated outreach. Emulator-proven 103/103."),
     ], [0.6 * inch, 1.75 * inch, 4.65 * inch]))
 
     s.append(PageBreak())
@@ -177,16 +182,25 @@ def build_checklist():
         ("PART", "iOS PWA safe-area (7c)", "Founder device check clears it."),
         ("TODO", "Reviews: public replies", "v110 ships view + dispute-to-admin. Public company replies to individual reviews need a moderation model - phased for later."),
         ("TODO", "Company SEO pages", "Deliberately OFF until legal review."),
+        ("TODO", "Surface the verified-hire data", "v117 STARTS capturing how each role was filled. Nothing displays it yet - the aggregate ('N roles filled via GhostProofJob') needs a view before it can be used as a public proof-point."),
+        ("PART", "Candidate messaging depth", "Outreach is one reach-out + one structured response (interested / not now / slot / appeal). There is no back-and-forth thread; scheduling is free-text slots, not calendar integration. Honest framing: minimal-real, not a full ATS inbox."),
     ], [0.6 * inch, 1.75 * inch, 4.65 * inch]))
 
     s.append(Paragraph("5. Founder actions", H2))
     s.append(Paragraph(
-        "<b>1. Redeploy firestore.rules</b> - v110 adds one rule: a role owner may CLOSE their own live role "
-        "(active true-&gt;false) but still cannot self-activate. Without it, 'Mark filled' is denied.<br/>"
+        "<b>1. Redeploy firestore.rules</b> - carries three security fixes (recruiters could self-set isValidated, "
+        "claim another company's domain, or self-grant a paid tier), the company team model, and the close-role "
+        "rule (a role owner may CLOSE their live role, active true-&gt;false, but never self-activate). Without it, "
+        "'Close / filled' is denied.<br/>"
         "<b>2. Verify recruiter@ is a recruiter account</b> - sign in, open For Employers. Company profile = real "
         "recruiter account (auto-routes now). 'Create employer account' = it was made via candidate signup and "
         "needs recreating through the employer path.<br/>"
-        "<b>3. Submit sitemap</b> - https://ghostproofjob.com/sitemap.xml to Google Search Console once deployed.<br/>"
+        "<b>3. Sitemap</b> - DONE: Search Console reports it processed, 63 pages discovered.<br/>"
+        "<b>3b. Stripe billing</b> - set Vercel env STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET, then add the webhook "
+        "endpoint https://ghostproofjob.com/api/stripe-webhook with SIX events (checkout.session.completed, "
+        "customer.subscription.updated, customer.subscription.deleted, invoice.payment_failed, charge.refunded, "
+        "charge.dispute.created). Until this is done, paying customers are granted NOTHING. See docs/stripe-setup.md.<br/>"
+        "<b>3c. Weekly Content Pack</b> - the marketing engine has never run; trigger it once to confirm.<br/>"
         "<b>4. Deployed already:</b> Worker (mode:summary + CAN-SPAM footers), Firestore rules through v107, "
         "Vercel FIREBASE_SERVICE_ACCOUNT.", BODY))
 
