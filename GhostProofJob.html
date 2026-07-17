@@ -4,6 +4,10 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <meta name="theme-color" content="#120F1D"/>
+<meta name="description" content="GhostProofJob — the ethical, free-until-hired job search. Verified roles, ghost-job flags, and AI resume tailoring that never invents experience. Build · Optimize · Apply."/>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin/>
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin/>
+<link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin/>
 <title>GhostProofJob – Ethical Job Search</title>
 <!-- ===== BRAND ICONS: real GhostProofJob logo (favicon · iOS home-screen · PWA install) ===== -->
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png"/>
@@ -2216,6 +2220,14 @@
             </div>
           </div>
 
+          <!-- v119 (founder-directed): the contact toggles ALSO live here, next to the
+               headshot, so everything you show/hide on the resume is in ONE place.
+               Same stored preference as the Account-page toggles. -->
+          <div class="field-label">Contact on resume</div>
+          <div class="toggle-row" style="margin-bottom:6px;"><div style="font-size:12px;font-weight:600;">📞 Phone number</div><div class="toggle-switch on" id="tpl-phone-toggle" onclick="togglePhoneOnResume(this)"></div></div>
+          <div class="toggle-row" style="margin-bottom:6px;"><div style="font-size:12px;font-weight:600;">📍 Address</div><div class="toggle-switch" id="tpl-address-toggle" onclick="toggleAddressOnResume(this)"></div></div>
+          <div class="toggle-row" style="margin-bottom:12px;"><div style="font-size:12px;font-weight:600;">🏠 Full street address <span style="color:var(--muted);font-weight:400;">(off = City, State only)</span></div><div class="toggle-switch" id="tpl-addrfull-toggle" onclick="toggleAddressFull(this)"></div></div>
+
           <div class="field-label">Target Market <span style="text-transform:none;font-weight:400;">(drives suggestions)</span></div>
           <select class="field-input" id="tpl-market" onchange="marketAdvice()" style="margin-bottom:8px;font-size:13px;">
             <option value="us" selected>🇺🇸 US / Canada</option>
@@ -2670,7 +2682,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v118</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v119</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3189,7 +3201,7 @@ async function saveCompanyProfile(){
   r.contactTitle=val('emp-contact-title').trim();
   if(!r.company){ showToast('Company name is required'); return; }
   try{
-    await fb.createRecruiter(r.uid,{company:r.company,website:r.website,description:r.description,team:r.team,location:r.location,contactFirst:r.contactFirst,contactLast:r.contactLast,contactTitle:r.contactTitle});
+    await fb.createRecruiter(r.uid,{company:r.company,website:r.website,linkedin:r.linkedin||'',x:r.x||'',description:r.description,team:r.team,location:r.location,contactFirst:r.contactFirst,contactLast:r.contactLast,contactTitle:r.contactTitle});
     const companyId=r.companyId||r.domain||r.uid;
     await fb.saveCompany(companyId,{name:r.company,website:r.website,description:r.description,location:r.location});
     showToast('💾 Company profile saved');
@@ -3369,6 +3381,8 @@ function renderRecCompany(){
     +'<div class="rec-sec-title">Company</div>'
     +'<div class="field-label">Company name</div>'+inp('rc-company','Acme Corp',r.company||'')
     +'<div class="field-label">Website</div>'+inp('rc-website','https://acme.com',r.website||'')
+    +'<div class="field-label">LinkedIn page <span style="text-transform:none;font-weight:400;">(optional — used on your job cards)</span></div>'+inp('rc-linkedin','https://linkedin.com/company/acme',r.linkedin||'')
+    +'<div class="field-label">X / Twitter <span style="text-transform:none;font-weight:400;">(optional)</span></div>'+inp('rc-x','https://x.com/acme',r.x||'')
     +'<div class="field-label">What the company does</div>'+inp('rc-desc','One or two lines candidates will see.',r.description||'',true)
     +'<div class="field-label">Team size · time zone</div>'+inp('rc-team','50–200 · CT (Houston)',r.team||'')
     +'<div class="field-label">Location (city, state)</div>'+inp('rc-location','Houston, TX',r.location||'')
@@ -3380,7 +3394,7 @@ function renderRecCompany(){
       : '<div style="background:var(--plum3);border:1px solid var(--plum4);color:var(--muted);border-radius:12px;padding:11px;text-align:center;font-size:11.5px;line-height:1.5;margin-top:6px;">Company details are managed by your company admins. You can post roles and hire.</div>')
     +'<div id="rec-team" style="margin-top:20px;"></div>';
   /* v112: standard members see the company info read-only */
-  if(!_recIsCompanyAdmin()){ ['rc-company','rc-website','rc-desc','rc-team','rc-location','rc-cfirst','rc-clast','rc-ctitle'].forEach(id=>{ const e=document.getElementById(id); if(e){ e.disabled=true; e.style.opacity='.7'; } }); }
+  if(!_recIsCompanyAdmin()){ ['rc-company','rc-website','rc-linkedin','rc-x','rc-desc','rc-team','rc-location','rc-cfirst','rc-clast','rc-ctitle'].forEach(id=>{ const e=document.getElementById(id); if(e){ e.disabled=true; e.style.opacity='.7'; } }); }
   try{ renderRecTeam(); }catch(e){}
 }
 /* v112 company team ------------------------------------------------------- */
@@ -3493,11 +3507,11 @@ async function _gpjRedeemInviteIfPending(){
 async function saveRecCompany(){
   const r=window._recruiter; if(!r){ showToast('Sign in as an employer first'); return; }
   const v=id=>((document.getElementById(id)||{}).value||'').trim();
-  r.company=v('rc-company'); r.website=v('rc-website'); r.description=v('rc-desc'); r.team=v('rc-team');
+  r.company=v('rc-company'); r.website=v('rc-website'); r.linkedin=v('rc-linkedin'); r.x=v('rc-x'); r.description=v('rc-desc'); r.team=v('rc-team');
   r.location=v('rc-location'); r.contactFirst=v('rc-cfirst'); r.contactLast=v('rc-clast'); r.contactTitle=v('rc-ctitle');
   try{
-    if(window.fb&&fb.saveCompany){ const cid=r.companyId||(r.email&&r.email.split('@')[1])||r.uid; await fb.saveCompany(cid,{name:r.company,website:r.website,description:r.description,team:r.team,location:r.location,contactFirst:r.contactFirst,contactLast:r.contactLast,contactTitle:r.contactTitle}); }
-    if(window.fb&&fb.createRecruiter) await fb.createRecruiter(r.uid,{company:r.company,website:r.website,description:r.description,team:r.team,location:r.location,contactFirst:r.contactFirst,contactLast:r.contactLast,contactTitle:r.contactTitle});
+    if(window.fb&&fb.saveCompany){ const cid=r.companyId||(r.email&&r.email.split('@')[1])||r.uid; await fb.saveCompany(cid,{name:r.company,website:r.website,linkedin:r.linkedin||'',x:r.x||'',description:r.description,team:r.team,location:r.location,contactFirst:r.contactFirst,contactLast:r.contactLast,contactTitle:r.contactTitle}); }
+    if(window.fb&&fb.createRecruiter) await fb.createRecruiter(r.uid,{company:r.company,website:r.website,linkedin:r.linkedin||'',x:r.x||'',description:r.description,team:r.team,location:r.location,contactFirst:r.contactFirst,contactLast:r.contactLast,contactTitle:r.contactTitle});
     showToast('✅ Company profile saved');
   }catch(e){ showToast('Could not save — try again'); }
 }
@@ -3553,7 +3567,7 @@ async function postRecJob(){
   /* v118: carry `region` (same "City, ST" shape the harvester writes) so the
      region-scoped candidate query can also find employer roles — belt to the
      fetchJobs internal-merge suspenders. Content field; rules allow on edit too. */
-  const job={title:title,location:remote?'Remote':loc,is_remote:remote,region:remote?'Remote':loc,description:desc,requirements:v('rl-req'),salary_min:parseInt(v('rl-smin'),10)||null,salary_max:parseInt(v('rl-smax'),10)||null,companyId:r.companyId||'',company:r.company||''};
+  const job={title:title,location:remote?'Remote':loc,is_remote:remote,region:remote?'Remote':loc,description:desc,requirements:v('rl-req'),salary_min:parseInt(v('rl-smin'),10)||null,salary_max:parseInt(v('rl-smax'),10)||null,companyId:r.companyId||'',company:r.company||'',companyWebsite:r.website||'',companyLinkedIn:r.linkedin||'',companyX:r.x||''};
   /* v117: the SAME form edits an existing role. Rules keep ownerUid/source/isValidated
      immutable, so this can only ever change content — and the seat cap must not fire
      on an edit (you're not adding a role). */
@@ -4397,7 +4411,9 @@ function mapFirestoreJob(r){
     req:dressEnd(cutWords(_req.replace(/<[^>]+>/g,' ').trim(),4000),250,_capR),
     benefits:dressEnd(cutWords(_ben,2500),200,_capB),
     summary:cutWords(dressEnd((((_req&&_req.length>20)?_req:_desc).replace(/<[^>]+>/g,' ').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim()),250,((_req&&_req.length>20)?_capR:_capD)),11000),
-    ghost:Math.min(95, ghostRiskFor(co)+(_stale?15:0)),
+    ghost:Math.min(95, _ghostHeuristic(r,co)+(_stale?15:0)),
+    _verifiedCo:(r.source==='internal'&&r.isValidated===true),
+    companyWebsite:r.companyWebsite||'', companyLinkedIn:r.companyLinkedIn||'', companyX:r.companyX||'',
     match:(typeof computeMatch==='function'?computeMatch(r.title||'',_desc||r.description||r.desc||''):0),
     posting_age_days:_age,
     stale:_stale,
@@ -4781,7 +4797,7 @@ function browseJobCard(j,i){
     '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">'+
       '<div class="salary-badge">'+dt(j.sal||'Salary on request')+'</div>'+
       '<div style="background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.35);color:var(--cyber);font-size:11px;padding:3px 8px;border-radius:8px;">\ud83d\udccd '+dt(String(j.loc||'').split(',')[0])+'</div>'+
-      '<div style="background:var(--plum3);border:1px solid var(--plum4);color:'+gc+';font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;">\ud83d\udc7b '+(j.ghost!=null?j.ghost:'?')+'%</div>'+
+      _ghostChipHtml(j)+
       matchBadge+
     '</div>'+
     '<div onclick="event.stopPropagation();notInterestedLive('+i+',event)" style="margin-top:10px;background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.3);color:var(--danger);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">\ud83d\udeab Not Interested</div>'+
@@ -4821,7 +4837,7 @@ function buildBrowseExpanded(j,i){
     '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:11px;">'+
       '<div class="salary-badge">'+dt(j.sal||'Salary on request')+'</div>'+
       '<div style="background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.35);color:var(--cyber);font-size:11px;padding:3px 8px;border-radius:8px;">\ud83d\udccd '+dt(String(j.loc||'').split(',')[0])+'</div>'+
-      '<div style="background:var(--plum3);border:1px solid var(--plum4);color:'+gc+';font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;">\ud83d\udc7b '+(j.ghost!=null?j.ghost:'?')+'%</div>'+
+      _ghostChipHtml(j)+
       matchBadge+
       /* F-REQMATCH (v90): requirement-gaps chip beside the match % */
       ((typeof _reqGaps==='function'&&resumeReady)?(function(){ const g=_reqGaps(j); return g.gaps.length?('<div onclick="openReqGapsLive('+i+',event)" style="background:rgba(255,179,71,.12);border:1px solid rgba(255,179,71,.45);color:var(--warn);font-size:11px;font-weight:800;padding:3px 9px;border-radius:8px;cursor:pointer;">\u26a0\ufe0f '+g.gaps.length+' requirement gap'+(g.gaps.length>1?'s':'')+'</div>'):''; })():'')+
@@ -4846,7 +4862,7 @@ function buildBrowseExpanded(j,i){
        drawer \u2014 Recent Company News + Connect with Hiring Team \u2014 one card design. */
     (function(){
       if(!co) return '';
-      const L=companyLinks(co);
+      const L=companyLinks(co, j);
       return '<div style="margin-top:14px;font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-bottom:5px;">RECENT COMPANY NEWS <span style="font-weight:400;color:var(--cyber);">(tap to read)</span></div>'+
         '<div onclick="event.stopPropagation();window.open(\''+L.news+'\',\'_blank\',\'noopener\')" style="cursor:pointer;color:var(--cyber);font-size:12px;margin:4px 0;">\ud83d\udcf0 Latest news about '+co+' \u2192</div>'+
         '<div onclick="event.stopPropagation();window.open(\''+L.newsHiring+'\',\'_blank\',\'noopener\')" style="cursor:pointer;color:var(--cyber);font-size:12px;margin:4px 0;">\ud83d\udcf0 '+co+': hiring &amp; layoff coverage \u2192</div>'+
@@ -4979,6 +4995,7 @@ function renderBrowse(){
       '<div style="display:flex;gap:10px;margin:4px 16px 14px;">'+
       (livePage>1?'<div onclick="prevLivePage()" style="flex:1;background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:12px;padding:12px;text-align:center;font-size:13px;font-weight:800;cursor:pointer;">← Previous</div>':'')+
       (livePage<totalPages?'<div onclick="nextLivePage()" style="flex:1;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.35);color:var(--mint);border-radius:12px;padding:12px;text-align:center;font-size:13px;font-weight:800;cursor:pointer;">Next Page →</div>':'')+'</div>'+
+      _pageNumsHtml(livePage,totalPages)+
       '<div style="text-align:center;font-size:10px;color:var(--muted);padding-bottom:10px;">Page '+livePage+' of '+totalPages+' · '+showJobs.length+' jobs</div>';
     renderGhostCompanies();
     return;
@@ -5006,7 +5023,7 @@ function renderBrowse(){
   }
   const rowHtml=(j)=>{
     const mc=j.match>=80?'var(--mint)':(j.match>=65?'var(--warn)':'var(--muted)');
-    const gc=j.ghost<=15?'var(--mint)':(j.ghost<=30?'var(--warn)':'var(--danger)');
+    const gc=(j._verifiedCo||(j.ghost!=null&&j.ghost<=15))?'var(--mint)':(j.ghost==null?'var(--muted)':(j.ghost<=30?'var(--warn)':'var(--danger)'));
     const loc=j.style==='Remote'?'Remote':(j.dist+' mi away');
     return `<div class="browse-row" onclick="externalApply(${browseJobs.indexOf(j)})">
       <div class="logo-circle" style="background:var(--plum3);">${j.e}</div>
@@ -5018,7 +5035,7 @@ function renderBrowse(){
       <div style="text-align:right;flex-shrink:0;">
         <div onclick="openMatchInsight('${j.t.replace(/'/g,"\\'")}',${j.match},event)" style="font-size:14px;font-weight:800;color:${mc};cursor:pointer;text-decoration:underline;text-decoration-color:rgba(181,95,230,.35);">${j.match}%</div>
         <div style="font-size:9px;color:var(--muted);">match</div>
-        <div style="font-size:10px;font-weight:700;color:${gc};margin-top:3px;">👻 ${j.ghost}%</div>
+        <div style="font-size:10px;font-weight:700;color:${gc};margin-top:3px;">${j._verifiedCo?'✅ Verified':(j.ghost!=null?('👻 '+j.ghost+'%'):'👻 —')}</div>
         <div onclick="copyOptBrowse(${browseJobs.indexOf(j)},event)" title="Optimize Cover Letter" style="margin-top:5px;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:8px;padding:3px 8px;font-size:10px;font-weight:800;cursor:pointer;">✨ Optimize</div>
         <div onclick="notInterestedBrowse(${browseJobs.indexOf(j)},event)" title="Not interested — hide this and free up space" style="margin-top:5px;background:rgba(255,77,106,.12);border:1px solid rgba(255,77,106,.35);color:var(--danger);border-radius:8px;padding:3px 8px;font-size:10px;font-weight:800;cursor:pointer;">🚫 Not interested</div>
       </div>
@@ -6718,6 +6735,11 @@ function buildResumeHTML(forExport){
   </div>`;
 }
 function renderTplPreview(){
+  /* v119 (render boundary): contact honors the CURRENT toggles on every paint —
+     a stale prebuilt contact string can never leak the street once "City, State
+     only" is chosen. Also keeps the Studio toggle mirrors in sync. */
+  try{ _rebuildContact(); }catch(e){}
+  try{ _syncContactToggles(); }catch(e){}
   const el=document.getElementById('tpl-preview');
   if(el) el.innerHTML=buildResumeHTML(false);
 }
@@ -7671,7 +7693,9 @@ async function _fetchLiveMarketJobs(){
       req:(function(){ const _r=(typeof cleanMd==='function'?cleanMd(r.requirements||r.req||''):String(r.requirements||r.req||'')); const _raw=String(r.requirements||r.req||'').length; const s=cutWords(_r.replace(/<[^>]+>/g,' ').trim(),4000); return (typeof dressEnd==='function')?dressEnd(s,250,(_raw>=850&&_raw<=950)):s; })(),
       benefits:(function(){ const _b=(typeof cleanMd==='function'?cleanMd(r.benefits||''):String(r.benefits||'')); const _raw=String(r.benefits||'').length; const s=cutWords(_b,2500); return (typeof dressEnd==='function')?dressEnd(s,200,(_raw>=450&&_raw<=550)):s; })(),
       summary:(function(){ const _r0=String(r.requirements||r.req||''), _d0=String(r.description||r.desc||''); const _src=(_r0&&_r0.length>20)?_r0:_d0; const _s=(typeof cleanMd==='function'?cleanMd(_src):_src); const _raw=_src.length; const dressed=(typeof dressEnd==='function')?dressEnd(_s.replace(/<[^>]+>/g,' ').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim(),250,((_r0&&_r0.length>20)?(_raw>=850&&_raw<=950):(_raw>=3400&&_raw<=3600))):_s; return cutWords(dressed,11000); })(),
-      ghost:ghostRiskFor((typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'x'),
+      ghost:_ghostHeuristic(r,(typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||'x'),
+      _verifiedCo:(r.source==='internal'&&r.isValidated===true),
+      companyWebsite:r.companyWebsite||'', companyLinkedIn:r.companyLinkedIn||'', companyX:r.companyX||'',
       match:computeMatch(r.title||'',r.description||r.desc||''),
       posting_age_days:jobAgeDays(r),
     jtype:(typeof jobTypeTag==='function'?jobTypeTag(r):''),
@@ -7919,9 +7943,36 @@ function computeMatch(jobTitle,jobDesc){
   if(jtFieldWords.length && !anyRelevant) score=Math.min(score,32);
   return Math.max(18,Math.min(98,score));
 }
+/* v119: REAL-SIGNAL ghost risk. ghostRiskFor used to be 8+hash(name)%70 — a
+   fabricated number wearing a %-sign (founder caught it: a brand-new VERIFIED
+   employer showed "23%"). Risk now comes only from signals that exist:
+   community reports, posting age, salary transparency, description quality,
+   evergreen phrases. A verified employer role is 0. A company with NO data
+   shows "—", never a pretend precision. */
+function _ghostHeuristic(r, co){
+  try{
+    if(communityGhost[co]!==undefined) return communityGhost[co];
+    if(r && r.source==='internal' && r.isValidated===true) return 0;
+    let g=12;
+    const age=(typeof jobAgeDays==='function')?jobAgeDays(r):null;
+    if(age!=null){ if(age>90) g+=43; else if(age>60) g+=25; else if(age>30) g+=10; }
+    const hasSal=!!(r&&(r.salary_min||r.salary_max||(r.salary&&/[0-9]/.test(String(r.salary)))));
+    if(!hasSal) g+=14;
+    const d=String((r&&(r.description||r.desc))||'');
+    if(d.length<350) g+=12;
+    if(/always (hiring|accepting)|ongoing basis|evergreen|continuous(ly)? (hiring|recruiting)|future (openings|opportunities)|talent (pool|community|network)/i.test(d)) g+=18;
+    return Math.max(2,Math.min(95,g));
+  }catch(e){ return 12; }
+}
 function ghostRiskFor(co){
   if(communityGhost[co]!==undefined) return communityGhost[co];
-  return 8+(hashStr(co)%70);
+  return null;   /* v119: no data -> no number (display sites render "—") */
+}
+function _ghostChipHtml(j){
+  if(j&&j._verifiedCo) return '<div style="background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);font-size:11px;font-weight:800;padding:3px 8px;border-radius:8px;">✅ Verified employer</div>';
+  if(!j||j.ghost==null) return '<div style="background:var(--plum3);border:1px solid var(--plum4);color:var(--muted);font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;">👻 —</div>';
+  const gc=j.ghost<=15?'var(--mint)':(j.ghost<=35?'var(--warn)':'var(--danger)');
+  return '<div style="background:var(--plum3);border:1px solid var(--plum4);color:'+gc+';font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;">👻 '+j.ghost+'%</div>';
 }
 /* ===== MATCH TO JOB =====
    Analyze the gap between the user's resume and a specific job, suggest REALISTIC
@@ -8246,11 +8297,23 @@ async function rateResume(){
      window, re-rates now measure the RESUME against the same yardstick. */
   let corpus=null;
   try{
+    /* v119: the yardstick persists 7 DAYS (localStorage), not 10 minutes — the
+       score can no longer swing between visits just because the newest posting
+       batch changed (founder repro: 96 one day, 50 another). Re-mined only when
+       stale or the role changes; a re-rate inside the window measures the
+       RESUME against the SAME benchmark. Also a net Firestore-read WIN. */
+    const CK='gpj_corpus_v1', TTL=7*24*60*60*1000;
     const cc=window._roleCorpusCache;
-    if(cc && cc.role===role && (Date.now()-cc.ts)<10*60*1000){ corpus=cc.corpus; }
-    else if(window.fb&&fb.mineRoleKeywords){
+    if(cc && cc.role===role && (Date.now()-cc.ts)<TTL){ corpus=cc.corpus; }
+    if(!corpus){
+      try{ const st=JSON.parse(localStorage.getItem(CK)||'null'); if(st && st.role===role && (Date.now()-st.ts)<TTL && st.corpus && st.corpus.terms && st.corpus.terms.length){ corpus=st.corpus; window._roleCorpusCache={role:role,ts:st.ts,corpus:corpus}; } }catch(e2){}
+    }
+    if(!corpus && window.fb&&fb.mineRoleKeywords){
       corpus=await fb.mineRoleKeywords(role);
-      if(corpus) window._roleCorpusCache={role:role,ts:Date.now(),corpus:corpus};
+      if(corpus && corpus.terms && corpus.terms.length){
+        window._roleCorpusCache={role:role,ts:Date.now(),corpus:corpus};
+        try{ localStorage.setItem(CK,JSON.stringify({role:role,ts:Date.now(),corpus:{matched:corpus.matched,terms:corpus.terms.slice(0,40)}})); }catch(e2){}
+      }
     }
   }catch(e){}
   /* F-RATER (v83): strip non-skill words ("including") BEFORE scoring/suggesting */
@@ -8555,10 +8618,10 @@ function fillSlot(cardEl, job){
   /* at-a-glance ghost badge */
   const gb=cardEl.querySelector('.s-ghost');
   if(gb){
-    const g=job.ghost!==undefined?job.ghost:ghostRiskFor(job.co);
-    gb.textContent='👻 '+g+'%';
+    const g=job._verifiedCo?0:(job.ghost!=null?job.ghost:ghostRiskFor(job.co));
+    gb.textContent=job._verifiedCo?'✅ Verified':(g==null?'👻 —':'👻 '+g+'%');
     gb.style.display='inline-block';
-    const c=g<=15?'var(--mint)':(g<=35?'var(--warn)':'var(--danger)');
+    const c=(job._verifiedCo||(g!=null&&g<=15))?'var(--mint)':(g==null?'var(--muted)':(g<=35?'var(--warn)':'var(--danger)'));
     gb.style.color=c; gb.style.borderColor=c.replace(')',',.4)').replace('var(--mint','rgba(0,245,160').replace('var(--warn','rgba(255,179,71').replace('var(--danger','rgba(255,77,106');
   }
   /* live Green/Red flag text blocks (top card only has these).
@@ -8569,7 +8632,7 @@ function fillSlot(cardEl, job){
      genuinely high risk so it stays meaningful). */
   const gf=cardEl.querySelector('.green-flag'), rf=cardEl.querySelector('.red-flag');
   const RED_FLAG_AT=50;
-  const gRisk=(job.ghost!==undefined?job.ghost:ghostRiskFor(job.co));
+  const gRisk=job._verifiedCo?0:((job.ghost!=null?job.ghost:ghostRiskFor(job.co))||0);
   if(gRisk>=RED_FLAG_AT){
     if(rf){
       const reason=job.stale
@@ -9376,7 +9439,7 @@ function applySwipeFilters(){
 }
 
 /* ---------- CLICKABLE COMPANY INTEL (drawer) ---------- */
-function companyLinks(co){
+function companyLinks(co, j){
   const q=encodeURIComponent(co);
   /* strip legal suffixes + trailing punctuation so the search matches how the
      company actually lists itself (e.g. "Petroleum Analyzer Company, LP" →
@@ -9387,13 +9450,18 @@ function companyLinks(co){
     .replace(/\s+\b(lp|llp|llc|inc|incorporated|corp|corporation|ltd|limited|plc|gmbh|ag|pvt)\b\.?\s*$/i,'')            /* drop trailing " LTD" */
     .replace(/\s{2,}/g,' ').replace(/[,\s]+$/,'').trim();
   const qc=encodeURIComponent(clean||co);
+  /* v119 (founder-directed): an employer-posted job carries the company's OWN
+     links (snapshotted at post time) — use them directly; anything they didn't
+     fill falls back to the existing search process. */
+  const _own=function(u){ u=String(u||'').trim(); if(!u) return ''; if(!/^https?:[\/][\/]/i.test(u)) u='https://'+u; return /^https:[\/][\/][^\s"'<>]+$/i.test(u)?u:''; };
+  const ownWeb=_own(j&&j.companyWebsite), ownLi=_own(j&&j.companyLinkedIn), ownX=_own(j&&j.companyX);
   return {
     news:'https://news.google.com/search?q='+q,
     newsHiring:'https://news.google.com/search?q='+encodeURIComponent(co+' hiring layoffs'),
-    linkedin:'https://www.linkedin.com/search/results/companies/?keywords='+qc,
-    x:'https://x.com/search?q='+qc,
+    linkedin:ownLi||('https://www.linkedin.com/search/results/companies/?keywords='+qc),
+    x:ownX||('https://x.com/search?q='+qc),
     glassdoor:'https://www.glassdoor.com/Search/results.htm?keyword='+qc,
-    web:'https://www.google.com/search?q='+qc+'+official+site+careers'
+    web:ownWeb||('https://www.google.com/search?q='+qc+'+official+site+careers')
   };
 }
 function hydrateDrawer(){
@@ -9419,7 +9487,7 @@ function hydrateDrawer(){
       sumBox.style.display='block';
     } else sumBox.style.display='none';
   }
-  const L=companyLinks(co);
+  const L=companyLinks(co, (typeof _currentTopJob==='function'?_currentTopJob():null));
   const news=document.getElementById('drawer-news');
   if(news){
     news.innerHTML=
@@ -9429,9 +9497,10 @@ function hydrateDrawer(){
   /* dynamic ghost stat */
   const gv=document.getElementById('drawer-ghost-val');
   if(gv){
-    const g=ghostRiskFor(co);
-    gv.textContent=g+'%';
-    gv.style.color=g<=15?'var(--mint)':(g<=35?'var(--warn)':'var(--danger)');
+    const _tj=(typeof _currentTopJob==='function')?_currentTopJob():null;
+    const g=(_tj&&_tj._verifiedCo)?0:((_tj&&_tj.ghost!=null)?_tj.ghost:ghostRiskFor(co));
+    gv.textContent=(_tj&&_tj._verifiedCo)?'✅':(g==null?'—':g+'%');
+    gv.style.color=((_tj&&_tj._verifiedCo)||(g!=null&&g<=15))?'var(--mint)':(g==null?'var(--muted)':(g<=35?'var(--warn)':'var(--danger)'));
   }
   /* reports count + vibe — same real sources the company view uses */
   const rv=document.getElementById('drawer-reports-val');
@@ -9636,7 +9705,11 @@ function seenJobKeys(){
      `let lists` initializes, so reading lists here would throw a temporal-dead-zone
      ReferenceError and halt the whole script (killing desktop mode, auth, live jobs).
      lists is {}-empty at that point anyway, so guarding changes nothing once ready. */
-  try{ ['viewed','applied','skipped'].forEach(k=>{ (lists[k]||[]).forEach(it=>s.add(jobKey(it))); }); }catch(_){}
+  /* v119 (founder-directed): VIEWING details is not a decision — only acted-on
+     jobs (applied/skipped) + saved leave the pool. 'viewed' was silently
+     deleting every job the user merely opened (the founder's test job vanished
+     from the deck after one look + a re-login). */
+  try{ ['applied','skipped'].forEach(k=>{ (lists[k]||[]).forEach(it=>s.add(jobKey(it))); }); }catch(_){}
   try{ (savedJobs()||[]).forEach(it=>s.add(jobKey(it))); }catch(_){}
   return s;
 }
@@ -9835,7 +9908,7 @@ function renderStatList(kind){
     return `<div class="stat-row">
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:700;">${r.t||(r.co?('Role at '+r.co):'(untitled role)')}</div>
-        <div style="font-size:11px;color:var(--muted);">${r.co||'—'} · ${fmtAgo(r.when)} · ${(r.stage||r.reason)?'🚩 ':''}👻 ${r.ghost}%</div>
+        <div style="font-size:11px;color:var(--muted);">${r.co||'—'} · ${fmtAgo(r.when)} · ${(r.stage||r.reason)?'🚩 ':''}${r.ghost!=null?('👻 '+r.ghost+'%'):'👻 —'}</div>
       </div>${right}</div>`;
   }).join('');
 }
@@ -10267,6 +10340,17 @@ function toggleAddressFull(el){
   }catch(e){}
   try{ if(typeof renderTplPreview==='function') renderTplPreview(); }catch(e){}
   showToast(on?'\ud83c\udfe0 Full street address on your r\u00e9sum\u00e9':'\ud83c\udfd9\ufe0f City, State only on your r\u00e9sum\u00e9');
+}
+/* v119: ONE preference, reflected everywhere — the Account-page toggles and the
+   Export Template Studio mirrors always show the same state. */
+function _syncContactToggles(){
+  try{
+    const p=(typeof getProfile==='function')?getProfile():{}; const pr=p.preferences||{};
+    const set=function(fn,on){ document.querySelectorAll('[onclick*="'+fn+'"]').forEach(function(el){ if(el.classList.contains('toggle-switch')) el.classList.toggle('on',!!on); }); };
+    set('togglePhoneOnResume', pr.showPhoneOnResume!==false);
+    set('toggleAddressOnResume', pr.showAddressOnResume===true);
+    set('toggleAddressFull', pr.addressFull===true);
+  }catch(e){}
 }
 function fillProfileFields(){
   const p=getProfile();
@@ -11109,17 +11193,20 @@ function openCompanyView(co,job){
     } else js.style.display='none';
   }
   document.getElementById('cm-name').textContent=co;
-  const g=ghostRiskFor(co);
+  /* v119: honest categorization — a % only when real data exists. Verified
+     employer -> ✅; community reports -> real %; otherwise "—" (no fake hash). */
+  const _vco=!!(job&&(job._verifiedCo||(job.source==='internal'&&job.isValidated===true)));
+  const g=_vco?0:ghostRiskFor(co);
   const gv=document.getElementById('cm-ghost');
-  gv.textContent=g+'%';
-  gv.style.color=g<=15?'var(--mint)':(g<=35?'var(--warn)':'var(--danger)');
+  gv.textContent=_vco?'✅':(g==null?'—':g+'%');
+  gv.style.color=(_vco||(g!=null&&g<=15))?'var(--mint)':(g==null?'var(--muted)':(g<=35?'var(--warn)':'var(--danger)'));
   const reps=ghostReports[co]||[];
   const all=[...reps];
   document.getElementById('cm-count').textContent=all.length;
   document.getElementById('cm-reports').innerHTML=all.length
     ? all.slice(-6).reverse().map(r=>'<div style="background:var(--plum3);border-radius:10px;padding:10px;margin-bottom:8px;"><div style="font-size:10px;font-weight:800;color:var(--warn);">'+(r.stage||r.reason||'Reported')+'</div>'+(r.comment?'<div style="font-size:12px;color:var(--off);margin-top:4px;line-height:1.5;">"'+r.comment+'"</div>':'')+'<div style="font-size:10px;color:var(--muted);margin-top:4px;">'+fmtAgo(r.when||r.ts||Date.now())+' \u00b7 anonymous & verified</div></div>').join('')
     : '<div style="font-size:12px;color:var(--mint);padding:8px 0;">No ghosting reports \u2014 a good sign. \u2713</div>';
-  const L=companyLinks(co);
+  const L=companyLinks(co, job);
   /* F-CARD (v91): the company card mirrors the job card's company sections \u2014
      the two Recent Company News rows + the full Connect with Hiring Team icon
      set (LinkedIn / X / Glassdoor / Website) \u2014 one card design everywhere. */
@@ -11183,8 +11270,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v118';
+const APP_VERSION = 'v119';
 const CHANGELOG = {
+  'v119':['Batch 2: ghost honesty, deck viewed-fix, pagination numbers, prefs hydration, studio toggles, corpus persistence, employer own-links, forecast click, PageSpeed quick wins'],
   'v118':['Founder live-test bug batch: employer-job pool, discoverable persistence, City/State, rater corpus, optimizer copy, metric variety, completeness'],
   'v117':['Listings edit + verified fill-source capture'],
   'v104':['Employers now see candidates matched to their roles — ranked by fit, applicants first, contact shared only for candidates who opted in. Matching runs nightly on opted-in candidates only, never sold.'],
@@ -12470,9 +12558,9 @@ function updateJobMatchForecast(d){
   else roles=F([[title,94,'your strongest lane — direct experience'],[title+' (Senior)',80,'seniority framing helps'],[title+' Lead',68,'leadership framing would boost this'],['Related '+title+' roles',60,'transferable skills']]);
   const col=p=>p>=80?'var(--mint)':(p>=65?'var(--warn)':'var(--warn)');
   const rowsHtml=roles.map(([role,pct,note])=>
-    '<div class="match-row"><div class="match-ring" style="color:'+col(pct)+';">'+pct+'%</div>'+
+    '<div class="match-row" onclick="forecastGo(\''+String(role).replace(/[\\'"<>]/g,'')+'\')" style="cursor:pointer;"><div class="match-ring" style="color:'+col(pct)+';">'+pct+'%</div>'+
     '<div style="flex:1;"><div style="font-size:13px;font-weight:600;">'+role.replace(/</g,'&lt;')+'</div>'+
-    '<div style="font-size:11px;color:var(--muted);">'+note+'</div></div></div>').join('');
+    '<div style="font-size:11px;color:var(--muted);">'+note+' · tap to browse →</div></div></div>').join('');
   /* replace the hardcoded rows, keep the heading + the Start Swiping button */
   const oldRows=card.querySelectorAll('.match-row');
   oldRows.forEach(r=>r.remove());
@@ -12985,8 +13073,34 @@ buildFromProfile=function(){ _gateBuildFromProfile(); runPersonalizationCascade(
    admin portal via master email
    ============================================================ */
 
-function nextLivePage(){ livePage++; renderBrowse(); const vc=document.querySelector('.view-content'); if(vc) vc.scrollTop=0; }
-function prevLivePage(){ if(livePage>1){ livePage--; renderBrowse(); const vc=document.querySelector('.view-content'); if(vc) vc.scrollTop=0; } }
+/* v119: numbered pager (window of 5) + a scroll-to-top that actually hits the
+   scrolling container (mobile scrolls the window; desktop scrolls the region —
+   the old single-selector reset silently missed, founder repro). */
+function _pageNumsHtml(cur,total){
+  if(total<=1) return '';
+  let start=Math.max(1,cur-2), end=Math.min(total,start+4); start=Math.max(1,end-4);
+  const btn=function(p,curr){ return '<div onclick="gotoLivePage('+p+')" style="min-width:34px;padding:8px 0;text-align:center;border-radius:9px;'+(curr?'background:rgba(181,95,230,.2);border:1px solid var(--cyber);color:var(--cyber);':'background:var(--plum2);border:1px solid var(--plum3);color:var(--off);')+'font-size:12px;font-weight:800;cursor:pointer;">'+p+'</div>'; };
+  let h='<div id="browse-page-nums" style="display:flex;gap:6px;justify-content:center;align-items:center;margin:2px 14px 8px;flex-wrap:wrap;">';
+  if(start>1) h+=btn(1,false)+(start>2?'<div style="color:var(--muted);font-size:12px;">…</div>':'');
+  for(let p=start;p<=end;p++) h+=btn(p,p===cur);
+  if(end<total) h+=(end<total-1?'<div style="color:var(--muted);font-size:12px;">…</div>':'')+btn(total,false);
+  return h+'</div>';
+}
+function _browseScrollTop(){
+  try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){ try{ window.scrollTo(0,0); }catch(_){} }
+  try{ if(document.scrollingElement) document.scrollingElement.scrollTop=0; }catch(e){}
+  ['.view-content','#view-browse','#desk-main'].forEach(function(sel){ try{ const el=document.querySelector(sel); if(el) el.scrollTop=0; }catch(e){} });
+}
+function gotoLivePage(p){ livePage=p; renderBrowse(); _browseScrollTop(); }
+function forecastGo(role){
+  /* v119 (founder-directed): a forecast row jumps to Browse with the role
+     pre-filled — the search runs IN-MARKET, their location is never touched. */
+  try{ switchView('browse', document.querySelector('[data-view=browse]')); }catch(e){}
+  try{ const kw=document.getElementById('f-keyword'); if(kw) kw.value=role; }catch(e){}
+  try{ livePage=1; if(typeof searchAllJobsForKeyword==='function') searchAllJobsForKeyword(false); }catch(e){}
+}
+function nextLivePage(){ livePage++; renderBrowse(); _browseScrollTop(); }
+function prevLivePage(){ if(livePage>1){ livePage--; renderBrowse(); _browseScrollTop(); } }
 
 
 /* ---------- GHOST TAB AUTOCOMPLETE ---------- */
@@ -14360,6 +14474,18 @@ async function loadTierFromProfile(u){
         localStorage.setItem('gpj_profile',JSON.stringify(lp));
         const dt=document.getElementById('discoverable-toggle');
         if(dt) dt.classList.toggle('on', p.discoverable===true);
+      }catch(e){}
+    }
+    /* v119: restore TOP-LEVEL preferences (contact/address toggles) the same way
+       as discoverable — they saved to the cloud but were never rehydrated, so
+       "City, State only" silently reverted to the full street on a fresh login. */
+    if(p.preferences && typeof p.preferences==='object'){
+      try{
+        const lp2=(typeof getProfile==='function')?getProfile():{};
+        lp2.preferences=Object.assign({},lp2.preferences||{},p.preferences);
+        localStorage.setItem('gpj_profile',JSON.stringify(lp2));
+        try{ if(typeof _syncContactToggles==='function') _syncContactToggles(); }catch(e2){}
+        try{ if(typeof _rebuildContact==='function') _rebuildContact(); }catch(e2){}
       }catch(e){}
     }
     /* MATCH PREFERENCES — restore into DOM so account page shows them */

@@ -2638,6 +2638,137 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
   });
 });
 
+test.describe('[STATE-COVERAGE] v119 founder live-test batch 2', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._ghostHeuristic === 'function'
+      && typeof window.gotoLivePage === 'function' && typeof window.forecastGo === 'function',
+    null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(500);
+  });
+
+  test('ghost risk is REAL-SIGNAL only — no more hash-of-the-company-name', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const verified = mapFirestoreJob({ title: 'Marketing Manager', company: 'GPJ', location: 'Houston, TX', source: 'internal', isValidated: true, description: 'Run marketing.', ingestedAt: Date.now() });
+      const fresh = mapFirestoreJob({ title: 'Ops', company: 'FreshCo', location: 'Houston, TX', salary_min: 60000, description: 'x'.repeat(500), ingestedAt: Date.now() });
+      const risky = mapFirestoreJob({ title: 'Ops', company: 'StaleCo', location: 'Houston, TX', description: 'We are always hiring for future opportunities — join our talent pool.', ingestedAt: Date.now() - 100 * 86400000 });
+      return {
+        verified: { chip: _ghostChipHtml(verified), ghost: verified.ghost, flag: verified._verifiedCo },
+        freshGhost: fresh.ghost, riskyGhost: risky.ghost,
+        unknownCompany: ghostRiskFor('Never Reported Anywhere LLC'),
+        unknownChip: _ghostChipHtml({ ghost: null })
+      };
+    });
+    expect(r.verified.flag, 'admin-approved employer job is Verified').toBe(true);
+    expect(r.verified.ghost).toBe(0);
+    expect(r.verified.chip).toContain('Verified employer');
+    expect(r.freshGhost, 'fresh + salaried + full description = low risk').toBeLessThanOrEqual(30);
+    expect(r.riskyGhost, 'stale + no salary + evergreen phrases = high risk').toBeGreaterThanOrEqual(60);
+    expect(r.unknownCompany, 'no data -> null, never a fake number').toBeNull();
+    expect(r.unknownChip).toContain('—');
+  });
+
+  test('VIEWING a job no longer deletes it from the deck (applied/skipped still do)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      lists.viewed = [{ t: 'Marketing Manager', co: 'GPJ' }];
+      lists.applied = [{ t: 'Other Role', co: 'Acme' }];
+      lists.skipped = [];
+      const hidden = _deckHiddenSet();
+      return { viewedHidden: hidden.has(jobKey({ t: 'Marketing Manager', co: 'GPJ' })), appliedHidden: hidden.has(jobKey({ t: 'Other Role', co: 'Acme' })) };
+    });
+    expect(r.viewedHidden, 'a merely-VIEWED job stays in the deck (founder repro: test job vanished after one look)').toBe(false);
+    expect(r.appliedHidden, 'an acted-on job still leaves the pool').toBe(true);
+  });
+
+  test('Browse pagination: numbered pages (window of 5) + jump resets to page N', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const html = _pageNumsHtml(6, 8);
+      liveJobs = []; livePage = 5;          // let-globals: bare identifiers, not window props
+      gotoLivePage(2);
+      return { html, landedOn: livePage, single: _pageNumsHtml(1, 1) };
+    });
+    for (const p of [4, 5, 6, 7, 8]) expect(r.html).toContain('gotoLivePage(' + p + ')');
+    expect(r.html, 'quick jump back to page 1 (no more clicking Previous 7 times)').toContain('gotoLivePage(1)');
+    expect(r.landedOn).toBe(2);
+    expect(r.single, 'no pager when only one page').toBe('');
+  });
+
+  test('Job Match Forecast rows are clickable → Browse with the role pre-filled, location untouched', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.resumeData = window.resumeData || {}; resumeData.title = 'Marketing Specialist';
+      updateJobMatchForecast({ title: 'Marketing Specialist' });
+      const rows = document.querySelectorAll('#card-forecast .match-row[onclick*="forecastGo"]');
+      let searched = null;
+      window.searchAllJobsForKeyword = (nationwide) => { searched = { nationwide, kw: (document.getElementById('f-keyword') || {}).value }; };
+      forecastGo('Digital Marketing Manager');
+      return { clickableRows: rows.length, searched };
+    });
+    expect(r.clickableRows).toBeGreaterThanOrEqual(4);
+    expect(r.searched.kw).toBe('Digital Marketing Manager');
+    expect(r.searched.nationwide, 'search stays IN-MARKET — never widens location on its own').toBe(false);
+  });
+
+  test('rater yardstick persists 7 days — no more score whiplash between visits', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      // resumeData is a let-global: window.resumeData would be a DIFFERENT object.
+      // Mutate the real binding so rateResume sees the fixture.
+      Object.assign(resumeData, { title: 'Marketing Specialist', skills: 'Marketing · SEO', jobs: [{ t: 'Marketing Specialist', c: 'Acme', b: 'Ran campaigns' }], name: 'A', contact: 'a@b.c' });
+      localStorage.removeItem('gpj_corpus_v1'); window._roleCorpusCache = null;
+      let mines = 0;
+      window.fb = window.fb || {};
+      fb.mineRoleKeywords = async () => { mines++; return { matched: 30, terms: [{ term: 'social media', pct: 80 }, { term: 'seo', pct: 60 }] }; };
+      fb.mineHires = async () => [];
+      await rateResume(); await rateResume();
+      const stored = JSON.parse(localStorage.getItem('gpj_corpus_v1') || 'null');
+      window._roleCorpusCache = null;              // simulate a NEW session
+      await rateResume();
+      return { mines, storedRole: stored && stored.role, storedTerms: stored && stored.corpus.terms.length };
+    });
+    expect(r.mines, 'one mine serves repeat rates AND the next session (localStorage)').toBe(1);
+    expect(r.storedRole).toBe('Marketing Specialist');
+    expect(r.storedTerms).toBe(2);
+  });
+
+  test('contact prefs hydrate on sign-in + the Studio mirrors reflect them', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      fb.loadProfile = async () => ({ createdAt: 1700000000000, preferences: { showAddressOnResume: true, addressFull: false, showPhoneOnResume: true }, account: { first: 'Aal' }, accountEditedAt: 5 });
+      fb.saveProfile = async () => true; fb.current = () => ({ uid: 'u1' });
+      localStorage.removeItem('gpj_profile');
+      await loadTierFromProfile({ uid: 'u1' });
+      const p = JSON.parse(localStorage.getItem('gpj_profile') || '{}');
+      p.address = '5606 Main St Houston TX 77081';
+      localStorage.setItem('gpj_loc', 'Houston, TX');
+      return {
+        addrFull: p.preferences.addressFull,
+        onResume: _addressForResume(p),
+        studioAddrOn: document.getElementById('tpl-address-toggle').classList.contains('on'),
+        studioFullOff: !document.getElementById('tpl-addrfull-toggle').classList.contains('on'),
+        studioPhoneOn: document.getElementById('tpl-phone-toggle').classList.contains('on')
+      };
+    });
+    expect(r.addrFull, 'the cloud "City, State only" choice survives login').toBe(false);
+    expect(r.onResume, 'resume shows City, ST — never the street').toBe('Houston, TX');
+    expect(r.studioAddrOn).toBe(true);
+    expect(r.studioFullOff).toBe(true);
+    expect(r.studioPhoneOn).toBe(true);
+  });
+
+  test('employer-posted jobs use the company\'s OWN links; unfilled ones fall back to search', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const own = companyLinks('GPJ', { companyWebsite: 'ghostproofjob.com', companyLinkedIn: 'https://linkedin.com/company/gpj', companyX: '' });
+      const fallback = companyLinks('Some Harvested Co', null);
+      return { web: own.web, li: own.linkedin, x: own.x, fbWeb: fallback.web };
+    });
+    expect(r.web, 'bare domain normalized to https').toBe('https://ghostproofjob.com');
+    expect(r.li).toBe('https://linkedin.com/company/gpj');
+    expect(r.x, 'unfilled social falls back to the search process').toContain('x.com/search');
+    expect(r.fbWeb).toContain('google.com/search');
+  });
+});
+
 test.describe('[STATE-COVERAGE] v118 founder live-test bug batch', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
