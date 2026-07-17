@@ -2275,7 +2275,15 @@ test.describe('[STATE-COVERAGE] R5 outreach + anti-ghosting, R6 candidate tray',
   test.beforeEach(async ({ page }) => {
     page.on('dialog', (d) => d.accept('Hi, open to a chat?'));
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(2000);
+    // poll for the app, don't guess: a fixed delay races the 1MB inline script under parallel load
+    await page.waitForFunction(() => typeof window.renderMyReachouts === 'function'
+      && typeof window.openJobMatches === 'function' && typeof window.renderResponsiveness === 'function',
+    null, { timeout: 15000 });
+    // ...then wait for the firebase module (index.html:42), which replaces window.fb
+    // wholesale and fires the signed-out auth callback — both would land mid-test.
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(500);
   });
 
   test('R5: matched card offers reach-out + (applicant) kind decline; sends the right kind', async ({ page }) => {
@@ -2511,6 +2519,122 @@ test.describe('[STATE-COVERAGE] v109 R9-A employer nav visibility + desktop reac
     expect(r.shown).toBe('block');
     expect(r.sized, 'employer view actually occupies the workspace (not clipped to 0)').toBe(true);
     expect(r.company).toBe('Acme Talent');
+  });
+});
+
+test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-source', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.renderRecListings === 'function'
+      && typeof window.recEditJob === 'function' && typeof window.openFillModal === 'function',
+    null, { timeout: 15000 });
+    // The firebase MODULE lands after the main script and assigns window.fb wholesale
+    // (index.html:42), then wires onAuthStateChanged. Stubbing before that point gets the
+    // stubs replaced and window._recruiter nulled mid-test. Wait for the module to settle
+    // (or fail closed to null), then let the signed-out auth callback fire.
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(500);
+    await page.evaluate(() => {
+      // ...and keep a late auth callback from nulling the fixture. We're exercising the
+      // Listings panel, not auth.
+      window._gpjRecruiterAuthApply = () => {};
+      window.fb = window.fb || {};
+      window.__db = { j1: { id: 'j1', title: 'Ops Manager', location: 'Houston, TX', description: 'Run ops.', requirements: '5y', salary_min: 70000, salary_max: 90000, isValidated: true, active: true } };
+      window.__updated = null; window.__created = null; window.__filled = null; window.__hire = null;
+      fb.current = () => ({ uid: 'r1', email: 'owner@acme.com' });
+      fb.loadRecruiterJobs = async () => Object.values(window.__db);
+      fb.loadJob = async (id) => window.__db[id] || null;
+      fb.countJobApplicants = async () => 2;
+      fb.createRecruiterJob = async (j) => { window.__created = j; return 'jNew'; };
+      fb.updateRecruiterJob = async (id, d) => { window.__updated = { id, d }; Object.assign(window.__db[id], d); return true; };
+      fb.setRecruiterJobFilled = async (id, via) => { window.__filled = { id, via }; return true; };
+      fb.logHire = async (h) => { window.__hire = h; return true; };
+      window._recruiter = { uid: 'r1', company: 'Acme', companyId: 'acme.com', role: 'owner', isValidated: true, plan: 'free' };
+      _gpjApplyRecruiterSkin();
+    });
+    // the skin kicks off its own async panel render — let it land before the test drives
+    // the panel, or a stale render finishes mid-test and repaints over the form
+    await page.waitForTimeout(400);
+    await page.evaluate(async () => { await renderRecListings(); });
+    await page.waitForFunction(() => /Ops Manager/.test((document.getElementById('rl-list') || {}).innerHTML || ''), null, { timeout: 10000 });
+  });
+  const wait = `async (id, needle) => { for(let i=0;i<60;i++){ const el=document.getElementById(id); if(el&&(el.textContent||'').includes(needle)) return true; await new Promise(r=>setTimeout(r,50)); } return false; }`;
+
+  test('a role can be EDITED in place (was: delete + re-post, losing applicants)', async ({ page }) => {
+    const r = await page.evaluate(async (ws) => {
+      const wait = eval('(' + ws + ')');
+      await renderRecListings(); await wait('rl-list', 'Ops Manager');
+      const hasEdit = /recEditJob/.test(document.getElementById('rl-list').innerHTML);
+      await recEditJob('j1');
+      const prefill = { title: document.getElementById('rl-title').value, desc: document.getElementById('rl-desc').value, btn: document.getElementById('rl-post-btn').textContent };
+      document.getElementById('rl-desc').value = 'UPDATED description for the role.';
+      await postRecJob();
+      return { hasEdit, prefill, updated: window.__updated, created: window.__created, btnReset: document.getElementById('rl-post-btn').textContent };
+    }, wait);
+    expect(r.hasEdit, 'every listing offers Edit').toBe(true);
+    expect(r.prefill.title, 'the form prefills from the real job').toBe('Ops Manager');
+    expect(r.prefill.btn).toBe('💾 Save changes');
+    expect(r.updated.id).toBe('j1');
+    expect(r.updated.d.description).toBe('UPDATED description for the role.');
+    expect(r.created, 'editing must UPDATE, never create a duplicate').toBeNull();
+    expect(r.btnReset, 'the form returns to post mode after saving').toMatch(/Post role/);
+  });
+
+  test('editing does NOT trip the free-tier role cap (you are not adding a role)', async ({ page }) => {
+    const r = await page.evaluate(async (ws) => {
+      const wait = eval('(' + ws + ')');
+      window._myJobCount = 5;                       // free tier is full
+      await renderRecListings(); await wait('rl-list', 'Ops Manager');
+      await recEditJob('j1');
+      document.getElementById('rl-desc').value = 'Still editable at the cap.';
+      await postRecJob();
+      return { updated: window.__updated };
+    }, wait);
+    expect(r.updated, 'a full free team must still be able to EDIT its roles').not.toBeNull();
+    expect(r.updated.d.description).toBe('Still editable at the cap.');
+  });
+
+  test('a panel rebuild mid-edit keeps the edit — and the unsaved typing', async ({ page }) => {
+    const r = await page.evaluate(async (ws) => {
+      const wait = eval('(' + ws + ')');
+      await renderRecListings(); await wait('rl-list', 'Ops Manager');
+      await recEditJob('j1');
+      document.getElementById('rl-desc').value = 'Half-typed edit, not saved yet.';
+      await renderRecListings();          // tab switch / late applicant count / any repaint
+      return { desc: document.getElementById('rl-desc').value, title: document.getElementById('rl-title').value,
+        btn: document.getElementById('rl-post-btn').textContent, editing: window._editingJobId,
+        cancelShown: document.getElementById('rl-cancel-edit').style.display };
+    }, wait);
+    expect(r.desc, 'unsaved typing survives a rebuild (was: silently blanked)').toBe('Half-typed edit, not saved yet.');
+    expect(r.title).toBe('Ops Manager');
+    expect(r.btn, 'the form must not fall back to "Post role" while still in edit mode').toBe('💾 Save changes');
+    expect(r.editing, 'edit state and form stay in sync').toBe('j1');
+    expect(r.cancelShown).toBe('block');
+  });
+
+  test('closing a role captures HOW it was filled (verified proof the product works)', async ({ page }) => {
+    const r = await page.evaluate(async (ws) => {
+      const wait = eval('(' + ws + ')');
+      await renderRecListings(); await wait('rl-list', 'Ops Manager');
+      const hasClose = /openFillModal/.test(document.getElementById('rl-list').innerHTML);
+      openFillModal('j1', 'Ops Manager');
+      const opts = [...document.querySelectorAll('#fill-via option')].map((o) => o.value);
+      document.getElementById('fill-via').value = 'gpj';
+      await confirmFill('j1');
+      const gpj = { filled: window.__filled, hire: window.__hire };
+      openFillModal('j1', 'Ops Manager');
+      document.getElementById('fill-via').value = 'elsewhere';
+      window.__hire = null;
+      await confirmFill('j1');
+      return { hasClose, opts, gpj, elsewhere: { filled: window.__filled, hire: window.__hire } };
+    }, wait);
+    expect(r.hasClose).toBe(true);
+    expect(r.opts, 'on-site vs elsewhere vs cancelled').toEqual(['gpj', 'elsewhere', 'cancelled']);
+    expect(r.gpj.filled).toEqual({ id: 'j1', via: 'gpj' });
+    expect(r.gpj.hire, 'a GPJ hire logs an anonymous proof-point').not.toBeNull();
+    expect(r.elsewhere.filled.via).toBe('elsewhere');
+    expect(r.elsewhere.hire, 'filled elsewhere must NOT be counted as our hire').toBeNull();
   });
 });
 

@@ -332,7 +332,14 @@
       /* R9-D: close a filled role — deactivate (owner may set active true→false, never
          false→true; see rules) so it drops out of the candidate deck but keeps its
          applicant history. */
-      setRecruiterJobFilled: async (id)=>{ try{ await setDoc(doc(db,'jobs',id),{active:false,filled:true,filledAt:Date.now()},{merge:true}); return true; }catch(e){ console.warn('[GPJ] setRecruiterJobFilled',e&&e.message); return false; } },
+      /* v117: close a role AND record HOW it was filled. filledVia is the verified
+         signal that the product actually works ('gpj' = they hired someone who came
+         through GhostProofJob). Anonymous + aggregate — no candidate PII. */
+      setRecruiterJobFilled: async (id,via)=>{ try{ await setDoc(doc(db,'jobs',id),{active:false,filled:true,filledVia:String(via||'unknown'),filledAt:Date.now()},{merge:true}); return true; }catch(e){ console.warn('[GPJ] setRecruiterJobFilled',e&&e.message); return false; } },
+      /* v117: edit an existing listing. Rules keep ownerUid/source/isValidated/companyId
+         immutable to the owner, so a merge write can only ever change CONTENT. */
+      updateRecruiterJob: async (id,data)=>{ try{ await setDoc(doc(db,'jobs',id),Object.assign({},data,{updatedAt:Date.now()}),{merge:true}); return true; }catch(e){ console.warn('[GPJ] updateRecruiterJob',e&&e.message); return false; } },
+      loadJob: async (id)=>{ try{ const s=await getDoc(doc(db,'jobs',id)); return s.exists()?Object.assign({id:s.id},s.data()):null; }catch(e){ return null; } },
       /* admin: internal jobs awaiting review (source:'internal' + not yet validated) */
       adminPendingJobs: async ()=>{ try{ const q=query(collection(db,'jobs'), where('source','==','internal'), limit(200)); const s=await getDocs(q); const out=[]; s.forEach(d=>{ const v=d.data()||{}; if(v.isValidated!==true) out.push(Object.assign({id:d.id},v)); }); return out; }catch(e){ console.warn('[GPJ] adminPendingJobs',e&&e.message); return []; } },
       adminVerifyJob: async (id,approved)=>{ try{ await setDoc(doc(db,'jobs',id),{isValidated:!!approved,active:!!approved,verifiedAt:Date.now()},{merge:true}); return true; }catch(e){ console.warn('[GPJ] adminVerifyJob',e&&e.message); return false; } },
@@ -2634,7 +2641,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v116</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v117</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3468,6 +3475,7 @@ async function saveRecCompany(){
 /* ---- LISTINGS (resume tab) ---- */
 async function renderRecListings(){
   const box=document.getElementById('rec-resume'); if(!box) return;
+  const _snap=_recSnapJobForm();   /* v117: hold an edit in progress across the rebuild */
   const cap=5, plan=(window._recruiter&&window._recruiter.plan)||'free';
   box.innerHTML='<div style="font-size:20px;font-weight:800;margin-bottom:2px;">📋 Listings</div>'
     +'<div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Post roles and manage the ones you have open. New roles are reviewed before they go live.</div>'
@@ -3478,7 +3486,8 @@ async function renderRecListings(){
     +'<div class="field-label">Description</div><textarea class="field-input" id="rl-desc" rows="4" placeholder="What the role does." style="margin-bottom:8px;resize:vertical;"></textarea>'
     +'<div class="field-label">Requirements</div><textarea class="field-input" id="rl-req" rows="3" placeholder="Must-haves." style="margin-bottom:8px;resize:vertical;"></textarea>'
     +'<div class="field-row"><div style="flex:1;"><div class="field-label">Salary min</div><input class="field-input" id="rl-smin" type="number" placeholder="60000" style="margin-bottom:8px;"/></div><div style="flex:1;"><div class="field-label">Salary max</div><input class="field-input" id="rl-smax" type="number" placeholder="80000" style="margin-bottom:8px;"/></div></div>'
-    +'<div onclick="postRecJob()" style="background:linear-gradient(135deg,var(--cyber),#7E3FF2);color:#fff;font-weight:800;border-radius:12px;padding:13px;text-align:center;font-size:14px;cursor:pointer;">📋 Post role (pending review)</div>'
+    +'<div id="rl-post-btn" onclick="postRecJob()" style="background:linear-gradient(135deg,var(--cyber),#7E3FF2);color:#fff;font-weight:800;border-radius:12px;padding:13px;text-align:center;font-size:14px;cursor:pointer;">📋 Post role (pending review)</div>'
+    +'<div id="rl-cancel-edit" onclick="recCancelEdit()" style="display:none;margin-top:8px;text-align:center;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;">Cancel edit</div>'
     +'<div class="rec-sec-title" style="margin-top:18px;">Your roles</div><div id="rl-list"><div class="rec-empty">Loading…</div></div>';
   const listEl=document.getElementById('rl-list');
   if(!(window.fb&&fb.loadRecruiterJobs)){ listEl.innerHTML='<div class="rec-empty">Posting unavailable right now.</div>'; return; }
@@ -3487,14 +3496,21 @@ async function renderRecListings(){
   if(!jobs.length){ listEl.innerHTML='<div class="rec-empty">No roles yet — post your first above.</div>'; return; }
   const rows=await Promise.all(jobs.map(async j=>{
     let n=null; try{ if(fb.countJobApplicants) n=await fb.countJobApplicants(j.id); }catch(e){}
-    const status=j.filled?'<span style="color:var(--muted);">Closed / filled</span>':(j.isValidated?'<span style="color:var(--mint);">Live</span>':'<span style="color:var(--warn);">Pending review</span>');
+    const viaTxt={gpj:'Hired via GhostProofJob 💚',elsewhere:'Filled elsewhere',cancelled:'Role cancelled'}[j.filledVia]||'Closed';
+    const status=j.filled
+      ? '<span style="color:'+(j.filledVia==='gpj'?'var(--mint)':'var(--muted)')+';">'+viaTxt+'</span>'
+      : (j.isValidated?'<span style="color:var(--mint);">Live</span>':'<span style="color:var(--warn);">Pending review</span>');
+    const btn=(fn,label,css)=>'<div onclick="'+fn+'" style="flex:1;'+css+'border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">'+label+'</div>';
     return '<div class="rec-card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;"><div style="font-size:14px;font-weight:800;">'+_esc(j.title||'Untitled role')+'</div><div style="font-size:11px;">'+status+'</div></div>'
       +'<div style="font-size:11.5px;color:var(--muted);margin-top:3px;">'+_esc(j.location||(j.is_remote?'Remote':''))+' · <strong style="color:var(--cyber);">'+(n==null?'—':n)+'</strong> applicant'+(n===1?'':'s')+'</div>'
       +'<div style="display:flex;gap:8px;margin-top:9px;">'
-      +(j.filled?'':'<div onclick="recMarkFilled(\''+_esc(j.id)+'\')" style="flex:1;background:var(--plum3);border:1px solid var(--plum4);color:var(--off);border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✓ Mark filled</div>')
-      +'<div onclick="recRemoveJob(\''+_esc(j.id)+'\')" style="flex:1;background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.35);color:var(--danger);border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">🗑 Remove</div></div></div>';
+      +btn("recEditJob('"+_esc(j.id)+"')",'✎ Edit','background:var(--plum3);border:1px solid var(--plum4);color:var(--off);')
+      +(j.filled?'':btn("openFillModal('"+_esc(j.id)+"','"+_esc(String(j.title||'')).replace(/'/g,'')+"')",'✓ Close / filled','background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);'))
+      +btn("recRemoveJob('"+_esc(j.id)+"')",'🗑 Remove','background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.35);color:var(--danger);')
+      +'</div></div>';
   }));
   listEl.innerHTML=rows.join('');
+  await _recRepaintEditForm(_snap);   /* v117: a rebuild must never eat an edit in progress */
 }
 async function postRecJob(){
   if(!(window._recruiter&&window.fb&&fb.createRecruiterJob)){ showToast('Posting unavailable right now'); return; }
@@ -3504,21 +3520,117 @@ async function postRecJob(){
   if(!title){ showToast('Add a job title'); return; }
   if(!loc&&!remote){ showToast('Add a location or mark it remote'); return; }
   if(desc.length<20){ showToast('Add a short description (20+ characters)'); return; }
-  /* v113: via _recPlanLabel so a LAPSED plan is treated as Free (auto-downgrade) */
-  if(_recPlanLabel()==='Free' && (window._myJobCount||0)>=5){ showToast('Free tier posts up to 5 live roles — upgrade under Settings for more.'); return; }
   const r=window._recruiter;
   const job={title:title,location:remote?'Remote':loc,is_remote:remote,description:desc,requirements:v('rl-req'),salary_min:parseInt(v('rl-smin'),10)||null,salary_max:parseInt(v('rl-smax'),10)||null,companyId:r.companyId||'',company:r.company||''};
+  /* v117: the SAME form edits an existing role. Rules keep ownerUid/source/isValidated
+     immutable, so this can only ever change content — and the seat cap must not fire
+     on an edit (you're not adding a role). */
+  if(window._editingJobId){
+    const ok=await fb.updateRecruiterJob(window._editingJobId, job);
+    if(ok){ showToast('💾 Role updated'); recCancelEdit(); renderRecListings(); }
+    else showToast('Could not save — try again');
+    return;
+  }
+  /* v113: via _recPlanLabel so a LAPSED plan is treated as Free (auto-downgrade) */
+  if(_recPlanLabel()==='Free' && (window._myJobCount||0)>=5){ showToast('Free tier posts up to 5 live roles — upgrade under Settings for more.'); return; }
   const ok=await fb.createRecruiterJob(job);
-  if(ok){ showToast('📋 Role posted — pending review'); renderRecListings(); } else { showToast('Could not post — try again'); }
+  if(ok){ showToast('📋 Role posted — pending review'); recCancelEdit(); renderRecListings(); } else { showToast('Could not post — try again'); }
 }
 async function recRemoveJob(id){
   if(!(window.fb&&fb.deleteRecruiterJob)) return;
   const ok=await fb.deleteRecruiterJob(id); showToast(ok?'🗑 Role removed':'Could not remove — try again'); if(ok) renderRecListings();
 }
-async function recMarkFilled(id){
-  if(!(window.fb&&fb.setRecruiterJobFilled)){ recRemoveJob(id); return; }
-  const ok=await fb.setRecruiterJobFilled(id); showToast(ok?'✓ Marked filled — hidden from candidates':'Could not update'); if(ok) renderRecListings();
+/* ---- v117: EDIT a listing (the founder's "make any adjustments to the individual
+   jobs" — before this you had to delete and re-post, losing your applicants) ---- */
+/* v117: renderRecListings rebuilds the WHOLE panel (form included), so the edit form is
+   painted separately from the edit STATE. Any rebuild while an edit is open (tab switch,
+   a late applicant-count resolving, save→re-render) would otherwise blank the fields and
+   strand _editingJobId — an empty form still silently in "save" mode. _recPaintJobForm is
+   the single place that paints it, and _recRepaintEditForm re-applies it after a rebuild. */
+function _recPaintJobForm(j){
+  const set=(el,v)=>{ const e=document.getElementById(el); if(e&&('value' in e)) e.value=v==null?'':v; };
+  set('rl-title',j.title); set('rl-location',j.is_remote?'':j.location); set('rl-desc',j.description);
+  set('rl-req',j.requirements); set('rl-smin',j.salary_min); set('rl-smax',j.salary_max);
+  const rm=document.getElementById('rl-remote'); if(rm) rm.checked=!!j.is_remote;
+  const b=document.getElementById('rl-post-btn'); if(b) b.textContent='💾 Save changes';
+  const c=document.getElementById('rl-cancel-edit'); if(c) c.style.display='block';
 }
+const _REC_FORM_IDS=['rl-title','rl-location','rl-desc','rl-req','rl-smin','rl-smax'];
+function _recSnapJobForm(){
+  if(!window._editingJobId) return null;
+  const s={}; let any=false;
+  _REC_FORM_IDS.forEach(id=>{ const e=document.getElementById(id); s[id]=e?(e.value||''):''; if(s[id]) any=true; });
+  const rm=document.getElementById('rl-remote'); s.remote=!!(rm&&rm.checked);
+  return any?s:null;   /* nothing typed yet -> let the repaint come from the store */
+}
+async function _recRepaintEditForm(snap){
+  if(!window._editingJobId) return;
+  /* unsaved typing wins over the stored copy — a repaint must not undo the edit */
+  if(snap){
+    _REC_FORM_IDS.forEach(id=>{ const e=document.getElementById(id); if(e) e.value=snap[id]; });
+    const rm=document.getElementById('rl-remote'); if(rm) rm.checked=snap.remote;
+    const b=document.getElementById('rl-post-btn'); if(b) b.textContent='💾 Save changes';
+    const c=document.getElementById('rl-cancel-edit'); if(c) c.style.display='block';
+    return;
+  }
+  if(!(window.fb&&fb.loadJob)) return;
+  try{ const j=await fb.loadJob(window._editingJobId); if(j) _recPaintJobForm(j); }catch(e){}
+}
+async function recEditJob(id){
+  if(!(window.fb&&fb.loadJob)) return;
+  const j=await fb.loadJob(id); if(!j){ showToast('Could not open that role'); return; }
+  window._editingJobId=id;
+  _recPaintJobForm(j);
+  try{ document.getElementById('rl-title').scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){}
+  showToast('✎ Editing “'+(j.title||'role')+'” — change anything and save');
+}
+function recCancelEdit(){
+  window._editingJobId=null;
+  ['rl-title','rl-location','rl-desc','rl-req','rl-smin','rl-smax'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  const rm=document.getElementById('rl-remote'); if(rm) rm.checked=false;
+  const b=document.getElementById('rl-post-btn'); if(b) b.textContent='📋 Post role (pending review)';
+  const c=document.getElementById('rl-cancel-edit'); if(c) c.style.display='none';
+}
+/* ---- v117: closing a role captures HOW it was filled — the verified signal that
+   GhostProofJob actually works. Anonymous + aggregate; no candidate PII. ---- */
+function openFillModal(id,title){
+  const old=document.getElementById('fill-modal'); if(old) old.remove();
+  const s=document.createElement('div'); s.id='fill-modal';
+  s.style.cssText='position:fixed;inset:0;z-index:9700;background:rgba(8,6,16,.72);display:flex;align-items:center;justify-content:center;padding:18px;';
+  s.innerHTML='<div style="width:100%;max-width:440px;background:var(--plum2);border:1px solid var(--plum3);border-radius:18px;overflow:hidden;">'
+    +'<div style="padding:16px 18px 12px;border-bottom:1px solid var(--plum3);"><div style="font-size:16px;font-weight:800;color:var(--off);">✓ Closing “'+_esc(title||'this role')+'”</div>'
+    +'<div style="font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5;">One question — it’s the only way we can prove GhostProofJob actually gets people hired.</div></div>'
+    +'<div style="padding:16px 18px;">'
+    +'<div class="field-label">How did you fill it?</div>'
+    +'<select class="field-input" id="fill-via" style="margin-bottom:10px;font-size:13px;">'
+    +'<option value="gpj">💚 I hired someone from GhostProofJob</option>'
+    +'<option value="elsewhere">Filled it elsewhere</option>'
+    +'<option value="cancelled">Role cancelled / no longer hiring</option>'
+    +'</select>'
+    +'<div style="font-size:10.5px;color:var(--muted);line-height:1.6;margin-bottom:12px;">This is anonymous and aggregate — we never attach a candidate’s details to it. It only tells us whether the platform is working.</div>'
+    +'<div style="display:flex;gap:10px;">'
+    +'<div onclick="document.getElementById(\'fill-modal\').remove()" style="flex:1;text-align:center;padding:11px;border-radius:10px;border:1px solid var(--plum3);color:var(--muted);font-weight:700;font-size:13px;cursor:pointer;">Cancel</div>'
+    +'<div onclick="confirmFill(\''+_esc(id)+'\')" style="flex:1.4;text-align:center;padding:11px;border-radius:10px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;font-size:13px;cursor:pointer;">Close role</div>'
+    +'</div></div></div>';
+  s.addEventListener('click',e=>{ if(e.target===s) s.remove(); });
+  document.body.appendChild(s);
+}
+async function confirmFill(id){
+  const via=((document.getElementById('fill-via')||{}).value)||'unknown';
+  try{ document.getElementById('fill-modal').remove(); }catch(e){}
+  if(!(window.fb&&fb.setRecruiterJobFilled)) return;
+  const ok=await fb.setRecruiterJobFilled(id,via);
+  if(ok && via==='gpj'){
+    /* anonymous aggregate proof-point: a real hire came through the platform */
+    try{ if(fb.logHire) fb.logHire({source:'employer',via:'gpj',ts:Date.now()}); }catch(e){}
+    showToast('💚 Thank you — that’s a real person hired through GhostProofJob.');
+  } else {
+    showToast(ok?'✓ Role closed and hidden from candidates':'Could not update — try again');
+  }
+  if(ok) renderRecListings();
+}
+/* legacy entry kept so nothing that still calls it breaks */
+function recMarkFilled(id){ openFillModal(id,''); }
 /* ---- SETTINGS + PLAN (account tab) ---- */
 function renderRecSettings(){
   const box=document.getElementById('rec-account'); if(!box) return;
@@ -10976,8 +11088,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v116';
+const APP_VERSION = 'v117';
 const CHANGELOG = {
+  'v117':['Listings edit + verified fill-source capture'],
   'v104':['Employers now see candidates matched to their roles — ranked by fit, applicants first, contact shared only for candidates who opted in. Matching runs nightly on opted-in candidates only, never sold.'],
   'v103':['Ghost reports now count across all hunters (community reports), and every automated email carries a one-click unsubscribe. Behind the scenes: a dead email function was fixed.'],
   'v102':['Employers can now sign up, complete a company profile, and post roles (reviewed before they go live). Candidates can apply to those roles in-app, and opt in (off by default) to be found by verified employers. Skills on your résumé always render clean now.'],
