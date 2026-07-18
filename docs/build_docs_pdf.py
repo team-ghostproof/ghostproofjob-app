@@ -34,8 +34,8 @@ STOP = colors.HexColor("#C22C48")
 INK = colors.HexColor("#1B1526")
 MUTED = colors.HexColor("#5F5977")
 
-BUILD = "v117"
-DATE = "2026-07-17"
+BUILD = "v122"
+DATE = "2026-07-18"
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 ss = getSampleStyleSheet()
@@ -161,6 +161,8 @@ def build_checklist():
         ("DONE", "Company team (v112)", "Owner / admin / standard roles; email-bound invites redeem a company seat on first sign-in; seats by plan (Free 1 / Premium 5 / Pro unlimited)."),
         ("DONE", "Notification centre (v116)", "Bell + unread badge between the account chip and the plan button; reuses existing data (no new reads); click-through lands on the right tab."),
         ("DONE", "Listings EDIT in place (v117)", "The same form edits a live role - previously it could only be deleted and re-posted, which threw away its applicants. The seat cap does not fire on an edit. A repaint mid-edit no longer eats unsaved typing."),
+        ("DONE", "Founder live-test sprint (v118-v121)", "Employer jobs can never be buried in the pool; preferences persist across logins; ghost-risk is REAL signals only (no fabricated %); street-safe City/State; benefits + up to 5 custom application questions; company logo upload; admin approval alerts (bell + nightly email digest); candidate withdrawal + Seen-by-employer status; signup attribution; honest duplicate-apply guard."),
+        ("DONE", "Password recovery (v122)", "Forgot password on BOTH auth modals - before this a forgotten password was a permanent lockout (no reset path existed anywhere)."),
         ("DONE", "Verified fill-source (v117)", "Closing a role asks HOW it was filled: hired via GhostProofJob / filled elsewhere / cancelled. A GPJ hire logs an anonymous aggregate proof-point; 'filled elsewhere' deliberately does NOT count as our hire."),
         ("DONE", "R9 Full recruiter view (v109-v110)", "All 6 tabs reskin by role with real functionality. Fixed the desktop 'For Employers' bug. Zero candidate regression by construction."),
         ("DONE", "Security rules", "Scoped writes, no self-verify, verified-recruiter gates, consent-gated outreach. Emulator-proven 103/103."),
@@ -182,6 +184,8 @@ def build_checklist():
         ("PART", "iOS PWA safe-area (7c)", "Founder device check clears it."),
         ("TODO", "Reviews: public replies", "v110 ships view + dispute-to-admin. Public company replies to individual reviews need a moderation model - phased for later."),
         ("TODO", "Company SEO pages", "Deliberately OFF until legal review."),
+        ("TODO", "Full internal scheduling", "R7 minimal-real slots shipped; NEXT SPRINT: date/time pickers, an Interviews section both sides, reschedule/cancel, bell reminders."),
+        ("TODO", "Account deletion", "No delete-my-account path exists yet (privacy/trust gap found in the v122 e2e audit; auth imports already anticipate it)."),
         ("TODO", "Surface the verified-hire data", "v117 STARTS capturing how each role was filled. Nothing displays it yet - the aggregate ('N roles filled via GhostProofJob') needs a view before it can be used as a public proof-point."),
         ("PART", "Candidate messaging depth", "Outreach is one reach-out + one structured response (interested / not now / slot / appeal). There is no back-and-forth thread; scheduling is free-text slots, not calendar integration. Honest framing: minimal-real, not a full ATS inbox."),
     ], [0.6 * inch, 1.75 * inch, 4.65 * inch]))

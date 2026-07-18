@@ -2638,6 +2638,39 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
   });
 });
 
+test.describe('[STATE-COVERAGE] v122 password recovery (was: permanent lockout)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.authForgot === 'function' && typeof window.recForgot === 'function',
+      null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(500);
+  });
+
+  test('both auth modals offer Forgot password; it sends the reset to the typed email', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const candLink = [...document.querySelectorAll('[onclick*="authForgot"]')].length;
+      const recLink = [...document.querySelectorAll('[onclick*="recForgot"]')].length;
+      window.fb = window.fb || {};
+      let sent = [];
+      fb.resetPassword = async (e) => { sent.push(e); return true; };
+      document.getElementById('auth-email').value = '';
+      await authForgot();                                     // empty -> nudge, no send
+      const afterEmpty = sent.length;
+      document.getElementById('auth-email').value = 'aaliyah@example.com';
+      await authForgot();
+      document.getElementById('rec-email').value = 'owner@acme.com';
+      await recForgot();
+      return { candLink, recLink, afterEmpty, sent };
+    });
+    expect(r.candLink).toBeGreaterThanOrEqual(1);
+    expect(r.recLink).toBeGreaterThanOrEqual(1);
+    expect(r.afterEmpty, 'no email typed -> nudge, nothing sent').toBe(0);
+    expect(r.sent).toEqual(['aaliyah@example.com', 'owner@acme.com']);
+  });
+});
+
 test.describe('[STATE-COVERAGE] v121 withdrawal + attribution + honest duplicate guard', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });

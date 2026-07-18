@@ -21,7 +21,7 @@
 <!-- ===== FIREBASE CORE (v10 modular CDN) — Auth + Firestore ===== -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, deleteUser, updateEmail, EmailAuthProvider, reauthenticateWithCredential } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, deleteUser, updateEmail, EmailAuthProvider, reauthenticateWithCredential, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
   import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, getDocs, query, where, orderBy, limit, getCountFromServer } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
   import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
   /* Owner-provided config. NOTE: authDomain in the spec was malformed
@@ -47,6 +47,9 @@
       signUp: (e,p)=>createUserWithEmailAndPassword(auth,e,p),
       signIn: (e,p)=>signInWithEmailAndPassword(auth,e,p),
       signOut: ()=>signOut(auth),
+      /* v122: password reset — without this a forgotten password was a PERMANENT
+         lockout (no recovery path existed anywhere in the app). */
+      resetPassword: (e)=>sendPasswordResetEmail(auth,e),
       /* smartMatchResume Cloud Function — returns {finalResume, isAILimitHit} or
          null if the function isn't deployed/reachable (app then falls back to the
          free Firestore keyword-mining Match Job, so nothing breaks pre-deploy). */
@@ -1218,7 +1221,8 @@
       <div class="field-label">Email</div>
       <input class="field-input" id="auth-email" name="email" autocomplete="email" type="email" placeholder="you@email.com" style="margin-bottom:8px;"/>
       <div class="field-label">Password (6+ characters)</div>
-      <input class="field-input" id="auth-pass" name="password" autocomplete="current-password" type="password" placeholder="••••••••" style="margin-bottom:12px;"/>
+      <input class="field-input" id="auth-pass" name="password" autocomplete="current-password" type="password" placeholder="••••••••" style="margin-bottom:4px;"/>
+      <div onclick="authForgot()" style="font-size:11px;color:var(--cyber);cursor:pointer;text-align:right;margin-bottom:10px;">Forgot password?</div>
       <div id="auth-action" class="opt-actions" style="margin-top:0;">
         <div class="opt-btn-go" id="auth-primary-btn" onclick="authPrimary()" style="flex:1;">Create Account</div>
       </div>
@@ -1251,7 +1255,8 @@
       <input class="field-input" id="rec-email" type="email" autocomplete="username" placeholder="you@yourcompany.com" oninput="validateRecruiterEmail()" style="margin-bottom:2px;"/>
       <div id="rec-email-err" style="display:none;font-size:10px;color:var(--danger);margin-bottom:6px;"></div>
       <div class="field-label" style="margin-top:6px;">Password (6+ characters)</div>
-      <input class="field-input" id="rec-pass" type="password" autocomplete="new-password" placeholder="••••••••" style="margin-bottom:8px;"/>
+      <input class="field-input" id="rec-pass" type="password" autocomplete="new-password" placeholder="••••••••" style="margin-bottom:4px;"/>
+      <div onclick="recForgot()" style="font-size:11px;color:var(--cyber);cursor:pointer;text-align:right;margin-bottom:8px;">Forgot password?</div>
       <div class="field-label">How did you hear about us? <span style="text-transform:none;font-weight:400;">(optional)</span></div>
       <select class="field-input" id="rec-heard" onchange="try{ if(this.value) localStorage.setItem('gpj_heard',this.value); }catch(e){}" style="margin-bottom:12px;">
         <option value="">Prefer not to say</option>
@@ -2702,7 +2707,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v121</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v122</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -10217,6 +10222,22 @@ function authErrMsg(e){
   if(c.includes('invalid-email')) return 'That email doesn\u2019t look right.';
   return 'Sign-in unavailable right now — your data is still saved on this device.';
 }
+/* v122: password recovery — both sides. A forgotten password used to be a
+   permanent lockout; now it's a one-tap Firebase reset email. */
+async function authForgot(){
+  if(!(window.fb&&fb.resetPassword)){ showToast('⚠️ Accounts unavailable offline'); return; }
+  const e=((document.getElementById('auth-email')||{}).value||'').trim();
+  if(!e){ showToast('Type your email above first — then tap Forgot password'); return; }
+  try{ await fb.resetPassword(e); showToast('📧 Reset link sent to '+e+' — check your inbox (and spam).'); }
+  catch(err){ showToast('Could not send the reset email — double-check the address.'); }
+}
+async function recForgot(){
+  if(!(window.fb&&fb.resetPassword)){ showToast('⚠️ Accounts unavailable offline'); return; }
+  const e=((document.getElementById('rec-email')||{}).value||'').trim();
+  if(!e){ showToast('Type your work email above first — then tap Forgot password'); return; }
+  try{ await fb.resetPassword(e); showToast('📧 Reset link sent to '+e+' — check your inbox (and spam).'); }
+  catch(err){ showToast('Could not send the reset email — double-check the address.'); }
+}
 async function authSignUp(){
   if(!window.fb){ showToast('⚠️ Cloud accounts unavailable offline'); return; }
   const e=document.getElementById('auth-email').value.trim(), p=document.getElementById('auth-pass').value;
@@ -11470,8 +11491,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v121';
+const APP_VERSION = 'v122';
 const CHANGELOG = {
+  'v122':['Password recovery both sides (was: permanent lockout); full e2e guardrail pass'],
   'v121':['Candidate withdrawal + seen-by-employer status, signup attribution, honest duplicate-apply messaging'],
   'v120':['City/State real fix + benefits + custom application questions + logo upload + admin approval alerts'],
   'v119':['Batch 2: ghost honesty, deck viewed-fix, pagination numbers, prefs hydration, studio toggles, corpus persistence, employer own-links, forecast click, PageSpeed quick wins'],
