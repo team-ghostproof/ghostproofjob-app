@@ -2638,6 +2638,157 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
   });
 });
 
+test.describe('[STATE-COVERAGE] v120 street-safe City/State + listings upgrades + admin alerts', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._cityStateOf === 'function'
+      && typeof window._openApplyQuestions === 'function' && typeof window._notifAdmin === 'function',
+    null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(500);
+  });
+
+  test('the street can NEVER become the City/State (founder repro: "Bend, LN")', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_loc', 'Houston, TX');
+      return {
+        lnEnding: _cityStateOf('5606 Willow Bend Ln'),          // street suffix must NOT read as a state
+        bareStreet: _cityStateOf('Willow Bend Ln'),
+        noComma: _cityStateOf('5606 Main St Houston TX 77081'),
+        comma: _cityStateOf('123 Main St, Houston, TX 77081'),
+        southBend: _cityStateOf('900 W Sample St South Bend IN'), // real city containing "Bend"
+        cityState: _cityStateOf('Houston TX'),
+        bareCity: _cityStateOf('Katy'),
+        fakeState: _cityStateOf('123 Ocean Dr, Somewhere, ZZ'),   // ZZ is not a state
+        empty: _cityStateOf('')
+      };
+    });
+    expect(r.lnEnding, '"…Willow Bend Ln" falls back to the market — never "Bend, LN"').toBe('Houston, TX');
+    expect(r.bareStreet).toBe('Houston, TX');
+    expect(r.noComma).toBe('Houston, TX');
+    expect(r.comma).toBe('Houston, TX');
+    expect(r.southBend, 'a real city containing a suffix-like word still parses').toBe('South Bend, IN');
+    expect(r.cityState).toBe('Houston, TX');
+    expect(r.bareCity).toBe('Katy');
+    expect(r.fakeState, 'an invalid state code cannot mint a City/ST').toBe('Houston, TX');
+    expect(r.empty).toBe('');
+    for (const v of Object.values(r)) expect(String(v)).not.toMatch(/Main|Willow|Ocean|, LN|, DR|, ST$/);
+  });
+
+  test('a posted role carries Benefits + up to 5 application questions; edit prefills them', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window._gpjRecruiterAuthApply = () => {};
+      window.fb = window.fb || {};
+      let created = null;
+      fb.createRecruiterJob = async (j) => { created = j; return 'jN'; };
+      fb.loadRecruiterJobs = async () => [];
+      fb.loadJob = async () => ({ id: 'j1', title: 'Ops', location: 'Houston, TX', description: 'A role we will edit now.', benefits: 'PTO + 401k', appQuestions: ['Weekends OK?', 'Forklift certified?'] });
+      window._recruiter = { uid: 'r1', company: 'Acme', companyId: 'acme.com', role: 'owner', isValidated: true, plan: 'free' };
+      _gpjApplyRecruiterSkin(); await new Promise((x) => setTimeout(x, 400));
+      await renderRecListings(); await new Promise((x) => setTimeout(x, 200));
+      document.getElementById('rl-title').value = 'Warehouse Lead';
+      document.getElementById('rl-location').value = 'Katy, TX';
+      document.getElementById('rl-desc').value = 'Lead the warehouse team daily.';
+      document.getElementById('rl-benefits').value = 'Health · PTO';
+      document.getElementById('rl-questions').value = 'Weekends OK?\nForklift certified?\n\nQ3\nQ4\nQ5\nQ6 too many';
+      await postRecJob();
+      await recEditJob('j1');
+      return { created: { benefits: created.benefits, qs: created.appQuestions },
+        prefillBenefits: document.getElementById('rl-benefits').value,
+        prefillQs: document.getElementById('rl-questions').value };
+    });
+    expect(r.created.benefits).toBe('Health · PTO');
+    expect(r.created.qs, 'capped at 5, blanks dropped').toEqual(['Weekends OK?', 'Forklift certified?', 'Q3', 'Q4', 'Q5']);
+    expect(r.prefillBenefits).toBe('PTO + 401k');
+    expect(r.prefillQs).toBe('Weekends OK?\nForklift certified?');
+  });
+
+  test('applying to a job with questions asks them FIRST; answers ride in the application', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      let sent = null;
+      fb.applyToInternalJob = async (id, meta) => { sent = { id, meta }; return true; };
+      window.requireSignIn = () => true;
+      const j = { id: 'jq1', t: 'Ops Manager', co: 'GPJ', appQuestions: ['Weekends OK?', 'Start date?'] };
+      applyInternal(j);
+      await new Promise((x) => setTimeout(x, 100));
+      const modalOpen = !!document.getElementById('applyq-modal');
+      const qCount = document.querySelectorAll('#applyq-modal textarea').length;
+      document.getElementById('aq-0').value = 'Yes, both days';
+      document.getElementById('aq-1').value = 'Two weeks out';
+      _submitApplyQuestions();
+      await new Promise((x) => setTimeout(x, 200));
+      const plain = { id: 'jp1', t: 'Simple Role', co: 'Acme', appQuestions: [] };
+      let sentPlain = null;
+      fb.applyToInternalJob = async (id, meta) => { sentPlain = { id, meta }; return true; };
+      applyInternal(plain);
+      await new Promise((x) => setTimeout(x, 200));
+      return { modalOpen, qCount, answers: sent && sent.meta.answers, modalGone: !document.getElementById('applyq-modal'), plainDirect: !!sentPlain, plainAnswers: sentPlain && sentPlain.meta.answers };
+    });
+    expect(r.modalOpen, 'questions modal opens before sending').toBe(true);
+    expect(r.qCount).toBe(2);
+    expect(r.answers).toEqual([{ q: 'Weekends OK?', a: 'Yes, both days' }, { q: 'Start date?', a: 'Two weeks out' }]);
+    expect(r.modalGone).toBe(true);
+    expect(r.plainDirect, 'no questions -> applies directly').toBe(true);
+    expect(r.plainAnswers).toEqual([]);
+  });
+
+  test('the Candidate Card shows the screening answers', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window._recApps = { j1: [{ uid: 'c1', match: 90, resume: { name: 'Jane Doe', title: 'Ops Lead' }, coverLetter: 'Hi', answers: [{ q: 'Weekends OK?', a: 'Yes' }, { q: 'Start date?', a: '' }] }] };
+      openCandidateCard('j1', 0);
+      const t = (document.getElementById('candcard-scrim') || {}).textContent || '';
+      document.getElementById('candcard-scrim').remove();
+      return { hasSection: /Your questions/.test(t), hasQ: /Weekends OK\?/.test(t), hasA: /Yes/.test(t), hasEmpty: /no answer/.test(t) };
+    });
+    expect(r.hasSection).toBe(true);
+    expect(r.hasQ).toBe(true);
+    expect(r.hasA).toBe(true);
+    expect(r.hasEmpty, 'an unanswered question is shown honestly').toBe(true);
+  });
+
+  test('admins get pending-approval notifications; non-admins never do', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      fb.adminPendingRecruiters = async () => [{ uid: 'a' }, { uid: 'b' }];
+      fb.adminPendingJobs = async () => [{ id: 'j' }];
+      const items = await _notifAdmin();
+      return { n: items.length, t0: items[0] && items[0].title, t1: items[1] && items[1].title, views: items.map((i) => i.view) };
+    });
+    expect(r.n).toBe(2);
+    expect(r.t0).toMatch(/2 employer accounts waiting/);
+    expect(r.t1).toMatch(/1 employer job waiting/);
+    expect(r.views).toEqual(['account', 'account']);
+  });
+
+  test('logo: save publishes it to the company doc; the company card lazy-loads it for internal jobs', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window._gpjRecruiterAuthApply = () => {};
+      window.fb = window.fb || {};
+      let savedCompany = null;
+      fb.saveCompany = async (cid, d) => { savedCompany = d; return true; };
+      fb.createRecruiter = async () => true;
+      fb.loadCompany = async () => ({ name: 'GPJ', logo: 'data:image/png;base64,iVBORw0KGgo=' });
+      window._recruiter = { uid: 'r1', company: 'GPJ', companyId: 'gpj.com', role: 'owner', isValidated: true, logo: 'data:image/png;base64,iVBORw0KGgo=' };
+      _gpjApplyRecruiterSkin(); await new Promise((x) => setTimeout(x, 400));
+      await renderRecCompany(); await new Promise((x) => setTimeout(x, 300));
+      const hasUpload = !!document.getElementById('rc-logo-file');
+      const preview = (document.getElementById('rc-logo-preview') || {}).innerHTML || '';
+      await saveRecCompany();
+      openCompanyView('GPJ', { _internal: true, companyId: 'gpj.com', title: 'Marketing Manager' });
+      await new Promise((x) => setTimeout(x, 300));
+      const nameHtml = (document.getElementById('cm-name') || {}).innerHTML || '';
+      try { document.getElementById('company-modal').classList.remove('open'); } catch (e) {}
+      return { hasUpload, previewHasImg: /<img/.test(preview), savedLogo: savedCompany && savedCompany.logo, modalHasLogo: /<img/.test(nameHtml) };
+    });
+    expect(r.hasUpload).toBe(true);
+    expect(r.previewHasImg).toBe(true);
+    expect(r.savedLogo).toContain('data:image/png');
+    expect(r.modalHasLogo, 'candidate-facing company card shows the employer\'s own logo').toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] v119 founder live-test batch 2', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });

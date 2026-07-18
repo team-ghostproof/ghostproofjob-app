@@ -25,3 +25,11 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: node api/match/runNightly.js
+      # v120: email the founders when the review queue has work waiting — nobody
+      # sits pending unnoticed. No-ops safely without RESEND_API_KEY (logs counts).
+      - name: Admin pending-approvals digest
+        if: always()
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: node scripts/admin_digest.mjs
