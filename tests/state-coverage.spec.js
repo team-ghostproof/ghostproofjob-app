@@ -2638,6 +2638,119 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
   });
 });
 
+test.describe('[STATE-COVERAGE] v121 withdrawal + attribution + honest duplicate guard', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.withdrawApply === 'function'
+      && typeof window.recordSwipe === 'function' && typeof window.applyInternal === 'function',
+    null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(500);
+  });
+
+  test('a duplicate apply keeps the ORIGINAL date and says so (was: silent re-record)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      lists.applied = [];
+      recordSwipe('right', { t: 'Marketing Manager', co: 'GPJ', id: 'j1', _internal: true });
+      const firstWhen = lists.applied[0].when;
+      lists.applied[0].when = firstWhen - 3 * 86400000;          // pretend it was 3 days ago
+      recordSwipe('right', { t: 'Marketing Manager', co: 'GPJ', id: 'j1', _internal: true });
+      let sent = null;
+      window.fb = window.fb || {};
+      fb.applyToInternalJob = async (id, meta) => { sent = { id, meta }; return true; };
+      window.requireSignIn = () => true;
+      await applyInternal({ id: 'j1', t: 'Marketing Manager', co: 'GPJ', appQuestions: [] });
+      await new Promise((x) => setTimeout(x, 150));
+      return { rows: lists.applied.length, keptOriginal: lists.applied[0].when === firstWhen - 3 * 86400000, reSent: sent !== null };
+    });
+    expect(r.rows, 'still exactly one row').toBe(1);
+    expect(r.keptOriginal, 'the FIRST apply date is the truth — never reset').toBe(true);
+    expect(r.reSent, 'an already-applied role is not re-sent to the employer').toBe(false);
+  });
+
+  test('a candidate can withdraw an employer application; the row honestly says so', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      let withdrew = null;
+      fb.withdrawApplication = async (id) => { withdrew = id; return true; };
+      fb.current = () => ({ uid: 'c1' });
+      fb.myApplicationStatus = async () => ({ viewedByEmployer: true });
+      window.confirm = () => true;
+      lists.applied = [{ t: 'Marketing Manager', co: 'GPJ', when: Date.now(), id: 'j1', _internal: true, ghost: 0 }];
+      renderStatList('applied');
+      const hadButton = /withdrawApply\(0\)/.test(document.getElementById('stat-modal-list').innerHTML);
+      await withdrawApply(0);
+      await new Promise((x) => setTimeout(x, 200));
+      const html = document.getElementById('stat-modal-list').innerHTML;
+      return { hadButton, withdrew, marked: lists.applied[0].status, rowSaysWithdrawn: /withdrawn/.test(html), buttonGone: !/withdrawApply\(0\)/.test(html) };
+    });
+    expect(r.hadButton, 'internal applies offer Withdraw').toBe(true);
+    expect(r.withdrew).toBe('j1');
+    expect(r.marked).toBe('withdrawn');
+    expect(r.rowSaysWithdrawn).toBe(true);
+    expect(r.buttonGone, 'no double-withdraw').toBe(true);
+  });
+
+  test('the candidate sees the true delivery state — Seen by employer / Delivered', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      fb.current = () => ({ uid: 'c1' });
+      fb.myApplicationStatus = async (id) => (id === 'seen' ? { viewedByEmployer: true } : { status: 'applied' });
+      lists.applied = [
+        { t: 'Role A', co: 'GPJ', when: Date.now(), id: 'seen', _internal: true },
+        { t: 'Role B', co: 'Acme', when: Date.now(), id: 'fresh', _internal: true }
+      ];
+      renderStatList('applied');
+      await new Promise((x) => setTimeout(x, 300));
+      const html = document.getElementById('stat-modal-list').innerHTML;
+      return { seen: /Seen by employer/.test(html), delivered: /Delivered/.test(html) };
+    });
+    expect(r.seen, 'an opened application says so — silence is the thing we kill').toBe(true);
+    expect(r.delivered).toBe(true);
+  });
+
+  test('opening a Candidate Card marks the application as viewed by the employer', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      let marked = null;
+      fb.markApplicationViewed = async (jobId, uid) => { marked = { jobId, uid }; return true; };
+      window._recApps = { j1: [{ uid: 'cand9', match: 88, resume: { name: 'Jane' }, coverLetter: '' }] };
+      openCandidateCard('j1', 0);
+      document.getElementById('candcard-scrim').remove();
+      return marked;
+    });
+    expect(r).toEqual({ jobId: 'j1', uid: 'cand9' });
+  });
+
+  test('signup attribution: both forms offer it, and the choice persists to the profile once', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const cand = document.getElementById('auth-heard'), rec = document.getElementById('rec-heard');
+      cand.value = 'TikTok'; cand.dispatchEvent(new Event('change'));
+      const stashed = localStorage.getItem('gpj_heard');
+      window.fb = window.fb || {};
+      let saved = null;
+      fb.loadProfile = async () => ({ createdAt: 1700000000000, account: { first: 'A' }, accountEditedAt: 1 });
+      fb.saveProfile = async (uid, d) => { if (d.heardFrom) saved = d; return true; };
+      fb.current = () => ({ uid: 'u1' });
+      await loadTierFromProfile({ uid: 'u1' });
+      const cleared = localStorage.getItem('gpj_heard') === null;
+      // an EXISTING answer is never overwritten
+      localStorage.setItem('gpj_heard', 'Other');
+      let saved2 = null;
+      fb.loadProfile = async () => ({ createdAt: 1700000000000, heardFrom: 'TikTok' });
+      fb.saveProfile = async (uid, d) => { if (d.heardFrom) saved2 = d; return true; };
+      await loadTierFromProfile({ uid: 'u1' });
+      return { bothForms: !!(cand && rec), stashed, savedFrom: saved && saved.heardFrom, cleared, neverOverwrites: saved2 === null };
+    });
+    expect(r.bothForms).toBe(true);
+    expect(r.stashed).toBe('TikTok');
+    expect(r.savedFrom).toBe('TikTok');
+    expect(r.cleared, 'stash is consumed once').toBe(true);
+    expect(r.neverOverwrites).toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] v120 street-safe City/State + listings upgrades + admin alerts', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
