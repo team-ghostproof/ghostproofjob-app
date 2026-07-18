@@ -50,6 +50,22 @@
       /* v122: password reset — without this a forgotten password was a PERMANENT
          lockout (no recovery path existed anywhere in the app). */
       resetPassword: (e)=>sendPasswordResetEmail(auth,e),
+      /* v123: delete-my-account. Re-auth with the password, remove the user's own
+         docs (rules allow own-delete), then the auth user. Anonymous aggregates
+         (ghost-report counts, hire stats) are not tied to the account and remain. */
+      deleteMyAccount: async (password)=>{
+        try{
+          const u=auth.currentUser; if(!u) return {ok:false,err:'signed-out'};
+          try{
+            const cred=EmailAuthProvider.credential(u.email,password);
+            await reauthenticateWithCredential(u,cred);
+          }catch(e){ return {ok:false,err:'bad-password'}; }
+          try{ await deleteDoc(doc(db,'recruiters',u.uid)); }catch(e){}
+          try{ await deleteDoc(doc(db,'profiles',u.uid)); }catch(e){}
+          try{ await deleteUser(u); }catch(e){ return {ok:false,err:'delete-failed'}; }
+          return {ok:true};
+        }catch(e){ return {ok:false,err:'delete-failed'}; }
+      },
       /* smartMatchResume Cloud Function — returns {finalResume, isAILimitHit} or
          null if the function isn't deployed/reachable (app then falls back to the
          free Firestore keyword-mining Match Job, so nothing breaks pre-deploy). */
@@ -871,6 +887,7 @@
             <div class="pm-item" id="pm-selftest" onclick="document.getElementById('profile-menu').style.display='none';openSelfTest()" style="display:none;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">🧪 Run Self-Test</div>
             <div style="height:1px;background:var(--plum4);margin:4px 8px;"></div>
             <div class="pm-item" onclick="pmSignOut()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--danger);">🚪 Sign Out</div>
+            <div class="pm-item" onclick="openDeleteAccount()" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;cursor:pointer;font-size:11.5px;font-weight:600;color:var(--muted);">🗑 Delete my account</div>
           </div>
         </div>
         <!-- v116 notification centre: sits between the account chip and the plan
@@ -2707,7 +2724,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v122</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v123</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3817,7 +3834,19 @@ async function recToggleApplicants(jobId,title){
     const nm=(a.resume&&a.resume.name)||'Applicant';
     const ttl=(a.resume&&a.resume.title)||a.title||'';
     const m=(typeof a.match==='number')?(' · <span style="color:var(--mint);">'+a.match+'% match</span>'):'';
-    return '<div onclick="event.stopPropagation();openCandidateCard(\''+_esc(jobId)+'\','+i+')" style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-top:1px solid var(--plum3);cursor:pointer;"><div style="width:30px;height:30px;border-radius:50%;background:var(--plum3);display:grid;place-items:center;font-size:15px;">🧑</div><div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:var(--off);">'+_esc(nm)+'</div><div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_esc(ttl)+m+'</div></div><div style="color:var(--muted);">→</div></div>';
+    /* v123 (founder-approved): respond WITHOUT leaving the list. From here there
+       was previously NO response mechanism at all — the path of least resistance
+       was ghosting. One tap makes an answer the default; both feed the
+       Anti-Ghosting Badge responsiveness stat. */
+    const nmq=String(nm).replace(/['"<>\\]/g,'');
+    const tq=String(title||'this role').replace(/['"<>\\]/g,'');
+    const acts=a.uid
+      ? ('<div style="display:flex;gap:6px;padding:2px 4px 9px 40px;">'
+        +'<div onclick="event.stopPropagation();reachOutTo(\''+_esc(a.uid)+'\',\''+_esc(jobId)+'\',\''+tq+'\',\''+nmq+'\',\'reachout\')" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:8px;padding:7px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">💬 Reach out</div>'
+        +'<div onclick="event.stopPropagation();reachOutTo(\''+_esc(a.uid)+'\',\''+_esc(jobId)+'\',\''+tq+'\',\''+nmq+'\',\'rejection\')" style="flex:1;background:rgba(255,77,106,.10);border:1px solid rgba(255,77,106,.35);color:var(--danger);border-radius:8px;padding:7px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">💌 Send kind decline</div>'
+        +'</div>')
+      : '';
+    return '<div onclick="event.stopPropagation();openCandidateCard(\''+_esc(jobId)+'\','+i+')" style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-top:1px solid var(--plum3);cursor:pointer;"><div style="width:30px;height:30px;border-radius:50%;background:var(--plum3);display:grid;place-items:center;font-size:15px;">🧑</div><div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:var(--off);">'+_esc(nm)+'</div><div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_esc(ttl)+m+'</div></div><div style="color:var(--muted);">→</div></div>'+acts;
   }).join('');
 }
 /* ---- CANDIDATE CARD (applicant detail: resume + cover letter) ---- */
@@ -10222,6 +10251,23 @@ function authErrMsg(e){
   if(c.includes('invalid-email')) return 'That email doesn\u2019t look right.';
   return 'Sign-in unavailable right now — your data is still saved on this device.';
 }
+/* v123 (founder-approved): delete-my-account — password-confirmed, honest about
+   what remains (anonymous aggregates are not tied to the account). */
+async function openDeleteAccount(){
+  if(!(window.fb&&fb.current&&fb.current()&&fb.deleteMyAccount)){ showToast('Sign in first'); return; }
+  let pw=null;
+  try{ pw=prompt('This permanently deletes your GhostProofJob account: your profile, resume data, and (for employers) your recruiter access. Anonymous community stats are not tied to you and remain. Type your PASSWORD to confirm:',''); }catch(e){}
+  if(pw===null) return;                                   /* cancelled */
+  if(!pw){ showToast('Password required to confirm deletion.'); return; }
+  showToast('Deleting your account…');
+  const res=await fb.deleteMyAccount(pw);
+  if(res&&res.ok){
+    try{ localStorage.clear(); }catch(e){}
+    showToast('Account deleted. Take care out there 💚');
+    setTimeout(function(){ try{ location.reload(); }catch(e){} },1200);
+  } else if(res&&res.err==='bad-password'){ showToast('That password didn’t match — nothing was deleted.'); }
+  else showToast('Could not delete right now — try again or email security@ghostproofjob.com.');
+}
 /* v122: password recovery — both sides. A forgotten password used to be a
    permanent lockout; now it's a one-tap Firebase reset email. */
 async function authForgot(){
@@ -11491,8 +11537,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v122';
+const APP_VERSION = 'v123';
 const CHANGELOG = {
+  'v123':['Kind-decline from Applicants + account deletion + company SEO pages (safest model)'],
   'v122':['Password recovery both sides (was: permanent lockout); full e2e guardrail pass'],
   'v121':['Candidate withdrawal + seen-by-employer status, signup attribution, honest duplicate-apply messaging'],
   'v120':['City/State real fix + benefits + custom application questions + logo upload + admin approval alerts'],

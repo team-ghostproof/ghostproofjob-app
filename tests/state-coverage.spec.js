@@ -2638,6 +2638,64 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
   });
 });
 
+test.describe('[STATE-COVERAGE] v123 kind-decline from Applicants + account deletion', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.recToggleApplicants === 'function'
+      && typeof window.openDeleteAccount === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(500);
+  });
+
+  test('every applicant row offers Reach out + Send kind decline (was: no response path at all)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window._gpjRecruiterAuthApply = () => {};
+      window.fb = window.fb || {};
+      fb.loadJobApplicants = async () => [{ uid: 'cand1', match: 90, resume: { name: 'Jane Doe', title: 'Ops Lead' } }];
+      let sent = null;
+      fb.sendReachOut = async (uid, jobId, payload) => { sent = { uid, jobId, kind: payload.kind }; return 'ro9'; };
+      fb.markApplicationViewed = async () => true;
+      window._recruiter = { uid: 'r1', company: 'Acme', isValidated: true };
+      const host = document.createElement('div'); host.id = 'ra-jx'; host.style.display = 'none';
+      document.body.appendChild(host);
+      await recToggleApplicants('jx', 'Ops Manager');
+      const html = host.innerHTML;
+      window.prompt = () => 'Thank you for applying — moving forward with others.';
+      const declineBtn = [...host.querySelectorAll('[onclick*="rejection"]')][0];
+      declineBtn.click();
+      await new Promise((x) => setTimeout(x, 200));
+      host.remove();
+      return { hasReach: /'reachout'\)/.test(html.replace(/&#39;|\\'/g, "'")) || /reachout/.test(html), hasDecline: /rejection/.test(html), sent };
+    });
+    expect(r.hasReach).toBe(true);
+    expect(r.hasDecline).toBe(true);
+    expect(r.sent, 'one tap sends the respectful decline').toEqual({ uid: 'cand1', jobId: 'jx', kind: 'rejection' });
+  });
+
+  test('delete account: password-confirmed; a wrong password deletes nothing; cancel aborts', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      const calls = [];
+      fb.current = () => ({ uid: 'u1' });
+      fb.deleteMyAccount = async (pw) => { calls.push(pw); return pw === 'right' ? { ok: true } : { ok: false, err: 'bad-password' }; };
+      window.prompt = () => null;                 // cancel
+      await openDeleteAccount();
+      const afterCancel = calls.length;
+      window.prompt = () => 'wrong';
+      await openDeleteAccount();
+      window.prompt = () => 'right';
+      const hadKey = (localStorage.setItem('gpj_probe', '1'), true);
+      await openDeleteAccount();
+      const wiped = localStorage.getItem('gpj_probe') === null;
+      return { afterCancel, calls, hadKey, wiped };
+    });
+    expect(r.afterCancel, 'cancel = nothing happens').toBe(0);
+    expect(r.calls).toEqual(['wrong', 'right']);
+    expect(r.wiped, 'successful delete wipes local state').toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] v122 password recovery (was: permanent lockout)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });

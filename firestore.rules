@@ -276,7 +276,10 @@ service cloud.firestore {
                  || ( resource.data.get('companyId', '') == ''
                       && request.resource.data.companyId == recruiterDomain()
                       && recruiterDomain() != '' ) ));
-      allow delete: if isAdmin();
+      // v123: delete-my-account — a recruiter may remove their OWN doc (profiles
+      // already allow this via wipeProfile). Teammates/strangers still cannot.
+      allow delete: if isAdmin()
+        || (request.auth != null && request.auth.uid == rId);
     }
 
     // canonical company records — public READ; reputation/verified fields backend-only.

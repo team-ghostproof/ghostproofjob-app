@@ -16,7 +16,7 @@ const require = createRequire(import.meta.url);
 const { build, buildSitemap } = require('../../seo-generator/run.js');
 const { cities } = require('../../seo-generator/cities.js');
 
-const r = build({ write: false });          // render in memory — never touches disk
+const r = await build({ write: false, companies: false });   // in memory, OFFLINE — never touches disk or network
 const houston = r.pages.find((p) => p.slug === 'ghost-jobs-in-houston-tx');
 
 describe('SEO generator — output shape', () => {
@@ -76,8 +76,47 @@ describe('HONESTY rules (CLAUDE.md) enforced on public marketing pages', () => {
     assert.ok(houston.html.includes('No ads'), 'no-ads promise stated');
     assert.ok(houston.html.includes('never sell your data') || houston.html.includes('No data selling'), 'no data selling stated');
   });
-  test('NO per-company pages are generated (off until legal review)', () => {
+  test('city build emits only city pages (company pages are a separate, gated set)', () => {
     for (const p of r.pages) assert.ok(p.slug.startsWith('ghost-jobs-in-'), 'only city pages: ' + p.slug);
+  });
+});
+
+// v123 (founder-approved): per-company pages ARE now generated — but ONLY as
+// neutral placeholder pages built from the company's own postings, with a
+// claim-your-page CTA. The safety model is enforced here as tests.
+describe('company pages — the "safest way" honesty model', () => {
+  const { aggregate, renderCompanyPage, MIN_ROLES } = require('../../seo-generator/companies.js');
+  const fixture = [
+    { company: 'Acme Logistics', title: 'Ops Manager', location: 'Houston, TX', active: true },
+    { company: 'Acme Logistics', title: 'Dispatcher', location: 'Katy, TX', active: true },
+    { company: 'Acme Logistics', title: '<script>alert(1)</script>', location: 'Houston, TX', active: true },
+    { company: 'OneRoleCo', title: 'Solo Role', location: 'Austin, TX', active: true },
+    { company: 'Unknown', title: 'Junk', location: '', active: true },
+  ];
+  const list = aggregate(fixture);
+  const page = renderCompanyPage(list[0]);
+
+  test('aggregation: junk names dropped, thin companies dropped, slugs prefixed', () => {
+    assert.equal(list.length, 1, 'only companies with >=' + MIN_ROLES + ' roles get a page');
+    assert.equal(list[0].name, 'Acme Logistics');
+    assert.ok(list[0].slug.startsWith('co-'), 'company slugs never collide with city slugs');
+  });
+  test('NO ghost-report counts, risk %, or negative claims about the company', () => {
+    assert.doesNotMatch(page, /report(s|ed)?/i, 'no report language');
+    assert.doesNotMatch(page, /\d+\s*%/, 'no percentages of any kind');
+    assert.doesNotMatch(page, /ghost job|ghosting risk|ghosted/i, 'no ghost accusations near a named company');
+  });
+  test('counts are framed honestly as "recently seen" (a static page is not a live feed)', () => {
+    assert.match(page, /recently seen/i);
+    assert.match(page, /update(s)? inside the app|Openings change daily/i);
+  });
+  test('the claim-your-page CTA is present (the growth loop)', () => {
+    assert.match(page, /Are you .*Acme Logistics/);
+    assert.match(page, /free employer account/i);
+  });
+  test('job-sourced text is escaped and nothing fetches at runtime', () => {
+    assert.doesNotMatch(page, /<script>alert/, 'titles are escaped');
+    assert.doesNotMatch(page, /\bfetch\s*\(|XMLHttpRequest|firestore/i, 'zero runtime reads');
   });
 });
 

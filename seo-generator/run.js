@@ -37,30 +37,46 @@ function buildSitemap(list) {
   );
 }
 
-function build({ write = true } = {}) {
+async function build({ write = true, companies = true } = {}) {
   const pages = cities.map((c) => ({ slug: c.slug, html: renderPage(c) }));
   const index = renderIndex(cities);
-  const sitemap = buildSitemap(cities);
+
+  /* v123 (founder-approved "safest way"): neutral per-company pages built from
+     the company's OWN live postings + a claim-your-page CTA. Fetched once at
+     build time; a network failure never breaks the city-page build. */
+  let coPages = [], coList = [];
+  if (companies) {
+    try {
+      const { buildCompanies } = require('./companies');
+      const r = await buildCompanies();
+      coPages = r.pages; coList = r.list;
+    } catch (e) { console.warn('[seo] company pages skipped (build continues):', e.message); }
+  }
+
+  const sitemap = buildSitemap(cities.concat(coList));
 
   if (write) {
     fs.mkdirSync(OUT_DIR, { recursive: true });
     for (const p of pages) fs.writeFileSync(path.join(OUT_DIR, p.slug + '.html'), p.html, 'utf8');
+    for (const p of coPages) fs.writeFileSync(path.join(OUT_DIR, p.slug + '.html'), p.html, 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'index.html'), index, 'utf8');
     fs.writeFileSync(SITEMAP, sitemap, 'utf8');
   }
-  return { pages, index, sitemap, count: pages.length };
+  return { pages, index, sitemap, count: pages.length, companyCount: coPages.length };
 }
 
 module.exports = { build, buildSitemap };
 
 if (require.main === module) {
   const dry = process.argv.includes('--check');
-  const r = build({ write: !dry });
-  console.log(
-    (dry ? '[seo] DRY RUN — rendered ' : '[seo] wrote ') +
-      r.count +
-      ' city pages + index' +
-      (dry ? '' : ' → seo/ , sitemap.xml') +
-      ' (static, zero runtime reads)'
-  );
+  // dry run stays fully OFFLINE (CI-safe): cities only, nothing written
+  build({ write: !dry, companies: !dry }).then((r) => {
+    console.log(
+      (dry ? '[seo] DRY RUN — rendered ' : '[seo] wrote ') +
+        r.count + ' city pages + index' +
+        (r.companyCount ? (' + ' + r.companyCount + ' company pages') : '') +
+        (dry ? '' : ' → seo/ , sitemap.xml') +
+        ' (static, zero runtime reads)'
+    );
+  });
 }

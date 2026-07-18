@@ -524,3 +524,22 @@ describe('Referral engine — invitee-owned, no self-referral', () => {
     await assertFails(deleteDoc(doc(asCandC(), 'referrals/candC')));
   });
 });
+
+// ============================================================================
+// v123: account deletion — a user may delete their OWN docs, nobody else's.
+// Self-contained fixtures (unique ids) so the shared-seed baseline is untouched.
+// ============================================================================
+describe('v123: delete-my-account — own docs only', () => {
+  test('a user deletes their OWN profile + recruiter doc; strangers/teammates cannot', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const dbx = ctx.firestore();   // ONE call — a second ctx.firestore() re-applies settings and throws
+      await setDoc(doc(dbx, 'profiles/delme1'), { name: 'X' });
+      await setDoc(doc(dbx, 'recruiters/delrec1'), { company: 'DelCo', companyId: 'delco.com', isValidated: true, role: 'standard' });
+      await setDoc(doc(dbx, 'recruiters/delrec2'), { company: 'DelCo', companyId: 'delco.com', isValidated: true, role: 'owner' });
+    });
+    await assertFails(deleteDoc(doc(env.authenticatedContext('stranger9').firestore(), 'profiles/delme1')));
+    await assertSucceeds(deleteDoc(doc(env.authenticatedContext('delme1').firestore(), 'profiles/delme1')));
+    await assertFails(deleteDoc(doc(env.authenticatedContext('delrec2').firestore(), 'recruiters/delrec1')));
+    await assertSucceeds(deleteDoc(doc(env.authenticatedContext('delrec1').firestore(), 'recruiters/delrec1')));
+  });
+});
