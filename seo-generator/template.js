@@ -166,7 +166,8 @@ function renderPage({ city, state, label, slug }) {
 
   <footer>
     <p><a href="${SITE}">GhostProofJob</a> — Build · Optimize · Apply. Free until you're hired 💚<br>
-    <a href="${SITE}/seo/index.html">Other cities</a> · <span style="color:var(--muted)">No ads. No data selling. Ever.</span></p>
+    <a href="${SITE}/seo/index.html">Other cities</a> · <span style="color:var(--muted)">No ads. No data selling. Ever.</span><br>
+    <span style="color:var(--muted)">GhostProofJob · Houston, TX · <a href="tel:+12819159482">(281) 915-9482</a> · <a href="mailto:support@ghostproofjob.com">support@ghostproofjob.com</a></span></p>
   </footer>
 </div>
 </body>
@@ -212,7 +213,8 @@ function renderIndex(cities) {
   <ul>
       ${links}
   </ul>
-  <footer><p><a href="${SITE}">GhostProofJob</a> — free until you're hired 💚 · No ads. No data selling. Ever.</p></footer>
+  <footer><p><a href="${SITE}">GhostProofJob</a> — free until you're hired 💚 · No ads. No data selling. Ever.<br>
+  <span style="color:var(--muted)">Houston, TX · <a href="tel:+12819159482">(281) 915-9482</a> · <a href="mailto:support@ghostproofjob.com">support@ghostproofjob.com</a></span></p></footer>
 </div>
 </body>
 </html>

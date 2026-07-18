@@ -57,6 +57,11 @@ function withUnsubFooter(html, user) {
   const url = unsubUrl(user);
   const footer =
     '<hr style="border:none;border-top:1px solid #e5e0ee;margin:28px 0 12px"/>' +
+    '<p style="font:12px/1.6 -apple-system,Segoe UI,Arial,sans-serif;color:#8a85a0;margin:0 0 6px">' +
+    /* v124 (founder): real, reachable contact details beside the opt-out — credibility + CAN-SPAM */
+    'GhostProofJob · Houston, TX · <a href="tel:+12819159482" style="color:#8a85a0">(281) 915-9482</a> · ' +
+    '<a href="mailto:support@ghostproofjob.com" style="color:#8a85a0">support@ghostproofjob.com</a>' +
+    '</p>' +
     '<p style="font:12px/1.6 -apple-system,Segoe UI,Arial,sans-serif;color:#8a85a0;margin:0">' +
     'You’re getting this from GhostProofJob. ' +
     '<a href="' + url + '" style="color:#8a85a0;text-decoration:underline">Unsubscribe</a> anytime — ' +

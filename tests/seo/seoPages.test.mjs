@@ -45,7 +45,11 @@ describe('SEO correctness', () => {
   test('the city actually localises the page', () => {
     assert.ok(houston.html.includes('Houston'), 'city name present');
     const austin = r.pages.find((p) => p.slug === 'ghost-jobs-in-austin-tx');
-    assert.ok(austin.html.includes('Austin') && !austin.html.includes('Houston,'), 'pages are distinct per city');
+    // v124: every page footer now carries the real business contact line
+    // ("GhostProofJob · Houston, TX · phone") — that is the ADDRESS, not the
+    // page's city. Strip it before asserting content distinctness.
+    const austinBody = austin.html.replace(/GhostProofJob · Houston, TX[^<]*/g, '');
+    assert.ok(austin.html.includes('Austin') && !austinBody.includes('Houston,'), 'pages are distinct per city');
   });
   test('sitemap lists the home page, the index and every city page', () => {
     const sm = buildSitemap(cities);
