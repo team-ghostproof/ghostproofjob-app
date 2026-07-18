@@ -2638,6 +2638,43 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
   });
 });
 
+test.describe('[STATE-COVERAGE] v126 admin insights (hires + attribution)', () => {
+  test('insights paint real counts; empty data reads honestly; zero-hire stays muted', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.adminLoadInsights === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(500);
+    const r = await page.evaluate(async () => {
+      document.body.insertAdjacentHTML('beforeend',
+        '<div id="admin-hire-count"></div><div id="admin-heard-line"></div>');
+      window.fb = window.fb || {};
+      fb.adminHireCounts = async () => ({ total: 4, gpj: 2 });
+      fb.adminHeardFromCounts = async (chs) => { const m = {}; chs.forEach((c) => m[c] = 0); m['TikTok'] = 3; m['Referral'] = 1; return m; };
+      await adminLoadInsights();
+      const withData = {
+        hires: document.getElementById('admin-hire-count').textContent,
+        channels: document.getElementById('admin-heard-line').textContent
+      };
+      fb.adminHireCounts = async () => ({ total: 0, gpj: 0 });
+      fb.adminHeardFromCounts = async (chs) => { const m = {}; chs.forEach((c) => m[c] = 0); return m; };
+      await adminLoadInsights();
+      const empty = {
+        hires: document.getElementById('admin-hire-count').textContent,
+        channels: document.getElementById('admin-heard-line').textContent
+      };
+      document.getElementById('admin-hire-count').remove(); document.getElementById('admin-heard-line').remove();
+      return { withData, empty };
+    });
+    expect(r.withData.hires).toBe('2 via GhostProofJob · 4 closes recorded');
+    expect(r.withData.channels).toContain('TikTok: 3');
+    expect(r.withData.channels).toContain('Referral: 1');
+    expect(r.withData.channels, 'zero-count channels are not listed').not.toContain('Instagram');
+    expect(r.empty.hires).toBe('0 via GhostProofJob · 0 closes recorded');
+    expect(r.empty.channels, 'no data reads as honest copy, not fake numbers').toContain('none attributed yet');
+  });
+});
+
 test.describe('[STATE-COVERAGE] v125 client error monitoring', () => {
   test('errors are reported once signed in — capped at 3/session, correct shape, reporter never loops', async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
