@@ -191,6 +191,22 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // v125 (ops): client error telemetry — shape-locked, no PII, create-only.
+    // The signed-in gate keeps a spam flood from costing writes; reads are
+    // admin-only (nobody can mine other users' error traces).
+    match /client_errors/{id} {
+      allow read: if isAdmin();
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['msg','src','line','ua','v','ts'])
+        && request.resource.data.msg is string && request.resource.data.msg.size() <= 200
+        && request.resource.data.src is string && request.resource.data.src.size() <= 120
+        && request.resource.data.line is number
+        && request.resource.data.ua is string && request.resource.data.ua.size() <= 80
+        && request.resource.data.v is string && request.resource.data.v.size() <= 12
+        && request.resource.data.ts is number;
+      allow update, delete: if false;
+    }
+
     // hired — any signed-in create/read (aggregate "what got people hired" pool).
     // v101b Sprint 3: the app payload is ANONYMOUS by design (roleKey, titleRaw,
     // skills[], region-state, ts). Since any signed-in user can READ this pool,

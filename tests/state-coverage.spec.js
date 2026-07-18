@@ -2638,6 +2638,33 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
   });
 });
 
+test.describe('[STATE-COVERAGE] v125 client error monitoring', () => {
+  test('errors are reported once signed in — capped at 3/session, correct shape, reporter never loops', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._gpjReportErr === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(500);
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      const logged = [];
+      fb.current = () => ({ uid: 'u1' });
+      fb.logClientError = async (rec) => { logged.push(rec); return true; };
+      window._gpjErrQ = [];
+      for (let i = 0; i < 5; i++) {
+        window.dispatchEvent(new ErrorEvent('error', { message: 'Boom ' + i, filename: 'https://x/index.html', lineno: 10 + i }));
+      }
+      await new Promise((x) => setTimeout(x, 300));
+      return { count: logged.length, first: logged[0] };
+    });
+    expect(r.count, 'max 3 per session — no error storms').toBe(3);
+    expect(r.first.msg).toBe('Boom 0');
+    expect(r.first.src).toBe('index.html');
+    expect(r.first.line).toBe(10);
+    expect(String(r.first.v)).toMatch(/^v\d+/);
+  });
+});
+
 test.describe('[STATE-COVERAGE] v123 kind-decline from Applicants + account deletion', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });

@@ -543,3 +543,16 @@ describe('v123: delete-my-account — own docs only', () => {
     await assertSucceeds(deleteDoc(doc(env.authenticatedContext('delrec1').firestore(), 'recruiters/delrec1')));
   });
 });
+
+// v125: client error telemetry — shape-locked, signed-in create only, admin-read-only.
+describe('v125: client_errors telemetry', () => {
+  test('signed-in exact-shape create works; anon, junk keys, reads and deletes are denied', async () => {
+    const rec = { msg: 'Boom', src: 'index.html', line: 12, ua: 'test-ua', v: 'v125', ts: Date.now() };
+    await assertSucceeds(setDoc(doc(env.authenticatedContext('errU1').firestore(), 'client_errors/e1'), rec));
+    await assertFails(setDoc(doc(env.unauthenticatedContext().firestore(), 'client_errors/e2'), rec));
+    await assertFails(setDoc(doc(env.authenticatedContext('errU1').firestore(), 'client_errors/e3'), Object.assign({}, rec, { extra: 'x' })));
+    await assertFails(setDoc(doc(env.authenticatedContext('errU1').firestore(), 'client_errors/e4'), Object.assign({}, rec, { msg: 'x'.repeat(300) })));
+    await assertFails(getDoc(doc(env.authenticatedContext('errU1').firestore(), 'client_errors/e1')));
+    await assertFails(deleteDoc(doc(env.authenticatedContext('errU1').firestore(), 'client_errors/e1')));
+  });
+});
