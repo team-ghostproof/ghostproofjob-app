@@ -2653,6 +2653,83 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
   });
 });
 
+test.describe('[STATE-COVERAGE] v133 swipe binds to data model + metric-dupe self-heal', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.swipeCard === 'function'
+      && typeof window._currentTopJob === 'function' && typeof window._healMetricDupes === 'function',
+    null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(500);
+  });
+
+  test('swipe-right records the DATA-MODEL top job, not a stale DOM index (wrong-job repro)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      // let-globals: bare assignment, not window.X (the functions read the real bindings)
+      jobsQueue = [
+        { t: 'Marketing Specialist', co: 'Terracon Consultants Inc', url: 'https://x/terracon', id: '', loc: 'Houston, TX' },
+        { t: 'Ops', co: 'Liquidpower Specialty', url: 'https://x/lp', id: '' },
+      ];
+      deckJobs.length = 0;   // const array — mutate contents, don't reassign
+      deckJobs.push({ id: 'c0', t: 'Liquidpower Specialty role', co: 'Liquidpower Specialty' }, { id: 'c1', t: 'x', co: 'x' }, { id: 'c2', t: 'y', co: 'y' });
+      topIndex = 0;
+      lists = { applied: [], skipped: [], viewed: [], responses: [] };
+      window.isSignedIn = () => true; window.isPaid = () => true; window.profileComplete = () => true;
+      window.registerApply = () => {}; window.offerCoverLetter = () => {}; window.openSandbox = () => {}; window.openCompanyView = () => {};
+      window.advanceQueue = () => {}; window.applyInternal = () => {};
+      ['c0', 'c1', 'c2'].forEach((id, i) => { const d = document.createElement('div'); d.id = id; d.className = i === 0 ? 'job-card top' : 'job-card'; document.getElementById('card-deck').appendChild(d); });
+      let recorded = null;
+      window.recordSwipe = (dir, job) => { recorded = { dir, t: job.t, co: job.co }; };
+      swipeCard('right');
+      await new Promise((x) => setTimeout(x, 700));
+      return recorded;
+    });
+    expect(r, 'a swipe recorded something').not.toBeNull();
+    expect(r.co, 'the job APPLIED is the data-model top (Terracon), never the stale DOM card (Liquidpower)').toBe('Terracon Consultants Inc');
+    expect(r.t).toBe('Marketing Specialist');
+  });
+
+  test('metric-dupe self-heal re-varies ONLY generated-template duplicates, preserving numbers', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      // resumeData is a let-global: mutate the real object, don't reassign window.resumeData
+      resumeData.jobs = [
+        { t: 'A', c: 'X', b: 'Led a team\nManaged 500+ accounts and client relationships end-to-end' },
+        { t: 'B', c: 'Y', b: 'Managed 100 accounts and client relationships end-to-end' },
+        { t: 'C', c: 'Z', b: 'Managed 50 accounts and client relationships end-to-end\nManaged the front desk daily' },
+      ];
+      window.cloudSync = () => {};
+      const changed = _healMetricDupes();
+      const generated = resumeData.jobs.map((j) => j.b).join('\n');
+      const managedLines = generated.split('\n').filter((l) => /accounts and client|point of contact|portfolio of|working relationships across/i.test(l));
+      const shapes = new Set(managedLines.map((l) => l.replace(/\S*\d\S*/g, '#')));
+      return { changed, first: resumeData.jobs[0].b, distinctShapes: shapes.size, count: managedLines.length,
+        keptNumbers: /500\+/.test(generated) && /100/.test(generated) && /50/.test(generated),
+        userLineUntouched: /Managed the front desk daily/.test(generated) && /Led a team/.test(generated) };
+    });
+    expect(r.changed, 'duplicates were healed').toBe(true);
+    expect(r.count, 'still three metric bullets').toBe(3);
+    expect(r.distinctShapes, 'the three are now DIFFERENT wordings, not identical').toBe(3);
+    expect(r.keptNumbers, 'the real numbers (500+, 100, 50) are preserved').toBe(true);
+    expect(r.userLineUntouched, 'user-typed bullets are never rewritten').toBe(true);
+    expect(r.first, 'the FIRST occurrence keeps the original wording').toContain('Managed 500+ accounts and client relationships end-to-end');
+  });
+
+  test('delete-account asks "are you sure" BEFORE the password step', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      fb.current = () => ({ uid: 'u1' }); fb.deleteMyAccount = async () => ({ ok: true });
+      let confirmMsg = null, promptCalled = false;
+      window.confirm = (m) => { confirmMsg = m; return false; };
+      window.prompt = () => { promptCalled = true; return 'pw'; };
+      await openDeleteAccount();
+      return { confirmMsg, promptCalled };
+    });
+    expect(r.confirmMsg, 'a confirm fires first').toMatch(/permanently|cannot be undone/i);
+    expect(r.promptCalled, 'declining the confirm never reaches the password prompt').toBe(false);
+  });
+});
+
 test.describe('[STATE-COVERAGE] v128 post-apply email (confirmed applies only)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
@@ -2888,6 +2965,7 @@ test.describe('[STATE-COVERAGE] v123 kind-decline from Applicants + account dele
       const calls = [];
       fb.current = () => ({ uid: 'u1' });
       fb.deleteMyAccount = async (pw, appIds) => { calls.push({ pw, appIds }); return pw === 'right' ? { ok: true } : { ok: false, err: 'bad-password' }; };
+      window.confirm = () => true;   // v133: get past the new "are you sure" guard
       // v129: the user's internal applications must be handed over for cleanup (PII removal)
       window.lists = window.lists || {};
       lists.applied = [

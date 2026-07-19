@@ -2752,7 +2752,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v132</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v133</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -4254,6 +4254,14 @@ function swipeCard(dir){
     return;
   }
   if(!deckJobs.length || !deckJobs.some(d=>d.t)){ showToast('🔍 Loading live jobs — set your location or search to fill your deck.'); return; }
+  /* v133 (founder repro — CRITICAL): bind the DECISION to the DATA MODEL, not the
+     rotating DOM index. Reading deckJobs[(topIndex-1)%3] recorded the WRONG job
+     (applied Terracon → logged Liquidpower/CB&I) AND caused applied jobs to
+     recycle onto the deck (the stored key didn't match the painted card). This is
+     the exact bug CLAUDE.md §5 warns about; _currentTopJob() is the job the card
+     face actually paints. Captured ONCE here, used for record/apply/cover/toast. */
+  const _tj=(typeof _currentTopJob==='function'?_currentTopJob():null);
+  const topJob=_tj||{t:deckJobs[topIndex%3].t, co:deckJobs[topIndex%3].co, url:'', id:'', _internal:false};
   const topCard=document.getElementById(deckJobs[topIndex%3].id);
   if(!topCard||topCard.dataset.swiping) return;
   topCard.dataset.swiping='1';
@@ -4276,20 +4284,21 @@ function swipeCard(dir){
     botCard.classList.remove('bot'); botCard.classList.add('mid');
     botCard.style.transform='scale(.95) translateY(12px)';
     topIndex++;
-    recordSwipe(dir,{t:deckJobs[(topIndex-1)%3].t,co:deckJobs[(topIndex-1)%3].co});
+    recordSwipe(dir, topJob);                               /* v133: the data-model job, never the DOM index */
     if(dir!=='right'){ try{ advanceQueue(); }catch(e){} }   /* SKIP must refill the deck too — was only refilling on apply, causing skipped cards to recycle */
     if(dir==='right'){
       registerApply();
-      /* actually open the real listing — the toast promised this, now it delivers.
-         Prefer the in-app sandbox if we have a URL; otherwise open company view. */
-      const swCard=document.getElementById(deckJobs[(topIndex-1)%3].id);
-      const jurl=swCard?swCard.dataset.joburl:'';
-      const jt=deckJobs[(topIndex-1)%3].t, jco=deckJobs[(topIndex-1)%3].co;
-      if(jurl){ try{ openSandbox(jurl,jt,jco); }catch(e){ window.open(jurl,'_blank','noopener'); } }
-      else { try{ openCompanyView(jco,{title:jt,url:''}); }catch(e){} }
-      offerCoverLetter(jt, jco, false);
+      /* v133: an employer's INTERNAL job has no external URL — apply IN-APP (was
+         falling through to openCompanyView, so a swipe-right never truly applied). */
+      if(topJob._internal && topJob.id){ try{ applyInternal(topJob); }catch(e){} }
+      else {
+        const jurl=topJob.url||'';
+        if(jurl){ try{ openSandbox(jurl,topJob.t,topJob.co); }catch(e){ window.open(jurl,'_blank','noopener'); } }
+        else { try{ openCompanyView(topJob.co,{title:topJob.t,url:''}); }catch(e){} }
+        offerCoverLetter(topJob.t, topJob.co, false);
+      }
     }
-    showToast(dir==='right'?('❤️ '+deckJobs[(topIndex-1)%3].co+' — opening the listing to apply…'):'🚫 Skipped · Algorithm updated');
+    showToast(dir==='right'?('❤️ '+topJob.co+' — opening the listing to apply…'):'🚫 Skipped · Algorithm updated');
   },480);
 }
 let startX=0,startY=0,isDragging=false;
@@ -8462,6 +8471,29 @@ function _isJunkSkill(t){
   if(!t||t.split(/\s+/).length>1) return false;
   return _SKILL_STOP.test(t);
 }
+/* v118 VARIANT BANK (hoisted to module scope in v133 so _healMetricDupes shares
+   it): one template per unit produced near-identical twins when two jobs shared a
+   unit ("Managed 500+ accounts…" / "Managed 50 accounts…", founder repro). Rotate
+   variants per unit so no two generated bullets read the same; the number is
+   always the user's literal answer — no invented outcomes, ever. */
+const _MT={
+  accounts:[function(a){return 'Managed '+a+' accounts and client relationships end-to-end';},
+            function(a){return 'Served as the primary point of contact for '+a+' clients and customers';},
+            function(a){return 'Owned the day-to-day for a portfolio of '+a+' active accounts';},
+            function(a){return 'Built and maintained working relationships across '+a+' clients';}],
+  people:[function(a){return 'Worked with and supported a team of '+a;},
+          function(a){return 'Collaborated daily across a '+a+'-person team';},
+          function(a){return 'Partnered with '+a+' teammates to keep work moving';},
+          function(a){return 'Coordinated hands-on with a team of '+a;}],
+  budget:[function(a){return 'Owned work touching '+a+' in budget/revenue';},
+          function(a){return 'Handled responsibilities tied to '+a+' in budget or revenue';},
+          function(a){return 'Supported operations spanning '+a+' in business value';},
+          function(a){return 'Managed processes behind '+a+' of budget/revenue';}],
+  volume:[function(a){return 'Handled '+a+' as part of the core workload';},
+          function(a){return 'Processed '+a+' consistently and accurately';},
+          function(a){return 'Kept '+a+' moving on schedule end-to-end';},
+          function(a){return 'Delivered '+a+' with direct ownership';}]
+};
 /* ===== F-METRICS (v101b D, founder-approved): interactive, no-fabrication
    metric elicitation. Questions derive from the user's ACTUAL jobs whose
    bullets lack digits; every answer becomes ONE bullet on the CORRECT job,
@@ -8505,29 +8537,6 @@ function submitMetricsElicit(){
   if(!answered.length){ showToast('Nothing to add — every field was blank (that\'s fine!)'); return; }
   try{ storeResumeSnapshot('My resume — before adding metrics'); }catch(e){}
   let added=0;
-  /* v118: VARIANT BANK — one template per unit produced near-identical twins
-     when two jobs shared a unit ("Managed 500+ accounts…" / "Managed 50
-     accounts…", founder repro). Rotate variants per unit so no two generated
-     bullets read the same; the number is still the user's literal answer —
-     no invented outcomes, ever. */
-  const _MT={
-    accounts:[function(a){return 'Managed '+a+' accounts and client relationships end-to-end';},
-              function(a){return 'Served as the primary point of contact for '+a+' clients and customers';},
-              function(a){return 'Owned the day-to-day for a portfolio of '+a+' active accounts';},
-              function(a){return 'Built and maintained working relationships across '+a+' clients';}],
-    people:[function(a){return 'Worked with and supported a team of '+a;},
-            function(a){return 'Collaborated daily across a '+a+'-person team';},
-            function(a){return 'Partnered with '+a+' teammates to keep work moving';},
-            function(a){return 'Coordinated hands-on with a team of '+a;}],
-    budget:[function(a){return 'Owned work touching '+a+' in budget/revenue';},
-            function(a){return 'Handled responsibilities tied to '+a+' in budget or revenue';},
-            function(a){return 'Supported operations spanning '+a+' in business value';},
-            function(a){return 'Managed processes behind '+a+' of budget/revenue';}],
-    volume:[function(a){return 'Handled '+a+' as part of the core workload';},
-            function(a){return 'Processed '+a+' consistently and accurately';},
-            function(a){return 'Kept '+a+' moving on schedule end-to-end';},
-            function(a){return 'Delivered '+a+' with direct ownership';}]
-  };
   const _mtUsed={};
   answered.forEach(function(x){
     const j=(resumeData.jobs||[])[x.ji]; if(!j) return;
@@ -8543,6 +8552,37 @@ function submitMetricsElicit(){
   try{ if(typeof cloudSync==='function') cloudSync(); }catch(e){}
   const m=document.getElementById('metrics-modal'); if(m) m.remove();
   showToast('📊 '+added+' real-number bullet'+(added>1?'s':'')+' added — review them in your duties, then Re-rate');
+}
+/* v133 (founder repro): resumes created BEFORE the v118 variant bank still carry
+   duplicate generated bullets — three "Managed {N} accounts and client
+   relationships end-to-end", identical but for the number. The bank only fixed
+   NEW additions. This self-heal re-varies the DUPLICATES in place, but ONLY when
+   a bullet's number-stripped form EXACTLY matches a template we generated — a
+   user-typed bullet can never match, so real content is never touched. Runs once
+   per resume load. */
+function _healMetricDupes(){
+  try{
+    const jobs=(resumeData&&resumeData.jobs)||[]; if(!jobs.length) return false;
+    const norm=s=>String(s||'').replace(/\S*\d\S*/g,'#').replace(/\s+/g,' ').trim();
+    const templ={}; Object.keys(_MT).forEach(u=>_MT[u].forEach(fn=>{ templ[norm(fn('#'))]=u; }));
+    const used={}; let changed=false;
+    jobs.forEach(function(j){
+      if(!j||!j.b) return;
+      const lines=String(j.b).split('\n'); let touched=false;
+      const out=lines.map(function(line){
+        const unit=templ[norm(line)]; if(!unit) return line;      /* only generated templates */
+        const k=used[unit]||0; used[unit]=k+1;
+        if(k===0) return line;                                     /* first stays as-is */
+        const nm=line.match(/\S*\d\S*/); const num=nm?nm[0]:'';    /* preserve the real number */
+        const bank=_MT[unit]; const varied=bank[k%bank.length](num);
+        if(varied&&varied!==line){ touched=true; changed=true; return varied; }
+        return line;
+      });
+      if(touched){ j.b=out.join('\n'); }
+    });
+    if(changed){ try{ if(typeof cloudSync==='function') cloudSync(); }catch(e){} }
+    return changed;
+  }catch(e){ return false; }
 }
 async function rateResume(){
   if(!(resumeData&&(resumeData.title||resumeData.skills||(resumeData.jobs&&resumeData.jobs.length)))){
@@ -10427,6 +10467,11 @@ function authErrMsg(e){
    what remains (anonymous aggregates are not tied to the account). */
 async function openDeleteAccount(){
   if(!(window.fb&&fb.current&&fb.current()&&fb.deleteMyAccount)){ showToast('Sign in first'); return; }
+  /* v133 (founder): this row sits right under "Sign Out" — guard against an
+     accidental tap with an explicit confirm BEFORE the password step. */
+  let sure=false;
+  try{ sure=confirm('Delete your GhostProofJob account permanently? This cannot be undone.\n\nThis removes your profile, résumé data, and the applications you sent to employers. If you only want to log off, tap Cancel and use "Sign Out" instead.'); }catch(e){ sure=true; }
+  if(!sure) return;
   let pw=null;
   try{ pw=prompt('This permanently deletes your GhostProofJob account: your profile, résumé data, the applications you sent to employers, and (for employers) your recruiter access. Anonymous community stats are not tied to you and remain. Type your PASSWORD to confirm:',''); }catch(e){}
   if(pw===null) return;                                   /* cancelled */
@@ -11735,8 +11780,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v132';
+const APP_VERSION = 'v133';
 const CHANGELOG = {
+  'v133':['CRITICAL: swipe-right binds to data model (wrong-job + recycle fix); metric-dupe self-heal; delete confirm; CSP origins'],
   'v132':['Stop test emails to fixtures (block Worker in tests) + Reply-To support@ (no more no-reply) + DMARC doc'],
   'v131':['recruiter spec skips on empty session (runtime file check), not the collection-time env var — completes the CI-red fix'],
   'v130':['recruiter.setup degrades a bad test credential to a skip, not a red CI suite (fixes the v129 e2e wiring)'],
@@ -13250,6 +13296,7 @@ generateCoverLetter=function(){
 /* ---------- CASCADE HOOKS: parse + import + build-from-profile ---------- */
 function runPersonalizationCascade(){
   window.userProfileData=resumeData;
+  try{ _healMetricDupes(); }catch(e){}   /* v133: re-vary pre-v118 duplicate metric bullets, once on load */
   updateJobMatchForecast(window.userProfileData);
   renderResumeOptimizer(window.userProfileData);
   populatePastEmployersModal(window.userProfileData);
