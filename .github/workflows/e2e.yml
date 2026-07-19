@@ -30,6 +30,11 @@ jobs:
           # Without them, auth.setup writes an empty state and authed tests skip.
           TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+          # v129: signed-in RECRUITER CI. Set RECRUITER_TEST_EMAIL (a real employer
+          # account) + GPJ_RECRUITER_TEST_PASSWORD to run recruiter flows signed-in;
+          # without them recruiter.setup self-skips (no failure).
+          RECRUITER_TEST_EMAIL: ${{ secrets.RECRUITER_TEST_EMAIL }}
+          GPJ_RECRUITER_TEST_PASSWORD: ${{ secrets.GPJ_RECRUITER_TEST_PASSWORD }}
         run: npx playwright test
 
       - name: Upload screenshots

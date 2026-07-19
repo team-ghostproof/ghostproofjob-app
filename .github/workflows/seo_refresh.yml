@@ -1,0 +1,40 @@
+name: SEO Refresh (weekly)
+
+# Regenerates the static SEO pages from LIVE job data and commits any changes,
+# so the city pages + the per-company "Jobs at {Company}" pages stay honest
+# ("recently seen" must reflect the current pool as postings churn). Static
+# output = ZERO runtime reads to serve. Safe: the honesty model is enforced by
+# `npm run test:seo`, which must pass before anything is committed.
+on:
+  schedule:
+    - cron: '0 8 * * 1'      # Mondays 08:00 UTC (after the harvest, before traffic)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  seo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        run: npm install
+      - name: Guardrail tests (honesty model must hold before we publish)
+        run: npm run test:seo
+      - name: Regenerate SEO pages from live data
+        run: npm run seo:build
+      - name: Commit changed pages (if any)
+        run: |
+          git config user.name  "gpj-seo-bot"
+          git config user.email "seo-bot@users.noreply.github.com"
+          git add seo/ sitemap.xml
+          if git diff --cached --quiet; then
+            echo "No SEO changes this week."
+          else
+            git commit -m "chore(seo): weekly refresh of city + company pages from live data"
+            git push
+          fi
