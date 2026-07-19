@@ -34,7 +34,7 @@ STOP = colors.HexColor("#C22C48")
 INK = colors.HexColor("#1B1526")
 MUTED = colors.HexColor("#5F5977")
 
-BUILD = "v122"
+BUILD = "v128"
 DATE = "2026-07-18"
 HERE = os.path.dirname(os.path.abspath(__file__))
 

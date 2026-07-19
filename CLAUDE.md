@@ -2,7 +2,7 @@
 
 > Operating manual for any Claude (Claude Code or chat) working on GhostProofJob.
 > Read this fully before making changes. The rules here are non-negotiable.
-> **Current build: v122** (Playwright 341 tests — full-suite runs green with rare singleton parallel-load flakes that pass 3/3 isolated · Firestore rules emulator 103/103 · backend suites 84/84 · §4 benchmark green).
+> **Current build: v128** (Playwright 358 tests — full-suite runs green with rare singleton parallel-load flakes that pass 3/3 isolated · Firestore rules emulator 108/108 · backend suites 94/94 · §4 benchmark green).
 > GPJ is now a **two-sided marketplace**: the candidate product plus a full employer/recruiter product.
 > **The recruiter side is a RESKIN, not a second app** — `_gpjRecruiterMode()` + a `.rec-mode` class + per-view
 > `.rec-panel`s repaint the same 6 tabs by account role, so candidate views are never touched and cannot regress.
