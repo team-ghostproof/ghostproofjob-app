@@ -2739,6 +2739,23 @@ test.describe('[STATE-COVERAGE] v128 post-apply email (confirmed applies only)',
     await page.waitForTimeout(500);
   });
 
+  test('v134: the sandbox "Done — I Applied" also fires the post-apply email', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let fired = null;
+      window._fireApplyEmail = (t, co, m) => { fired = { t, co, m }; };
+      window._sbJob = { title: 'Marketing Specialist', co: 'Terracon Consultants Inc', loc: 'Houston, TX' };
+      window._realTitle = (x) => x; window._realCo = (x) => x;
+      lists = { applied: [], skipped: [], viewed: [], responses: [] };
+      window.saveLists = () => {}; window.updateStatCounters = () => {}; window.cloudSync = () => {};
+      window.closeSandbox = () => {}; window.reloadDeckFromQueue = () => {};
+      sandboxDone();
+      await new Promise((x) => setTimeout(x, 50));
+      return fired;
+    });
+    expect(r, 'the sandbox confirm fires the email (was the missed path)').not.toBeNull();
+    expect(r.co).toBe('Terracon Consultants Inc');
+  });
+
   test('fires once per job, caps at 5/day, and never fires signed-out', async ({ page }) => {
     const r = await page.evaluate(async () => {
       const calls = [];
