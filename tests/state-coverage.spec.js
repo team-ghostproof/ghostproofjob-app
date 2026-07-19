@@ -2641,6 +2641,50 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
   });
 });
 
+test.describe('[STATE-COVERAGE] v128 post-apply email (confirmed applies only)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._fireApplyEmail === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(500);
+  });
+
+  test('fires once per job, caps at 5/day, and never fires signed-out', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const calls = [];
+      const realFetch = window.fetch;
+      window.fetch = (url, opts) => {
+        if (String(url).includes('/api/apply-email')) { calls.push(JSON.parse(opts.body)); return Promise.resolve({ ok: true, json: async () => ({ ok: true }) }); }
+        return realFetch(url, opts);
+      };
+      localStorage.removeItem('gpj_apply_email_log');
+      // signed OUT -> no fire
+      window.fb = window.fb || {}; fb.current = () => null;
+      _fireApplyEmail('Ops Manager', 'Acme', 'Houston, TX');
+      await new Promise((x) => setTimeout(x, 50));
+      const signedOut = calls.length;
+      // signed IN
+      fb.current = () => ({ getIdToken: async () => 'tok123' });
+      _fireApplyEmail('Ops Manager', 'Acme', 'Houston, TX');
+      _fireApplyEmail('Ops Manager', 'Acme', 'Houston, TX');   // same job -> deduped
+      await new Promise((x) => setTimeout(x, 60));
+      const afterDupe = calls.length;
+      for (let i = 0; i < 8; i++) _fireApplyEmail('Role ' + i, 'Co ' + i, 'Houston, TX');
+      await new Promise((x) => setTimeout(x, 80));
+      const afterMany = calls.length;
+      window.fetch = realFetch;
+      return { signedOut, afterDupe, afterMany, firstBody: calls[0] };
+    });
+    expect(r.signedOut, 'signed-out never fires').toBe(0);
+    expect(r.afterDupe, 'same job fires exactly once').toBe(1);
+    expect(r.afterMany, 'capped at 5 per day').toBe(5);
+    expect(r.firstBody.idToken).toBe('tok123');
+    expect(r.firstBody.jobTitle).toBe('Ops Manager');
+    expect(r.firstBody.market).toBe('Houston, TX');
+  });
+});
+
 test.describe('[STATE-COVERAGE] v127 full internal scheduling', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });

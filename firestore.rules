@@ -191,6 +191,12 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // v128: post-apply email dedupe/rate ledger — written ONLY by the Vercel
+    // endpoint via the admin SDK (bypasses rules). No client touches it.
+    match /apply_emails/{id} {
+      allow read, write: if isAdmin();
+    }
+
     // v125 (ops): client error telemetry — shape-locked, no PII, create-only.
     // The signed-in gate keeps a spam flood from costing writes; reads are
     // admin-only (nobody can mine other users' error traces).
