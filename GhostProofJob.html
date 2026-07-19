@@ -435,13 +435,16 @@
          The candidate reads their own tray and responds. ===== */
       sendReachOut: async (toCandidateUid,jobId,data)=>{ try{ const u=auth.currentUser; if(!u||!toCandidateUid||!jobId) return false; const ref=doc(collection(db,'reachouts')); await setDoc(ref,Object.assign({fromRecruiterUid:u.uid,toCandidateUid:toCandidateUid,jobId:jobId,kind:'reachout',status:'sent',ts:Date.now()},data||{})); return ref.id; }catch(e){ console.warn('[GPJ] sendReachOut',e&&e.message); return false; } },
       loadMyReachouts: async ()=>{ try{ const u=auth.currentUser; if(!u) return []; const s=await getDocs(query(collection(db,'reachouts'), where('toCandidateUid','==',u.uid), limit(100))); const out=[]; s.forEach(d=>out.push(Object.assign({id:d.id},d.data()))); out.sort((a,b)=>((b.ts||0)-(a.ts||0))); return out; }catch(e){ console.warn('[GPJ] loadMyReachouts',e&&e.message); return []; } },
-      respondReachout: async (id,status,extra)=>{ try{ if(!id||['interested','declined','appealed'].indexOf(status)<0) return false; const p=Object.assign({status:status,respondedAt:Date.now()}, (extra&&typeof extra==='object')?extra:{}); await setDoc(doc(db,'reachouts',id),p,{merge:true}); return true; }catch(e){ console.warn('[GPJ] respondReachout',e&&e.message); return false; } },
+      respondReachout: async (id,status,extra)=>{ try{ if(!id||['interested','declined','appealed','reschedule-requested'].indexOf(status)<0) return false; const p=Object.assign({status:status,respondedAt:Date.now()}, (extra&&typeof extra==='object')?extra:{}); await setDoc(doc(db,'reachouts',id),p,{merge:true}); return true; }catch(e){ console.warn('[GPJ] respondReachout',e&&e.message); return false; } },
       /* R5 appeal: the candidate respectfully requests reconsideration of a rejection — real
          accountability, bounded to 400 chars, only valid against a rejection notice. */
       appealReachout: async (id,message)=>{ try{ if(!id) return false; await setDoc(doc(db,'reachouts',id),{status:'appealed',appealMessage:String(message||'').slice(0,400),appealedAt:Date.now()},{merge:true}); return true; }catch(e){ console.warn('[GPJ] appealReachout',e&&e.message); return false; } },
       countMyReachouts: async ()=>{ try{ const u=auth.currentUser; if(!u) return null; const s=await getCountFromServer(query(collection(db,'reachouts'), where('fromRecruiterUid','==',u.uid))); return s.data().count; }catch(e){ return null; } },
       /* R5/R7: the recruiter's OWN sent reach-outs so they can see who responded,
          accepted an interview slot, or appealed a decline (rules: fromRecruiterUid read). */
+      /* v127 full scheduling: the RECRUITER side of the loop — cancel with a
+         respectful note, or re-propose times (status back to 'sent'). */
+      recruiterUpdateReachout: async (id,patch)=>{ try{ const u=auth.currentUser; if(!u||!id) return false; await setDoc(doc(db,'reachouts',id),Object.assign({},patch||{}),{merge:true}); return true; }catch(e){ console.warn('[GPJ] recruiterUpdateReachout',e&&e.message); return false; } },
       loadSentReachouts: async ()=>{ try{ const u=auth.currentUser; if(!u) return []; const s=await getDocs(query(collection(db,'reachouts'), where('fromRecruiterUid','==',u.uid), limit(100))); const out=[]; s.forEach(d=>out.push(Object.assign({id:d.id},d.data()))); out.sort((a,b)=>((b.respondedAt||b.ts||0)-(a.respondedAt||a.ts||0))); return out; }catch(e){ console.warn('[GPJ] loadSentReachouts',e&&e.message); return []; } },
       /* ===== Referral engine (v107): one doc per invitee keyed by THEIR uid. The
          invitee records who referred them at signup, then flips onboarded:true once
@@ -2741,7 +2744,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v126</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v127</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3133,21 +3136,38 @@ async function renderRecruiterResponses(){
   const box=document.getElementById('emp-responses');
   if(!box) return;
   if(!(window._recruiter&&window.fb&&fb.loadSentReachouts)){ box.style.display='none'; return; }
-  const list=(await fb.loadSentReachouts()).filter(r=>r&&r.status&&r.status!=='sent');
-  if(!list.length){ box.style.display='none'; return; }
+  const _all=await fb.loadSentReachouts();
+  const list=_all.filter(r=>r&&r.status&&r.status!=='sent');
+  /* v127: confirmed interviews get their own strip + live controls */
+  const upcoming=_all.filter(r=>r&&r.status==='interested'&&r.acceptedTime).sort((a,b)=>(a.acceptedTs||9e15)-(b.acceptedTs||9e15));
+  if(!list.length&&!upcoming.length){ box.style.display='none'; return; }
   const dt=s=>String(s==null?'':s).replace(/</g,'&lt;');
+  const schedBtns=r=>'<div style="display:flex;gap:6px;margin-top:6px;">'
+    +'<div onclick="recRescheduleUI(\''+dt(r.id)+'\')" style="flex:1;background:var(--plum3);border:1px solid var(--plum4);color:var(--off);border-radius:8px;padding:6px;text-align:center;font-size:10.5px;font-weight:800;cursor:pointer;">🔁 Reschedule</div>'
+    +'<div onclick="recCancelInterviewUI(\''+dt(r.id)+'\')" style="flex:1;background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.35);color:var(--danger);border-radius:8px;padding:6px;text-align:center;font-size:10.5px;font-weight:800;cursor:pointer;">✖ Cancel</div></div>';
   const row=r=>{
     const who=dt(r.candidateName||'A candidate');
     if(r.status==='interested'){
-      return '<div style="background:rgba(0,245,160,.08);border:1px solid rgba(0,245,160,.3);border-radius:9px;padding:9px 11px;margin-bottom:7px;font-size:12px;color:var(--off);"><strong style="color:var(--mint);">👍 '+who+'</strong> is interested'+(r.jobTitle?(' in '+dt(r.jobTitle)):'')+(r.acceptedTime?('<div style="color:var(--mint);font-weight:700;margin-top:3px;">📅 Interview time: '+dt(r.acceptedTime)+'</div>'):'')+'</div>';
+      return '<div style="background:rgba(0,245,160,.08);border:1px solid rgba(0,245,160,.3);border-radius:9px;padding:9px 11px;margin-bottom:7px;font-size:12px;color:var(--off);"><strong style="color:var(--mint);">👍 '+who+'</strong> is interested'+(r.jobTitle?(' in '+dt(r.jobTitle)):'')+(r.acceptedTime?('<div style="color:var(--mint);font-weight:700;margin-top:3px;">📅 Interview time: '+dt(r.acceptedTime)+'</div>'+schedBtns(r)):'')+'</div>';
+    }
+    if(r.status==='reschedule-requested'){
+      return '<div style="background:rgba(181,95,230,.1);border:1px solid rgba(181,95,230,.4);border-radius:9px;padding:9px 11px;margin-bottom:7px;font-size:12px;color:var(--off);"><strong style="color:var(--cyber);">🔁 '+who+'</strong> asked to reschedule'+(r.jobTitle?(' — '+dt(r.jobTitle)):'')+(r.rescheduleNote?('<div style="color:var(--muted);margin-top:3px;line-height:1.5;">“'+dt(r.rescheduleNote)+'”</div>'):'')+schedBtns(r)+'</div>';
+    }
+    if(r.status==='cancelled'){
+      return '<div style="background:var(--plum2);border:1px solid var(--plum3);border-radius:9px;padding:9px 11px;margin-bottom:7px;font-size:12px;color:var(--muted);">✖ Interview with '+who+' cancelled — they were told (no ghosting).</div>';
     }
     if(r.status==='appealed'){
       return '<div style="background:rgba(181,95,230,.1);border:1px solid rgba(181,95,230,.4);border-radius:9px;padding:9px 11px;margin-bottom:7px;font-size:12px;color:var(--off);"><strong style="color:var(--cyber);">⤴ '+who+'</strong> respectfully appealed your decline'+(r.jobTitle?(' on '+dt(r.jobTitle)):'')+(r.appealMessage?('<div style="color:var(--muted);margin-top:3px;line-height:1.5;">“'+dt(r.appealMessage)+'”</div>'):'')+'<div style="font-size:10px;color:var(--muted);margin-top:4px;">A quick reconsider-or-reaffirm reply keeps your responsiveness high.</div></div>';
     }
     return '<div style="background:var(--plum2);border:1px solid var(--plum3);border-radius:9px;padding:9px 11px;margin-bottom:7px;font-size:12px;color:var(--muted);">'+who+' declined'+(r.jobTitle?(' — '+dt(r.jobTitle)):'')+'</div>';
   };
+  const upStrip=upcoming.length
+    ? ('<div style="font-size:11px;color:var(--mint);font-weight:800;letter-spacing:.3px;margin-bottom:7px;">📅 UPCOMING INTERVIEWS</div>'
+      +upcoming.map(r=>'<div style="background:rgba(0,245,160,.07);border:1px solid rgba(0,245,160,.25);border-radius:9px;padding:9px 11px;margin-bottom:7px;font-size:12px;color:var(--off);">📅 <strong>'+dt(r.acceptedTime)+'</strong> — '+dt(r.candidateName||'Candidate')+(r.jobTitle?(' · '+dt(r.jobTitle)):'')+schedBtns(r)+'</div>').join('')
+      +'<div style="height:6px;"></div>')
+    : '';
   box.style.display='block';
-  box.innerHTML='<div style="font-size:11px;color:var(--cyber);font-weight:800;letter-spacing:.3px;margin-bottom:7px;">CANDIDATE RESPONSES</div>'+list.map(row).join('');
+  box.innerHTML=upStrip+(list.length?('<div style="font-size:11px;color:var(--cyber);font-weight:800;letter-spacing:.3px;margin-bottom:7px;">CANDIDATE RESPONSES</div>'+list.map(row).join('')):'');
 }
 /* R2-B: create one internal job from the employer form (hidden until verified) */
 async function postRecruiterJob(){
@@ -3242,37 +3262,92 @@ async function openJobMatches(jobId,title){
       +contact+actions+'</div>';
   }).join('');
 }
-/* R5: recruiter reaches out to / respectfully declines a candidate. */
-async function reachOutTo(uid,jobId,jobTitle,name,kind){
+/* R5 + v127 FULL SCHEDULING: reach out / kind decline via a proper modal with
+   STRUCTURED date+time slot pickers (replaces the prompt() free-text of R7). */
+function _slotRowHtml(pfx,i){
+  return '<div style="display:flex;gap:6px;margin-bottom:6px;"><input type="date" id="'+pfx+'d'+i+'" class="field-input" style="flex:1.2;margin:0;font-size:12px;"/><input type="time" id="'+pfx+'t'+i+'" class="field-input" style="flex:1;margin:0;font-size:12px;"/></div>';
+}
+function _collectSlots(pfx){
+  const labels=[], ts=[];
+  for(let i=0;i<3;i++){
+    const d=((document.getElementById(pfx+'d'+i)||{}).value||''), t=((document.getElementById(pfx+'t'+i)||{}).value||'');
+    if(!d||!t) continue;
+    try{
+      const dtv=new Date(d+'T'+t);
+      if(isNaN(dtv.getTime())) continue;
+      const lbl=dtv.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})+' · '+dtv.toLocaleTimeString([],{hour:'numeric',minute:'2-digit',timeZoneName:'short'});
+      labels.push(lbl.slice(0,120)); ts.push(dtv.getTime());
+    }catch(e){}
+  }
+  return {labels:labels.slice(0,3), ts:ts.slice(0,3)};
+}
+function reachOutTo(uid,jobId,jobTitle,name,kind){
   if(!uid||!jobId) return;
   if(!(window._recruiter&&window.fb&&fb.sendReachOut)){ showToast('Sign in as an employer first'); return; }
   const isRej=(kind==='rejection');
-  const promptMsg=isRej
-    ? ('Send '+name+' a short, respectful note (better than silence). Optional:')
-    : ('Message to '+name+' about "'+jobTitle+'". Optional:');
-  let message='';
-  try{ message=(typeof prompt==='function')?(prompt(promptMsg,isRej?'Thank you for applying — we’ve decided to move forward with other candidates for this role. We’d welcome future applications.':'Hi — your background looks like a strong fit for '+jobTitle+'. Are you open to a quick chat?')||''):''; }catch(e){}
-  if(message===null) return;
-  /* R7 (minimal-real scheduling): on a reach-out, the recruiter may propose interview
-     slots inline. Comma-separated free text (e.g. "Tue 2pm CT, Wed 10am CT") — the
-     candidate picks one in their tray. Kept lightweight per the spec's "deferred
-     framework": no calendar integration, but a real structured slot exchange. */
-  let proposedTimes=[];
-  if(!isRej){
-    let slots=null;
-    try{ slots=(typeof prompt==='function')?prompt('Optional — propose up to 3 interview times '+name+' can pick from (comma-separated, e.g. "Tue 2pm CT, Thu 10am CT"). Leave blank to skip.',''):''; }catch(e){}
-    if(slots===null) return;   /* recruiter cancelled the whole action */
-    proposedTimes=String(slots||'').split(',').map(s=>s.trim().slice(0,120)).filter(Boolean).slice(0,3);
-  }
+  window._roCtx={uid:uid,jobId:jobId,jobTitle:String(jobTitle||''),name:String(name||''),kind:isRej?'rejection':'reachout'};
+  const old=document.getElementById('reachout-modal'); if(old) old.remove();
+  const defMsg=isRej
+    ? 'Thank you for applying — we’ve decided to move forward with other candidates for this role. We’d welcome future applications.'
+    : ('Hi — your background looks like a strong fit for '+String(jobTitle||'this role')+'. Are you open to a quick chat?');
+  const scrim=document.createElement('div');
+  scrim.id='reachout-modal'; scrim.className='modal-scrim open'; scrim.style.zIndex='356';
+  scrim.innerHTML='<div class="modal-box" style="text-align:left;">'
+    +'<div style="display:flex;align-items:center;margin-bottom:6px;"><div style="font-size:15px;font-weight:800;flex:1;">'+(isRej?'💌 Kind decline to ':'💬 Reach out to ')+String(name||'this candidate').replace(/</g,'&lt;')+'</div><div onclick="document.getElementById(\'reachout-modal\').remove()" style="color:var(--muted);cursor:pointer;font-size:16px;padding:4px;">✕</div></div>'
+    +'<div class="field-label">Message</div>'
+    +'<textarea class="field-input" id="ro-msg" rows="3" style="margin-bottom:10px;font-size:13px;resize:vertical;">'+defMsg.replace(/</g,'&lt;')+'</textarea>'
+    +(isRej?'':('<div class="field-label">Propose interview times <span style="text-transform:none;font-weight:400;">(optional, up to 3)</span></div>'
+      +_slotRowHtml('ro-',0)+_slotRowHtml('ro-',1)+_slotRowHtml('ro-',2)))
+    +'<div onclick="_sendReachOutModal()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:12px;text-align:center;font-size:13px;cursor:pointer;">'+(isRej?'Send kind decline':'Send reach-out')+'</div>'
+    +'</div>';
+  document.getElementById('app').appendChild(scrim);
+}
+async function _sendReachOutModal(){
+  const c=window._roCtx; if(!c) return;
+  const isRej=(c.kind==='rejection');
+  const message=String(((document.getElementById('ro-msg')||{}).value||'')).slice(0,800);
+  const slots=isRej?{labels:[],ts:[]}:_collectSlots('ro-');
   const co=(window._recruiter&&window._recruiter.company)||'';
-  const payload={kind:isRej?'rejection':'reachout',message:String(message).slice(0,800),jobTitle:jobTitle,company:co,candidateName:String(name||'').slice(0,80)};
-  if(proposedTimes.length) payload.proposedTimes=proposedTimes;
-  const id=await fb.sendReachOut(uid,jobId,payload);
+  const payload={kind:c.kind,message:message,jobTitle:c.jobTitle,company:co,candidateName:String(c.name||'').slice(0,80)};
+  if(slots.labels.length){ payload.proposedTimes=slots.labels; payload.proposedTs=slots.ts; }
+  const id=await fb.sendReachOut(c.uid,c.jobId,payload);
+  const m=document.getElementById('reachout-modal'); if(m) m.remove();
   if(id){
-    const box=document.getElementById('ro-'+uid);
+    const box=document.getElementById('ro-'+c.uid);
     if(box) box.innerHTML='<div style="flex:1;font-size:11px;color:'+(isRej?'var(--muted)':'var(--mint)')+';font-weight:700;text-align:center;padding:8px;">'+(isRej?'✓ Decline sent — thank you for not ghosting':'✓ Reach-out sent')+'</div>';
-    showToast(isRej?'✓ Respectful decline sent':'📨 Reach-out sent');
+    showToast(isRej?'✓ Respectful decline sent':('📨 Reach-out sent'+(slots.labels.length?(' with '+slots.labels.length+' proposed time'+(slots.labels.length>1?'s':'')):'')));
   } else { showToast('Could not send — try again'); }
+}
+/* v127: recruiter reschedules (new slots -> candidate re-picks) or cancels
+   (respectful auto-notice — the candidate is TOLD, never ghosted). */
+function recRescheduleUI(id){
+  window._resKedId=id;
+  const old=document.getElementById('resched-modal'); if(old) old.remove();
+  const scrim=document.createElement('div');
+  scrim.id='resched-modal'; scrim.className='modal-scrim open'; scrim.style.zIndex='356';
+  scrim.innerHTML='<div class="modal-box" style="text-align:left;">'
+    +'<div style="display:flex;align-items:center;margin-bottom:6px;"><div style="font-size:15px;font-weight:800;flex:1;">🔁 Propose new interview times</div><div onclick="document.getElementById(\'resched-modal\').remove()" style="color:var(--muted);cursor:pointer;font-size:16px;padding:4px;">✕</div></div>'
+    +'<div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">The candidate picks again from these — their previous pick is cleared.</div>'
+    +_slotRowHtml('rs-',0)+_slotRowHtml('rs-',1)+_slotRowHtml('rs-',2)
+    +'<div onclick="_sendReschedule()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:12px;text-align:center;font-size:13px;cursor:pointer;">Send new times</div>'
+    +'</div>';
+  document.getElementById('app').appendChild(scrim);
+}
+async function _sendReschedule(){
+  const id=window._resKedId; if(!id) return;
+  const slots=_collectSlots('rs-');
+  if(!slots.labels.length){ showToast('Pick at least one date + time'); return; }
+  const ok=(window.fb&&fb.recruiterUpdateReachout)?await fb.recruiterUpdateReachout(id,{status:'sent',proposedTimes:slots.labels,proposedTs:slots.ts,acceptedTime:'',rescheduleNote:'',ts:Date.now()}):false;
+  const m=document.getElementById('resched-modal'); if(m) m.remove();
+  showToast(ok?'🔁 New times sent — the candidate picks again':'Could not send — try again');
+  try{ renderRecruiterResponses(); }catch(e){}
+}
+async function recCancelInterviewUI(id){
+  let sure=true; try{ sure=confirm('Cancel this interview? The candidate is told respectfully — never silence.'); }catch(e){}
+  if(!sure) return;
+  const ok=(window.fb&&fb.recruiterUpdateReachout)?await fb.recruiterUpdateReachout(id,{status:'cancelled',cancelNote:'The employer had to cancel this interview — apologies. They may propose new times.'}):false;
+  showToast(ok?'✖ Cancelled — the candidate has been told (no ghosting)':'Could not cancel — try again');
+  try{ renderRecruiterResponses(); }catch(e){}
 }
 async function saveCompanyProfile(){
   if(!window._recruiter){ showToast('Sign in as an employer first'); return; }
@@ -3996,7 +4071,12 @@ async function _notifCandidate(){
           out.push({id:'ro:'+r.id+':slots',icon:'📅',title:co+' proposed interview times',body:'Pick a time that works for '+jt+'.',ts:r.ts||0,view:'account'});
         else
           out.push({id:'ro:'+r.id+':new',icon:'🔥',title:co+' wants you for '+jt,body:'A hot match — they reached out to you directly.',ts:r.ts||0,view:'account'});
+      } else if(r.status==='cancelled'){
+        out.push({id:'ro:'+r.id+':cxl',icon:'✖',title:co+' cancelled your interview',body:(r.cancelNote||'They told you instead of ghosting.'),ts:r.ts||0,view:'account'});
       }
+      /* v127: real reminder for a confirmed interview inside the next 48h */
+      if(r.status==='interested'&&typeof r.acceptedTs==='number'&&r.acceptedTs>Date.now()&&r.acceptedTs<Date.now()+48*3600*1000)
+        out.push({id:'ivw:'+r.id+':'+r.acceptedTs,icon:'📅',title:'Interview soon — '+co,body:(r.acceptedTime||'')+(r.jobTitle?(' · '+r.jobTitle):''),ts:r.acceptedTs,view:'account'});
     });
   }catch(e){}
   return out;
@@ -4011,6 +4091,10 @@ async function _notifRecruiter(){
         const who=r.candidateName||'A candidate';
         if(r.status==='interested') out.push({id:'resp:'+r.id+':int',icon:'👍',title:who+' is interested',body:(r.acceptedTime?('Interview time: '+r.acceptedTime):('In '+(r.jobTitle||'your role')+'.')),ts:r.respondedAt||r.ts||0,view:'swipe'});
         else if(r.status==='appealed') out.push({id:'resp:'+r.id+':app',icon:'⤴',title:who+' appealed your decline',body:'A quick reconsider-or-reaffirm keeps your responsiveness high.',ts:r.respondedAt||r.ts||0,view:'swipe'});
+        else if(r.status==='reschedule-requested') out.push({id:'resp:'+r.id+':rsk',icon:'🔁',title:who+' asked to reschedule',body:(r.rescheduleNote||'Propose new times from your inbox.'),ts:r.respondedAt||r.ts||0,view:'swipe'});
+        /* v127: recruiter-side reminder for confirmed interviews inside 48h */
+        if(r.status==='interested'&&typeof r.acceptedTs==='number'&&r.acceptedTs>Date.now()&&r.acceptedTs<Date.now()+48*3600*1000)
+          out.push({id:'ivwr:'+r.id+':'+r.acceptedTs,icon:'📅',title:'Interview soon — '+who,body:(r.acceptedTime||'')+(r.jobTitle?(' · '+r.jobTitle):''),ts:r.acceptedTs,view:'swipe'});
       });
     }
     const r=window._recruiter||{};
@@ -11258,8 +11342,13 @@ async function renderMyReachouts(){
   const list=await fb.loadMyReachouts();
   if(!list.length){ sec.style.display='none'; return; }
   sec.style.display='block';
+  window._myRO={}; list.forEach(function(r){ if(r&&r.id) window._myRO[r.id]=r; });
   const dt=s=>String(s==null?'':s).replace(/</g,'&lt;');
-  box.innerHTML=list.map(r=>{
+  /* v127: confirmed upcoming interviews, at the top where they belong */
+  const _upc=list.filter(r=>r.status==='interested'&&r.acceptedTime).sort((a,b)=>(a.acceptedTs||9e15)-(b.acceptedTs||9e15));
+  const _upHtml=_upc.length?('<div style="font-size:10.5px;color:var(--mint);font-weight:800;margin:2px 0 6px;">📅 YOUR INTERVIEWS</div>'
+    +_upc.map(r=>'<div style="background:rgba(0,245,160,.07);border:1px solid rgba(0,245,160,.25);border-radius:10px;padding:9px 11px;margin-bottom:7px;font-size:11.5px;color:var(--off);">📅 <strong>'+dt(r.acceptedTime)+'</strong> — '+dt(r.company||'Employer')+(r.jobTitle?(' · '+dt(r.jobTitle)):'')+'</div>').join('')):'';
+  box.innerHTML=_upHtml+list.map(r=>{
     const rej=(r.kind==='rejection');
     const head=rej
       ? '<span style="color:var(--muted);font-weight:700;">'+dt(r.company||'An employer')+' — update on '+dt(r.jobTitle||'your application')+'</span>'
@@ -11270,9 +11359,10 @@ async function renderMyReachouts(){
     let slotBlock='';
     if(slots.length && r.status==='sent'){
       slotBlock='<div style="margin-top:8px;"><div style="font-size:10.5px;color:var(--cyber);font-weight:700;margin-bottom:5px;">📅 Pick an interview time:</div><div style="display:flex;flex-wrap:wrap;gap:6px;">'
-        +slots.map(s=>'<div onclick="pickInterviewSlot(\''+dt(r.id)+'\',\''+dt(s).replace(/'/g,'')+'\')" style="background:rgba(181,95,230,.14);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;">'+dt(s)+'</div>').join('')+'</div></div>';
-    } else if(r.acceptedTime){
-      slotBlock='<div style="font-size:11px;color:var(--mint);font-weight:700;margin-top:7px;">📅 Interview set: '+dt(r.acceptedTime)+'</div>';
+        +slots.map((s,i)=>'<div onclick="pickInterviewSlot(\''+dt(r.id)+'\','+i+')" style="background:rgba(181,95,230,.14);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;">'+dt(s)+'</div>').join('')+'</div></div>';
+    } else if(r.acceptedTime && r.status==='interested'){
+      slotBlock='<div style="font-size:11px;color:var(--mint);font-weight:700;margin-top:7px;">📅 Interview set: '+dt(r.acceptedTime)+'</div>'
+        +'<div onclick="requestRescheduleUI(\''+dt(r.id)+'\')" style="margin-top:6px;display:inline-block;background:var(--plum3);border:1px solid var(--plum4);color:var(--off);border-radius:8px;padding:6px 11px;font-size:10.5px;font-weight:700;cursor:pointer;">🔁 Request a different time</div>';
     }
     let action='';
     if(rej){
@@ -11283,6 +11373,8 @@ async function renderMyReachouts(){
     else if(r.status==='sent'){ action='<div style="display:flex;gap:8px;margin-top:8px;" id="rar-'+dt(r.id)+'">'
       +'<div onclick="respondToReachout(\''+dt(r.id)+'\',\'interested\')" style="flex:1;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">👍 Interested</div>'
       +'<div onclick="respondToReachout(\''+dt(r.id)+'\',\'declined\')" style="flex:1;background:var(--plum3);border:1px solid var(--plum4);color:var(--muted);border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">Not now</div></div>'; }
+    else if(r.status==='cancelled'){ action='<div style="font-size:11px;color:var(--muted);margin-top:7px;line-height:1.5;">✖ '+dt(r.company||'The employer')+' cancelled this interview'+(r.cancelNote?(' — “'+dt(r.cancelNote)+'”'):'')+'<br><span style="color:var(--mint);">They told you instead of ghosting. 💚</span></div>'; }
+    else if(r.status==='reschedule-requested'){ action='<div style="font-size:11px;color:var(--cyber);font-weight:700;margin-top:7px;">🔁 You asked to reschedule — the employer will propose new times.</div>'; }
     else { action='<div style="font-size:11px;color:'+(r.status==='interested'?'var(--mint)':'var(--muted)')+';font-weight:700;margin-top:7px;">You replied: '+(r.status==='interested'?'👍 Interested':'Not now')+'</div>'; }
     return '<div style="background:var(--plum2);border:1px solid var(--plum3);border-radius:11px;padding:12px 13px;margin-bottom:8px;">'
       +'<div style="font-size:12px;">'+head+'</div>'+msg+slotBlock+action+'</div>';
@@ -11295,11 +11387,25 @@ async function respondToReachout(id,status){
   if(ok&&box){ box.innerHTML='<div style="flex:1;font-size:11px;color:'+(status==='interested'?'var(--mint)':'var(--muted)')+';font-weight:700;text-align:center;padding:8px;">You replied: '+(status==='interested'?'👍 Interested — the employer can follow up':'Not now')+'</div>'; }
   showToast(ok?(status==='interested'?'👍 Sent — the employer will see you’re interested':'Noted — thanks for replying'):'Could not send — try again');
 }
-/* R7: candidate accepts a proposed interview slot (records acceptedTime + marks interested) */
-async function pickInterviewSlot(id,slot){
+/* R7 + v127: candidate accepts a proposed slot BY INDEX — the structured
+   timestamp (proposedTs) rides along so reminders can be real, not parsed. */
+async function pickInterviewSlot(id,idx){
   if(!(window.fb&&fb.respondReachout)) return;
-  const ok=await fb.respondReachout(id,'interested',{acceptedTime:String(slot||'').slice(0,200)});
+  const r=(window._myRO||{})[id]||{};
+  const slots=Array.isArray(r.proposedTimes)?r.proposedTimes:[];
+  const slot=String(slots[idx]||'').slice(0,200); if(!slot) return;
+  const extra={acceptedTime:slot};
+  try{ if(Array.isArray(r.proposedTs)&&typeof r.proposedTs[idx]==='number') extra.acceptedTs=r.proposedTs[idx]; }catch(e){}
+  const ok=await fb.respondReachout(id,'interested',extra);
   showToast(ok?('📅 Interview time confirmed: '+slot+' — the employer will follow up'):'Could not confirm — try again');
+  try{ renderMyReachouts(); }catch(e){}
+}
+/* v127: candidate asks for a different time — a short note rides along */
+async function requestRescheduleUI(id){
+  let note=null; try{ note=prompt('Ask for a different time — a short note helps (e.g. "Mornings work better").',''); }catch(e){}
+  if(note===null) return;
+  const ok=(window.fb&&fb.respondReachout)?await fb.respondReachout(id,'reschedule-requested',{rescheduleNote:String(note||'').slice(0,300)}):false;
+  showToast(ok?'🔁 Sent — the employer will propose new times':'Could not send — try again');
   try{ renderMyReachouts(); }catch(e){}
 }
 /* R5 appeal: the candidate respectfully asks the employer to reconsider a rejection */
@@ -11616,8 +11722,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v126';
+const APP_VERSION = 'v127';
 const CHANGELOG = {
+  'v127':['Full internal scheduling: structured slot pickers, Interviews both sides, reschedule/cancel with respectful notice, bell reminders'],
   'v126':['Admin insights: verified-hire counts + signup attribution channels (admin-only until numbers are real)'],
   'v125':['Client error monitoring: onerror/unhandledrejection -> shape-locked telemetry + admin 24h count'],
   'v124':['Real contact details (Google Voice) on every trust surface + email footers'],

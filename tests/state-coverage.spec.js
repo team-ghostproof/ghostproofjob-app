@@ -2299,6 +2299,9 @@ test.describe('[STATE-COVERAGE] R5 outreach + anti-ghosting, R6 candidate tray',
       const hasReach = /Reach out/.test(inner), hasDecline = /Send kind decline/.test(inner);
       document.querySelector('#matches-body div[onclick*="reachOutTo"][onclick*="reachout"]').click();
       await new Promise((r) => setTimeout(r, 150));
+      // v127: reach-out now opens a structured modal (default message prefilled) — confirm to send
+      await _sendReachOutModal();
+      await new Promise((r) => setTimeout(r, 100));
       return { hasReach, hasDecline, sentKind: sent && sent.data && sent.data.kind, sentTo: sent && sent.uid, hasMessage: !!(sent && sent.data && sent.data.message) };
     });
     expect(r.hasReach).toBe(true);
@@ -2638,6 +2641,90 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
   });
 });
 
+test.describe('[STATE-COVERAGE] v127 full internal scheduling', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.reachOutTo === 'function'
+      && typeof window._collectSlots === 'function' && typeof window.pickInterviewSlot === 'function',
+    null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(500);
+  });
+
+  test('recruiter proposes structured slots via the modal; timestamps ride along', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      let sent = null;
+      fb.sendReachOut = async (uid, jobId, payload) => { sent = { uid, jobId, payload }; return 'ro1'; };
+      window._recruiter = { uid: 'r1', company: 'Acme', isValidated: true };
+      reachOutTo('cand1', 'job1', 'Ops Manager', 'Jane Doe', 'reachout');
+      const hasModal = !!document.getElementById('reachout-modal');
+      const dateInputs = document.querySelectorAll('#reachout-modal input[type="date"]').length;
+      // fill two of three slots
+      document.getElementById('ro-d0').value = '2026-08-10'; document.getElementById('ro-t0').value = '14:00';
+      document.getElementById('ro-d1').value = '2026-08-11'; document.getElementById('ro-t1').value = '10:30';
+      await _sendReachOutModal();
+      return { hasModal, dateInputs, payload: sent && sent.payload, modalGone: !document.getElementById('reachout-modal') };
+    });
+    expect(r.hasModal).toBe(true);
+    expect(r.dateInputs, 'three structured slot rows').toBe(3);
+    expect(r.payload.proposedTimes.length, 'two filled slots collected').toBe(2);
+    expect(r.payload.proposedTs.length).toBe(2);
+    expect(typeof r.payload.proposedTs[0]).toBe('number');
+    expect(r.modalGone).toBe(true);
+  });
+
+  test('candidate picks a slot BY INDEX — the real timestamp is stored (not re-parsed)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      let resp = null;
+      fb.respondReachout = async (id, status, extra) => { resp = { id, status, extra }; return true; };
+      window._myRO = { ro9: { id: 'ro9', proposedTimes: ['Mon Aug 10 · 2:00 PM CDT', 'Tue Aug 11 · 10:30 AM CDT'], proposedTs: [1786000000000, 1786100000000] } };
+      window.renderMyReachouts = () => {};
+      await pickInterviewSlot('ro9', 1);
+      return resp;
+    });
+    expect(r.status).toBe('interested');
+    expect(r.extra.acceptedTime).toBe('Tue Aug 11 · 10:30 AM CDT');
+    expect(r.extra.acceptedTs, 'the structured timestamp powers reminders, no string parsing').toBe(1786100000000);
+  });
+
+  test('recruiter cancel + reschedule call the recruiter update path with the right status', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      const calls = [];
+      fb.recruiterUpdateReachout = async (id, patch) => { calls.push({ id, patch }); return true; };
+      window.renderRecruiterResponses = () => {};
+      window.confirm = () => true;
+      await recCancelInterviewUI('roX');
+      recRescheduleUI('roY');
+      document.getElementById('rs-d0').value = '2026-09-01'; document.getElementById('rs-t0').value = '09:00';
+      await _sendReschedule();
+      return calls;
+    });
+    expect(r[0].patch.status, 'cancel is a real, told status — never silence').toBe('cancelled');
+    expect(r[0].patch.cancelNote).toBeTruthy();
+    expect(r[1].patch.status, 'reschedule re-opens the slot picker').toBe('sent');
+    expect(r[1].patch.proposedTimes.length).toBe(1);
+    expect(r[1].patch.acceptedTime, 'the old pick is cleared').toBe('');
+  });
+
+  test('candidate can request a reschedule with a note', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      let resp = null;
+      fb.respondReachout = async (id, status, extra) => { resp = { id, status, extra }; return true; };
+      window.prompt = () => 'Mornings work better for me';
+      window.renderMyReachouts = () => {};
+      await requestRescheduleUI('ro5');
+      return resp;
+    });
+    expect(r.status).toBe('reschedule-requested');
+    expect(r.extra.rescheduleNote).toBe('Mornings work better for me');
+  });
+});
+
 test.describe('[STATE-COVERAGE] v126 admin insights (hires + attribution)', () => {
   test('insights paint real counts; empty data reads honestly; zero-hire stays muted', async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
@@ -2725,10 +2812,12 @@ test.describe('[STATE-COVERAGE] v123 kind-decline from Applicants + account dele
       document.body.appendChild(host);
       await recToggleApplicants('jx', 'Ops Manager');
       const html = host.innerHTML;
-      window.prompt = () => 'Thank you for applying — moving forward with others.';
       const declineBtn = [...host.querySelectorAll('[onclick*="rejection"]')][0];
       declineBtn.click();
-      await new Promise((x) => setTimeout(x, 200));
+      await new Promise((x) => setTimeout(x, 150));
+      // v127: kind decline opens the structured modal (default note prefilled) — confirm to send
+      await _sendReachOutModal();
+      await new Promise((x) => setTimeout(x, 100));
       host.remove();
       return { hasReach: /'reachout'\)/.test(html.replace(/&#39;|\\'/g, "'")) || /reachout/.test(html), hasDecline: /rejection/.test(html), sent };
     });

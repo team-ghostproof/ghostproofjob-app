@@ -399,6 +399,21 @@ describe('R5 — outreach is consent-gated + anti-ghost audited', () => {
   test('R5 appeal: a non-recipient cannot appeal on a candidate’s behalf', async () => {
     await assertFails(setDoc(doc(asCandD(), 'reachouts/roRej'), { fromRecruiterUid: 'recruiterA', toCandidateUid: 'candC', jobId: 'jobA', kind: 'rejection', status: 'appealed', appealMessage: 'let me in' }, { merge: true }));
   });
+  // v127 FULL SCHEDULING — recruiter-side reschedule/cancel + candidate reschedule-request
+  test('v127: the SENDING recruiter may cancel (respectful, never silent) and reschedule', async () => {
+    await assertSucceeds(setDoc(doc(asRecruiterA(), 'reachouts/ro1'), ro({ status: 'cancelled', cancelNote: 'Sorry, we had to cancel — new times soon.' }), { merge: true }));
+    await assertSucceeds(setDoc(doc(asRecruiterA(), 'reachouts/ro1'), ro({ status: 'sent', proposedTimes: ['Mon 9am', 'Tue 10am'], acceptedTime: '' }), { merge: true }));
+  });
+  test('v127: a recruiter canNOT forge a candidate response or touch someone else’s reach-out', async () => {
+    // recruiter cannot set a candidate-only status like 'interested'
+    await assertFails(setDoc(doc(asRecruiterA(), 'reachouts/ro1'), ro({ status: 'interested' }), { merge: true }));
+    // a different recruiter cannot cancel A's reach-out
+    await assertFails(setDoc(doc(asRecruiterB(), 'reachouts/ro1'), ro({ status: 'cancelled', cancelNote: 'nope' }), { merge: true }));
+  });
+  test('v127: the recipient candidate may request a reschedule (bounded note)', async () => {
+    await assertSucceeds(setDoc(doc(asCandC(), 'reachouts/ro1'), ro({ status: 'reschedule-requested', rescheduleNote: 'Mornings work better.' }), { merge: true }));
+    await assertFails(setDoc(doc(asCandC(), 'reachouts/ro1'), ro({ status: 'reschedule-requested', rescheduleNote: 'x'.repeat(400) }), { merge: true }));
+  });
 });
 
 describe('v113 SECURITY — a user cannot buy themselves a tier for free', () => {

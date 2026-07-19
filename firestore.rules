@@ -369,19 +369,33 @@ service cloud.firestore {
         // R7: optional proposed interview slots ride along on a reach-out (bounded list of short strings)
         && request.resource.data.get('proposedTimes', []).size() <= 5
         && candidateReachable(request.resource.data.toCandidateUid, request.resource.data.jobId);
-      // ONLY the recipient candidate may respond. They may: accept/decline (R6),
-      // pick a proposed interview slot (R7 acceptedTime), or appeal a rejection (R5).
+      // The recipient CANDIDATE may respond: accept/decline (R6), pick a proposed
+      // interview slot (R7 acceptedTime), appeal a rejection (R5), or request a
+      // reschedule (v127). Immutable identity fields; bounded strings.
       allow update: if request.auth != null
         && resource.data.toCandidateUid == request.auth.uid
         && request.resource.data.toCandidateUid == resource.data.toCandidateUid
         && request.resource.data.fromRecruiterUid == resource.data.fromRecruiterUid
         && request.resource.data.jobId == resource.data.jobId
         && request.resource.data.kind == resource.data.kind
-        && request.resource.data.status in ['interested', 'declined', 'appealed']
+        && request.resource.data.status in ['interested', 'declined', 'appealed', 'reschedule-requested']
         && request.resource.data.get('acceptedTime', '').size() <= 200
         && request.resource.data.get('appealMessage', '').size() <= 400
+        && request.resource.data.get('rescheduleNote', '').size() <= 300
         // an appeal is only valid against a rejection notice (anti-ghosting accountability)
         && (request.resource.data.status != 'appealed' || resource.data.kind == 'rejection');
+      // v127: the SENDING recruiter may reschedule (re-propose times -> 'sent') or
+      // cancel with a respectful note. Identity fields stay immutable; a recruiter
+      // can never flip an appeal or forge a candidate response.
+      allow update: if request.auth != null
+        && resource.data.fromRecruiterUid == request.auth.uid
+        && request.resource.data.fromRecruiterUid == resource.data.fromRecruiterUid
+        && request.resource.data.toCandidateUid == resource.data.toCandidateUid
+        && request.resource.data.jobId == resource.data.jobId
+        && request.resource.data.kind == resource.data.kind
+        && request.resource.data.status in ['sent', 'cancelled']
+        && request.resource.data.get('proposedTimes', []).size() <= 5
+        && request.resource.data.get('cancelNote', '').size() <= 300;
       allow delete: if false;
     }
 
