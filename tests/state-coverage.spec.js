@@ -2875,7 +2875,14 @@ test.describe('[STATE-COVERAGE] v123 kind-decline from Applicants + account dele
       window.fb = window.fb || {};
       const calls = [];
       fb.current = () => ({ uid: 'u1' });
-      fb.deleteMyAccount = async (pw) => { calls.push(pw); return pw === 'right' ? { ok: true } : { ok: false, err: 'bad-password' }; };
+      fb.deleteMyAccount = async (pw, appIds) => { calls.push({ pw, appIds }); return pw === 'right' ? { ok: true } : { ok: false, err: 'bad-password' }; };
+      // v129: the user's internal applications must be handed over for cleanup (PII removal)
+      window.lists = window.lists || {};
+      lists.applied = [
+        { t: 'Ops Manager', co: 'GPJ', id: 'jobA', _internal: true },
+        { t: 'External Role', co: 'BigCo', id: '', _internal: false },
+        { t: 'Analyst', co: 'Acme', id: 'jobB', _internal: true },
+      ];
       window.prompt = () => null;                 // cancel
       await openDeleteAccount();
       const afterCancel = calls.length;
@@ -2888,7 +2895,8 @@ test.describe('[STATE-COVERAGE] v123 kind-decline from Applicants + account dele
       return { afterCancel, calls, hadKey, wiped };
     });
     expect(r.afterCancel, 'cancel = nothing happens').toBe(0);
-    expect(r.calls).toEqual(['wrong', 'right']);
+    expect(r.calls.map((c) => c.pw)).toEqual(['wrong', 'right']);
+    expect(r.calls[1].appIds, 'only internal-job applications are handed over for PII cleanup').toEqual(['jobA', 'jobB']);
     expect(r.wiped, 'successful delete wipes local state').toBe(true);
   });
 });
