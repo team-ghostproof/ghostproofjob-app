@@ -92,7 +92,8 @@ async function handler(req, res) {
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: 'GhostProofJob <no-reply@ghostproofjob.com>', to: [email], subject, html }),
+      // v132: NOT "no-reply" (Resend Insights) + replies reach a monitored inbox
+      body: JSON.stringify({ from: 'GhostProofJob <support@ghostproofjob.com>', reply_to: 'support@ghostproofjob.com', to: [email], subject, html }),
     });
     if (r.ok) {
       try { await db.collection('apply_emails').add({ uid, ts: Date.now() }); } catch (e) {}

@@ -86,6 +86,7 @@ async function sendViaSendGrid(apiKey, fromAddr, to, subject, html) {
     body: JSON.stringify({
       personalizations: [{ to: [{ email: to }] }],
       from: { email: fromAddr },
+      reply_to: { email: process.env.EMAIL_REPLY_TO || 'support@ghostproofjob.com' },
       subject,
       content: [{ type: 'text/html', value: html }],
     }),
@@ -105,13 +106,16 @@ async function sendAutomatedEmail(user, type, content) {
   if (isSuppressed(user)) return { sent: false, reason: 'unsubscribed' };   // global opt-out wins
   if (!isAllowed(user.preferences, type)) return { sent: false, reason: 'pref_disabled' };
 
-  const from = process.env.EMAIL_FROM || 'GhostProofJob <noreply@ghostproofjob.com>';
+  // v132 (founder + Resend Insights): NOT "no-reply" — a monitored From, and a
+  // Reply-To that reaches support so a recipient can actually respond.
+  const from = process.env.EMAIL_FROM || 'GhostProofJob <support@ghostproofjob.com>';
+  const replyTo = process.env.EMAIL_REPLY_TO || 'support@ghostproofjob.com';
   const subject = (content && content.subject) || 'GhostProofJob';
   const html = withUnsubFooter((content && content.html) || '', user);   // every email carries the opt-out
 
   try {
     if (process.env.RESEND_API_KEY) {
-      const ok = await sendViaResend(process.env.RESEND_API_KEY, { from, to: user.email, subject, html });
+      const ok = await sendViaResend(process.env.RESEND_API_KEY, { from, reply_to: replyTo, to: user.email, subject, html });
       return { sent: ok, reason: ok ? undefined : 'provider_error' };
     }
     if (process.env.SENDGRID_API_KEY) {

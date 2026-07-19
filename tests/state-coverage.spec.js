@@ -19,6 +19,18 @@ const { mockNetworkFailure, mockEmptyData, FIRESTORE_URLS, WORKER_URLS } = requi
    so they are deterministic in CI.
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* v132 SAFETY GUARD (founder-caught): a test that drives a real user action which
+   fires a fetch to the Cloudflare Worker (e.g. inviteTeammate → /email/company-invite)
+   was sending REAL emails via Resend to the test fixtures (newhire@acme.com,
+   sam@acme.com) on every CI + local run — 35+ suppressed sends. Firestore was NOT
+   polluted (fb.* is stubbed) but the Worker fetch was not. This blocks EVERY Worker
+   call at the network layer for the whole file, so no test can ever email again.
+   Q3/Q4 register their own Worker routes AFTER this (last route wins), so their
+   deliberate failure/empty simulations still work. */
+test.beforeEach(async ({ page }) => {
+  await page.route(WORKER_URLS, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+});
+
 test.describe('[STATE-COVERAGE] Q1 guest', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
