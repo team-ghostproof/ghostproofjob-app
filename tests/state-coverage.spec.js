@@ -2730,6 +2730,127 @@ test.describe('[STATE-COVERAGE] v133 swipe binds to data model + metric-dupe sel
   });
 });
 
+test.describe('[STATE-COVERAGE] v141 community flags on cards + hybrid work style', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._paintJobReportBadge === 'function'
+      && typeof window._recWorkStyle === 'function' && typeof window.reportExpired === 'function',
+    null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('flagging a job files a CLOUD report keyed to that posting (was: local only)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      let filed = null;
+      fb.current = () => ({ uid: 'u1' });
+      fb.fileGhostReport = async (co, stage, jobKey, jobTitle) => { filed = { co, stage, jobKey, jobTitle }; return true; };
+      localStorage.setItem('gpj_expired', '[]');
+      reportExpired('Marketing Specialist', 'Terracon Consultants Inc');
+      await new Promise((x) => setTimeout(x, 80));
+      return filed;
+    });
+    expect(r, 'the community never saw these flags before').not.toBeNull();
+    expect(r.jobKey, 'keyed to the posting, using the folded company key').toBe('marketing specialist|terracon');
+    expect(r.jobTitle).toBe('Marketing Specialist');
+  });
+
+  test('a placeholder company never files a community report', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      let filed = false;
+      fb.current = () => ({ uid: 'u1' });
+      fb.fileGhostReport = async () => { filed = true; return true; };
+      reportExpired('Some Role', 'Hiring Company');
+      await new Promise((x) => setTimeout(x, 80));
+      return filed;
+    });
+    expect(r, 'placeholder names must never pollute real ghost data').toBe(false);
+  });
+
+  test('the card shows "N reported" only when the count is REAL', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      fb.current = () => ({ uid: 'u1' });
+      window._jobReportCache = {};
+      const mk = () => { const d = document.createElement('div'); d.innerHTML = '<div><span class="s-title">Ops Manager</span><span class="s-ghost"></span></div>'; document.body.appendChild(d); return d; };
+      // count 0 -> no badge at all
+      fb.countJobReports = async () => 0;
+      const zero = mk();
+      _paintJobReportBadge(zero, { t: 'Ops Manager', co: 'Acme' });
+      await new Promise((x) => setTimeout(x, 120));
+      const zeroHidden = !zero.querySelector('.s-community-flag') || zero.querySelector('.s-community-flag').style.display === 'none';
+      // count 3 -> visible warning
+      window._jobReportCache = {};
+      fb.countJobReports = async () => 3;
+      const three = mk();
+      _paintJobReportBadge(three, { t: 'Ops Manager', co: 'Acme' });
+      await new Promise((x) => setTimeout(x, 120));
+      const el = three.querySelector('.s-community-flag');
+      const txt = el ? el.textContent : '';
+      zero.remove(); three.remove();
+      return { zeroHidden, txt };
+    });
+    expect(r.zeroHidden, 'no reports => no scary badge invented').toBe(true);
+    expect(r.txt).toBe('🚩 3 reported');
+  });
+
+  test('report counts are cached per session (deck repaints cannot spam reads)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      let calls = 0;
+      fb.current = () => ({ uid: 'u1' });
+      fb.countJobReports = async () => { calls++; return 2; };
+      window._jobReportCache = {};
+      const mk = () => { const d = document.createElement('div'); d.innerHTML = '<div><span class="s-title">Ops Manager</span><span class="s-ghost"></span></div>'; document.body.appendChild(d); return d; };
+      const a = mk(); _paintJobReportBadge(a, { t: 'Ops Manager', co: 'Acme' });
+      await new Promise((x) => setTimeout(x, 120));
+      const b = mk(); _paintJobReportBadge(b, { t: 'Ops Manager', co: 'Acme' });
+      await new Promise((x) => setTimeout(x, 120));
+      a.remove(); b.remove();
+      return calls;
+    });
+    expect(r, 'one aggregation per posting per session').toBe(1);
+  });
+
+  test('Remote and Hybrid are mutually exclusive and both post correctly', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window._gpjRecruiterAuthApply = () => {};
+      window.fb = window.fb || {};
+      let created = null;
+      fb.createRecruiterJob = async (j) => { created = j; return 'jN'; };
+      fb.loadRecruiterJobs = async () => [];
+      fb.current = () => ({ uid: 'r1' });
+      window._recruiter = { uid: 'r1', company: 'Acme', companyId: 'acme.com', role: 'owner', isValidated: true, plan: 'free' };
+      _gpjApplyRecruiterSkin(); await new Promise((x) => setTimeout(x, 300));
+      await renderRecListings(); await new Promise((x) => setTimeout(x, 200));
+      const hasHybrid = !!document.getElementById('rl-hybrid');
+      // ticking hybrid clears remote, and vice versa
+      document.getElementById('rl-remote').checked = true; _recWorkStyle('remote');
+      document.getElementById('rl-hybrid').checked = true; _recWorkStyle('hybrid');
+      const remoteCleared = document.getElementById('rl-remote').checked === false;
+      // hybrid WITHOUT a location must be refused
+      document.getElementById('rl-title').value = 'Ops Manager';
+      document.getElementById('rl-desc').value = 'Run the warehouse day to day.';
+      document.getElementById('rl-location').value = '';
+      await postRecJob();
+      const refusedWithoutLoc = created === null;
+      // with a location it posts as Hybrid
+      document.getElementById('rl-location').value = 'Katy, TX';
+      await postRecJob();
+      return { hasHybrid, remoteCleared, refusedWithoutLoc, setting: created && created.work_setting, isRemote: created && created.is_remote, loc: created && created.location };
+    });
+    expect(r.hasHybrid, 'hybrid toggle exists beside remote').toBe(true);
+    expect(r.remoteCleared, 'a role cannot be both remote and hybrid').toBe(true);
+    expect(r.refusedWithoutLoc, 'hybrid needs a location to commute to').toBe(true);
+    expect(r.setting).toBe('Hybrid');
+    expect(r.isRemote).toBe(false);
+    expect(r.loc, 'hybrid keeps its real location').toBe('Katy, TX');
+  });
+});
+
 test.describe('[STATE-COVERAGE] v140 sync gate cannot stick shut + market backfill', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });

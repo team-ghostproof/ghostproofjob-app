@@ -183,11 +183,18 @@ service cloud.firestore {
     // aggregation ("N hunters reported this") + the backend content engine.
     match /ghost_reports/{id} {
       allow read: if request.auth != null;
+      // v141: reports are now also keyed to the SPECIFIC POSTING (jobKey), so a
+      // card can show "N hunters reported this" instead of only a company-level
+      // signal. Still shape-locked and PII-free — no free text is ever stored.
       allow create: if request.auth != null
-        && request.resource.data.keys().hasOnly(['company','companyKey','stage','ts','reporterUid'])
+        && request.resource.data.keys().hasOnly(['company','companyKey','stage','ts','reporterUid','jobKey','jobTitle'])
         && request.resource.data.reporterUid == request.auth.uid
         && request.resource.data.company is string
-        && request.resource.data.company.size() <= 120;
+        && request.resource.data.company.size() <= 120
+        && request.resource.data.get('jobKey', '') is string
+        && request.resource.data.get('jobKey', '').size() <= 200
+        && request.resource.data.get('jobTitle', '') is string
+        && request.resource.data.get('jobTitle', '').size() <= 120;
       allow update, delete: if false;
     }
 

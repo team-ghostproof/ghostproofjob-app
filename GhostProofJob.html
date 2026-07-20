@@ -486,8 +486,13 @@
          reported this" + the content engine work cross-user. Minimal, NO PII, NO
          free-text stored server-side (the comment stays device-local). Counts use
          count() aggregation — NOT per-doc reads — so this stays D1-friendly. ===== */
-      fileGhostReport: async (company,stage)=>{ try{ const u=auth.currentUser; const co=String(company||'').trim(); if(!u||!co) return false; const companyKey=co.toLowerCase().replace(/\s+/g,' ').trim(); const ref=doc(collection(db,'ghost_reports')); await setDoc(ref,{company:co,companyKey:companyKey,stage:String(stage||'').slice(0,60),ts:Date.now(),reporterUid:u.uid}); return true; }catch(e){ console.warn('[GPJ] fileGhostReport',e&&e.message); return false; } },
+      /* v141: a report is now tied to the SPECIFIC POSTING too (jobKey), so every
+         hunter sees "N reported this job" on the card — the community signal the
+         whole product is for. Company-level counting is unchanged. */
+      fileGhostReport: async (company,stage,jobKey,jobTitle)=>{ try{ const u=auth.currentUser; const co=String(company||'').trim(); if(!u||!co) return false; const companyKey=co.toLowerCase().replace(/\s+/g,' ').trim(); const ref=doc(collection(db,'ghost_reports')); const rec={company:co,companyKey:companyKey,stage:String(stage||'').slice(0,60),ts:Date.now(),reporterUid:u.uid}; const jk=String(jobKey||'').slice(0,200); if(jk){ rec.jobKey=jk; rec.jobTitle=String(jobTitle||'').slice(0,120); } await setDoc(ref,rec); return true; }catch(e){ console.warn('[GPJ] fileGhostReport',e&&e.message); return false; } },
       countGhostReports: async (company)=>{ try{ const companyKey=String(company||'').toLowerCase().replace(/\s+/g,' ').trim(); if(!companyKey) return null; const s=await getCountFromServer(query(collection(db,'ghost_reports'), where('companyKey','==',companyKey))); return s.data().count; }catch(e){ return null; } },
+      /* count() aggregation — ONE cheap read per posting, not per-doc (D1-safe) */
+      countJobReports: async (jobKey)=>{ try{ const jk=String(jobKey||'').trim(); if(!jk) return null; const s=await getCountFromServer(query(collection(db,'ghost_reports'), where('jobKey','==',jk))); return s.data().count; }catch(e){ return null; } },
       current: ()=>auth.currentUser
     };
     onAuthStateChanged(auth, u=>{ if(window.gpjAuthChanged) window.gpjAuthChanged(u); });
@@ -2773,7 +2778,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v140</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v141</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3757,7 +3762,13 @@ async function renderRecListings(){
     +'<div class="rec-sec-title">Post a role</div>'
     +'<div class="field-label">Job title</div><input class="field-input" id="rl-title" placeholder="e.g. Operations Manager" style="margin-bottom:8px;"/>'
     +'<div class="field-label">Location</div><input class="field-input" id="rl-location" placeholder="Houston, TX" style="margin-bottom:8px;"/>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--off);margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="rl-remote" style="accent-color:var(--mint);width:15px;height:15px;"/> Remote role</label>'
+    /* v141 (founder-approved): Hybrid sits BESIDE Remote. They are mutually
+       exclusive — a role is on-site, hybrid, or remote, never two at once — and
+       hybrid keeps a real location because the candidate must be able to commute. */
+    +'<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--off);cursor:pointer;"><input type="checkbox" id="rl-remote" onchange="_recWorkStyle(\'remote\')" style="accent-color:var(--mint);width:15px;height:15px;"/> Remote role</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--off);cursor:pointer;"><input type="checkbox" id="rl-hybrid" onchange="_recWorkStyle(\'hybrid\')" style="accent-color:var(--cyber);width:15px;height:15px;"/> Hybrid <span style="color:var(--muted);font-weight:400;">(keeps a location)</span></label>'
+    +'</div>'
     +'<div class="field-label">Description</div><textarea class="field-input" id="rl-desc" rows="4" placeholder="What the role does." style="margin-bottom:8px;resize:vertical;"></textarea>'
     +'<div class="field-label">Requirements</div><textarea class="field-input" id="rl-req" rows="3" placeholder="Must-haves." style="margin-bottom:8px;resize:vertical;"></textarea>'
     +'<div class="field-label">Benefits</div><textarea class="field-input" id="rl-benefits" rows="3" placeholder="Health, PTO, 401(k), remote days…" style="margin-bottom:8px;resize:vertical;"></textarea>'
@@ -3793,15 +3804,18 @@ async function postRecJob(){
   if(!(window._recruiter&&window.fb&&fb.createRecruiterJob)){ showToast('Posting unavailable right now'); return; }
   const v=id=>((document.getElementById(id)||{}).value||'').trim();
   const remote=!!(document.getElementById('rl-remote')||{}).checked;
+  const hybrid=!!(document.getElementById('rl-hybrid')||{}).checked;
   const title=v('rl-title'), loc=v('rl-location'), desc=v('rl-desc');
   if(!title){ showToast('Add a job title'); return; }
   if(!loc&&!remote){ showToast('Add a location or mark it remote'); return; }
+  /* v141: hybrid REQUIRES a location — a candidate has to know where they'd commute */
+  if(hybrid&&!loc){ showToast('Hybrid roles need a location — candidates need to know where they’d commute'); return; }
   if(desc.length<20){ showToast('Add a short description (20+ characters)'); return; }
   const r=window._recruiter;
   /* v118: carry `region` (same "City, ST" shape the harvester writes) so the
      region-scoped candidate query can also find employer roles — belt to the
      fetchJobs internal-merge suspenders. Content field; rules allow on edit too. */
-  const job={title:title,location:remote?'Remote':loc,is_remote:remote,region:remote?'Remote':loc,description:desc,requirements:v('rl-req'),benefits:v('rl-benefits'),appQuestions:v('rl-questions').split('\n').map(function(t){return t.trim().slice(0,200);}).filter(Boolean).slice(0,5),salary_min:parseInt(v('rl-smin'),10)||null,salary_max:parseInt(v('rl-smax'),10)||null,companyId:r.companyId||'',company:r.company||'',companyWebsite:r.website||'',companyLinkedIn:r.linkedin||'',companyX:r.x||''};
+  const job={title:title,location:remote?'Remote':loc,is_remote:remote,work_setting:(remote?'Remote':(hybrid?'Hybrid':'On-site')),region:remote?'Remote':loc,description:desc,requirements:v('rl-req'),benefits:v('rl-benefits'),appQuestions:v('rl-questions').split('\n').map(function(t){return t.trim().slice(0,200);}).filter(Boolean).slice(0,5),salary_min:parseInt(v('rl-smin'),10)||null,salary_max:parseInt(v('rl-smax'),10)||null,companyId:r.companyId||'',company:r.company||'',companyWebsite:r.website||'',companyLinkedIn:r.linkedin||'',companyX:r.x||''};
   /* v117: the SAME form edits an existing role. Rules keep ownerUid/source/isValidated
      immutable, so this can only ever change content — and the seat cap must not fire
      on an edit (you're not adding a role). */
@@ -3834,8 +3848,20 @@ function _recPaintJobForm(j){
   set('rl-questions',(Array.isArray(j.appQuestions)?j.appQuestions:[]).join('\n'));
   set('rl-smin',j.salary_min); set('rl-smax',j.salary_max);
   const rm=document.getElementById('rl-remote'); if(rm) rm.checked=!!j.is_remote;
+  /* v141: round-trip the hybrid choice on edit */
+  const hy=document.getElementById('rl-hybrid'); if(hy) hy.checked=(!j.is_remote && String(j.work_setting||'').toLowerCase()==='hybrid');
   const b=document.getElementById('rl-post-btn'); if(b) b.textContent='💾 Save changes';
   const c=document.getElementById('rl-cancel-edit'); if(c) c.style.display='block';
+}
+/* v141: Remote and Hybrid are mutually exclusive — ticking one clears the other,
+   so a posting can never claim to be both (which would make the location meaningless). */
+function _recWorkStyle(which){
+  try{
+    const rem=document.getElementById('rl-remote'), hyb=document.getElementById('rl-hybrid');
+    if(!rem||!hyb) return;
+    if(which==='remote' && rem.checked) hyb.checked=false;
+    if(which==='hybrid' && hyb.checked) rem.checked=false;
+  }catch(e){}
 }
 const _REC_FORM_IDS=['rl-title','rl-location','rl-desc','rl-req','rl-benefits','rl-questions','rl-smin','rl-smax'];
 function _recSnapJobForm(){
@@ -3843,6 +3869,7 @@ function _recSnapJobForm(){
   const s={}; let any=false;
   _REC_FORM_IDS.forEach(id=>{ const e=document.getElementById(id); s[id]=e?(e.value||''):''; if(s[id]) any=true; });
   const rm=document.getElementById('rl-remote'); s.remote=!!(rm&&rm.checked);
+  const hy=document.getElementById('rl-hybrid'); s.hybrid=!!(hy&&hy.checked);
   return any?s:null;   /* nothing typed yet -> let the repaint come from the store */
 }
 async function _recRepaintEditForm(snap){
@@ -3851,6 +3878,7 @@ async function _recRepaintEditForm(snap){
   if(snap){
     _REC_FORM_IDS.forEach(id=>{ const e=document.getElementById(id); if(e) e.value=snap[id]; });
     const rm=document.getElementById('rl-remote'); if(rm) rm.checked=snap.remote;
+    const hy=document.getElementById('rl-hybrid'); if(hy) hy.checked=!!snap.hybrid;
     const b=document.getElementById('rl-post-btn'); if(b) b.textContent='💾 Save changes';
     const c=document.getElementById('rl-cancel-edit'); if(c) c.style.display='block';
     return;
@@ -3870,6 +3898,7 @@ function recCancelEdit(){
   window._editingJobId=null;
   _REC_FORM_IDS.forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
   const rm=document.getElementById('rl-remote'); if(rm) rm.checked=false;
+  const hy=document.getElementById('rl-hybrid'); if(hy) hy.checked=false;
   const b=document.getElementById('rl-post-btn'); if(b) b.textContent='📋 Post role (pending review)';
   const c=document.getElementById('rl-cancel-edit'); if(c) c.style.display='none';
 }
@@ -4547,6 +4576,45 @@ function _pruneExpiredFromQueues(){
   try{ if(typeof rawQueue!=='undefined'&&rawQueue) rawQueue=keep(rawQueue); }catch(e){}
   try{ if(typeof jobsQueue!=='undefined'&&jobsQueue) jobsQueue=keep(jobsQueue); }catch(e){}
 }
+/* ===== v141 COMMUNITY FLAG BADGE (founder-directed) =====
+   A report filed by ANY hunter must be visible to EVERY hunter, on the card, before
+   they spend time on it. Counts come from the cloud (count() aggregation = one cheap
+   read per posting) and are cached per session so a repainting deck can't spam reads.
+   Shows nothing at all when the count is 0 — we never imply a warning that isn't real. */
+window._jobReportCache=window._jobReportCache||{};
+function _paintJobReportBadge(cardEl, job){
+  if(!cardEl||!job) return;
+  const t=(job.t||job.title||''), co=(job.co||job.company||'');
+  if(!t||!co) return;
+  if(typeof _PLACEHOLDER_CO!=='undefined' && _PLACEHOLDER_CO.test(String(co).trim())) return;
+  const key=gpjExpiredKey(t,co);
+  const paint=(n)=>{
+    try{
+      let el=cardEl.querySelector('.s-community-flag');
+      if(!(n>0)){ if(el) el.style.display='none'; return; }
+      if(!el){
+        el=document.createElement('span');
+        el.className='location-badge s-community-flag';
+        el.style.cssText='background:rgba(255,77,106,.12);border:1px solid rgba(255,77,106,.45);color:var(--danger);font-weight:800;';
+        const host=(cardEl.querySelector('.s-ghost')||{}).parentNode;
+        if(host) host.appendChild(el); else return;
+      }
+      el.textContent='🚩 '+n+' reported';
+      el.title=n+' hunter'+(n===1?'':'s')+' reported this posting as no longer accepting applications';
+      el.style.display='inline-block';
+    }catch(e){}
+  };
+  const cached=window._jobReportCache[key];
+  if(typeof cached==='number'){ paint(cached); return; }
+  if(!(window.fb&&fb.countJobReports&&fb.current&&fb.current())) return;
+  fb.countJobReports(key).then(function(n){
+    if(typeof n!=='number') return;
+    window._jobReportCache[key]=n;
+    /* only paint if this card still shows the SAME job (deck may have advanced) */
+    try{ const cur=(cardEl.querySelector('.s-title')||{}).textContent||''; if(cur && cur.trim()!==String(t).trim()) return; }catch(e){}
+    paint(n);
+  }).catch(function(){});
+}
 function reportExpired(t,co){
   /* B-DEMO-FLAG (v75): reporting requires a signed-in account — anonymous/demo
      flags polluted real ghost data (a placeholder company showed "1 report"). */
@@ -4555,6 +4623,18 @@ function reportExpired(t,co){
   /* never file a report against a PLACEHOLDER company name — those bleed a fake
      report count onto every card whose posting lacked a real company */
   try{ if(typeof ghostReports==='object'&&ghostReports&&co&&!_PLACEHOLDER_CO.test(String(co).trim())){ (ghostReports[co]=ghostReports[co]||[]).push({stage:'No longer accepting applications',reason:'No longer accepting applications',when:Date.now(),ts:Date.now()}); } }catch(e){}
+  /* v141 (founder-directed, the community promise): this flag used to be LOCAL
+     ONLY — one hunter's warning never reached anyone else, which defeats the point
+     of a community platform. Now it also files a shape-locked cloud report keyed to
+     the SPECIFIC POSTING, so every other hunter sees "N reported this" on the card
+     BEFORE they waste time on it. No free text, no PII — just the signal. */
+  try{
+    if(co && !_PLACEHOLDER_CO.test(String(co).trim()) && window.fb && fb.fileGhostReport){
+      const _jk=gpjExpiredKey(t,co);
+      fb.fileGhostReport(co,'No longer accepting applications',_jk,t);
+      try{ if(window._jobReportCache) delete window._jobReportCache[_jk]; }catch(e2){}   /* re-count on next paint */
+    }
+  }catch(e){}
   /* also log it as skipped: that list is cloud-synced + part of the shared seen-set,
      so the hide persists across reloads and devices (localStorage 'gpj_expired' alone
      did not sync, which is why a reported job came back after reopening) */
@@ -8964,6 +9044,11 @@ function fillSlot(cardEl, job){
     const c=(job._verifiedCo||(g!=null&&g<=15))?'var(--mint)':(g==null?'var(--muted)':(g<=35?'var(--warn)':'var(--danger)'));
     gb.style.color=c; gb.style.borderColor=c.replace(')',',.4)').replace('var(--mint','rgba(0,245,160').replace('var(--warn','rgba(255,179,71').replace('var(--danger','rgba(255,77,106');
   }
+  /* v141: COMMUNITY WARNING on the card face — "N hunters reported this". This is
+     the whole point of a community platform: one person's wasted week saves the
+     next person's. Counted with a count() aggregation (one cheap read per posting,
+     cached per session) and only ever shown when the number is REAL. */
+  try{ _paintJobReportBadge(cardEl, job); }catch(e){}
   /* live Green/Red flag text blocks (top card only has these).
      FIX (v41): the red-flag element existed but was never populated, so every
      card showed a Green Flag regardless of ghost risk. Now we pick ONE flag from
@@ -11849,8 +11934,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v140';
+const APP_VERSION = 'v141';
 const CHANGELOG = {
+  'v141':['Community flags visible on job cards (cloud, per-posting) + Hybrid work-style toggle'],
   'v140':['v137 gate could stick shut and block ALL syncing (why the match never worked) + market backfill'],
   'v139':['Mobile OOM: session cache kept 4 full job pools; wide pull now scales to device memory'],
   'v138':['Company-name folding kills duplicate/recycling jobs + expired flags now cross-device'],

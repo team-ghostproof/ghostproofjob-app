@@ -571,3 +571,22 @@ describe('v125: client_errors telemetry', () => {
     await assertFails(deleteDoc(doc(env.authenticatedContext('errU1').firestore(), 'client_errors/e1')));
   });
 });
+
+// v141: ghost reports are now keyed to the SPECIFIC POSTING (jobKey) so a card can
+// show a real community warning. Still shape-locked and PII-free.
+describe('v141: job-level ghost reports', () => {
+  test('a signed-in user files a posting-keyed report; shape stays locked', async () => {
+    const base = { company: 'Acme', companyKey: 'acme', stage: 'No longer accepting applications', ts: Date.now(), reporterUid: 'candC' };
+    const asC = () => env.authenticatedContext('candC', { email: 'c@x.com' }).firestore();
+    // with jobKey + jobTitle
+    await assertSucceeds(setDoc(doc(asC(), 'ghost_reports/gr_v141a'), Object.assign({}, base, { jobKey: 'ops manager|acme', jobTitle: 'Ops Manager' })));
+    // company-only (legacy) still allowed
+    await assertSucceeds(setDoc(doc(asC(), 'ghost_reports/gr_v141b'), base));
+    // free text / PII is still refused
+    await assertFails(setDoc(doc(asC(), 'ghost_reports/gr_v141c'), Object.assign({}, base, { comment: 'they ghosted me' })));
+    // oversize jobKey refused
+    await assertFails(setDoc(doc(asC(), 'ghost_reports/gr_v141d'), Object.assign({}, base, { jobKey: 'x'.repeat(300) })));
+    // cannot report as someone else
+    await assertFails(setDoc(doc(asC(), 'ghost_reports/gr_v141e'), Object.assign({}, base, { reporterUid: 'candD' })));
+  });
+});
