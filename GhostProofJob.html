@@ -2752,7 +2752,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v136</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v137</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -10982,8 +10982,23 @@ document.addEventListener('click',e=>{
   if(pm&&pm.style.display==='block'&&!e.target.closest('#auth-chip')&&!e.target.closest('#profile-menu')) pm.style.display='none';
 });
 /* auto-save resume/profile history documents to Firestore */
+/* v137: TRUE until the cloud profile has been read for the signed-in user.
+   Reset on every auth change; opened only by loadTierFromProfile. */
+window._gpjCloudLoaded=false;
+/* The hardcoded placeholder prefs in the markup. If the DOM still shows these,
+   the user's real prefs have NOT painted yet — writing them would overwrite the
+   real ones with demo text (exactly the "Engineer, Developer, Tech Lead" the
+   founder found on her account). */
+const _GPJ_PREF_PLACEHOLDERS={titles:'Engineer, Developer, Tech Lead',salary:'$120,000 / year'};
 function cloudSync(){
   if(!window.fb||!fb.current()) return;
+  /* ===== v137 DATA-LOSS GUARD (founder P0: applied/skipped/responses/prefs all
+     vanished). cloudSync writes `lists` and reads `prefs` FROM THE DOM. Any of its
+     17 call sites firing BEFORE the cloud restore finished wrote an EMPTY lists
+     object and the placeholder prefs straight over the real cloud data — and the
+     restore is a MERGE, so once the cloud copy was empty the data was gone for
+     good. Never write until we have actually READ what we'd be overwriting. */
+  if(!window._gpjCloudLoaded){ try{ dbg('cloudSync skipped — cloud profile not loaded yet (data-loss guard)'); }catch(e){} return; }
   try{
     syncProfileToResume();
     /* always include createdAt so every device can compute the correct day count */
@@ -11001,11 +11016,15 @@ function cloudSync(){
       tombstones:gpjTombs(),
       location:_mkt,
       openToRemote:(function(){ try{ return /remote/i.test(_mkt); }catch(e){ return false; } })(),
-      prefs:{
-        titles:document.getElementById('pref-titles')?document.getElementById('pref-titles').textContent:'',
-        salary:document.getElementById('pref-salary')?document.getElementById('pref-salary').textContent:'',
-        industries:document.getElementById('pref-industries')?document.getElementById('pref-industries').textContent:''
-      },
+      /* v137 second, independent guard: even past the gate, never persist the
+         markup placeholders over real prefs. Omitting the key leaves the stored
+         value untouched (saveProfile merges). */
+      prefs:(function(){
+        const t=document.getElementById('pref-titles'), s=document.getElementById('pref-salary'), i=document.getElementById('pref-industries');
+        const tv=t?String(t.textContent||'').trim():'', sv=s?String(s.textContent||'').trim():'', iv=i?String(i.textContent||'').trim():'';
+        if(tv===_GPJ_PREF_PLACEHOLDERS.titles && sv===_GPJ_PREF_PLACEHOLDERS.salary) return undefined;   /* still placeholders — don't clobber */
+        return {titles:tv,salary:sv,industries:iv};
+      })(),
       updated:Date.now()
     }).catch(()=>{});
   }catch(e){}
@@ -11788,8 +11807,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v136';
+const APP_VERSION = 'v137';
 const CHANGELOG = {
+  'v137':['P0 DATA LOSS: cloudSync could overwrite cloud lists+prefs before the restore finished'],
   'v136':['CRITICAL: candidate market never reached match tokens - no candidate matched any on-site job'],
   'v134':['sandboxDone fires post-apply email (was missed — external applies confirmed via sandbox sent nothing)'],
   'v133':['CRITICAL: swipe-right binds to data model (wrong-job + recycle fix); metric-dupe self-heal; delete confirm; CSP origins'],
@@ -14936,7 +14956,15 @@ window.gpjAuthChanged=function(u){
    handler's bare reassignment (index.html §auth). Gated on gpj_role==='recruiter'
    so a pure candidate never triggers a recruiter Firestore read (candidate-first). */
 const _recruiterAuthChain=window.gpjAuthChanged;
-window.gpjAuthChanged=function(u){ _recruiterAuthChain(u); _gpjRecruiterAuthApply(u); };
+window.gpjAuthChanged=function(u){
+  /* v137: RE-ARM the data-loss gate on EVERY auth change (sign-in, sign-out,
+     account switch). Until loadTierFromProfile re-reads this user's cloud
+     profile, cloudSync must not write — otherwise the incoming account's empty
+     boot state can overwrite the real data (the account-switch variant of the
+     founder's P0). */
+  window._gpjCloudLoaded=false;
+  _recruiterAuthChain(u); _gpjRecruiterAuthApply(u);
+};
 /* On sign-in, pull the user's saved tier from their Firestore profile so a paid
    user gets paywall access automatically — on any device, no admin action.
    This is how a real payment unlock should propagate once your payment flow
@@ -14945,7 +14973,11 @@ async function loadTierFromProfile(u){
   try{
     if(!u||!(window.fb&&fb.loadProfile)) return;
     const p=await fb.loadProfile(u.uid);
-    if(!p) return;
+    /* v137 DATA-LOSS GUARD: no cloud profile yet (brand-new account) — it IS safe
+       to sync from here, so open the gate. Everything else keeps it CLOSED until
+       the restore below finishes. If the read THREW, the gate stays closed on
+       purpose: we'd rather block a write than overwrite data we couldn't read. */
+    if(!p){ window._gpjCloudLoaded=true; return; }
     /* v113: carry the entitlement WINDOW too — the Stripe webhook writes paidUntil
        alongside tier, and userTier() reads as free once it passes. Cleared when the
        backend has no expiry (a lifetime pass) so it can never wrongly expire. */
@@ -15173,6 +15205,9 @@ async function loadTierFromProfile(u){
        final merged lists (resolves the "…" restoring state even for an account
        with no cloud lists, and refreshes the admin device line). */
     try{ updateStatCounters(); }catch(e){}
+    /* v137: the restore is COMPLETE — lists, prefs and resume now hold the real
+       cloud data, so cloudSync may finally write. Set LAST, and only on success. */
+    window._gpjCloudLoaded=true;
   }catch(e){}
 }
 function hydrateResumeFields(){

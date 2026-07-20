@@ -2730,6 +2730,97 @@ test.describe('[STATE-COVERAGE] v133 swipe binds to data model + metric-dupe sel
   });
 });
 
+test.describe('[STATE-COVERAGE] v137 DATA-LOSS guard (founder P0: lists + prefs wiped)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.cloudSync === 'function' && typeof window.loadTierFromProfile === 'function',
+      null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('THE BUG: cloudSync must NOT write before the cloud profile is read', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      const writes = [];
+      fb.current = () => ({ uid: 'u1' });
+      fb.saveProfile = async (uid, d) => { writes.push(d); return true; };
+      window._gpjCloudLoaded = false;          // simulates boot / just-signed-in
+      lists = { applied: [], skipped: [], responses: [], viewed: [] };   // empty boot state
+      cloudSync();
+      await new Promise((x) => setTimeout(x, 80));
+      return { writesWhileLoading: writes.length };
+    });
+    expect(r.writesWhileLoading, 'an empty boot state can never overwrite real cloud data').toBe(0);
+  });
+
+  test('after the restore completes, cloudSync writes normally', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      const writes = [];
+      fb.current = () => ({ uid: 'u1' });
+      fb.saveProfile = async (uid, d) => { writes.push(d); return true; };
+      fb.loadProfile = async () => ({ createdAt: 1700000000000, lists: { applied: [{ t: 'Role', co: 'Co', when: Date.now() }] } });
+      await loadTierFromProfile({ uid: 'u1' });          // opens the gate
+      const gateOpen = window._gpjCloudLoaded === true;
+      cloudSync();
+      await new Promise((x) => setTimeout(x, 80));
+      return { gateOpen, wrote: writes.length > 0, keptApplied: (writes[0] && writes[0].lists && writes[0].lists.applied || []).length };
+    });
+    expect(r.gateOpen, 'a completed restore opens the gate').toBe(true);
+    expect(r.wrote).toBe(true);
+    expect(r.keptApplied, 'it writes the RESTORED lists, not an empty set').toBeGreaterThan(0);
+  });
+
+  test('a brand-new account (no cloud profile) can still sync', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      fb.current = () => ({ uid: 'new1' });
+      fb.saveProfile = async () => true;
+      fb.loadProfile = async () => null;                 // no profile yet
+      window._gpjCloudLoaded = false;
+      await loadTierFromProfile({ uid: 'new1' });
+      return window._gpjCloudLoaded === true;
+    });
+    expect(r, 'a new user is not locked out of syncing').toBe(true);
+  });
+
+  test('placeholder prefs are never persisted over real ones', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      const writes = [];
+      fb.current = () => ({ uid: 'u1' });
+      fb.saveProfile = async (uid, d) => { writes.push(d); return true; };
+      window._gpjCloudLoaded = true;                     // gate open
+      // DOM still shows the markup placeholders
+      document.getElementById('pref-titles').textContent = 'Engineer, Developer, Tech Lead';
+      document.getElementById('pref-salary').textContent = '$120,000 / year';
+      cloudSync();
+      await new Promise((x) => setTimeout(x, 60));
+      const placeholderWrite = writes[0] && writes[0].prefs;
+      // now real prefs are painted
+      document.getElementById('pref-titles').textContent = 'Marketing Manager, Brand Lead';
+      cloudSync();
+      await new Promise((x) => setTimeout(x, 60));
+      const realWrite = writes[1] && writes[1].prefs;
+      return { placeholderWrite: placeholderWrite === undefined, realTitles: realWrite && realWrite.titles };
+    });
+    expect(r.placeholderWrite, 'placeholder prefs are omitted, leaving the stored value intact').toBe(true);
+    expect(r.realTitles, 'real prefs still save').toBe('Marketing Manager, Brand Lead');
+  });
+
+  test('an auth change re-arms the gate (account switch cannot clobber)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window._gpjCloudLoaded = true;
+      window._gpjRecruiterAuthApply = () => {};
+      gpjAuthChanged({ uid: 'other' });
+      return window._gpjCloudLoaded;
+    });
+    expect(r, 'switching accounts closes the gate until the new profile is read').toBe(false);
+  });
+});
+
 test.describe('[STATE-COVERAGE] v128 post-apply email (confirmed applies only)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
