@@ -13,8 +13,29 @@
 // ============================================================================
 
 function _split(s) { return String(s || '').split(/[·,\n]/).map((x) => x.trim()).filter(Boolean); }
+/* v136: the app now writes profile.location (see cloudSync). For profiles saved
+   BEFORE that fix, fall back to the account address tail so existing candidates
+   match immediately instead of waiting for their next sync. Never invents a
+   market — an unparseable address still yields '' (and inScope excludes, which
+   is the honest outcome when we genuinely don't know where someone is). */
+const _US_ST = new Set(['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC']);
+function _cityStateFromAddress(addr) {
+  const s = String(addr || '').replace(/\s*\d{5}(-\d{4})?\s*$/, '').trim();
+  if (!s) return '';
+  const parts = s.split(',').map((x) => x.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const st = parts[parts.length - 1].toUpperCase();
+    if (_US_ST.has(st)) return parts[parts.length - 2] + ', ' + st;
+  }
+  const m = s.match(/([A-Za-z][A-Za-z.'-]*(?:\s[A-Za-z][A-Za-z.'-]*)?)\s+([A-Za-z]{2})$/);
+  if (m && _US_ST.has(m[2].toUpperCase())) return m[1].trim() + ', ' + m[2].toUpperCase();
+  return '';
+}
 function _market(profile) {
-  const loc = profile.location || profile.market || (profile.addr && [profile.addr.city, profile.addr.state].filter(Boolean).join(', ')) || '';
+  const acct = profile.account || {};
+  const loc = profile.location || profile.market
+    || (profile.addr && [profile.addr.city, profile.addr.state].filter(Boolean).join(', '))
+    || acct.location || _cityStateFromAddress(acct.address) || '';
   return String(loc).trim();
 }
 function _displayName(profile) {
