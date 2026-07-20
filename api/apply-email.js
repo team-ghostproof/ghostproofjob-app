@@ -56,8 +56,18 @@ async function handler(req, res) {
     if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
     const admin = require('firebase-admin');
     const svc = process.env.FIREBASE_SERVICE_ACCOUNT;
-    if (!svc) { res.status(500).json({ error: 'not configured' }); return; }
-    if (!admin.apps.length) admin.initializeApp({ credential: admin.credential.cert(JSON.parse(svc)) });
+    // v135: NAME the failure. A generic 500 made a broken Vercel env var
+    // indistinguishable from a code fault (cost real debugging time). Each cause
+    // now reports itself so it can be fixed without guessing.
+    if (!svc) { res.status(500).json({ error: 'config', detail: 'FIREBASE_SERVICE_ACCOUNT is not set in Vercel env' }); return; }
+    let creds;
+    try { creds = JSON.parse(svc); }
+    catch (e) { res.status(500).json({ error: 'config', detail: 'FIREBASE_SERVICE_ACCOUNT is set but is not valid JSON — re-paste the whole service-account file into Vercel env' }); return; }
+    if (!creds || !creds.project_id || !creds.private_key) {
+      res.status(500).json({ error: 'config', detail: 'FIREBASE_SERVICE_ACCOUNT JSON is missing project_id/private_key — re-paste the full file' }); return;
+    }
+    try { if (!admin.apps.length) admin.initializeApp({ credential: admin.credential.cert(creds) }); }
+    catch (e) { res.status(500).json({ error: 'config', detail: 'firebase-admin rejected the service account: ' + (e && e.message || e) }); return; }
     const db = admin.firestore();
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
