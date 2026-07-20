@@ -2752,7 +2752,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v137</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v138</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -4488,7 +4488,23 @@ function salaryFromText(text){
    and the company's ghost reports tick up (warning the next person). Combined with
    the posting-age badge + stale flag, this keeps filled roles from lingering. */
 function gpjExpiredSet(){ try{ return JSON.parse(localStorage.getItem('gpj_expired')||'[]'); }catch(e){ return []; } }
-function gpjExpiredKey(t,co){ return ((t||'')+'|'+(co||'')).toLowerCase().replace(/\s+/g,' ').trim(); }
+/* v138 (founder repro): the SAME role kept appearing twice and re-flagging never
+   stuck, because the key was raw `title|company` — and the harvester stores the
+   same employer under several names ("Terracon" vs "Terracon Consultants Inc").
+   Different string => different key => duplicate row + a flag that never matched.
+   _coKey folds a company to its brand: drop the legal suffix and the trailing
+   descriptor words, so all spellings of one employer share ONE key. Conservative
+   by design — only TRAILING boilerplate is removed, never a leading brand word,
+   and a name that reduces to nothing keeps its original text. */
+const _CO_TAIL=new Set(['inc','llc','lp','llp','ltd','limited','corp','corporation','co','company','companies','plc','gmbh','ag','nv','sa','pvt','pte','holdings','holding','group','partners','consultants','consulting','international','worldwide','staffing','solutions','services','enterprises','industries']);
+function _coKey(co){
+  const raw=String(co||'').toLowerCase().replace(/\s+/g,' ').trim();
+  const toks=raw.replace(/\([^)]*\)/g,' ')      /* drop "(B Corp)" style parentheticals */
+    .replace(/[.,&']/g,' ').replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
+  while(toks.length>1 && _CO_TAIL.has(toks[toks.length-1])) toks.pop();
+  return toks.join(' ').trim() || raw;          /* never reduce a name to nothing */
+}
+function gpjExpiredKey(t,co){ return ((t||'')+'|'+_coKey(co)).toLowerCase().replace(/\s+/g,' ').trim(); }
 function gpjIsExpired(t,co){
   try{
     const k=gpjExpiredKey(t,co);
@@ -10001,7 +10017,9 @@ function saveLists(){ try{localStorage.setItem('gpj_lists',JSON.stringify(lists)
 /* SHARED SEEN-STATE: one canonical key per job + the set of jobs already acted on
    (applied/skipped/saved). Used by BOTH Browse and the Swipe deck so a job handled
    on one page never reappears on the other. */
-function jobKey(j){ return (((j&&(j.t||j.title))||'')+'|'+((j&&(j.co||j.company))||'')).toLowerCase().replace(/\s+/g,' ').trim(); }
+/* v138: same brand-folding as gpjExpiredKey — one employer, one key, so a role
+   can't land in Applied twice under two spellings of the same company. */
+function jobKey(j){ return (((j&&(j.t||j.title))||'')+'|'+_coKey((j&&(j.co||j.company))||'')).toLowerCase().replace(/\s+/g,' ').trim(); }
 function seenJobKeys(){
   const s=new Set();
   /* GUARDED: a top-level boot call to applySwipeFilters() runs a few lines BEFORE
@@ -11016,6 +11034,9 @@ function cloudSync(){
       tombstones:gpjTombs(),
       location:_mkt,
       openToRemote:(function(){ try{ return /remote/i.test(_mkt); }catch(e){ return false; } })(),
+      /* v138 (founder-directed): "no longer accepting" flags were device-local, so a
+         job you hid on your laptop came right back on your phone. Now cloud-backed. */
+      expired:(function(){ try{ return gpjExpiredSet().slice(-500); }catch(e){ return []; } })(),
       /* v137 second, independent guard: even past the gate, never persist the
          markup placeholders over real prefs. Omitting the key leaves the stored
          value untouched (saveProfile merges). */
@@ -11807,8 +11828,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v137';
+const APP_VERSION = 'v138';
 const CHANGELOG = {
+  'v138':['Company-name folding kills duplicate/recycling jobs + expired flags now cross-device'],
   'v137':['P0 DATA LOSS: cloudSync could overwrite cloud lists+prefs before the restore finished'],
   'v136':['CRITICAL: candidate market never reached match tokens - no candidate matched any on-site job'],
   'v134':['sandboxDone fires post-apply email (was missed — external applies confirmed via sandbox sent nothing)'],
@@ -15115,6 +15137,17 @@ async function loadTierFromProfile(u){
         dbg('notification preferences restored from cloud');
       }catch(e){}
     }
+    /* v138: restore the cross-device "no longer accepting" flags. UNION, never
+       replace — a flag raised on any device must survive on all of them. Keys are
+       re-normalized through gpjExpiredKey's brand folding on use, so older raw
+       keys still match. */
+    try{
+      if(Array.isArray(p.expired)){
+        const local=gpjExpiredSet();
+        const merged=[...new Set([...local,...p.expired])].slice(-500);
+        localStorage.setItem('gpj_expired', JSON.stringify(merged));
+      }
+    }catch(e){}
     /* VIEWED / APPLIED / SAVED lists */
     if(p.lists){
       try{

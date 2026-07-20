@@ -2730,6 +2730,79 @@ test.describe('[STATE-COVERAGE] v133 swipe binds to data model + metric-dupe sel
   });
 });
 
+test.describe('[STATE-COVERAGE] v138 company-name folding + cross-device expired flags', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._coKey === 'function' && typeof window.jobKey === 'function',
+      null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('one employer = one key, so a role cannot duplicate under two spellings', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      terracon: jobKey({ t: 'Marketing Specialist', co: 'Terracon Consultants Inc' }) === jobKey({ t: 'Marketing Specialist', co: 'Terracon' }),
+      roberthalf: jobKey({ t: 'Data Entry Clerk', co: 'Robert Half' }) === jobKey({ t: 'Data Entry Clerk', co: 'Robert Half International' }),
+      distinctCo: jobKey({ t: 'X', co: 'Terracon' }) !== jobKey({ t: 'X', co: 'Terradyne' }),
+      distinctTitle: jobKey({ t: 'Marketing Assistant', co: 'Robert Half' }) !== jobKey({ t: 'Marketing Coordinator', co: 'Robert Half' }),
+      boilerplateOnly: _coKey('Group'),
+    }));
+    expect(r.terracon, 'the founder\'s duplicate: "Terracon Consultants Inc" === "Terracon"').toBe(true);
+    expect(r.roberthalf).toBe(true);
+    expect(r.distinctCo, 'genuinely different employers must NOT merge').toBe(true);
+    expect(r.distinctTitle, 'different roles at one agency stay separate jobs').toBe(true);
+    expect(r.boilerplateOnly, 'a name that is only boilerplate keeps its text').toBe('group');
+  });
+
+  test('a flag raised under one spelling hides the job under the other', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_expired', '[]');
+      window.fb = window.fb || {}; fb.current = () => ({ uid: 'u1' });   // reportExpired requires sign-in
+      // reportExpired is the real flag path (writes gpj_expired + lists.skipped)
+      try{ reportExpired('Marketing Specialist', 'Terracon Consultants Inc'); }catch(e){}
+      return {
+        sameSpelling: gpjIsExpired('Marketing Specialist', 'Terracon Consultants Inc'),
+        otherSpelling: gpjIsExpired('Marketing Specialist', 'Terracon'),
+        differentRole: gpjIsExpired('Data Entry Clerk', 'Terracon'),
+      };
+    });
+    expect(r.sameSpelling).toBe(true);
+    expect(r.otherSpelling, 'flagging once hides every spelling of that employer\'s role').toBe(true);
+    expect(r.differentRole, 'a different role at the same employer is still shown').toBe(false);
+  });
+
+  test('expired flags restore from the cloud as a UNION (never lost on another device)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      fb.current = () => ({ uid: 'u1' });
+      fb.saveProfile = async () => true;
+      localStorage.setItem('gpj_expired', JSON.stringify(['local only|acme']));
+      fb.loadProfile = async () => ({ createdAt: 1700000000000, expired: ['from other device|globex'] });
+      await loadTierFromProfile({ uid: 'u1' });
+      const set = JSON.parse(localStorage.getItem('gpj_expired') || '[]');
+      return { hasLocal: set.includes('local only|acme'), hasCloud: set.includes('from other device|globex') };
+    });
+    expect(r.hasLocal, 'a device-local flag is never dropped').toBe(true);
+    expect(r.hasCloud, 'a flag from another device arrives here').toBe(true);
+  });
+
+  test('cloudSync ships the expired set (gated by the v137 data-loss guard)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      const writes = [];
+      fb.current = () => ({ uid: 'u1' });
+      fb.saveProfile = async (uid, d) => { writes.push(d); return true; };
+      localStorage.setItem('gpj_expired', JSON.stringify(['role|acme']));
+      window._gpjCloudLoaded = true;
+      cloudSync();
+      await new Promise((x) => setTimeout(x, 60));
+      return writes[0] && writes[0].expired;
+    });
+    expect(r).toContain('role|acme');
+  });
+});
+
 test.describe('[STATE-COVERAGE] v137 DATA-LOSS guard (founder P0: lists + prefs wiped)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
