@@ -2730,6 +2730,77 @@ test.describe('[STATE-COVERAGE] v133 swipe binds to data model + metric-dupe sel
   });
 });
 
+test.describe('[STATE-COVERAGE] v140 sync gate cannot stick shut + market backfill', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.loadTierFromProfile === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('THE BUG: a restore step throwing must NOT block syncing forever', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      fb.current = () => ({ uid: 'u1' });
+      fb.saveProfile = async () => true;
+      // a good READ, then force a restore-step failure
+      fb.loadProfile = async () => ({
+        createdAt: 1700000000000,
+        get lists() { throw new Error('boom during restore'); },
+      });
+      window._gpjCloudLoaded = false;
+      await loadTierFromProfile({ uid: 'u1' });
+      return window._gpjCloudLoaded;
+    });
+    expect(r, 'read succeeded => syncing stays possible even if painting failed').toBe(true);
+  });
+
+  test('a FAILED read still keeps the gate shut (data-loss guard intact)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      fb.current = () => ({ uid: 'u1' });
+      fb.loadProfile = async () => { throw new Error('network down'); };
+      window._gpjCloudLoaded = false;
+      await loadTierFromProfile({ uid: 'u1' });
+      return window._gpjCloudLoaded;
+    });
+    expect(r, 'never write over data we could not read').toBe(false);
+  });
+
+  test('the market is backfilled to the profile so reverse-match can scope her', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      const writes = [];
+      fb.current = () => ({ uid: 'u1' });
+      fb.saveProfile = async (uid, d) => { writes.push(d); return true; };
+      fb.loadProfile = async () => ({ createdAt: 1700000000000 });   // no location stored yet
+      localStorage.setItem('gpj_loc', 'Houston, TX');
+      await loadTierFromProfile({ uid: 'u1' });
+      await new Promise((x) => setTimeout(x, 80));
+      const mkt = writes.find((w) => w && w.location);
+      return { wroteLocation: mkt && mkt.location, touchedLists: writes.some((w) => w && 'lists' in w) };
+    });
+    expect(r.wroteLocation, 'her saved market reaches the profile').toBe('Houston, TX');
+    expect(r.touchedLists, 'the backfill is single-field — it never writes lists').toBe(false);
+  });
+
+  test('no redundant write when the profile already has the market', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      const writes = [];
+      fb.current = () => ({ uid: 'u1' });
+      fb.saveProfile = async (uid, d) => { writes.push(d); return true; };
+      fb.loadProfile = async () => ({ createdAt: 1700000000000, location: 'Houston, TX' });
+      localStorage.setItem('gpj_loc', 'Houston, TX');
+      await loadTierFromProfile({ uid: 'u1' });
+      await new Promise((x) => setTimeout(x, 80));
+      return writes.filter((w) => w && w.location).length;
+    });
+    expect(r, 'already correct => no wasted write').toBe(0);
+  });
+});
+
 test.describe('[STATE-COVERAGE] v138 company-name folding + cross-device expired flags', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
