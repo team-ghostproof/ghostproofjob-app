@@ -22,7 +22,9 @@
     "seo:build": "node seo-generator/run.js",
     "seo:check": "node seo-generator/run.js --check",
     "test:seo": "node --test tests/seo/seoPages.test.mjs",
-    "test:billing": "node --test tests/billing/stripeWebhook.test.mjs"
+    "test:billing": "node --test tests/billing/stripeWebhook.test.mjs",
+    "benchmark": "node scripts/benchmark.mjs",
+    "verify": "npm run benchmark && npm run test:match && npm run test:growth && npm run test:email && npm run test:apply && npm run test:seo && npm run test:billing && npx playwright test --project=chromium --workers=2"
   },
   "dependencies": {
     "@sparticuz/chromium": "^123.0.1",
