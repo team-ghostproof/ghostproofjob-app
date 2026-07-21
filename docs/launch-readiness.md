@@ -1,6 +1,6 @@
 # GhostProofJob — Launch Readiness
 
-**Build:** v143 · **Updated:** 2026-07-21 · **Status:** NOT launch-ready — 1 catastrophic item open, 4 blocking
+**Build:** v144 · **Updated:** 2026-07-21 · **Status:** NOT launch-ready — 3 blocking items open (P1-1 closed in v144)
 
 How to read this: items are ordered by *what it costs the user if it ships broken*, not by
 effort. A P0 destroys user data or makes the core promise false. A P1 makes a paid-for or
@@ -54,7 +54,19 @@ stops further loss. Nothing further is owed here.
 
 ## P1 — Blocking (advertised feature does not work)
 
-### 🔴 P1-1 Employer jobs are effectively invisible — **OPEN** **[UI-REVIEW]**
+### ✅ P1-1 Employer jobs were effectively invisible — **FIXED v144**
+Shipped as approved: **(A)** relevance-gated pin, cap 3, `match` sort only, applied at the
+deck's final sort (`applySwipeFilters`) — an off-field employer role is *not* pinned, because
+that would be an ad. **(B)** description floor 20 → **250 chars** in both posting paths, with
+existing listings grandfathered (the floor fires on edit only when the description changes),
+plus a live strength meter reading the same fields `computeMatch` consumes.
+
+> **Founder note:** your live posting is 26 characters and now scores **3%**. It will still
+> serve, and you can still edit its salary/benefits/questions without rewriting it — but it
+> will not clear the relevance gate to be pinned until you expand it. Expanding it is the
+> single highest-value thing you can do for the employer side.
+
+<details><summary>Original diagnosis (kept for the record)</summary>
 Measured live: your GPJ posting sits at **position 1,498 of 2,127** in the deck; with your
 résumé loaded it improves only to **~105**. Nobody swipes 105 cards. This is why no
 application was ever created and why the recruiter side shows zero applicants — *the apply
@@ -69,6 +81,7 @@ which our own matcher scores at 61% against competitors' 85%.
 - **A.** Pin verified internal jobs into the top N of an in-field deck — they are the product.
 - **B.** Enforce a posting-quality floor (minimum description/requirements) with a live
   "your listing scores X%" meter on the post form.
+</details>
 
 ### 🟠 P1-2 Reverse match returns nothing — **DIAGNOSED, blocked on one data point**
 Ruled out in code: your profile has `discoverable: true` ✓ and `location: "Houston, TX"` ✓;
