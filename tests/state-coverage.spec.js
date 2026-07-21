@@ -2021,7 +2021,9 @@ test.describe('[STATE-COVERAGE] R2-B recruiter job posting + listing', () => {
       switchView('employer'); renderEmployerView();
       const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
       set('job-title', 'Operations Manager'); set('job-location', 'Houston, TX');
-      set('job-desc', 'Oversee warehouse operations and vendor logistics for the region.'); set('job-req', '5 years ops');
+      // v144: clears the 250-char listing-quality floor. This test is about the
+      // PAYLOAD shape, not description length, so the fixture just gets realistic.
+      set('job-desc', 'Oversee warehouse operations and vendor logistics for the region. You will lead a team of eight, own the weekly KPI review, and report to the Ops Director. In your first 90 days you will rebuild the shift plan, close out open safety actions, and take over vendor scheduling end to end.'); set('job-req', '5 years ops');
       set('job-sal-min', '60000'); set('job-sal-max', '80000'); document.getElementById('job-type').value = 'Full-time';
       await postRecruiterJob(); await new Promise((r) => setTimeout(r, 250));
       const listText = (document.getElementById('emp-jobs-list').textContent || '');
@@ -2593,7 +2595,7 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
       const hasEdit = /recEditJob/.test(document.getElementById('rl-list').innerHTML);
       await recEditJob('j1');
       const prefill = { title: document.getElementById('rl-title').value, desc: document.getElementById('rl-desc').value, btn: document.getElementById('rl-post-btn').textContent };
-      document.getElementById('rl-desc').value = 'UPDATED description for the role.';
+      document.getElementById('rl-desc').value = 'UPDATED — ' + 'Own the day to day running of the site, including scheduling, safety walks and inventory accuracy. You will lead a team of eight, report to the Ops Director, and own the weekly KPI review. In your first 90 days you will rebuild the shift plan, close out the open safety actions, and take over vendor scheduling end to end.';
       await postRecJob();
       return { hasEdit, prefill, updated: window.__updated, created: window.__created, btnReset: document.getElementById('rl-post-btn').textContent };
     }, wait);
@@ -2601,7 +2603,7 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
     expect(r.prefill.title, 'the form prefills from the real job').toBe('Ops Manager');
     expect(r.prefill.btn).toBe('💾 Save changes');
     expect(r.updated.id).toBe('j1');
-    expect(r.updated.d.description).toBe('UPDATED description for the role.');
+    expect(r.updated.d.description).toBe('UPDATED — ' + 'Own the day to day running of the site, including scheduling, safety walks and inventory accuracy. You will lead a team of eight, report to the Ops Director, and own the weekly KPI review. In your first 90 days you will rebuild the shift plan, close out the open safety actions, and take over vendor scheduling end to end.');
     expect(r.created, 'editing must UPDATE, never create a duplicate').toBeNull();
     expect(r.btnReset, 'the form returns to post mode after saving').toMatch(/Post role/);
   });
@@ -2612,12 +2614,12 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
       window._myJobCount = 5;                       // free tier is full
       await renderRecListings(); await wait('rl-list', 'Ops Manager');
       await recEditJob('j1');
-      document.getElementById('rl-desc').value = 'Still editable at the cap.';
+      document.getElementById('rl-desc').value = 'Still editable at the cap. ' + 'Own the day to day running of the site, including scheduling, safety walks and inventory accuracy. You will lead a team of eight, report to the Ops Director, and own the weekly KPI review. In your first 90 days you will rebuild the shift plan, close out the open safety actions, and take over vendor scheduling end to end.';
       await postRecJob();
       return { updated: window.__updated };
     }, wait);
     expect(r.updated, 'a full free team must still be able to EDIT its roles').not.toBeNull();
-    expect(r.updated.d.description).toBe('Still editable at the cap.');
+    expect(r.updated.d.description).toBe('Still editable at the cap. ' + 'Own the day to day running of the site, including scheduling, safety walks and inventory accuracy. You will lead a team of eight, report to the Ops Director, and own the weekly KPI review. In your first 90 days you will rebuild the shift plan, close out the open safety actions, and take over vendor scheduling end to end.');
   });
 
   test('a panel rebuild mid-edit keeps the edit — and the unsaved typing', async ({ page }) => {
@@ -2625,13 +2627,13 @@ test.describe('[STATE-COVERAGE] v117 Listings: edit a role + verified fill-sourc
       const wait = eval('(' + ws + ')');
       await renderRecListings(); await wait('rl-list', 'Ops Manager');
       await recEditJob('j1');
-      document.getElementById('rl-desc').value = 'Half-typed edit, not saved yet.';
+      document.getElementById('rl-desc').value = 'Half-typed edit, not saved yet. ' + 'Own the day to day running of the site, including scheduling, safety walks and inventory accuracy. You will lead a team of eight, report to the Ops Director, and own the weekly KPI review. In your first 90 days you will rebuild the shift plan, close out the open safety actions, and take over vendor scheduling end to end.';
       await renderRecListings();          // tab switch / late applicant count / any repaint
       return { desc: document.getElementById('rl-desc').value, title: document.getElementById('rl-title').value,
         btn: document.getElementById('rl-post-btn').textContent, editing: window._editingJobId,
         cancelShown: document.getElementById('rl-cancel-edit').style.display };
     }, wait);
-    expect(r.desc, 'unsaved typing survives a rebuild (was: silently blanked)').toBe('Half-typed edit, not saved yet.');
+    expect(r.desc, 'unsaved typing survives a rebuild (was: silently blanked)').toBe('Half-typed edit, not saved yet. ' + 'Own the day to day running of the site, including scheduling, safety walks and inventory accuracy. You will lead a team of eight, report to the Ops Director, and own the weekly KPI review. In your first 90 days you will rebuild the shift plan, close out the open safety actions, and take over vendor scheduling end to end.');
     expect(r.title).toBe('Ops Manager');
     expect(r.btn, 'the form must not fall back to "Post role" while still in edit mode').toBe('💾 Save changes');
     expect(r.editing, 'edit state and form stay in sync').toBe('j1');
@@ -2843,7 +2845,7 @@ test.describe('[STATE-COVERAGE] v141 community flags on cards + hybrid work styl
       const remoteCleared = document.getElementById('rl-remote').checked === false;
       // hybrid WITHOUT a location must be refused
       document.getElementById('rl-title').value = 'Ops Manager';
-      document.getElementById('rl-desc').value = 'Run the warehouse day to day.';
+      document.getElementById('rl-desc').value = 'Own the day to day running of the site, including scheduling, safety walks and inventory accuracy. You will lead a team of eight, report to the Ops Director, and own the weekly KPI review. In your first 90 days you will rebuild the shift plan, close out the open safety actions, and take over vendor scheduling end to end.';
       document.getElementById('rl-location').value = '';
       await postRecJob();
       const refusedWithoutLoc = created === null;
@@ -3896,7 +3898,7 @@ test.describe('[STATE-COVERAGE] v120 street-safe City/State + listings upgrades 
       await renderRecListings(); await new Promise((x) => setTimeout(x, 200));
       document.getElementById('rl-title').value = 'Warehouse Lead';
       document.getElementById('rl-location').value = 'Katy, TX';
-      document.getElementById('rl-desc').value = 'Lead the warehouse team daily.';
+      document.getElementById('rl-desc').value = 'Own the day to day running of the site, including scheduling, safety walks and inventory accuracy. You will lead a team of eight, report to the Ops Director, and own the weekly KPI review. In your first 90 days you will rebuild the shift plan, close out the open safety actions, and take over vendor scheduling end to end.';
       document.getElementById('rl-benefits').value = 'Health · PTO';
       document.getElementById('rl-questions').value = 'Weekends OK?\nForklift certified?\n\nQ3\nQ4\nQ5\nQ6 too many';
       await postRecJob();
@@ -4749,5 +4751,139 @@ test.describe('[STATE-COVERAGE] Q4 empty data', () => {
     expect(err).toBe('');
     const rows = await page.evaluate(() => document.querySelectorAll('.job-card-browse').length);
     expect(rows, 'no fake/demo rows may appear in an empty live view').toBe(0);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v144 P1-1 — verified employer roles are REACHABLE, and worth reaching.
+
+   Measured before this shipped: the founder's own GPJ posting sat at position
+   1,498 of 2,127 in the deck (≈105 with a résumé). Nobody swipes 105 cards —
+   which is why the recruiter side showed zero applicants. The apply plumbing
+   was fine and verified working; the card was simply unreachable.
+
+   Part A pins verified employer roles, RELEVANCE-GATED and capped at 3, in the
+   deck's final sort only. Part B stops us pinning something threadbare.
+   ═══════════════════════════════════════════════════════════════════════════ */
+test.describe('[STATE-COVERAGE] v144 P1-1A deck pin — employer roles reachable, never an ad', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.applySwipeFilters === 'function', null, { timeout: 15000 });
+  });
+
+  // seed: 40 scraped jobs + the supplied employer ones, then run the REAL final sort
+  const seed = (page, internals, sort) => page.evaluate(({ internals, sort }) => {
+    const scraped = [];
+    // scraped jobs carry a real salary so the salary sorters have something to
+    // rank; without it `salhi` sinks them (no-salary jobs go last by design) and
+    // an employer job would top that sort legitimately, proving nothing.
+    for (let i = 0; i < 40; i++) scraped.push({ t: 'Scraped Role ' + i, co: 'BigCo ' + i, loc: 'Houston, TX', match: 90, desc: 'x', salMax: 200000, _internal: false });
+    rawQueue = scraped.concat(internals);
+    jobsQueue = rawQueue.slice();
+    try { const s = document.getElementById('sw-sort'); if (s && sort) s.value = sort; } catch (e) {}
+    applySwipeFilters();
+    return jobsQueue.slice(0, 8).map((j) => ({ t: j.t, _internal: !!j._internal, match: j.match }));
+  }, { internals, sort });
+
+  test('Q1 guest: a RELEVANT verified employer role is pinned to the top of the deck', async ({ page }) => {
+    const top = await seed(page, [{ t: 'Marketing Manager', co: 'GPJ Employer', loc: 'Houston, TX', match: 70, id: 'emp1', _internal: true }], null);
+    expect(top[0]._internal, 'the employer role leads the deck instead of sitting at ~1,498').toBe(true);
+    expect(top[0].t).toBe('Marketing Manager');
+  });
+
+  test('the pin is CAPPED at 3 — employers cannot flood the deck', async ({ page }) => {
+    const internals = [];
+    for (let i = 0; i < 6; i++) internals.push({ t: 'Employer Role ' + i, co: 'GPJ Employer', loc: 'Houston, TX', match: 70, id: 'e' + i, _internal: true });
+    const top = await seed(page, internals, null);
+    expect(top.slice(0, 3).every((j) => j._internal), 'first three are the pinned employer roles').toBe(true);
+    expect(top[3]._internal, 'the fourth employer role falls back into normal ranking').toBe(false);
+  });
+
+  test('the relevance GATE holds: a weak-match employer role is NOT pinned (it would be an ad)', async ({ page }) => {
+    const top = await seed(page, [{ t: 'Unrelated Role', co: 'GPJ Employer', loc: 'Houston, TX', match: 12, id: 'emp1', _internal: true }], null);
+    expect(top[0]._internal, 'an irrelevant employer role must never be pinned over a real match').toBe(false);
+  });
+
+  test('an explicit candidate sort wins — pins apply to the match sort only', async ({ page }) => {
+    const top = await seed(page, [{ t: 'Marketing Manager', co: 'GPJ Employer', loc: 'Houston, TX', match: 70, id: 'emp1', salMax: 1, _internal: true }], 'salhi');
+    expect(top[0]._internal, 'sorting by salary must respect the candidate, not the employer').toBe(false);
+  });
+
+  test('Q4 empty: no employer roles in market -> deck order is untouched', async ({ page }) => {
+    const top = await seed(page, [], null);
+    expect(top.every((j) => j._internal === false)).toBe(true);
+    expect(top[0].t).toContain('Scraped Role');
+  });
+});
+
+test.describe('[STATE-COVERAGE] v144 P1-1B listing quality floor + honest strength meter', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._recListingScore === 'function', null, { timeout: 15000 });
+  });
+
+  test('the founder-repro 26-char listing scores poorly and names what is missing', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      weak: _recListingScore({ desc: 'Manage marketing\nBudgeting', req: '', benefits: '', smin: '', smax: '' }),
+      strong: _recListingScore({ desc: 'x'.repeat(900), req: 'y'.repeat(200), benefits: 'z'.repeat(90), smin: '60000', smax: '80000' }),
+    }));
+    expect(r.weak.score, 'the 26-char posting that lost to scraped listings scores badly').toBeLessThan(20);
+    expect(r.weak.gaps.join(' ')).toContain('requirements');
+    expect(r.strong.score, 'a complete listing scores strongly').toBeGreaterThanOrEqual(95);
+    expect(r.strong.gaps.length, 'a complete listing has nothing left to name').toBe(0);
+  });
+
+  test('Q2 authed: a NEW post under the floor is blocked and never reaches Firestore', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let created = 0;
+      window._recruiter = { companyId: 'c1', company: 'Acme', plan: 'free' };
+      window.fb = Object.assign(window.fb || {}, { createRecruiterJob: async () => { created++; return true; } });
+      window._editingJobId = null;
+      const set = (id, v) => { let e = document.getElementById(id); if (!e) { e = document.createElement('textarea'); e.id = id; document.body.appendChild(e); } e.value = v; };
+      set('rl-title', 'Marketing Manager'); set('rl-location', 'Houston, TX'); set('rl-desc', 'Manage marketing');
+      await postRecJob();
+      return { created };
+    });
+    expect(r.created, 'a threadbare listing must not be created — it would be pinned and still lose').toBe(0);
+  });
+
+  test('GRANDFATHERED: an existing short listing still saves while its description is untouched', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const out = { unchanged: 0, shortened: 0 };
+      window._recruiter = { companyId: 'c1', company: 'Acme', plan: 'free' };
+      window.fb = window.fb || {};
+      const set = (id, v) => { let e = document.getElementById(id); if (!e) { e = document.createElement('textarea'); e.id = id; document.body.appendChild(e); } e.value = v; };
+      set('rl-title', 'Marketing Manager'); set('rl-location', 'Houston, TX');
+
+      // editing the SALARY of a legacy 26-char listing — must still be allowed through
+      window._editingJobId = 'job1'; window._editingJobDesc = 'Manage marketing\nBudgeting';
+      set('rl-desc', 'Manage marketing\nBudgeting');
+      window.fb.updateRecruiterJob = async () => { out.unchanged++; return true; };
+      await postRecJob();
+
+      // but CHANGING the description to something still-short must be refused
+      window._editingJobId = 'job1'; window._editingJobDesc = 'Manage marketing\nBudgeting';
+      set('rl-desc', 'Manage marketing now');
+      window.fb.updateRecruiterJob = async () => { out.shortened++; return true; };
+      await postRecJob();
+      return out;
+    });
+    expect(r.unchanged, 'you can still edit a legacy listing without rewriting it first').toBe(1);
+    expect(r.shortened, 'but touching the description holds it to the floor').toBe(0);
+  });
+
+  test('Q3 the meter is pure client copy — it renders with no network and no auth', async ({ page }) => {
+    await mockNetworkFailure(page, FIRESTORE_URLS);
+    const r = await page.evaluate(() => {
+      let host = document.getElementById('rl-quality');
+      if (!host) { host = document.createElement('div'); host.id = 'rl-quality'; document.body.appendChild(host); }
+      let d = document.getElementById('rl-desc');
+      if (!d) { d = document.createElement('textarea'); d.id = 'rl-desc'; document.body.appendChild(d); }
+      d.value = 'x'.repeat(300);
+      recPaintListingScore();
+      return { len: host.innerHTML.length, hasPct: /listing strength/.test(host.innerHTML) };
+    });
+    expect(r.hasPct, 'the meter renders offline and signed-out').toBe(true);
+    expect(r.len).toBeGreaterThan(0);
   });
 });

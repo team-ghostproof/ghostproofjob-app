@@ -2805,7 +2805,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v143</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v144</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3239,7 +3239,9 @@ async function postRecruiterJob(){
   const title=v('job-title'), loc=v('job-location'), desc=v('job-desc');
   if(!title){ showToast('Add a job title'); return; }
   if(!loc && !remote){ showToast('Add a location or mark it remote'); return; }
-  if(desc.length<20){ showToast('Add a short description (20+ characters)'); return; }
+  /* v144 P1-1B: same quality floor as the main posting form. No grandfathering
+     needed here — this path only ever CREATES a role, it never edits one. */
+  if(desc.length<REC_MIN_DESC){ showToast('Add '+(REC_MIN_DESC-desc.length)+' more characters — short listings lose to scraped postings in candidate matching'); return; }
   /* R8: free-tier soft cap on active roles. Paid plans (Stripe) not wired yet —
      the product is free, so this only paces posting, it never charges. */
   const _plan=(window._recruiter&&window._recruiter.plan)||'free';
@@ -3796,11 +3798,14 @@ async function renderRecListings(){
     +'<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--off);cursor:pointer;"><input type="checkbox" id="rl-remote" onchange="_recWorkStyle(\'remote\')" style="accent-color:var(--mint);width:15px;height:15px;"/> Remote role</label>'
     +'<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--off);cursor:pointer;"><input type="checkbox" id="rl-hybrid" onchange="_recWorkStyle(\'hybrid\')" style="accent-color:var(--cyber);width:15px;height:15px;"/> Hybrid <span style="color:var(--muted);font-weight:400;">(keeps a location)</span></label>'
     +'</div>'
-    +'<div class="field-label">Description</div><textarea class="field-input" id="rl-desc" rows="4" placeholder="What the role does." style="margin-bottom:8px;resize:vertical;"></textarea>'
-    +'<div class="field-label">Requirements</div><textarea class="field-input" id="rl-req" rows="3" placeholder="Must-haves." style="margin-bottom:8px;resize:vertical;"></textarea>'
-    +'<div class="field-label">Benefits</div><textarea class="field-input" id="rl-benefits" rows="3" placeholder="Health, PTO, 401(k), remote days…" style="margin-bottom:8px;resize:vertical;"></textarea>'
+    +'<div class="field-label">Description</div><textarea class="field-input" id="rl-desc" rows="4" placeholder="What the role does, who they work with, what a good first 90 days looks like. Candidates are matched on this text — the fuller it is, the better you rank." style="margin-bottom:4px;resize:vertical;" oninput="recPaintListingScore()"></textarea>'
+    /* v144 P1-1B: live listing-strength meter. Same signals candidate matching
+       reads, so the number is honest about reach rather than decorative. */
+    +'<div id="rl-quality" style="margin-bottom:8px;"></div>'
+    +'<div class="field-label">Requirements</div><textarea class="field-input" id="rl-req" rows="3" placeholder="Must-haves." style="margin-bottom:8px;resize:vertical;" oninput="recPaintListingScore()"></textarea>'
+    +'<div class="field-label">Benefits</div><textarea class="field-input" id="rl-benefits" rows="3" placeholder="Health, PTO, 401(k), remote days…" style="margin-bottom:8px;resize:vertical;" oninput="recPaintListingScore()"></textarea>'
     +'<div class="field-label">Application questions <span style="text-transform:none;font-weight:400;">(optional, up to 5 — one per line)</span></div><textarea class="field-input" id="rl-questions" rows="3" placeholder="e.g. Do you have weekend availability?" style="margin-bottom:8px;resize:vertical;"></textarea>'
-    +'<div class="field-row"><div style="flex:1;"><div class="field-label">Salary min</div><input class="field-input" id="rl-smin" type="number" placeholder="60000" style="margin-bottom:8px;"/></div><div style="flex:1;"><div class="field-label">Salary max</div><input class="field-input" id="rl-smax" type="number" placeholder="80000" style="margin-bottom:8px;"/></div></div>'
+    +'<div class="field-row"><div style="flex:1;"><div class="field-label">Salary min</div><input class="field-input" id="rl-smin" type="number" placeholder="60000" style="margin-bottom:8px;" oninput="recPaintListingScore()"/></div><div style="flex:1;"><div class="field-label">Salary max</div><input class="field-input" id="rl-smax" type="number" placeholder="80000" style="margin-bottom:8px;" oninput="recPaintListingScore()"/></div></div>'
     +'<div id="rl-post-btn" onclick="postRecJob()" style="background:linear-gradient(135deg,var(--cyber),#7E3FF2);color:#fff;font-weight:800;border-radius:12px;padding:13px;text-align:center;font-size:14px;cursor:pointer;">📋 Post role (pending review)</div>'
     +'<div id="rl-cancel-edit" onclick="recCancelEdit()" style="display:none;margin-top:8px;text-align:center;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;">Cancel edit</div>'
     +'<div class="rec-sec-title" style="margin-top:18px;">Your roles</div><div id="rl-list"><div class="rec-empty">Loading…</div></div>';
@@ -3826,6 +3831,42 @@ async function renderRecListings(){
   }));
   listEl.innerHTML=rows.join('');
   await _recRepaintEditForm(_snap);   /* v117: a rebuild must never eat an edit in progress */
+  try{ recPaintListingScore(); }catch(e){}   /* v144: meter reflects whatever survived the rebuild */
+}
+/* ── v144 P1-1B: listing quality ────────────────────────────────────────────
+   The old floor was 20 characters. The founder's live posting was 26 ("Manage
+   marketing\nBudgeting") and our OWN matcher scored it 61% against scraped ATS
+   posts at 85% — so verified employer roles lost the ranking fight on content,
+   not on merit. Part A pins them; this stops us pinning something threadbare.
+
+   _recListingScore reads the SAME fields computeMatch actually consumes, so the
+   number an employer sees is the number candidates' matching uses. It is not a
+   vanity meter — overstating it would be lying to the employer about reach. */
+const REC_MIN_DESC=250;
+function _recListingScore(o){
+  const d=(o.desc||'').trim(), r=(o.req||'').trim(), b=(o.benefits||'').trim();
+  const gaps=[]; let score=0;
+  /* description carries most of the matchable signal, so it carries most weight */
+  if(d.length>=800) score+=50; else if(d.length>=250) score+=30+Math.round((d.length-250)/550*20);
+  else { score+=Math.round(d.length/250*30); gaps.push('a fuller description (250+ characters)'); }
+  if(r.length>=120) score+=25; else if(r.length) { score+=Math.round(r.length/120*25); gaps.push('more detail in requirements'); }
+  else gaps.push('requirements — candidates match against these');
+  if(b.length>=60) score+=15; else gaps.push('benefits');
+  if(o.smin||o.smax) score+=10; else gaps.push('a salary range (listings with pay get far more applicants)');
+  return { score:Math.max(0,Math.min(100,score)), gaps:gaps };
+}
+/* live meter under the description field; safe no-op if the form isn't mounted */
+function recPaintListingScore(){
+  const el=document.getElementById('rl-quality'); if(!el) return;
+  const v=id=>((document.getElementById(id)||{}).value||'');
+  const q=_recListingScore({desc:v('rl-desc'),req:v('rl-req'),benefits:v('rl-benefits'),smin:v('rl-smin'),smax:v('rl-smax')});
+  const col=q.score>=70?'var(--mint)':(q.score>=40?'var(--cyber)':'var(--danger)');
+  el.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin:2px 0 6px;">'
+    +'<div style="flex:1;height:6px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;">'
+    +'<div style="height:100%;width:'+q.score+'%;background:'+col+';transition:width .25s;"></div></div>'
+    +'<span style="font-size:11px;color:'+col+';font-weight:700;white-space:nowrap;">'+q.score+'% listing strength</span></div>'
+    +(q.gaps.length?'<div style="font-size:11px;color:var(--muted);line-height:1.5;">Candidates match on what you write here. Still missing: '+q.gaps.slice(0,3).map(g=>_esc(g)).join(' · ')+'</div>'
+                   :'<div style="font-size:11px;color:var(--mint);">Strong listing — this competes with any scraped posting.</div>');
 }
 async function postRecJob(){
   if(!(window._recruiter&&window.fb&&fb.createRecruiterJob)){ showToast('Posting unavailable right now'); return; }
@@ -3837,7 +3878,14 @@ async function postRecJob(){
   if(!loc&&!remote){ showToast('Add a location or mark it remote'); return; }
   /* v141: hybrid REQUIRES a location — a candidate has to know where they'd commute */
   if(hybrid&&!loc){ showToast('Hybrid roles need a location — candidates need to know where they’d commute'); return; }
-  if(desc.length<20){ showToast('Add a short description (20+ characters)'); return; }
+  /* v144 P1-1B: the floor applies to a NEW post, and to an edit ONLY when the
+     description actually changed (founder-approved grandfathering). */
+  const _descChanged=!window._editingJobId || desc!==(window._editingJobDesc||'');
+  if(_descChanged && desc.length<REC_MIN_DESC){
+    showToast('Add '+(REC_MIN_DESC-desc.length)+' more characters — short listings lose to scraped postings in candidate matching');
+    try{ recPaintListingScore(); document.getElementById('rl-desc').focus(); }catch(e){}
+    return;
+  }
   const r=window._recruiter;
   /* v118: carry `region` (same "City, ST" shape the harvester writes) so the
      region-scoped candidate query can also find employer roles — belt to the
@@ -3871,6 +3919,7 @@ async function recRemoveJob(id){
 function _recPaintJobForm(j){
   const set=(el,v)=>{ const e=document.getElementById(el); if(e&&('value' in e)) e.value=v==null?'':v; };
   set('rl-title',j.title); set('rl-location',j.is_remote?'':j.location); set('rl-desc',j.description);
+  try{ setTimeout(recPaintListingScore,0); }catch(e){}   /* v144: show the role's real strength on open */
   set('rl-req',j.requirements); set('rl-benefits',j.benefits);
   set('rl-questions',(Array.isArray(j.appQuestions)?j.appQuestions:[]).join('\n'));
   set('rl-smin',j.salary_min); set('rl-smax',j.salary_max);
@@ -3917,12 +3966,18 @@ async function recEditJob(id){
   if(!(window.fb&&fb.loadJob)) return;
   const j=await fb.loadJob(id); if(!j){ showToast('Could not open that role'); return; }
   window._editingJobId=id;
+  /* v144 P1-1B: remember the description we OPENED with, so the new quality floor
+     only fires when the description is actually changed. Founder-approved
+     grandfathering — an existing short listing keeps working until you touch it,
+     instead of locking you out of editing its salary/benefits/questions. */
+  window._editingJobDesc=(j.description||'');
   _recPaintJobForm(j);
   try{ document.getElementById('rl-title').scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){}
   showToast('✎ Editing “'+(j.title||'role')+'” — change anything and save');
 }
 function recCancelEdit(){
   window._editingJobId=null;
+  window._editingJobDesc=null;   /* v144: never let a stale baseline skip the floor */
   _REC_FORM_IDS.forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
   const rm=document.getElementById('rl-remote'); if(rm) rm.checked=false;
   const hy=document.getElementById('rl-hybrid'); if(hy) hy.checked=false;
@@ -9911,8 +9966,37 @@ function applySwipeFilters(){
        source date never wrongly hides a job. */
     (!swFreshDays || j.posting_age_days==null || j.posting_age_days<=swFreshDays)
   );
+  /* ── v144 P1-1A: verified employer roles get a capped, RELEVANCE-GATED pin ──
+     Measured before this: the founder's own GPJ posting sat at position 1,498 of
+     2,127 in the deck (≈105 with a résumé loaded). Nobody swipes 105 cards, which
+     is why the recruiter side showed zero applicants — the apply plumbing was fine
+     and verified working, the card was simply unreachable.
+
+     Deliberately NOT an unconditional pin (founder-approved, cap 3):
+       · relevance gate — in-field title OR match ≥55 (the same ≥55 `primary` bar
+         searchRankJobs uses). An off-field employer role stays in normal ranking;
+         pinning one would be an ad, and GPJ does not do ads.
+       · cap 3 — employers cannot flood the deck no matter how many they post.
+       · `match` sort ONLY. If the candidate explicitly sorts by salary/ghost/az,
+         we honour THEIR choice and pin nothing.
+     Runs AFTER the filters above, so a pinned job can never resurrect something
+     applied / skipped / flagged / expired — those are already out of `list`. */
+  const _pinned=new Set();
+  try{
+    if((sort||'match')==='match'){
+      const fw=(typeof _resumeFieldWord==='function'?_resumeFieldWord():'');
+      list.filter(j=>j&&j._internal&&j.id)
+          .filter(j=>(fw&&(j.t||'').toLowerCase().includes(fw))||(j.match||0)>=55)
+          .sort((a,b)=>(b.match||0)-(a.match||0))
+          .slice(0,3)
+          .forEach(j=>_pinned.add(j));
+    }
+  }catch(e){}
   const sorters={
     match:(a,b)=>{
+      /* v144: verified employer roles that cleared the relevance gate lead. */
+      const ap=_pinned.has(a)?1:0, bp=_pinned.has(b)?1:0;
+      if(bp!==ap) return bp-ap;
       /* B1: lead with the user's FIELD (job title contains their résumé field word),
          THEN by match %. This is the deck's FINAL sort — sorting by raw match here is
          what previously buried in-field roles under off-field ones. Falls back to pure
@@ -12128,8 +12212,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v143';
+const APP_VERSION = 'v144';
 const CHANGELOG = {
+  'v144':['P1-1: verified employer roles reachable (relevance-gated pin, cap 3) + listing quality floor & live strength meter'],
   'v143':['P0 monotonic list sync (data loss), deck accordion + Save button, one-report-per-user, reported-badge explainer, reverse-match observability'],
   'v142':['Desktop deck sized to the card (Save button was 119px below the fold)'],
   'v141':['Community flags visible on job cards (cloud, per-posting) + Hybrid work-style toggle'],
