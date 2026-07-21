@@ -43,12 +43,12 @@ means the key is omitted; only an explicit reset shrinks a list.
 Firebase re-fires `onAuthStateChanged` (token refresh, restored session); each fire slammed
 the gate shut, silently dropping swipes. Now re-arms only on a real uid change.
 
-### 🔴 P0-4 Your existing history is **unrecoverable**
-Your profile doc shows `lists` empty while `appliedToday: {n: 1}` — the counter recorded an
-application whose list row is gone. Point-in-time recovery was not enabled, so there is no
-restore path. v143 stops further loss; it cannot undo this.
-**Founder action:** enable PITR in Firestore now (7-day window, low cost). This should have
-been recommended before the first write-path change shipped.
+### 🟡 P0-4 The history lost BEFORE PITR was enabled is unrecoverable
+Your profile doc showed `lists` empty while `appliedToday: {n: 1}` — the counter recorded an
+application whose list row was gone.
+**PITR is enabled** (founder turned it on ~3 versions ago, after the loss). So going forward
+there is a 7-day restore window; the data lost before that point has no restore path. v143
+stops further loss. Nothing further is owed here.
 
 ---
 
@@ -132,9 +132,21 @@ roadmap), and the recruiter billing/plan-cap flows.
 
 ## Founder action list
 
-1. **Enable Firestore point-in-time recovery** (P0-4) — before anything else.
-2. **Deploy v143** (drag-and-drop `index.html` + `GhostProofJob.html` + `sw.js`; never paste).
-3. **Confirm `rules.yml` is green in CI** before deploying `firestore.rules`.
-4. **Read the Reverse Match run log line** (P1-2).
+1. ✅ ~~Enable Firestore point-in-time recovery~~ — **done**, enabled ~v140.
+2. ✅ ~~Confirm the rules job is green in CI~~ — **green**, full gate passed on `79713dc`.
+3. **Deploy v143** (drag-and-drop `index.html` + `GhostProofJob.html` + `sw.js`; never paste).
+4. **Read the Reverse Match run log line** (P1-2) — one line ends that investigation.
 5. Re-test the accordion + Save button **on desktop, on v143**.
 6. Approve or reject the **P1-1 A+B** approach so employer jobs become reachable.
+
+---
+
+## Release infrastructure — live as of 79713dc
+
+- **`stable` branch exists** and is advanced by CI only, after all four gates pass.
+  Redeploy from it at any time. See `docs/release-policy.md` for the three rollback levels.
+- **Mass-flake class eliminated.** The suite was failing ~25 tests at random with
+  `ReferenceError` on functions that plainly exist. Cause was the app reloading itself
+  mid-test (service-worker `controllerchange`, and the desktop-breakpoint media query).
+  Both reloads are correct for real users and were left alone; the tests stop racing them.
+  Full suite now 437/438, 0 flaky.
