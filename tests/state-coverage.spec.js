@@ -2990,16 +2990,29 @@ test.describe('[STATE-COVERAGE] v143 accordion — the deck springs back after e
     const r = await page.evaluate(async () => {
       const deck = document.getElementById('card-deck'), top = document.querySelector('.job-card.top');
       const H = () => Math.round(deck.getBoundingClientRect().height);
+      // The deck is resized on transitionend + a fallback timer, so the height is
+      // in motion for a while. POLL until it stops changing rather than guessing a
+      // fixed delay — a fixed wait passes locally and flakes on a loaded CI runner
+      // (which is exactly what a timing guess always does).
+      const settled = async () => {
+        let last = -1, stable = 0;
+        for (let i = 0; i < 120; i++) {                 // ≤6s ceiling
+          await new Promise((x) => setTimeout(x, 50));
+          const h = H();
+          stable = (h === last) ? stable + 1 : 0;
+          last = h;
+          if (stable >= 6) break;                       // ~300ms unchanged = settled
+        }
+        return last;
+      };
       try { syncDeckHeight(); } catch (e) {}
-      await new Promise((x) => setTimeout(x, 700));
-      const before = H();
+      const before = await settled();
       const d = top.querySelector('.card-drawer');
       if (d) { d.classList.add('open'); syncDeckHeight(); }
-      await new Promise((x) => setTimeout(x, 800));
-      const expanded = H();
+      const expanded = await settled();
       if (d) { d.classList.remove('open'); syncDeckHeight(); }
-      await new Promise((x) => setTimeout(x, 800));   // MUST outlast the CSS transition
-      return { before, expanded, after: H() };
+      const after = await settled();
+      return { before, expanded, after };
     });
     expect(r.expanded, 'expanding still grows the deck').toBeGreaterThan(r.before);
     expect(r.after, 'and collapsing puts it back exactly').toBe(r.before);

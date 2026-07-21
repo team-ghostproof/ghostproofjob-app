@@ -70,7 +70,33 @@ jobs:
       # workers=2: the suite is known to flake under parallel load on a saturated
       # machine (failures rotate run-to-run and pass 3/3 isolated). Two workers is
       # the documented stable setting — do not raise it to "speed up" CI.
-      - run: npx playwright test --project=chromium --workers=2 --reporter=line
+      # The json reporter is what makes a failure DIAGNOSABLE: the GitHub API does
+      # not expose Playwright's annotations, so the first red run cost a round of
+      # guessing. The summary step below prints the failing test names into the log.
+      - run: npx playwright test --project=chromium --workers=2 --reporter=line,json
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: pw-results.json
+      - name: Name the failing tests (so the log answers "which one?")
+        if: failure()
+        run: |
+          echo "::group::Failing tests"
+          node -e '
+            const fs=require("fs");
+            if(!fs.existsSync("pw-results.json")){ console.log("no json report — see the run log above"); process.exit(0); }
+            const r=JSON.parse(fs.readFileSync("pw-results.json","utf8"));
+            const bad=[];
+            const walk=(s)=>{ (s.suites||[]).forEach(walk); (s.specs||[]).forEach(sp=>{
+              (sp.tests||[]).forEach(t=>{ if(t.status!=="expected"&&t.status!=="skipped"){
+                const res=(t.results||[])[0]||{};
+                bad.push({title:sp.title, file:sp.file, line:sp.line, status:t.status,
+                  error:((res.error||{}).message||"").split("\n").slice(0,4).join(" | ")});
+              }});
+            }); };
+            (r.suites||[]).forEach(walk);
+            if(!bad.length){ console.log("Reporter saw no failed specs (infra/timeout failure — check the log)."); }
+            bad.forEach(b=>console.log("FAILED  "+b.file+":"+b.line+"  "+b.title+"\n        status="+b.status+"\n        "+b.error+"\n"));
+          '
+          echo "::endgroup::"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -78,6 +104,7 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            pw-results.json
           retention-days: 14
 
   # Promotes main -> stable ONLY when every gate above is green, and only for a
