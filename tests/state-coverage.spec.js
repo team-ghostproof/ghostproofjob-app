@@ -2851,6 +2851,65 @@ test.describe('[STATE-COVERAGE] v141 community flags on cards + hybrid work styl
   });
 });
 
+test.describe('[STATE-COVERAGE] v142 desktop deck height — Save button stays reachable', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.syncDeckHeight === 'function' && document.querySelector('.job-card.top'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(600);
+  });
+
+  const measure = `async (desk) => {
+    document.body.classList.toggle('desk', !!desk);
+    try{ if(desk && typeof buildDesktopGrid==='function') buildDesktopGrid(); }catch(e){}
+    try{ syncDeckHeight(); }catch(e){}
+    await new Promise(r=>setTimeout(r,700));
+    const deck=document.getElementById('card-deck'), top=document.querySelector('.job-card.top');
+    const ctrls=document.querySelector('.swipe-controls');
+    return {
+      deckH: Math.round(deck.getBoundingClientRect().height),
+      cardH: Math.round(top.scrollHeight),
+      overlaps: Math.round(top.getBoundingClientRect().bottom) > Math.round(ctrls.getBoundingClientRect().top)+2
+    };
+  }`;
+
+  test('the collapsed desktop deck sizes to the CARD, not a fixed 440 (was 206px of dead space)', async ({ page }) => {
+    const r = await page.evaluate(`(${measure})(true)`);
+    expect(r.deckH, 'no longer padded out to 440').toBeLessThan(440);
+    expect(r.deckH, 'never smaller than the card it contains').toBeGreaterThanOrEqual(Math.min(r.cardH, 300));
+    expect(r.overlaps, 'the card must never bleed over the swipe controls').toBe(false);
+  });
+
+  test('mobile is unchanged by the desktop fix (no regression)', async ({ page }) => {
+    const r = await page.evaluate(`(${measure})(false)`);
+    expect(r.deckH, 'mobile keeps its 300px floor').toBe(300);
+    expect(r.overlaps).toBe(false);
+  });
+
+  test('an EXPANDED card still grows the deck to fit its drawer', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      document.body.classList.add('desk');
+      try{ syncDeckHeight(); }catch(e){}
+      await new Promise((x)=>setTimeout(x,500));
+      const collapsed = Math.round(document.getElementById('card-deck').getBoundingClientRect().height);
+      const d = document.querySelector('.job-card.top .card-drawer');
+      if (d) { d.classList.add('open'); syncDeckHeight(); }
+      await new Promise((x)=>setTimeout(x,700));
+      const deck = document.getElementById('card-deck'), top = document.querySelector('.job-card.top');
+      const ctrls = document.querySelector('.swipe-controls');
+      return {
+        collapsed,
+        expanded: Math.round(deck.getBoundingClientRect().height),
+        cardH: Math.round(top.scrollHeight),
+        overlaps: Math.round(top.getBoundingClientRect().bottom) > Math.round(ctrls.getBoundingClientRect().top)+2,
+      };
+    });
+    expect(r.expanded, 'opening the drawer grows the deck').toBeGreaterThanOrEqual(r.collapsed);
+    expect(r.expanded, 'the expanded deck contains the taller card').toBeGreaterThanOrEqual(r.cardH);
+    expect(r.overlaps, 'still no overlap when expanded').toBe(false);
+  });
+});
+
 test.describe('[STATE-COVERAGE] v141 notification toggles tell the truth', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
