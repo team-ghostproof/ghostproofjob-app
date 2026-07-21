@@ -195,7 +195,22 @@ service cloud.firestore {
         && request.resource.data.get('jobKey', '').size() <= 200
         && request.resource.data.get('jobTitle', '') is string
         && request.resource.data.get('jobTitle', '').size() <= 120;
-      allow update, delete: if false;
+      // v143: report ids are now DETERMINISTIC (posting__uid) so one person can
+      // only ever hold ONE report per posting. Re-reporting must therefore be an
+      // idempotent overwrite of YOUR OWN row — same shape-lock, and the existing
+      // row's reporterUid must already be you, so nobody can overwrite anyone
+      // else's report. Deletes stay closed: community history is append-only.
+      allow update: if request.auth != null
+        && resource.data.reporterUid == request.auth.uid
+        && request.resource.data.reporterUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['company','companyKey','stage','ts','reporterUid','jobKey','jobTitle'])
+        && request.resource.data.company is string
+        && request.resource.data.company.size() <= 120
+        && request.resource.data.get('jobKey', '') is string
+        && request.resource.data.get('jobKey', '').size() <= 200
+        && request.resource.data.get('jobTitle', '') is string
+        && request.resource.data.get('jobTitle', '').size() <= 120;
+      allow delete: if false;
     }
 
     // v128: post-apply email dedupe/rate ledger — written ONLY by the Vercel

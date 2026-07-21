@@ -2851,6 +2851,202 @@ test.describe('[STATE-COVERAGE] v141 community flags on cards + hybrid work styl
   });
 });
 
+/* ===========================================================================
+   v143 — founder live-test batch. Every test here is a REPRODUCED failure:
+   the data loss she hit on every login, the accordion that never sprang back,
+   and the community count she inflated by reporting one job twice.
+   =========================================================================== */
+test.describe('[STATE-COVERAGE] v143 P0 — lists sync is monotonic (login can never wipe history)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._gpjMonotonicLists === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(300);
+  });
+
+  test('Q2 authenticated — an EMPTY device cannot wipe the cloud copy (the founder P0)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window._gpjCloudListsSeen = { applied: [{ t: 'Marketing Specialist', co: 'Bexar', when: 1000 },
+        { t: 'Analyst', co: 'HP', when: 900 }], responses: [], skipped: [], viewed: [] };
+      lists = { applied: [], responses: [], skipped: [], viewed: [] };   // empty boot state
+      return _gpjMonotonicLists().applied.length;
+    });
+    expect(r, 'both cloud rows survive a write from a device that booted empty').toBe(2);
+  });
+
+  test('Q4 empty/missing — no cloud READ yet means the lists key is OMITTED, never overwritten', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window._gpjCloudListsSeen = null;
+      lists = { applied: [], responses: [], skipped: [], viewed: [] };
+      return _gpjMonotonicLists() === undefined;
+    });
+    expect(r, 'omitting the key leaves the stored value untouched').toBe(true);
+  });
+
+  test('a new row still GROWS the list (monotonic must not mean frozen)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window._gpjCloudListsSeen = { applied: [{ t: 'Old', co: 'X', when: 100 }], responses: [], skipped: [], viewed: [] };
+      lists = { applied: [{ t: 'New Role', co: 'Acme', when: 2000 }], responses: [], skipped: [], viewed: [] };
+      const w = _gpjMonotonicLists();
+      return { n: w.applied.length, first: w.applied[0].t };
+    });
+    expect(r.n).toBe(2);
+    expect(r.first, 'newest first').toBe('New Role');
+  });
+
+  test('an EXPLICIT reset still clears — the one legitimate way a list shrinks', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const at = Date.now();
+      localStorage.setItem('gpj_lists_reset', String(at));
+      window._gpjCloudListsSeen = { applied: [{ t: 'Old', co: 'X', when: at - 5000 }], responses: [], skipped: [], viewed: [] };
+      lists = { applied: [{ t: 'After', co: 'Y', when: at + 5000 }], responses: [], skipped: [], viewed: [] };
+      const w = _gpjMonotonicLists();
+      localStorage.removeItem('gpj_lists_reset');
+      return { n: w.applied.length, kept: w.applied[0] && w.applied[0].t };
+    });
+    expect(r.n, 'pre-reset row dropped, post-reset row kept').toBe(1);
+    expect(r.kept).toBe('After');
+  });
+
+  test('the data-loss gate does not flap when Firebase re-fires auth for the SAME user', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window._gpjGateUid = 'uid-A'; window._gpjCloudLoaded = true;
+      window._gpjCloudListsSeen = { applied: [{ t: 'a', co: 'b', when: 1 }], responses: [], skipped: [], viewed: [] };
+      gpjAuthChanged({ uid: 'uid-A' });                       // token refresh / restored session
+      const sameUser = { open: window._gpjCloudLoaded === true, kept: !!window._gpjCloudListsSeen };
+      gpjAuthChanged({ uid: 'uid-B' });                       // real account switch
+      return { sameUser, switched: { open: window._gpjCloudLoaded, seen: window._gpjCloudListsSeen } };
+    });
+    expect(r.sameUser.open, 'same uid must NOT slam the gate shut').toBe(true);
+    expect(r.sameUser.kept, 'baseline survives a repeat fire').toBe(true);
+    expect(r.switched.open, 'a real account switch DOES re-arm').toBe(false);
+    expect(r.switched.seen, 'and drops the previous account baseline').toBeNull();
+  });
+});
+
+test.describe('[STATE-COVERAGE] v143 P0 — sign-out flushes BEFORE it wipes', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.gpjFlushBeforeSignOut === 'function', null, { timeout: 15000 });
+  });
+
+  // The founder's exact repro: APPLIED 1 / SKIPPED 21 on screen, empty cloud copy,
+  // sign out -> 0/0/0 forever. Sign-out used to run fb.signOut() FIRST and then wipe
+  // local, so by the time anything could flush, fb.current() was already null.
+  test('populated device + EMPTY cloud — history reaches the cloud before the wipe', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let saved = null;
+      window.fb = { current: () => ({ uid: 'u1' }),
+        loadProfile: async () => ({ lists: { applied: [], skipped: [], responses: [], viewed: [] } }),
+        saveProfile: async (uid, d) => { saved = d; return true; }, signOut: async () => {} };
+      window._gpjCloudListsSeen = null;
+      lists = { applied: [{ t: 'PR Lead', co: 'EQL', when: 5 }], responses: [], viewed: [],
+        skipped: Array.from({ length: 21 }, (_, i) => ({ t: 'J' + i, co: 'C' + i, when: i })) };
+      const ok = await gpjFlushBeforeSignOut();
+      return { ok, applied: saved && saved.lists ? saved.lists.applied.length : -1,
+        skipped: saved && saved.lists ? saved.lists.skipped.length : -1 };
+    });
+    expect(r.ok, 'flush reports success').toBe(true);
+    expect(r.applied).toBe(1);
+    expect(r.skipped, 'all 21 skipped rows persisted').toBe(21);
+  });
+
+  test('Q3 failed network — a flush that fails must NOT green-light the wipe', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = { current: () => ({ uid: 'u1' }),
+        loadProfile: async () => ({ lists: {} }),
+        saveProfile: async () => { throw new Error('network down'); }, signOut: async () => {} };
+      window._gpjCloudListsSeen = null;
+      lists = { applied: [{ t: 'A', co: 'B', when: 1 }], responses: [], skipped: [], viewed: [] };
+      return await gpjFlushBeforeSignOut();
+    });
+    expect(r, 'stale local data beats deleted data').toBe(false);
+  });
+
+  test('a NON-empty cloud is never clobbered by a local copy we could not merge', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let saved = null;
+      window.fb = { current: () => ({ uid: 'u1' }),
+        loadProfile: async () => ({ lists: { applied: [{ t: 'Cloud', co: 'X', when: 9 }], skipped: [], responses: [], viewed: [] } }),
+        saveProfile: async (uid, d) => { saved = d; return true; }, signOut: async () => {} };
+      window._gpjCloudListsSeen = null;                 // no baseline -> cannot safely merge
+      lists = { applied: [], responses: [], skipped: [], viewed: [] };
+      const ok = await gpjFlushBeforeSignOut();
+      return { ok, sentLists: !!(saved && saved.lists) };
+    });
+    expect(r.ok).toBe(true);
+    expect(r.sentLists, 'nothing is written when we cannot prove it is safe').toBe(false);
+  });
+});
+
+test.describe('[STATE-COVERAGE] v143 accordion — the deck springs back after expanding', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.syncDeckHeight === 'function' && document.querySelector('.job-card.top'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(600);
+  });
+
+  test('collapsing returns the deck to its original height (was 333px of permanent dead space)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const deck = document.getElementById('card-deck'), top = document.querySelector('.job-card.top');
+      const H = () => Math.round(deck.getBoundingClientRect().height);
+      try { syncDeckHeight(); } catch (e) {}
+      await new Promise((x) => setTimeout(x, 700));
+      const before = H();
+      const d = top.querySelector('.card-drawer');
+      if (d) { d.classList.add('open'); syncDeckHeight(); }
+      await new Promise((x) => setTimeout(x, 800));
+      const expanded = H();
+      if (d) { d.classList.remove('open'); syncDeckHeight(); }
+      await new Promise((x) => setTimeout(x, 800));   // MUST outlast the CSS transition
+      return { before, expanded, after: H() };
+    });
+    expect(r.expanded, 'expanding still grows the deck').toBeGreaterThan(r.before);
+    expect(r.after, 'and collapsing puts it back exactly').toBe(r.before);
+  });
+});
+
+test.describe('[STATE-COVERAGE] v143 community reports — one person, one vote + an explained badge', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.gpjExplainReports === 'function', null, { timeout: 15000 });
+  });
+
+  test('the "N reported" badge opens a closeable explainer (Esc AND the button)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      gpjExplainReports(2);
+      await new Promise((x) => setTimeout(x, 200));
+      const opened = !!document.getElementById('reports-explain-modal');
+      const text = (document.getElementById('reports-explain-modal') || {}).innerText || '';
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      await new Promise((x) => setTimeout(x, 150));
+      const escClosed = !document.getElementById('reports-explain-modal');
+      gpjExplainReports(1);
+      await new Promise((x) => setTimeout(x, 150));
+      const singular = (document.getElementById('reports-explain-modal').innerText || '').includes('1 job hunter has');
+      document.getElementById('reports-explain-close').click();
+      await new Promise((x) => setTimeout(x, 150));
+      return { opened, escClosed, singular, btnClosed: !document.getElementById('reports-explain-modal'), saysOnce: /once/i.test(text) };
+    });
+    expect(r.opened).toBe(true);
+    expect(r.escClosed, 'Esc closes').toBe(true);
+    expect(r.btnClosed, 'the button closes').toBe(true);
+    expect(r.singular, 'grammar is correct for a single reporter').toBe(true);
+    expect(r.saysOnce, 'it must state that each person can report once').toBe(true);
+  });
+
+  test('Q1 guest — the explainer is pure client copy and never needs auth or a read', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      gpjExplainReports(3);
+      await new Promise((x) => setTimeout(x, 200));
+      const ok = !!document.getElementById('reports-explain-modal');
+      const m = document.getElementById('reports-explain-modal'); if (m) m.remove();
+      return ok;
+    });
+    expect(r, 'a signed-out hunter can still learn what the badge means').toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] v142 desktop deck height — Save button stays reachable', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });

@@ -347,8 +347,21 @@ describe('F-GHOST — cross-user ghost reports (shape-locked, no free-text)', ()
   test('signed-in user CAN read (for the count aggregation)', async () => {
     await assertSucceeds(getDoc(doc(asCandC(), 'ghost_reports/gr1')));
   });
-  test('reports are immutable — no update or delete', async () => {
-    await assertFails(setDoc(doc(asCandC(), 'ghost_reports/gr1'), Object.assign({}, ok, { stage: 'edited' })));
+  // v143: the contract CHANGED on purpose. Report ids are now deterministic
+  // (posting__uid), so re-reporting the same posting must be an idempotent
+  // overwrite of your OWN row rather than a second document — that is what makes
+  // the community count one-person-one-vote instead of inflatable.
+  test('v143: a user CAN overwrite their OWN report (re-report is idempotent, not a 2nd vote)', async () => {
+    await assertSucceeds(setDoc(doc(asCandC(), 'ghost_reports/gr1'), Object.assign({}, ok, { stage: 'No longer accepting applications' })));
+  });
+  test('v143: a user CANNOT overwrite SOMEONE ELSE\'S report', async () => {
+    // gr1 is owned by candC; candD must not be able to take it over or alter it
+    await assertFails(setDoc(doc(asCandD(), 'ghost_reports/gr1'), Object.assign({}, ok, { reporterUid: 'candD' })));
+  });
+  test('v143: an update carrying a free-text comment is still REJECTED', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'ghost_reports/gr1'), Object.assign({}, ok, { comment: 'they are a scam' })));
+  });
+  test('reports can never be deleted — community history is append-only', async () => {
     await assertFails(deleteDoc(doc(asCandC(), 'ghost_reports/gr1')));
   });
 });
