@@ -2994,20 +2994,26 @@ test.describe('[STATE-COVERAGE] v143 accordion — the deck springs back after e
       // in motion for a while. POLL until it stops changing rather than guessing a
       // fixed delay — a fixed wait passes locally and flakes on a loaded CI runner
       // (which is exactly what a timing guess always does).
+      // The stability window MUST outlast the app's own settle path, or this polls
+      // its way into a false positive: syncDeckHeight measures at rAF+rAF (~32ms),
+      // again on transitionend, and once more on a 420ms fallback timer. A 300ms
+      // "stable" window fits INSIDE that, so a mid-transition height reads as
+      // settled — which is exactly how this test latched a half-collapsed deck and
+      // reported dead space that does not exist. 700ms clears the 420ms fallback.
       const settled = async () => {
         let last = -1, stable = 0;
-        for (let i = 0; i < 120; i++) {                 // ≤6s ceiling
+        for (let i = 0; i < 160; i++) {                 // ≤8s ceiling
           await new Promise((x) => setTimeout(x, 50));
           const h = H();
           stable = (h === last) ? stable + 1 : 0;
           last = h;
-          if (stable >= 6) break;                       // ~300ms unchanged = settled
+          if (stable >= 14) break;                      // ~700ms unchanged = settled
         }
         return last;
       };
+      const d = top.querySelector('.card-drawer');
       try { syncDeckHeight(); } catch (e) {}
       const before = await settled();
-      const d = top.querySelector('.card-drawer');
       if (d) { d.classList.add('open'); syncDeckHeight(); }
       const expanded = await settled();
       if (d) { d.classList.remove('open'); syncDeckHeight(); }
