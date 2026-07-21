@@ -26,12 +26,36 @@ module.exports = defineConfig({
   timeout: 30000,
   expect: { timeout: 10000 },
   fullyParallel: true,
+  // workers=2 lives HERE, not in a CI flag. It was previously passed only by
+  // verify.yml's command line, so e2e.yml ran unconstrained on the same commit
+  // and produced a completely different result (402/438 vs 432/438). One
+  // setting, one source of truth — both workflows now inherit it.
+  workers: process.env.CI ? 2 : undefined,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: process.env.GPJ_BASE_URL || 'http://localhost:8000',
     headless: true,
     screenshot: 'only-on-failure',
+    // THE mass-flake root cause (found v143, CI run #149: 6 failed + 25 flaky,
+    // nearly all "ReferenceError: <top-level fn> is not defined" plus one
+    // explicit "Execution context was destroyed").
+    //
+    // index.html registers a service worker and reloads itself when the SW takes
+    // control:  navigator.serviceWorker.addEventListener('controllerchange',
+    //           () => location.reload())
+    // That is CORRECT for real users — it is how a new build reaches them. But
+    // SW install -> activate -> controllerchange is nondeterministic, and slows
+    // down badly on a saturated runner. When it lands mid-test the page reloads,
+    // the execution context is destroyed, and every top-level function the test
+    // is about to call ceases to exist. Hence functions that obviously exist
+    // reporting as undefined, at random, only under load.
+    //
+    // Blocking service workers removes the entire class. It does NOT hide a user
+    // bug: the reload is desired in production and is not what these specs cover.
+    // Any future test that DOES cover SW update behaviour must opt back in with
+    // its own context.
+    serviceWorkers: 'block',
   },
   // Serve the repo root so /index.html (the deployed file) loads exactly as in prod.
   // 'python' (not 'python3') resolves on Windows dev machines AND on ubuntu CI

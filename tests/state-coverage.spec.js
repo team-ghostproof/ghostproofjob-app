@@ -1626,7 +1626,17 @@ test.describe('[STATE-COVERAGE] v101b batch A (forms, overlay gate, safe-area)',
   test('7c: screen-sizing matrix — no horizontal overflow at phone/tablet/desktop widths', async ({ page }) => {
     for (const [w, h] of [[375, 812], [768, 1024], [1280, 800]]) {
       await page.setViewportSize({ width: w, height: h });
-      await page.waitForTimeout(300);
+      // Crossing the desktop/mobile breakpoint RELOADS the page by design
+      // (index.html: deskMQ 'change' -> location.reload(), because
+      // buildDesktopGrid restructures the DOM). A fixed 300ms wait races that
+      // reload and measures a page that is still rebuilding — which is why CI
+      // reported "header renders at 375px" on chromium (resizing DOWN across the
+      // breakpoint) and "at 1280px" on mobile (resizing UP). Same bug, different
+      // width. Wait for the header to actually exist instead of guessing.
+      await page.waitForFunction(
+        () => { const h = document.getElementById('header'); return !!(h && h.offsetHeight > 0); },
+        null, { timeout: 15000 },
+      ).catch(() => {});
       const m = await page.evaluate(() => ({
         overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         headerVisible: !!(document.getElementById('header') && document.getElementById('header').offsetHeight),
