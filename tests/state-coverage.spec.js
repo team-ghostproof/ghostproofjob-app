@@ -2851,6 +2851,57 @@ test.describe('[STATE-COVERAGE] v141 community flags on cards + hybrid work styl
   });
 });
 
+test.describe('[STATE-COVERAGE] v141 notification toggles tell the truth', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.setNotifPref === 'function' && typeof window.clOptedOut === 'function',
+      null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'),
+      null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('a toggle that sends nothing must SAY so, and must not default to on', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const row = (id) => { const t = document.getElementById(id); return { on: t.classList.contains('on'), text: (t.closest('.pref-row') || {}).textContent || '' }; };
+      return { m: row('notif-newmatches'), g: row('notif-ghostrisk'), r: row('notif-ratingreminders'), cl: row('cl-offers-toggle') };
+    });
+    for (const k of ['m', 'g', 'r']) {
+      expect(r[k].text, 'a non-sending toggle is labelled honestly').toMatch(/EMAIL NOT LIVE YET/);
+      expect(r[k].on, 'never default-ON for something that does nothing').toBe(false);
+    }
+    expect(r.cl.text, 'the REAL toggle carries no false disclaimer').not.toMatch(/EMAIL NOT LIVE YET/);
+  });
+
+  test('every toggle still persists the user\'s choice (local + cloud)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window.fb = window.fb || {};
+      const writes = [];
+      fb.current = () => ({ uid: 'u1' });
+      fb.saveProfile = async (uid, d) => { writes.push(d); return true; };
+      const el = document.getElementById('notif-newmatches');
+      el.classList.remove('on');
+      setNotifPref(el, 'newJobMatches');                 // -> on
+      const local = JSON.parse(localStorage.getItem('gpj_profile') || '{}');
+      return { on: el.classList.contains('on'), localPref: local.preferences && local.preferences.newJobMatches, cloudPref: writes[0] && writes[0].preferences && writes[0].preferences.newJobMatches };
+    });
+    expect(r.on).toBe(true);
+    expect(r.localPref, 'saved locally').toBe(true);
+    expect(r.cloudPref, 'saved to the cloud so it survives a device change').toBe(true);
+  });
+
+  test('the Cover Letter toggle is REAL — it gates the in-app offer', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      setCLOptOut(true);
+      const optedOut = clOptedOut();
+      setCLOptOut(false);
+      return { optedOut, optedIn: !clOptedOut() };
+    });
+    expect(r.optedOut, 'opting out is enforced by clOptedOut()').toBe(true);
+    expect(r.optedIn).toBe(true);
+  });
+});
+
 test.describe('[STATE-COVERAGE] v140 sync gate cannot stick shut + market backfill', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });

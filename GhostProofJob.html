@@ -2722,10 +2722,18 @@
 
       <div class="pref-section" id="sec-notif">
         <div class="pref-section-title">Notifications</div>
-        <div class="pref-row"><div class="pref-icon" style="background:rgba(0,245,160,.12);">🔔</div><div style="flex:1;font-size:13px;font-weight:600;">New Job Matches</div><div class="toggle-switch on" id="notif-newmatches" onclick="setNotifPref(this,'newJobMatches')"></div></div>
-        <div class="pref-row"><div class="pref-icon" style="background:rgba(255,77,106,.12);">👻</div><div style="flex:1;font-size:13px;font-weight:600;">Ghost Risk Alerts</div><div class="toggle-switch on" id="notif-ghostrisk" onclick="setNotifPref(this,'ghostRiskAlerts')"></div></div>
+        <!-- v141 HONESTY AUDIT (founder: "verify each toggle is wired and fires").
+             These three save a real preference AND the backend gate honours it
+             (sendAutomatedEmail.isAllowed), but NOTHING currently calls that sender
+             — no cron, no route, no workflow. So they controlled nothing while
+             looking live, which is the same fake precision we removed from the
+             ghost score, and breaks the no-misleading-copy rule. They now say so
+             plainly and stay OFF until a real sender exists. The in-app bell and
+             the Cover Letter offer below are unaffected: those DO fire today. -->
+        <div class="pref-row" style="opacity:.72;"><div class="pref-icon" style="background:rgba(0,245,160,.12);">🔔</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">New Job Matches <span style="font-size:10px;font-weight:800;color:var(--warn);">· EMAIL NOT LIVE YET</span></div><div style="font-size:11px;color:var(--muted);">Your choice is saved. We don't send this email yet — matches appear on the 🔔 bell in-app.</div></div><div class="toggle-switch" id="notif-newmatches" onclick="setNotifPref(this,'newJobMatches')"></div></div>
+        <div class="pref-row" style="opacity:.72;"><div class="pref-icon" style="background:rgba(255,77,106,.12);">👻</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Ghost Risk Alerts <span style="font-size:10px;font-weight:800;color:var(--warn);">· EMAIL NOT LIVE YET</span></div><div style="font-size:11px;color:var(--muted);">Your choice is saved. Ghost risk always shows on the job card itself.</div></div><div class="toggle-switch" id="notif-ghostrisk" onclick="setNotifPref(this,'ghostRiskAlerts')"></div></div>
         <div class="pref-row"><div class="pref-icon" style="background:rgba(0,245,160,.12);">✉️</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Tailored Cover Letter Offers</div><div style="font-size:11px;color:var(--muted);">Ask after each apply · free, with generous daily limits</div></div><div class="toggle-switch on" id="cl-offers-toggle" onclick="setNotifPref(this,'coverLetterOffers');setCLOptOut(!this.classList.contains('on'))"></div></div>
-        <div class="pref-row"><div class="pref-icon" style="background:rgba(181,95,230,.12);">⭐</div><div style="flex:1;font-size:13px;font-weight:600;">Company Rating Reminders</div><div class="toggle-switch on" id="notif-ratingreminders" onclick="setNotifPref(this,'companyRatingReminders')"></div></div>
+        <div class="pref-row" style="opacity:.72;"><div class="pref-icon" style="background:rgba(181,95,230,.12);">⭐</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Company Rating Reminders <span style="font-size:10px;font-weight:800;color:var(--warn);">· EMAIL NOT LIVE YET</span></div><div style="font-size:11px;color:var(--muted);">Your choice is saved. We ask for ratings in-app instead.</div></div><div class="toggle-switch" id="notif-ratingreminders" onclick="setNotifPref(this,'companyRatingReminders')"></div></div>
       </div>
 
       <!-- R2-D: candidate discoverable opt-in (default OFF). Plain consent copy;
