@@ -57,10 +57,20 @@ function profileToToken(uid, profile) {
   const skills = _split(r.skills).slice(0, 20);
   const market = _market(profile);
   if (!title && !skills.length) return null;                   // nothing to match on
+  // v146 P-MATCH: carry the DUTIES corpus + summary so the shared scorer sees the
+  // same résumé content computeMatch does — the fix for the 75%-vs-98% split. These
+  // are the candidate's OWN résumé fields (not third-party PII) and stay bounded.
+  const roles = (Array.isArray(r.jobs) ? r.jobs : [])
+    .filter((j) => j && j.t && j.t !== '(role)')
+    .slice(0, 6)
+    .map((j) => ({ t: String(j.t || '').slice(0, 120), b: String(j.b || '').slice(0, 800) }));
+  const summary = String(r.summary || '').slice(0, 900);
   return {
     uid,
     title,
     skills,
+    roles,                                                     // v146: [{t,b}] duties corpus
+    summary,                                                   // v146
     market,
     is_remote: profile.openToRemote === true || /remote/i.test(market),
     discoverable: true,

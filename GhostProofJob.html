@@ -710,6 +710,10 @@
 
   /* Browse */
   .filter-bar{background:var(--plum2);border:1px solid var(--plum3);border-radius:16px;margin:0 16px 12px;padding:14px;}
+  /* v146 P2-5: Browse filter accordion — collapse the fields, keep the header. */
+  #browse-filter-body{overflow:hidden;transition:max-height .28s ease,opacity .2s ease;max-height:4000px;opacity:1;}
+  #browse-filter-body.browse-acc-collapsed{max-height:0;opacity:0;pointer-events:none;}
+  #browse-filter-head.open #browse-filter-chev,#browse-filter-chev.open{transform:rotate(180deg);}
   .browse-row{background:var(--plum2);border:1px solid var(--plum3);border-radius:14px;margin:0 16px 10px;padding:12px 14px;display:flex;gap:12px;align-items:center;cursor:pointer;transition:border-color .2s;}
   .browse-row:active{border-color:var(--cyber);}
   .range-input{width:100%;accent-color:var(--mint);height:24px;}
@@ -1521,6 +1525,8 @@
         <div style="flex:1;"></div>
         <div onclick="openCmReviews()" style="font-size:11px;font-weight:700;color:var(--cyber);cursor:pointer;">⭐ Rate / see reviews</div>
       </div>
+      <!-- v146 P2-6 (founder): mute an entire company (staffing-agency flooding). -->
+      <div onclick="hideCompanyRoles((document.getElementById('cm-name')||{}).textContent||'this company')" style="font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;text-align:center;margin-bottom:10px;text-decoration:underline;">🚫 Hide all roles from this company</div>
       <div id="cm-reviews" style="display:none;max-height:170px;overflow-y:auto;margin-bottom:10px;"></div>
       <div onclick="prefillGhostReport()" style="background:rgba(181,95,230,.12);border:1px dashed rgba(181,95,230,.4);color:var(--cyber);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:700;cursor:pointer;">👻 Report this company</div>
     </div>
@@ -1916,6 +1922,15 @@
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">Filter & layer your search — no swiping required</div>
       </div>
       <div class="filter-bar">
+        <!-- v146 P2-5 (founder-requested): the whole filter/sort block collapses into
+             an accordion so Browse opens compact and the results are visible without a
+             long scroll. Collapsed by default; the header shows the live region + count
+             so it stays useful while closed. -->
+        <div id="browse-filter-head" onclick="toggleBrowseFilters()" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBrowseFilters();}" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:2px 0 10px;">
+          <div style="flex:1;font-size:13px;font-weight:800;color:var(--off);">⚙️ Filter &amp; sort jobs <span id="browse-filter-sum" style="font-weight:400;color:var(--muted);font-size:11px;"></span></div>
+          <div id="browse-filter-chev" style="font-size:13px;color:var(--cyber);transition:transform .2s;">▾</div>
+        </div>
+        <div id="browse-filter-body" class="browse-acc-collapsed">
         <div class="field-label">🏢 Company Lookup <span style="text-transform:none;font-weight:400;color:var(--mint);">(jump to any employer's profile)</span></div>
         <div style="position:relative;margin-bottom:10px;">
           <input class="field-input" id="browse-co-q" placeholder="Search a company — Walmart, CVS, local shops…" oninput="browseCoSuggest(this.value)" onkeydown="browseCoKey(event)" autocomplete="off"/>
@@ -1985,6 +2000,7 @@
           <option value="50">Within 50 mi</option>
           <option value="100">Within 100 mi</option>
         </select>
+        </div><!-- /browse-filter-body -->
       </div>
       <div id="browse-results"></div>
     </div>
@@ -2725,6 +2741,12 @@
         <div class="pref-row" onclick="editPref('industries')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(255,179,71,.12);">🏭</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Industries</div><div style="font-size:11px;color:var(--warn);" id="pref-industries">Tap to set your industries</div></div><div style="color:var(--muted);">✎</div></div>
       </div>
 
+      <!-- v146 P2-6: Hidden companies manager — unhide anything muted from a card. -->
+      <div class="pref-section" id="sec-hiddencos" style="display:none;">
+        <div class="pref-section-title">🚫 Hidden companies <span style="text-transform:none;font-weight:400;">(you won't see their roles)</span></div>
+        <div id="hiddencos-list" style="margin-top:2px;"></div>
+      </div>
+
       <!-- R6: employer messages tray — reach-outs + respectful declines from
            verified employers, with Interested / Not interested responses. Only
            populated when a candidate opted in (discoverable) or applied. -->
@@ -2811,7 +2833,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v145</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v146</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -2981,7 +3003,16 @@ function switchView(id,el){
   if(el) el.classList.add('active');
   document.querySelector('.view-content').scrollTop=0;
   try{ updateJettCounts(); }catch(e){}
-  if(id==='browse'){ try{ refreshBrowse(); }catch(e){} }
+  if(id==='browse'){
+    try{ refreshBrowse(); }catch(e){}
+    /* v146: restore the saved accordion state (default collapsed) + fill the summary */
+    try{
+      const open=localStorage.getItem('gpj_browse_filters_open')==='1';
+      if(typeof _setBrowseFiltersOpen==='function') _setBrowseFiltersOpen(open);
+      _browseFilterSummary();
+    }catch(e){}
+  }
+  if(id==='account'){ try{ _renderHiddenCosList(); }catch(e){} }   /* v146: hidden-companies manager */
   try{ if(typeof _gpjRecruiterMode==='function' && _gpjRecruiterMode()) _gpjRenderRecPanel(id); }catch(e){}   /* v110 R9 */
 }
 
@@ -5239,6 +5270,38 @@ function refreshBrowse(){
     try{ await ensureBrowsePool(false); }catch(e){}
     try{ renderBrowse(); }catch(e){}
   }, 300);
+  try{ _browseFilterSummary(); }catch(e){}
+}
+/* v146 P2-5: the Browse filter accordion — collapse the fields, keep a live summary
+   in the header so it stays useful while closed. State persists per session. */
+/* drive the height with an EXPLICIT inline max-height, not just the class — the
+   class-only max-height transition can fail to fire in some engines when the
+   element first painted collapsed. Inline always wins and always animates. */
+function _setBrowseFiltersOpen(open){
+  const body=document.getElementById('browse-filter-body'), head=document.getElementById('browse-filter-head'), chev=document.getElementById('browse-filter-chev');
+  if(!body) return;
+  body.classList.toggle('browse-acc-collapsed',!open);
+  body.style.maxHeight = open ? '4000px' : '0px';
+  body.style.opacity = open ? '1' : '0';
+  if(head) head.classList.toggle('open',open);
+  if(chev) chev.classList.toggle('open',open);
+}
+function toggleBrowseFilters(){
+  const body=document.getElementById('browse-filter-body'); if(!body) return;
+  const open=body.classList.contains('browse-acc-collapsed');   // currently collapsed → opening
+  _setBrowseFiltersOpen(open);
+  try{ localStorage.setItem('gpj_browse_filters_open', open?'1':'0'); }catch(e){}
+}
+function _browseFilterSummary(){
+  const el=document.getElementById('browse-filter-sum'); if(!el) return;
+  const v=id=>((document.getElementById(id)||{}).value||'').trim();
+  const bits=[];
+  const loc=v('f-location'), st=v('f-state'); if(loc) bits.push('📍 '+loc+(st?(', '+st):'')); else if(st) bits.push('📍 '+st);
+  const kw=v('f-keyword'); if(kw) bits.push('“'+kw+'”');
+  const style=v('f-style'); if(style) bits.push(style);
+  const sortSel=document.getElementById('f-livesort'); const sortTxt=sortSel&&sortSel.options[sortSel.selectedIndex]?sortSel.options[sortSel.selectedIndex].text:'';
+  if(sortTxt && sortTxt.indexOf('Best Match')!==0) bits.push('↕ '+sortTxt);
+  el.textContent = bits.length?('· '+bits.join(' · ')):'· tap to open';
 }
 async function searchAllJobsForKeyword(nationwide){
   const kw=((document.getElementById('f-keyword')||{}).value||'').toLowerCase().trim();
@@ -5470,6 +5533,8 @@ function renderBrowse(){
       }
       return true;
     });
+    /* v146 P2-6: drop companies the user chose to hide entirely (staffing-agency flood) */
+    try{ const _hc=gpjHiddenCos(); if(_hc.size) hits=hits.filter(j=>!_hc.has(_coKey(j.co))); }catch(e){}
     const lsort=(document.getElementById('f-livesort')||{}).value||'rel';
     if(lsort==='date') hits=hits.slice().sort((a,b)=>(a.posting_age_days??999)-(b.posting_age_days??999));
     else if(lsort==='salhi') hits=hits.slice().sort((a,b)=>(b.salMax||0)-(a.salMax||0));
@@ -8386,7 +8451,69 @@ function searchRankJobs(jobs, q){
    The FIELD word (marketing, pharmacy, nursing) is what actually matters. */
 const GENERIC_ROLE_WORDS=new Set(['specialist','manager','assistant','coordinator','associate','analyst','representative','administrator','officer','agent','clerk','lead','senior','junior','staff','team','member','supervisor','director','executive','professional','consultant','generalist','intern','trainee','worker','technician','support','services','service','general']);
 
+/* ── v146 P-MATCH: the ONE match algorithm (browser twin of api/match/scoreCore.js).
+   Both sides — the candidate's computeMatch AND the recruiter's reverseMatch — now
+   run this identical math over the same résumé fields, so a (résumé, job) pair
+   scores the SAME number from either direction (was 98% candidate vs 75% recruiter).
+   Keep this in lock-step with scoreCore.js (there is a convergence test). */
+function _gpjScoreMatch(cand,job){
+  const jt=(job&&job.title||'').toLowerCase();
+  const jd=(job&&job.desc||'').toLowerCase();
+  const title=String((cand&&cand.title)||'').trim();
+  const roleObjs=Array.isArray(cand&&cand.roles)?cand.roles:[];
+  const skills=Array.isArray(cand&&cand.skills)?cand.skills.map(x=>String(x).toLowerCase().trim()).filter(Boolean):String((cand&&cand.skills)||'').toLowerCase().split(/[·,]/).map(x=>x.trim()).filter(Boolean);
+  const summary=String((cand&&cand.summary)||'');
+  const _cp=[]; if(title)_cp.push(title);
+  roleObjs.forEach(r=>{ if(r){ if(r.t&&r.t!=='(role)')_cp.push(r.t); if(r.b)_cp.push(r.b); } });
+  if(cand&&cand.skills)_cp.push(Array.isArray(cand.skills)?cand.skills.join(' '):cand.skills);
+  if(summary)_cp.push(summary);
+  const myCorpus=_cp.join(' ').toLowerCase();
+  const jtWords=jt.split(/\s+/).filter(w=>w.length>3);
+  const jtFieldWords=jtWords.filter(w=>!GENERIC_ROLE_WORDS.has(w));
+  const roles=[]; if(title)roles.push(title.toLowerCase());
+  roleObjs.forEach(r=>{ if(r&&r.t&&r.t!=='(role)')roles.push((r.t||'').toLowerCase()); });
+  if(!roles.length)roles.push('');
+  function scoreAgainstRole(roleStr){
+    const rWordsAll=roleStr.split(/\s+/).filter(w=>w.length>3);
+    const rFieldWords=new Set(rWordsAll.filter(w=>!GENERIC_ROLE_WORDS.has(w)));
+    const rWords=new Set(rWordsAll); let s=22; let fieldHits=0;
+    jtFieldWords.forEach(w=>{ if(rFieldWords.has(w))fieldHits++; });
+    if(jtFieldWords.length)s+=Math.round((fieldHits/jtFieldWords.length)*50);
+    if(fieldHits>0)s+=12;
+    let genHits=0; jtWords.forEach(w=>{ if(GENERIC_ROLE_WORDS.has(w)&&rWords.has(w))genHits++; });
+    if(genHits)s+=Math.min(8,genHits*4);
+    return {score:s,fieldHits:fieldHits};
+  }
+  let best=0,bestFieldHits=0;
+  roles.forEach((roleStr,idx)=>{ const weight=Math.max(0.7,1-idx*0.08); const r=scoreAgainstRole(roleStr); const weighted=Math.round(22+(r.score-22)*weight); if(weighted>best){ best=weighted; bestFieldHits=r.fieldHits; } });
+  let titleSkillHits=0,descSkillHits=0;
+  skills.forEach(s=>{ if(!s)return; if(jt.includes(s))titleSkillHits++; else if(jd.includes(s))descSkillHits++; });
+  let score=best;
+  if(titleSkillHits>0){ score+=22+Math.min(12,(titleSkillHits-1)*6); }
+  if(skills.length&&descSkillHits)score+=Math.round((descSkillHits/skills.length)*18);
+  const anySkill=(titleSkillHits+descSkillHits)>0;
+  let corpusFieldHits=0; jtFieldWords.forEach(w=>{ if(myCorpus.indexOf(w)>=0)corpusFieldHits++; });
+  if(jtFieldWords.length){ score+=Math.round((corpusFieldHits/jtFieldWords.length)*20); }
+  const _seen=new Set(); let jdHits=0,jdTot=0;
+  jd.split(/[^a-z]+/).forEach(w=>{ if(w.length<6||GENERIC_ROLE_WORDS.has(w)||_seen.has(w))return; if(jdTot>=16)return; _seen.add(w); jdTot++; if(myCorpus.indexOf(w)>=0)jdHits++; });
+  if(jdTot)score+=Math.round((jdHits/jdTot)*6);
+  const anyRelevant=(bestFieldHits>0)||anySkill||(corpusFieldHits>0);
+  if(jtFieldWords.length&&!anyRelevant)score=Math.min(score,32);
+  return Math.max(18,Math.min(98,score));
+}
 function computeMatch(jobTitle,jobDesc){
+  if(!resumeReady || !(resumeData&&(resumeData.title||resumeData.skills))){
+    /* no resume → market-fit estimate (stable, labelled "fit" not "match") */
+    return 52+(hashStr(jobTitle||'')%34);
+  }
+  /* v146: delegate to the shared scorer so the candidate number matches the
+     recruiter number for the same pair. Same résumé fields, same math. */
+  return _gpjScoreMatch(
+    {title:resumeData.title||'', roles:(resumeData.jobs||[]), skills:resumeData.skills||'', summary:resumeData.summary||''},
+    {title:jobTitle||'', desc:jobDesc||''}
+  );
+}
+function _computeMatch_legacy(jobTitle,jobDesc){
   const jt=(jobTitle||'').toLowerCase();
   const jd=(jobDesc||'').toLowerCase();
   if(!resumeReady || !(resumeData&&(resumeData.title||resumeData.skills))){
@@ -9964,10 +10091,12 @@ function applySwipeFilters(){
      salary (or any) filter resurrected already-acted-on cards from rawQueue. Use the
      durable hidden set (shared seen-set + gpj_expired) so no toggle can bring them back. */
   const hiddenKeys=_deckHiddenSet();
+  const hiddenCos=gpjHiddenCos();   /* v146: companies the user chose to hide entirely (staffing-agency flooding) */
   let list=rawQueue.filter(j=>
     (!q || j.t.toLowerCase().includes(q) || j.co.toLowerCase().includes(q)) &&
     (!hide || (j.ghost!==undefined && j.ghost<=35)) &&
     !hiddenKeys.has(jobKey(j)) &&
+    !hiddenCos.has(_coKey(j.co)) &&
     /* freshness: New(<30) / Active(<90). Keep jobs with unknown age so a missing
        source date never wrongly hides a job. */
     (!swFreshDays || j.posting_age_days==null || j.posting_age_days<=swFreshDays)
@@ -10066,13 +10195,22 @@ function hydrateDrawer(){
   if(sumBox){
     const d=(_tj&&_tj.desc)||(topCard&&topCard.dataset.jobdesc)||'', u=(_tj&&_tj.url)||(topCard&&topCard.dataset.joburl)||'', rq=(_tj&&_tj.req)||(topCard&&topCard.dataset.jobreq)||'', bn=(_tj&&_tj.benefits)||(topCard&&topCard.dataset.jobbenefits)||'';
     const lead=rq||d;
-    if(lead||u||bn){
+    /* v146 (founder): a HOSTED (internal) job has no third-party posting, so the
+       "View Full Posting ↗" button is wrong for it. Show an explicit in-app apply
+       AND say why there's no external link — the Verified badge now means "hosted
+       here, apply in-app." Fixes the drawer having no apply affordance for
+       internal jobs (it only ever rendered a button when a URL existed). */
+    const _int=!!(_tj&&_tj._internal&&_tj.id);
+    if(lead||u||bn||_int){
       sumBox.innerHTML=
         '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📋 Job Expectations & Summary</div>'+
-        (lead?('<div class="desc-clamp">'+_fmtJobText(lead)+'</div>'):'<div style="font-size:11px;color:var(--muted);">Full details live on the original posting.</div>')+
+        (lead?('<div class="desc-clamp">'+_fmtJobText(lead)+'</div>'):(_int?'':'<div style="font-size:11px;color:var(--muted);">Full details live on the original posting.</div>'))+
         ((rq&&d&&d!==rq)?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px;">ℹ️ More about the role</div><div class="desc-clamp">'+_fmtJobText(d)+'</div>'):'')+
         (bn?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px;">🎁 Benefits</div><div class="desc-clamp">'+_fmtJobText(bn)+'</div>'):'')+
-        (u?('<div onclick="applyTopJob(event,\''+u.replace(/'/g,'')+'\',\''+String(co||'').replace(/'/g,'')+'\')" style="margin-top:10px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:10px;text-align:center;font-size:12px;cursor:pointer;">View Full Posting ↗</div>'):'');
+        (_int
+          ?('<div style="font-size:11px;color:var(--mint);margin-top:10px;display:flex;align-items:center;gap:6px;">✅ Hosted &amp; verified on GhostProofJob — apply in-app, no third-party site.</div>'
+            +'<div onclick="applyInternalById(\''+String(_tj.id).replace(/\x27/g,'')+'\',\''+String((_tj.t||'')).replace(/\x27/g,'')+'\',\''+String(co||'').replace(/\x27/g,'')+'\')" style="margin-top:6px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:11px;text-align:center;font-size:13px;cursor:pointer;">📨 Apply to this role</div>')
+          :(u?('<div onclick="applyTopJob(event,\''+u.replace(/\x27/g,'')+'\',\''+String(co||'').replace(/\x27/g,'')+'\')" style="margin-top:10px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:10px;text-align:center;font-size:12px;cursor:pointer;">View Full Posting ↗</div>'):''));
       sumBox.style.display='block';
     } else sumBox.style.display='none';
   }
@@ -10316,6 +10454,52 @@ function _deckHiddenSet(){
   const s=(typeof seenJobKeys==='function'?seenJobKeys():new Set());
   try{ (gpjExpiredSet()||[]).forEach(k=>s.add(k)); }catch(_){}
   return s;
+}
+/* ── v146 P2-6 (founder-requested): hide ALL roles from a company ──────────────
+   Staffing agencies (Robert Half, etc.) flood the deck with many genuinely-
+   different roles. This lets a candidate mute an entire company. Stored locally
+   AND on the profile (top-level `hiddenCompanies`) so it follows them across
+   devices; applied at the deck's final filter and the Browse render. Uses the
+   shared _coKey (defined above) so hiding folds every spelling of one employer. */
+function gpjHiddenCos(){
+  try{ const a=JSON.parse(localStorage.getItem('gpj_hidden_cos')||'[]'); return new Set((Array.isArray(a)?a:[]).map(_coKey).filter(Boolean)); }
+  catch(e){ return new Set(); }
+}
+function _saveHiddenCos(set){
+  try{ localStorage.setItem('gpj_hidden_cos', JSON.stringify(Array.from(set))); }catch(e){}
+  /* follow the user across devices — top-level profile field (freely user-writable) */
+  try{ if(window.fb&&fb.current&&fb.current()&&fb.saveProfile) fb.saveProfile(fb.current().uid,{hiddenCompanies:Array.from(set)}); }catch(e){}
+}
+function hideCompanyRoles(co){
+  const key=_coKey(co); if(!key) return;
+  const set=gpjHiddenCos(); if(set.has(key)) return;
+  set.add(key); _saveHiddenCos(set);
+  try{ if(typeof closeCompanyView==='function') closeCompanyView(); }catch(e){}
+  try{ applySwipeFilters(); }catch(e){}
+  try{ if(typeof renderBrowse==='function') renderBrowse(); }catch(e){}
+  try{ if(typeof _renderHiddenCosList==='function') _renderHiddenCosList(); }catch(e){}
+  showToast('🚫 Hiding all roles from '+String(co||'this company')+'. Undo under Settings → Hidden companies.');
+}
+function unhideCompany(key){
+  const set=gpjHiddenCos(); if(!set.delete(_coKey(key))) return;
+  _saveHiddenCos(set);
+  try{ applySwipeFilters(); }catch(e){}
+  try{ if(typeof renderBrowse==='function') renderBrowse(); }catch(e){}
+  try{ _renderHiddenCosList(); }catch(e){}
+  showToast('↩ Showing roles from that company again');
+}
+/* Settings → Hidden companies: list each muted company with a one-tap unhide.
+   Hidden entirely when the set is empty so it never shows an empty section. */
+function _renderHiddenCosList(){
+  const sec=document.getElementById('sec-hiddencos'), list=document.getElementById('hiddencos-list');
+  if(!list) return;
+  const arr=Array.from(gpjHiddenCos());
+  if(!arr.length){ if(sec) sec.style.display='none'; list.innerHTML=''; return; }
+  if(sec) sec.style.display='block';
+  list.innerHTML=arr.map(function(k){
+    const safe=_esc(k), attr=String(k).replace(/\x27/g,'');
+    return '<div class="pref-row" style="cursor:default;"><div class="pref-icon" style="background:rgba(255,77,106,.12);">🚫</div><div style="flex:1;text-transform:capitalize;font-size:13px;font-weight:600;">'+safe+'</div><div onclick="unhideCompany(\''+attr+'\')" style="font-size:11px;font-weight:800;color:var(--mint);cursor:pointer;">Unhide</div></div>';
+  }).join('');
 }
 /* The current top deck job straight from the DATA MODEL (the same vis[0] that paints
    the card face), NOT the DOM. The expanded drawer + company view used to read the
@@ -12272,8 +12456,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v145';
+const APP_VERSION = 'v146';
 const CHANGELOG = {
+  'v146':['P2-5 Browse filters accordion; P2-6 hide-all-roles-from-company; hosted-job apply button + Verified=hosted-here messaging; P-MATCH unified bidirectional scorer (candidate == recruiter number)'],
   'v145':['P1-4: full internal application (work-auth + sponsorship + contact) + voluntary EEO stored in an employer-invisible collection (eeo_responses, admin-only read)'],
   'v144':['P1-1: verified employer roles reachable (relevance-gated pin, cap 3) + listing quality floor & live strength meter'],
   'v143':['P0 monotonic list sync (data loss), deck accordion + Save button, one-report-per-user, reported-badge explainer, reverse-match observability'],
@@ -15566,6 +15751,14 @@ async function loadTierFromProfile(u){
         localStorage.setItem('gpj_profile',JSON.stringify(lp));
         const dt=document.getElementById('discoverable-toggle');
         if(dt) dt.classList.toggle('on', p.discoverable===true);
+      }catch(e){}
+    }
+    /* v146: restore hidden-companies (UNION with local, so a hide on one device
+       follows to another and is never lost on a fresh login). */
+    if(Array.isArray(p.hiddenCompanies)){
+      try{
+        const merged=new Set([...gpjHiddenCos(), ...p.hiddenCompanies.map(_coKey).filter(Boolean)]);
+        localStorage.setItem('gpj_hidden_cos', JSON.stringify(Array.from(merged)));
       }catch(e){}
     }
     /* v119: restore TOP-LEVEL preferences (contact/address toggles) the same way

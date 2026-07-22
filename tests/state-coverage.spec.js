@@ -5001,3 +5001,87 @@ test.describe('[STATE-COVERAGE] v145 P1-4 internal apply + voluntary EEO', () =>
     expect(r.path, 'EEO lives in its own top-level collection, not under the application').toEqual(['eeo_responses', 'u1', 'jobs', 'job9']);
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v146 — founder live-test batch: Browse accordion, hide-company, hosted-job
+   apply affordance, and the unified two-way match scorer (candidate == recruiter).
+   ═══════════════════════════════════════════════════════════════════════════ */
+test.describe('[STATE-COVERAGE] v146 Browse filter accordion (P2-5)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.toggleBrowseFilters === 'function', null, { timeout: 15000 });
+  });
+
+  test('filters collapse by default and toggle open/closed; the fields live inside the body', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      switchView('browse');
+      const body = document.getElementById('browse-filter-body');
+      const collapsedByDefault = body.classList.contains('browse-acc-collapsed');
+      const fieldsInside = !!body.querySelector('#f-location') && !!body.querySelector('#f-livesort');
+      _setBrowseFiltersOpen(true);
+      const openClass = !body.classList.contains('browse-acc-collapsed');
+      const contentHeight = body.scrollHeight;   // real content height (headless won't paint the anim)
+      _setBrowseFiltersOpen(false);
+      const reClosed = body.classList.contains('browse-acc-collapsed');
+      return { collapsedByDefault, fieldsInside, openClass, contentHeight, reClosed };
+    });
+    expect(r.collapsedByDefault, 'accordion starts collapsed').toBe(true);
+    expect(r.fieldsInside, 'the filter fields are inside the collapsible body').toBe(true);
+    expect(r.openClass, 'toggling opens it').toBe(true);
+    expect(r.contentHeight, 'the body has real content to show').toBeGreaterThan(200);
+    expect(r.reClosed, 'toggling closes it again').toBe(true);
+  });
+
+  test('the header summary reflects the active region + sort while collapsed', async ({ page }) => {
+    const sum = await page.evaluate(() => {
+      switchView('browse');
+      document.getElementById('f-location').value = 'Houston';
+      _browseFilterSummary();
+      return document.getElementById('browse-filter-sum').textContent;
+    });
+    expect(sum).toContain('Houston');
+  });
+});
+
+test.describe('[STATE-COVERAGE] v146 hide all roles from a company (P2-6)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.hideCompanyRoles === 'function', null, { timeout: 15000 });
+    await page.evaluate(() => { try { localStorage.removeItem('gpj_hidden_cos'); } catch (e) {} });
+  });
+
+  test('hiding a company removes its roles from the deck; unhide restores them', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const jobs = [
+        { t: 'Recruiter I', co: 'Robert Half', loc: 'Houston, TX', match: 80, ghost: 10 },
+        { t: 'Recruiter II', co: 'Robert Half', loc: 'Houston, TX', match: 78, ghost: 10 },
+        { t: 'Ops Lead', co: 'Acme', loc: 'Houston, TX', match: 75, ghost: 10 },
+      ];
+      rawQueue = jobs.slice(); jobsQueue = jobs.slice();
+      applySwipeFilters();
+      const before = jobsQueue.map(j => j.co);
+      hideCompanyRoles('Robert Half');
+      const after = jobsQueue.map(j => j.co);
+      unhideCompany('robert half');
+      const restored = jobsQueue.map(j => j.co);
+      return { before, after, restored, hiddenSet: Array.from(gpjHiddenCos()) };
+    });
+    expect(r.before.filter(c => c === 'Robert Half').length, 'both agency roles present first').toBe(2);
+    expect(r.after.includes('Robert Half'), 'hiding removes ALL of that company').toBe(false);
+    expect(r.after.includes('Acme'), 'other companies are untouched').toBe(true);
+    expect(r.restored.filter(c => c === 'Robert Half').length, 'unhide brings them back').toBe(2);
+  });
+
+  test('the Settings hidden-companies manager lists muted companies with an unhide', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_hidden_cos', JSON.stringify(['robert half']));
+      _renderHiddenCosList();
+      const sec = document.getElementById('sec-hiddencos');
+      const list = document.getElementById('hiddencos-list');
+      return { sectionShown: sec.style.display !== 'none', hasUnhide: /Unhide/.test(list.innerHTML), hasName: /robert half/i.test(list.innerHTML) };
+    });
+    expect(r.sectionShown).toBe(true);
+    expect(r.hasUnhide).toBe(true);
+    expect(r.hasName).toBe(true);
+  });
+});

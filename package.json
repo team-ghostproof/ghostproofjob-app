@@ -12,7 +12,7 @@
     "test:smoke": "playwright test smoke",
     "screenshots": "playwright test screenshots",
     "report": "playwright show-report",
-    "test:match": "node --test tests/match/reverseMatch.test.mjs tests/match/r3pipeline.test.mjs tests/recruiter/domainCheck.test.mjs",
+    "test:match": "node --test tests/match/reverseMatch.test.mjs tests/match/r3pipeline.test.mjs tests/match/scoreCore.test.mjs tests/recruiter/domainCheck.test.mjs",
     "test:growth": "node --test tests/growth/ghostContent.test.mjs",
     "test:email": "node --test tests/email/optout.test.mjs",
     "test:apply": "node --test tests/email/applyEmail.test.mjs",

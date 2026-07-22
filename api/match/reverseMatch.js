@@ -15,6 +15,10 @@
 // ============================================================================
 'use strict';
 
+// v146 P-MATCH: the scoring math now lives in ONE shared module so the recruiter
+// side and the candidate side produce the SAME number for the same pair.
+const { scoreMatch } = require('./scoreCore');
+
 const GENERIC_ROLE_WORDS = new Set([
   'specialist', 'manager', 'assistant', 'coordinator', 'associate', 'analyst',
   'representative', 'administrator', 'officer', 'agent', 'clerk', 'lead', 'senior',
@@ -51,36 +55,16 @@ function inScope(job, cand) {
   return sameMarket(job.market, cand.market);
 }
 
-/** Score ONE candidate against a job → { score, matched, missing }. */
+/** Score ONE candidate against a job → { score, matched, missing }.
+ *  v146: delegates to the shared scoreCore so the recruiter number equals the
+ *  candidate number for the same pair. The candidate input is built from the
+ *  ENRICHED token (title + duties roles + skills + summary + req/desc) instead of
+ *  the old title+skills-only view that made the two sides disagree. */
 function scoreCandidateForJob(job, cand) {
-  const jtField = new Set(fieldWords(job.title));
-  const jobBlob = new Set(words(`${job.title} ${job.req || ''} ${job.desc || ''}`));
-  const candTitle = new Set(fieldWords(cand.title));
-  const candSkills = (cand.skills || []).map((s) => String(s).toLowerCase());
-
-  let score = 20;
-  const matched = [];
-  const missing = [];
-
-  // title field-word overlap (candidate's field vs the job's field)
-  let fieldHits = 0;
-  jtField.forEach((w) => { if (candTitle.has(w)) { fieldHits++; matched.push(w); } });
-  if (jtField.size) score += Math.round((fieldHits / jtField.size) * 45);
-  if (fieldHits > 0) score += 10;
-
-  // skill overlap with the job text
-  let skillHits = 0;
-  candSkills.forEach((s) => {
-    const lead = s.split(/[\s/]+/)[0];
-    if (lead.length > 2 && jobBlob.has(lead)) { skillHits++; if (matched.indexOf(s) < 0) matched.push(s); }
-  });
-  if (candSkills.length) score += Math.round((skillHits / Math.max(1, candSkills.length)) * 20);
-
-  // job field words the candidate has NO signal for → "missing"
-  jtField.forEach((w) => { if (!candTitle.has(w) && !candSkills.some((s) => s.indexOf(w) >= 0)) missing.push(w); });
-
-  score = Math.max(5, Math.min(98, score));
-  return { score, matched: matched.slice(0, 12), missing: missing.slice(0, 8) };
+  return scoreMatch(
+    { title: cand.title, roles: cand.roles || [], skills: cand.skills || [], summary: cand.summary || '' },
+    { title: job.title, desc: `${job.desc || ''} ${job.req || ''}`.trim() },
+  );
 }
 
 /**
