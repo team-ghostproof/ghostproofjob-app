@@ -50,6 +50,9 @@ async function seedBaseline() {
     await setDoc(doc(db, 'profiles/candC'), { name: 'Cand C', contact: 'c@x.com' });
     await setDoc(doc(db, 'profiles/candD'), { name: 'Cand D', contact: 'd@x.com' });
     await setDoc(doc(db, 'jobs/jobA/applications/candC'), { status: 'applied' });
+    // v145 P1-4: a voluntary EEO response — recruiterA OWNS jobA and can read the
+    // application above, so this is the sharpest possible test that EEO stays hidden.
+    await setDoc(doc(db, 'eeo_responses/candC/jobs/jobA'), { gender: 'Woman', ts: 1 });
     await setDoc(doc(db, 'jobs/jobA/recommended_candidates/candC'), { score: 88 });
     await setDoc(doc(db, 'candidate_cards/candC'), { matchPct: 88, skills: ['ops'] });
     await setDoc(doc(db, 'match_tokens/candC'), { title: 'ops', skills: ['ops'] });   // candC is DISCOVERABLE (token exists) + applied to jobA
@@ -601,5 +604,35 @@ describe('v141: job-level ghost reports', () => {
     await assertFails(setDoc(doc(asC(), 'ghost_reports/gr_v141d'), Object.assign({}, base, { jobKey: 'x'.repeat(300) })));
     // cannot report as someone else
     await assertFails(setDoc(doc(asC(), 'ghost_reports/gr_v141e'), Object.assign({}, base, { reporterUid: 'candD' })));
+  });
+});
+
+describe('v145 P1-4 EEO — employer-invisible self-identification', () => {
+  test('candidate CAN read their OWN eeo response', async () => {
+    await assertSucceeds(getDoc(doc(asCandC(), 'eeo_responses/candC/jobs/jobA')));
+  });
+  test('candidate can create their own eeo response', async () => {
+    await assertSucceeds(setDoc(doc(asCandC(), 'eeo_responses/candC/jobs/jobB'), { gender: 'Man', ts: 2 }));
+  });
+  test('candidate CANNOT read ANOTHER candidate eeo response', async () => {
+    await assertFails(getDoc(doc(asCandD(), 'eeo_responses/candC/jobs/jobA')));
+  });
+  test('candidate CANNOT write into ANOTHER candidate eeo path', async () => {
+    await assertFails(setDoc(doc(asCandD(), 'eeo_responses/candC/jobs/jobA'), { gender: 'x', ts: 3 }));
+  });
+  // THE point of the whole feature: the recruiter who OWNS the job and CAN read the
+  // application still cannot read the candidate's demographic self-identification.
+  test('the OWNER recruiter CANNOT read a candidate eeo response', async () => {
+    await assertSucceeds(getDoc(doc(asRecruiterA(), 'jobs/jobA/applications/candC'))); // proves ownership/read
+    await assertFails(getDoc(doc(asRecruiterA(), 'eeo_responses/candC/jobs/jobA')));    // ...but not the EEO
+  });
+  test('a stranger recruiter CANNOT read a candidate eeo response', async () => {
+    await assertFails(getDoc(doc(asRecruiterB(), 'eeo_responses/candC/jobs/jobA')));
+  });
+  test('a guest CANNOT read a candidate eeo response', async () => {
+    await assertFails(getDoc(doc(asGuest(), 'eeo_responses/candC/jobs/jobA')));
+  });
+  test('admin CAN read eeo responses (aggregate reporting)', async () => {
+    await assertSucceeds(getDoc(doc(asAdmin(), 'eeo_responses/candC/jobs/jobA')));
   });
 });

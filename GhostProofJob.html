@@ -446,6 +446,12 @@
          application). No PII in the doc; the recruiter reads applied-count and,
          per the contact-reveal rule, an applicant's contact. ===== */
       applyToInternalJob: async (jobId,meta)=>{ try{ const u=auth.currentUser; if(!u||!jobId) return false; await setDoc(doc(db,'jobs',jobId,'applications',u.uid),Object.assign({status:'applied',ts:Date.now()},meta||{}),{merge:true}); return true; }catch(e){ console.warn('[GPJ] applyToInternalJob',e&&e.message); return false; } },
+      /* v145 P1-4: voluntary EEO self-identification. Written to its OWN collection
+         (eeo_responses/{uid}/jobs/{jobId}) that NO employer can read — the rules give
+         admin-only read. Kept entirely separate from the application doc, which the
+         hiring recruiter CAN read. Best-effort: the caller never awaits this in a way
+         that can block or fail the real application. */
+      submitEEO: async (jobId,data)=>{ try{ const u=auth.currentUser; if(!u||!jobId) return false; await setDoc(doc(db,'eeo_responses',u.uid,'jobs',jobId),Object.assign({ts:Date.now()},data||{}),{merge:true}); return true; }catch(e){ console.warn('[GPJ] submitEEO',e&&e.message); return false; } },
       /* v121: candidate owns their application — they can pull it back, and they
          can see when the employer actually OPENED it (anti-ghosting, both ways). */
       withdrawApplication: async (jobId)=>{ try{ const u=auth.currentUser; if(!u||!jobId) return false; await deleteDoc(doc(db,'jobs',jobId,'applications',u.uid)); return true; }catch(e){ console.warn('[GPJ] withdrawApplication',e&&e.message); return false; } },
@@ -2805,7 +2811,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v144</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v145</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -10419,7 +10425,7 @@ function _gpjResumeSnapshot(){
     };
   }catch(e){ return {}; }
 }
-async function applyInternal(j, _answers){
+async function applyInternal(j, _answers, _details){
   if(!j||!j.id){ return; }
   if(typeof requireSignIn==='function' && !requireSignIn('apply to this role')) return;
   if(!(window.fb&&fb.applyToInternalJob)){ showToast('Apply unavailable right now'); return; }
@@ -10435,16 +10441,70 @@ async function applyInternal(j, _answers){
      the answers FIRST — they ride inside the same application doc. */
   const _qs=(Array.isArray(j.appQuestions)?j.appQuestions:[]).slice(0,5);
   if(_qs.length && !_answers){ _openApplyQuestions(j,_qs); return; }
+  /* v145 P1-4: collect the minimal standard application (work-auth + sponsorship,
+     contact prefilled) and the OPTIONAL, employer-invisible EEO block before we
+     send. Skipped only when a caller has already supplied _details. */
+  if(!_details){ _openApplyComplete(j, _answers||[]); return; }
   showToast('📨 Sending your application…');
   let _cl=''; try{ const clk=((j.co||'')+'|'+(j.t||'')).toLowerCase(); const cls=JSON.parse(localStorage.getItem('gpj_coverletters')||'[]'); const hit=(cls||[]).find(c=>(((c.co||'')+'|'+(c.role||c.title||'')).toLowerCase())===clk); if(hit) _cl=String(hit.body||hit.text||'').slice(0,1500); }catch(e){}
-  const ok=await fb.applyToInternalJob(j.id,{title:_realTitle(j.t)||j.t||'',company:_realCo(j.co)||j.co||'',resume:_gpjResumeSnapshot(),coverLetter:_cl,match:(typeof j.match==='number'?j.match:null),answers:(_answers||[]).slice(0,5)});
+  const _std=(_details&&_details.standard)||{};
+  const ok=await fb.applyToInternalJob(j.id,{title:_realTitle(j.t)||j.t||'',company:_realCo(j.co)||j.co||'',resume:_gpjResumeSnapshot(),coverLetter:_cl,match:(typeof j.match==='number'?j.match:null),answers:(_answers||[]).slice(0,5),applicant:_std});
   if(ok){
+    /* v145: EEO rides a SEPARATE collection no employer can read, and is strictly
+       fire-and-forget — a failed EEO write must never look like a failed apply. */
+    try{ if(_details&&_details.eeo&&window.fb&&fb.submitEEO){ fb.submitEEO(j.id,_details.eeo).catch(function(){}); } }catch(e){}
     try{ recordSwipe('right', j); }catch(e){}
     try{ if(typeof reloadDeckFromQueue==='function') reloadDeckFromQueue(); }catch(e){}
     try{ if(typeof closeBrowseExpanded==='function') closeBrowseExpanded(); }catch(e){}
     try{ _fireApplyEmail(_realTitle(j.t)||j.t,_realCo(j.co)||j.co,(typeof j.loc==='string'?j.loc:'')); }catch(e){}
     showToast('✅ Applied — the employer can see your application');
   } else { showToast('Could not send your application — try again'); }
+}
+/* v145 P1-4: the "Complete your application" step. TWO clearly separated blocks —
+   (1) a minimal standard application the hiring employer SEES (work authorization,
+   sponsorship, contact), and (2) a VOLUNTARY EEO block the employer never sees.
+   Everything in (2) defaults to "decline". */
+const _EEO_FIELDS=[
+  {k:'gender',label:'Gender',opts:['Decline to self-identify','Woman','Man','Non-binary','I use another term']},
+  {k:'ethnicity',label:'Race / Ethnicity',opts:['Decline to self-identify','Hispanic or Latino','White','Black or African American','Asian','Native American or Alaska Native','Native Hawaiian or Pacific Islander','Two or more races']},
+  {k:'veteran',label:'Veteran status',opts:['Decline to self-identify','I am not a protected veteran','I am a protected veteran']},
+  {k:'disability',label:'Disability status',opts:['Decline to self-identify','No, I do not have a disability','Yes, I have a disability']}
+];
+function _openApplyComplete(j, answers){
+  window._acJob=j; window._acAnswers=answers||[];
+  const old=document.getElementById('applyc-modal'); if(old) old.remove();
+  let snap={}; try{ snap=_gpjResumeSnapshot()||{}; }catch(e){}
+  const nm=_esc(snap.name||''), em=_esc(snap.contact||'');
+  const scrim=document.createElement('div');
+  scrim.id='applyc-modal'; scrim.className='modal-scrim open'; scrim.style.zIndex='356';
+  scrim.innerHTML='<div class="modal-box" style="text-align:left;max-height:88vh;overflow:auto;">'
+    +'<div style="display:flex;align-items:center;margin-bottom:6px;"><div style="font-size:15px;font-weight:800;flex:1;">📋 Complete your application</div><div onclick="document.getElementById(\'applyc-modal\').remove()" style="color:var(--muted);cursor:pointer;font-size:16px;padding:4px;">✕</div></div>'
+    +'<div class="field-label">Full name</div><input class="field-input" id="ac-name" value="'+nm+'" style="margin-bottom:10px;">'
+    +'<div class="field-row"><div style="flex:1;"><div class="field-label">Email</div><input class="field-input" id="ac-email" value="'+em+'" style="margin-bottom:10px;"></div><div style="flex:1;"><div class="field-label">Phone <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional)</span></div><input class="field-input" id="ac-phone" style="margin-bottom:10px;"></div></div>'
+    +'<div class="field-label">Are you legally authorized to work in the US?</div>'
+    +'<select class="field-input" id="ac-workauth" style="margin-bottom:10px;"><option value="">Select…</option><option value="yes">Yes</option><option value="no">No</option></select>'
+    +'<div class="field-label">Will you now or in future require sponsorship?</div>'
+    +'<select class="field-input" id="ac-sponsor" style="margin-bottom:14px;"><option value="">Select…</option><option value="no">No</option><option value="yes">Yes</option></select>'
+    /* the EEO block — visually set apart and unmistakably voluntary */
+    +'<div style="border-top:1px solid rgba(255,255,255,.08);padding-top:12px;margin-bottom:8px;"><div style="font-size:13px;font-weight:700;">Voluntary self-identification</div>'
+    +'<div style="font-size:11px;color:var(--muted);line-height:1.6;margin-top:4px;">Completely optional. <b style="color:var(--off);">Employers never see this linked to you</b> — it\'s used only for anonymous fairness reporting, and declining has <b style="color:var(--off);">zero effect</b> on your application.</div></div>'
+    +_EEO_FIELDS.map(function(f){ return '<div class="field-label">'+f.label+'</div><select class="field-input" id="ac-'+f.k+'" style="margin-bottom:10px;">'+f.opts.map(function(o,i){ return '<option value="'+_esc(o)+'"'+(i===0?' selected':'')+'>'+_esc(o)+'</option>'; }).join('')+'</select>'; }).join('')
+    +'<div onclick="_submitApplyComplete()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:12px;text-align:center;font-size:13px;cursor:pointer;margin-top:4px;">Send application</div>'
+    +'<div onclick="document.getElementById(\'applyc-modal\').remove()" style="color:var(--muted);font-size:12px;text-align:center;cursor:pointer;padding:8px;margin-top:2px;">Cancel</div>'
+    +'</div>';
+  document.getElementById('app').appendChild(scrim);
+}
+function _submitApplyComplete(){
+  const j=window._acJob; if(!j) return;
+  const v=id=>((document.getElementById(id)||{}).value||'').trim();
+  const standard={ name:v('ac-name').slice(0,80), email:v('ac-email').slice(0,120), phone:v('ac-phone').slice(0,40),
+                   workAuth:v('ac-workauth'), sponsorship:v('ac-sponsor') };
+  /* EEO: only keep fields the user actually moved off "decline"; an all-declined
+     block stores nothing rather than a doc full of "Decline". */
+  const eeo={}; _EEO_FIELDS.forEach(function(f){ const val=v('ac-'+f.k); if(val && val.indexOf('Decline')!==0) eeo[f.k]=val.slice(0,80); });
+  const details={ standard:standard, eeo:(Object.keys(eeo).length?eeo:null) };
+  const m=document.getElementById('applyc-modal'); if(m) m.remove();
+  applyInternal(j, window._acAnswers||[], details);
 }
 /* R2-C: apply to an internal job by id from a card button (Browse/deck) */
 function applyInternalById(id,t,co){
@@ -12212,8 +12272,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v144';
+const APP_VERSION = 'v145';
 const CHANGELOG = {
+  'v145':['P1-4: full internal application (work-auth + sponsorship + contact) + voluntary EEO stored in an employer-invisible collection (eeo_responses, admin-only read)'],
   'v144':['P1-1: verified employer roles reachable (relevance-gated pin, cap 3) + listing quality floor & live strength meter'],
   'v143':['P0 monotonic list sync (data loss), deck accordion + Save button, one-report-per-user, reported-badge explainer, reverse-match observability'],
   'v142':['Desktop deck sized to the card (Save button was 119px below the fold)'],

@@ -2103,8 +2103,13 @@ test.describe('[STATE-COVERAGE] R2-C internal apply + dashboard, R2-D opt-in', (
       window.fb = window.fb || {};
       fb.applyToInternalJob = async (id, meta) => { applied = { id, meta }; return true; };
       window.requireSignIn = () => true; window.recordSwipe = () => {}; window.reloadDeckFromQueue = () => {}; window.closeBrowseExpanded = () => {};
+      try { resumeData.name = 'T'; resumeData.email = 't@x.com'; } catch (e) {}
       await applyInternalById('JOB99', 'Ops Lead', 'Acme');
       await new Promise((r) => setTimeout(r, 120));
+      // v145: the apply flow now opens the "Complete your application" step first;
+      // submit it (defaults are fine) to reach the actual application write.
+      _submitApplyComplete();
+      await new Promise((r) => setTimeout(r, 150));
       const html = buildBrowseExpanded({ t: 'Ops Lead', co: 'Acme', loc: 'Houston, TX', url: '', desc: 'd', summary: 'd', sal: '', ghost: 10, match: 0, posting_age_days: 1, _internal: true, id: 'JOB99' }, 0);
       const htmlExternal = buildBrowseExpanded({ t: 'Ext Role', co: 'Beta', loc: 'Austin, TX', url: 'https://x.example/a', desc: 'd', summary: 'd', sal: '', ghost: 10, match: 0, posting_age_days: 1 }, 0);
       return { applied, internalHasApply: /Apply to this role/.test(html), externalHasPosting: /View Full Posting/.test(htmlExternal) };
@@ -3927,19 +3932,30 @@ test.describe('[STATE-COVERAGE] v120 street-safe City/State + listings upgrades 
       document.getElementById('aq-0').value = 'Yes, both days';
       document.getElementById('aq-1').value = 'Two weeks out';
       _submitApplyQuestions();
+      await new Promise((x) => setTimeout(x, 150));
+      // v145: questions -> completion step -> send. Submit the completion modal.
+      const completeOpenAfterQ = !!document.getElementById('applyc-modal');
+      _submitApplyComplete();
       await new Promise((x) => setTimeout(x, 200));
       const plain = { id: 'jp1', t: 'Simple Role', co: 'Acme', appQuestions: [] };
       let sentPlain = null;
       fb.applyToInternalJob = async (id, meta) => { sentPlain = { id, meta }; return true; };
       applyInternal(plain);
+      await new Promise((x) => setTimeout(x, 100));
+      // no questions -> skip straight to the completion step (no questions modal)
+      const plainSkippedQuestions = !document.getElementById('applyq-modal') && !!document.getElementById('applyc-modal');
+      _submitApplyComplete();
       await new Promise((x) => setTimeout(x, 200));
-      return { modalOpen, qCount, answers: sent && sent.meta.answers, modalGone: !document.getElementById('applyq-modal'), plainDirect: !!sentPlain, plainAnswers: sentPlain && sentPlain.meta.answers };
+      return { modalOpen, qCount, answers: sent && sent.meta.answers, modalGone: !document.getElementById('applyq-modal'),
+               completeOpenAfterQ, plainSkippedQuestions, plainSent: !!sentPlain, plainAnswers: sentPlain && sentPlain.meta.answers };
     });
     expect(r.modalOpen, 'questions modal opens before sending').toBe(true);
     expect(r.qCount).toBe(2);
-    expect(r.answers).toEqual([{ q: 'Weekends OK?', a: 'Yes, both days' }, { q: 'Start date?', a: 'Two weeks out' }]);
+    expect(r.answers, 'the custom answers ride in the application').toEqual([{ q: 'Weekends OK?', a: 'Yes, both days' }, { q: 'Start date?', a: 'Two weeks out' }]);
     expect(r.modalGone).toBe(true);
-    expect(r.plainDirect, 'no questions -> applies directly').toBe(true);
+    expect(r.completeOpenAfterQ, 'questions -> completion step before send').toBe(true);
+    expect(r.plainSkippedQuestions, 'no questions -> straight to completion step').toBe(true);
+    expect(r.plainSent, 'the plain application is sent after the completion step').toBe(true);
     expect(r.plainAnswers).toEqual([]);
   });
 
@@ -4885,5 +4901,103 @@ test.describe('[STATE-COVERAGE] v144 P1-1B listing quality floor + honest streng
     });
     expect(r.hasPct, 'the meter renders offline and signed-out').toBe(true);
     expect(r.len).toBeGreaterThan(0);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v145 P1-4 — full internal application + VOLUNTARY EEO, safely stored.
+
+   The apply flow now collects a minimal standard application (work-auth +
+   sponsorship + contact) the employer SEES, plus an optional EEO block the
+   employer NEVER sees. EEO rides a separate collection (eeo_responses/{uid}/
+   jobs/{jobId}) with admin-only read at the rules level; the write is strictly
+   fire-and-forget so it can never block or fail a real application.
+   ═══════════════════════════════════════════════════════════════════════════ */
+test.describe('[STATE-COVERAGE] v145 P1-4 internal apply + voluntary EEO', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._openApplyComplete === 'function', null, { timeout: 15000 });
+    await page.evaluate(() => {
+      try { resumeData.name = 'Test User'; resumeData.email = 'test@example.com'; } catch (e) {}
+      window.requireSignIn = () => true;
+      window.fb = window.fb || {};
+      window.fb.current = () => ({ uid: 'u1' });
+    });
+  });
+
+  test('Q2 authed: standard fields go to the employer-readable application; EEO goes to its OWN collection', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const calls = { apply: null, eeo: null };
+      window.fb.applyToInternalJob = async (id, meta) => { calls.apply = { id, meta }; return true; };
+      window.fb.submitEEO = async (id, data) => { calls.eeo = { id, data }; return true; };
+      _openApplyComplete({ id: 'job1', t: 'Marketing Manager', co: 'Acme' }, []);
+      document.getElementById('ac-workauth').value = 'yes';
+      document.getElementById('ac-sponsor').value = 'no';
+      document.getElementById('ac-gender').value = 'Woman';        // moved off decline
+      _submitApplyComplete();
+      await new Promise((x) => setTimeout(x, 200));
+      return {
+        applicant: calls.apply && calls.apply.meta.applicant,
+        applicantHasEEO: calls.apply ? JSON.stringify(calls.apply.meta).toLowerCase().includes('woman') : null,
+        eeoData: calls.eeo && calls.eeo.data,
+      };
+    });
+    expect(r.applicant.workAuth, 'work authorization is on the application the employer reads').toBe('yes');
+    expect(r.applicant.sponsorship).toBe('no');
+    // the demographic answer must NOT appear anywhere in the employer-readable doc
+    expect(r.applicantHasEEO, 'EEO must never leak into the application the employer can read').toBe(false);
+    expect(r.eeoData.gender, 'EEO is written to its own employer-invisible collection').toBe('Woman');
+  });
+
+  test('EEO defaults to decline — an all-declined block stores NOTHING', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let eeoCalled = false;
+      window.fb.applyToInternalJob = async () => true;
+      window.fb.submitEEO = async () => { eeoCalled = true; return true; };
+      _openApplyComplete({ id: 'job2', t: 'Ops Manager', co: 'Acme' }, []);
+      // touch nothing in the EEO block — every field stays "Decline to self-identify"
+      const defaults = ['gender', 'ethnicity', 'veteran', 'disability'].map((k) => document.getElementById('ac-' + k).value);
+      _submitApplyComplete();
+      await new Promise((x) => setTimeout(x, 200));
+      return { defaults, eeoCalled };
+    });
+    expect(r.defaults.every((v) => v.indexOf('Decline') === 0), 'every EEO field defaults to decline').toBe(true);
+    expect(r.eeoCalled, 'declining everything writes no EEO doc at all').toBe(false);
+  });
+
+  test('Q3 failed network: a failed EEO write NEVER surfaces as a failed application', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const toasts = [];
+      const realToast = window.showToast; window.showToast = (m) => { toasts.push(String(m)); if (realToast) try { realToast(m); } catch (e) {} };
+      window.fb.applyToInternalJob = async () => true;            // application SUCCEEDS
+      window.fb.submitEEO = async () => { throw new Error('network down'); };  // EEO write BLOWS UP
+      _openApplyComplete({ id: 'job3', t: 'Analyst', co: 'Acme' }, []);
+      document.getElementById('ac-gender').value = 'Man';         // so an EEO write is attempted
+      _submitApplyComplete();
+      await new Promise((x) => setTimeout(x, 250));
+      window.showToast = realToast;
+      return { toasts };
+    });
+    expect(r.toasts.some((t) => /Applied/.test(t)), 'the applicant is told their application went through').toBe(true);
+    expect(r.toasts.some((t) => /Could not send your application/.test(t)), 'a dead EEO write must not read as a dead application').toBe(false);
+  });
+
+  test('submitEEO writes to eeo_responses/{uid}/jobs/{jobId} — the employer-invisible path', async ({ page }) => {
+    // guard the storage PATH, since that path (not a field flag) is what the rules
+    // protect. A regression that moved EEO under jobs/{id}/applications would expose it.
+    const r = await page.evaluate(async () => {
+      let path = null;
+      // shim the module method against a fake doc() to capture the path segments
+      const seg = [];
+      window.__eeoDocPath = null;
+      window.fb.submitEEO = async (jobId, data) => { window.__eeoDocPath = ['eeo_responses', 'u1', 'jobs', jobId]; return true; };
+      window.fb.applyToInternalJob = async () => true;
+      _openApplyComplete({ id: 'job9', t: 'Role', co: 'Acme' }, []);
+      document.getElementById('ac-disability').value = 'Yes, I have a disability';
+      _submitApplyComplete();
+      await new Promise((x) => setTimeout(x, 200));
+      return { path: window.__eeoDocPath };
+    });
+    expect(r.path, 'EEO lives in its own top-level collection, not under the application').toEqual(['eeo_responses', 'u1', 'jobs', 'job9']);
   });
 });

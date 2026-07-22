@@ -133,6 +133,25 @@ service cloud.firestore {
       }
     }
 
+    // v145 P1-4: EEO / voluntary self-identification — the ONE surface that a hiring
+    // employer must NEVER be able to tie to an individual candidate. It therefore
+    // lives OUTSIDE jobs/{jobId}/applications (which the owner recruiter CAN read,
+    // line ~121) in its own collection, keyed by uid so the rule can verify the
+    // writer directly from the path.
+    //   • the candidate writes/updates/deletes ONLY their own responses
+    //   • read is ADMIN-ONLY — isRecruiter is deliberately absent, so an employer
+    //     (verified or not, owner of the job or not) gets zero read at the rules
+    //     level. Reporting is aggregate, done with the Admin SDK.
+    //   • every field is optional and defaults to "decline"; storing nothing is fine.
+    match /eeo_responses/{uid}/jobs/{jobId} {
+      // read: the candidate themselves (to review/change their answer) OR admin
+      // (aggregate reporting). isRecruiter is deliberately ABSENT — an employer,
+      // owner of the job or not, verified or not, gets zero read at the rules level.
+      allow read:   if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create, update: if signedIn() && request.auth.uid == uid;
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+    }
+
     // 2. PROFILES (unchanged from live)
     match /profiles/{userId} {
       allow read: if isAdmin()
