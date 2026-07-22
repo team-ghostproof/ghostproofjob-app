@@ -20,3 +20,4 @@ __pycache__/
 
 # growth: generated content packs are per-run founder deliverables (Action uploads them as artifacts)
 content-packs/
+pw*.json
