@@ -5408,3 +5408,48 @@ test.describe('[STATE-COVERAGE] v149 restore never strands the account', () => {
     expect(r.gateOpen, 'a recovered read opens the gate so syncing resumes').toBe(true);
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v151 — event-driven notification emails (interview confirmation + employer
+   reach-out). The client trigger _gpjFireEmail must (a) no-op when signed out
+   (never POST for a guest) and (b) POST the caller's idToken + payload to the
+   right endpoint when signed in. Server-side auth/suppression/send-once are
+   covered by the api/*-email unit tests.
+   ═══════════════════════════════════════════════════════════════════════════ */
+test.describe('[STATE-COVERAGE] v151 notification-email trigger', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._gpjFireEmail === 'function', null, { timeout: 15000 });
+  });
+
+  // 1) Guest / logged-out state: no token, no email — never POST for a guest.
+  test('signed OUT: _gpjFireEmail never POSTs', async ({ page }) => {
+    const posted = await page.evaluate(async () => {
+      let calls = 0; const origFetch = window.fetch;
+      window.fetch = (...a) => { calls++; return Promise.resolve({ ok: true }); };
+      window.fb = Object.assign(window.fb || {}, { current: () => null });
+      _gpjFireEmail('/api/interview-email', { reachoutId: 'ro1' });
+      await new Promise(r => setTimeout(r, 60));
+      window.fetch = origFetch;
+      return calls;
+    });
+    expect(posted, 'a guest triggers no email POST').toBe(0);
+  });
+
+  // 2) Authenticated: POSTs idToken + payload to the given endpoint.
+  test('signed IN: POSTs idToken + reachoutId to the endpoint', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let seen = null; const origFetch = window.fetch;
+      window.fetch = (url, opts) => { seen = { url, body: JSON.parse((opts && opts.body) || '{}') }; return Promise.resolve({ ok: true }); };
+      window.fb = Object.assign(window.fb || {}, { current: () => ({ uid: 'u1', getIdToken: async () => 'tok-123' }) });
+      _gpjFireEmail('/api/interview-email', { reachoutId: 'ro9' });
+      await new Promise(r => setTimeout(r, 80));
+      window.fetch = origFetch;
+      return seen;
+    });
+    expect(r, 'a signed-in user POSTs').not.toBeNull();
+    expect(r.url).toBe('/api/interview-email');
+    expect(r.body.idToken).toBe('tok-123');
+    expect(r.body.reachoutId).toBe('ro9');
+  });
+});
