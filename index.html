@@ -110,15 +110,15 @@
         }catch(e){ console.warn('[GPJ] smartMatch unavailable, using local fallback:', e&&e.message); return null; }
       },
       saveProfile: (uid,data)=>setDoc(doc(db,'profiles',uid),data,{merge:true}),
-      loadProfile: async (uid)=>{ try{ const s=await getDoc(doc(db,'profiles',uid)); return s.exists()?s.data():null; }catch(e){ return null; } },
       /* v149 (founder "my data went away, then came back on re-login"): loadProfile
-         SWALLOWS a network error and returns null — which is indistinguishable from
-         a brand-new account with no profile. On the restore path that made a failed
-         READ look like an empty account: the write-gate opened, the monotonic guard
-         baselined EMPTY, and real data vanished until a manual re-login re-read it.
-         This strict variant THROWS on a real error and returns null ONLY when the
-         doc genuinely does not exist, so the caller can retry instead of stranding. */
-      loadProfileStrict: async (uid)=>{ const s=await getDoc(doc(db,'profiles',uid)); return s.exists()?s.data():null; },
+         USED to swallow a network error and return null — indistinguishable from a
+         brand-new account with no profile. On the sign-in restore path that made a
+         FAILED read look like an empty account: the write-gate opened, the monotonic
+         guard baselined EMPTY, and real data vanished until a manual re-login re-read
+         it. It now THROWS on a real error and returns null ONLY when the doc genuinely
+         doesn't exist, so loadTierFromProfile can RETRY instead of stranding. Every
+         other caller already treats a throw as "keep local" (guarded reads). */
+      loadProfile: async (uid)=>{ const s=await getDoc(doc(db,'profiles',uid)); return s.exists()?s.data():null; },
       setTierFor: (uid,tier)=>setDoc(doc(db,'profiles',uid),{tier,tierSetAt:Date.now()},{merge:true}),
       wipeProfile: async (uid)=>{ try{await deleteDoc(doc(db,'profiles',uid));}catch(e){} try{if(auth.currentUser)await deleteUser(auth.currentUser);}catch(e){} },
       fileBugReport: async (report)=>{
@@ -2841,7 +2841,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v149</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v150</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3615,7 +3615,7 @@ function _gpjRecruiterAuthApply(u){
          is not the recruiter collection, so the candidate-first invariant (zero
          recruiter-doc reads for candidates) is preserved: loadRecruiter fires only
          when the profile marker says recruiter. */
-      fb.loadProfile(u.uid).then(p=>{ if(p && p.role==='recruiter'){ fb.loadRecruiter(u.uid).then(_apply); } });
+      fb.loadProfile(u.uid).then(p=>{ if(p && p.role==='recruiter'){ fb.loadRecruiter(u.uid).then(_apply); } }).catch(function(){});   /* v149: loadProfile now throws on a read error — a failed role probe just stays candidate */
     }
     try{ _gpjApplyRecruiterSkin(); }catch(e){}
   }catch(e){}
@@ -12705,9 +12705,10 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v149';
+const APP_VERSION = 'v150';
 const CHANGELOG = {
-  'v149':['restore resilience: loadProfileStrict distinguishes a failed read from an absent profile; loadTierFromProfile retries with backoff + reschedules on total failure — a transient blip no longer strands the account (data-loss \'never goes back\')'],
+  'v150':['CI green: 3 accept-flow tests updated to the v148 modal flow; v149 restore approach corrected — loadProfile itself now THROWS on a read error (drop the separate strict fn) so all existing loadProfile-stubbing tests keep working'],
+  'v149':['restore resilience: loadProfile now THROWS on a read error (null only for a truly-absent doc) instead of swallowing it as an empty account; loadTierFromProfile retries with backoff + reschedules on total failure — a transient blip no longer strands the account (data-loss \'never goes back\')'],
   'v148':['interview + mutual contact-exchange flow: notif anchor routing, modality (in-person/virtual/phone), contact reveal on accept, clickable match-why, persistent already-sent state, two-way cancel'],
   'v147':['internal-apply routing: defer record to real send (kills phantom \'no longer on file\' row), dedupe prefers verified internal, applyInternal never dies silent on missing id'],
   'v146':['P2-5 Browse filters accordion; P2-6 hide-all-roles-from-company; hosted-job apply button + Verified=hosted-here messaging; P-MATCH unified bidirectional scorer (candidate == recruiter number)'],
@@ -15923,9 +15924,9 @@ async function loadTierFromProfile(u){
        only then do we retry. If every attempt fails we DO NOT open the gate or
        baseline empty (that was the data-loss) — we reschedule so a reconnect
        restores automatically, no manual re-login needed. */
-    let p=null, _got=false, _readFn=(fb.loadProfileStrict||fb.loadProfile);
+    let p=null, _got=false;
     for(let _a=0; _a<4 && !_got; _a++){
-      try{ p=await _readFn(u.uid); _got=true; }
+      try{ p=await fb.loadProfile(u.uid); _got=true; }
       catch(e){ if(_a<3) await new Promise(function(r){ setTimeout(r, (window._gpjRestoreBackoff||700)*Math.pow(2,_a)); }); }
     }
     if(!_got){ _gpjScheduleRestoreRetry(u); return; }   /* gate stays SHUT — never overwrite unseen data */

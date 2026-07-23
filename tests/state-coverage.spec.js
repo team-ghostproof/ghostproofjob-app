@@ -2365,8 +2365,13 @@ test.describe('[STATE-COVERAGE] R5 outreach + anti-ghosting, R6 candidate tray',
       await new Promise((r) => setTimeout(r, 200));
       const shown = getComputedStyle(document.getElementById('sec-reachouts')).display !== 'none';
       const txt = document.getElementById('reachouts-list').textContent || '';
-      document.querySelector('#reachouts-list div[onclick*="interested"]').click();
+      // v148: "Interested" now opens the accept modal so contact is collected on
+      // accept (the mutual-exchange consent gate); the record fires on confirm.
+      document.querySelector('#reachouts-list div[onclick*="_openAcceptInterview"]').click();
       await new Promise((r) => setTimeout(r, 150));
+      document.getElementById('ai-email').value = 'c1@cand.com';
+      await _confirmAcceptInterview();
+      await new Promise((r) => setTimeout(r, 80));
       return { shown, hasReach: /Acme reached out/.test(txt), hasDecline: /instead of ghosting/.test(txt), responded };
     });
     expect(r.shown, 'tray shows when there are messages').toBe(true);
@@ -2394,14 +2399,20 @@ test.describe('[STATE-COVERAGE] R5 outreach + anti-ghosting, R6 candidate tray',
       await new Promise((r) => setTimeout(r, 150));
       const txt = document.getElementById('reachouts-list').textContent || '';
       const hasPrompt = /Pick an interview time/.test(txt), bothSlots = /Tue 2pm CT/.test(txt) && /Thu 10am CT/.test(txt);
+      // v148: picking a slot opens the accept modal (time pre-selected); the record
+      // fires when the candidate confirms + shares contact.
       document.querySelector('#reachouts-list div[onclick*="pickInterviewSlot"]').click();
       await new Promise((r) => setTimeout(r, 150));
+      document.getElementById('ai-email').value = 'c1@cand.com';
+      await _confirmAcceptInterview();
+      await new Promise((r) => setTimeout(r, 80));
       return { hasPrompt, bothSlots, responded };
     });
     expect(r.hasPrompt, 'R7 is a real slot exchange, not free text').toBe(true);
     expect(r.bothSlots).toBe(true);
     expect(r.responded.st).toBe('interested');
     expect(r.responded.extra.acceptedTime).toBe('Tue 2pm CT');
+    expect(r.responded.extra.candidateContact.email, 'accepting shares contact (v148)').toBe('c1@cand.com');
   });
 
   test('R5 appeal: a rejection can be respectfully appealed (anti-ghosting accountability)', async ({ page }) => {
@@ -3528,9 +3539,14 @@ test.describe('[STATE-COVERAGE] v127 full internal scheduling', () => {
       window.fb = window.fb || {};
       let resp = null;
       fb.respondReachout = async (id, status, extra) => { resp = { id, status, extra }; return true; };
-      window._myRO = { ro9: { id: 'ro9', proposedTimes: ['Mon Aug 10 · 2:00 PM CDT', 'Tue Aug 11 · 10:30 AM CDT'], proposedTs: [1786000000000, 1786100000000] } };
+      window._myRO = { ro9: { id: 'ro9', company: 'Acme', proposedTimes: ['Mon Aug 10 · 2:00 PM CDT', 'Tue Aug 11 · 10:30 AM CDT'], proposedTs: [1786000000000, 1786100000000] } };
       window.renderMyReachouts = () => {};
-      await pickInterviewSlot('ro9', 1);
+      // v148: picking a slot opens the accept modal with that time pre-selected; the
+      // structured timestamp still rides through, and the record fires on confirm.
+      pickInterviewSlot('ro9', 1);
+      await new Promise((r) => setTimeout(r, 120));
+      document.getElementById('ai-email').value = 'c1@cand.com';
+      await _confirmAcceptInterview();
       return resp;
     });
     expect(r.status).toBe('interested');
@@ -5330,7 +5346,7 @@ test.describe('[STATE-COVERAGE] v148 interview + contact-exchange flow', () => {
    SWALLOWED a network error and returned null, indistinguishable from a brand-new
    account: the restore then OPENED the write-gate and baselined the monotonic
    guard EMPTY on a FAILED read, so real data vanished until a manual re-login.
-   Fix: loadProfileStrict throws on a real error (null only for a truly-absent doc);
+   Fix: loadProfile now throws on a real error (null only for a truly-absent doc);
    loadTierFromProfile retries with backoff and, if the read never succeeds, keeps
    the gate SHUT and reschedules — never overwriting data it hasn't seen.
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -5347,7 +5363,7 @@ test.describe('[STATE-COVERAGE] v149 restore never strands the account', () => {
       window._gpjCloudLoaded = false; window._gpjCloudListsSeen = null; window._gpjRestoreRetryPending = false;
       let reads = 0;
       window.fb = Object.assign(window.fb || {}, {
-        loadProfileStrict: async () => { reads++; throw new Error('network down'); },
+        loadProfile: async () => { reads++; throw new Error('network down'); },
         current: () => ({ uid: 'u1' }),
       });
       await loadTierFromProfile({ uid: 'u1' });
@@ -5365,7 +5381,7 @@ test.describe('[STATE-COVERAGE] v149 restore never strands the account', () => {
     const r = await page.evaluate(async () => {
       window._gpjCloudLoaded = false; window._gpjCloudListsSeen = null;
       window.fb = Object.assign(window.fb || {}, {
-        loadProfileStrict: async () => null,          // doc genuinely doesn't exist
+        loadProfile: async () => null,          // doc genuinely doesn't exist
         current: () => ({ uid: 'newuser' }),
       });
       await loadTierFromProfile({ uid: 'newuser' });
@@ -5382,7 +5398,7 @@ test.describe('[STATE-COVERAGE] v149 restore never strands the account', () => {
       window._gpjCloudLoaded = false; window._gpjCloudListsSeen = null;
       let n = 0;
       window.fb = Object.assign(window.fb || {}, {
-        loadProfileStrict: async () => { n++; if (n < 3) throw new Error('blip'); return { lists: { applied: [{ t: 'Ops Lead', co: 'Acme', when: Date.now() }] } }; },
+        loadProfile: async () => { n++; if (n < 3) throw new Error('blip'); return { lists: { applied: [{ t: 'Ops Lead', co: 'Acme', when: Date.now() }] } }; },
         current: () => ({ uid: 'u2' }),
       });
       await loadTierFromProfile({ uid: 'u2' });
