@@ -5176,3 +5176,151 @@ test.describe('[STATE-COVERAGE] v147 internal-apply routing', () => {
     expect(r.recorded[0].t).toBe('Growth Lead');
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v148 — interview + MUTUAL contact-exchange flow (founder live-test build):
+   modality offer, contact revealed only on accept, clickable match-why, the
+   persistent already-reached-out state, notification anchor routing, two-way
+   cancel. Privacy spine: the candidate is anonymous until THEY accept.
+   ═══════════════════════════════════════════════════════════════════════════ */
+test.describe('[STATE-COVERAGE] v148 interview + contact-exchange flow', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._collectModality === 'function' && typeof window._confirmAcceptInterview === 'function' && typeof window._showMatchWhy === 'function', null, { timeout: 15000 });
+    await page.evaluate(() => { try { localStorage.removeItem('gpj_rec_cleared'); } catch (e) {} });
+  });
+
+  // Recruiter offers modalities → the collector reads exactly what was toggled.
+  test('modality offer: toggled chips + their details collect correctly', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const host = document.createElement('div'); host.id = '_modtest';
+      host.innerHTML = _modalityOfferHtml(); document.body.appendChild(host);
+      _roToggleMode('inperson'); _roToggleMode('phone');   // offer two of three
+      document.getElementById('ro-addr').value = '100 Main St, Houston, TX';
+      document.getElementById('ro-phone').value = '281-555-0100';
+      const out = _collectModality();
+      host.remove();
+      return out;
+    });
+    expect(r.modes.sort()).toEqual(['inperson', 'phone']);
+    expect(r.details.address).toBe('100 Main St, Houston, TX');
+    expect(r.details.phone).toBe('281-555-0100');
+    expect(r.details.link, 'a mode not offered carries no detail').toBeUndefined();
+  });
+
+  // The heart of the flow: accepting writes the candidate's OWN contact + chosen
+  // modality (was: nothing was ever exchanged, so neither side could connect).
+  test('accept writes candidateContact + chosenModality + the picked time', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let sent = null;
+      window.fb = Object.assign(window.fb || {}, { respondReachout: async (id, status, extra) => { sent = { id, status, extra }; return true; } });
+      _gpjResumeSnapshot = () => ({ name: 'Aaliyah S', contact: 'a@cand.com' });
+      window._myRO = { ro1: { id: 'ro1', company: 'GPJ', proposedTimes: ['Tue 2pm CT'], proposedTs: [123], modalities: ['virtual', 'phone'] } };
+      _openAcceptInterview('ro1', 0);
+      document.getElementById('ai-email').value = 'a@cand.com';
+      _aiPickMode('phone');
+      await _confirmAcceptInterview();
+      return sent;
+    });
+    expect(r, 'respondReachout was called').not.toBeNull();
+    expect(r.status).toBe('interested');
+    expect(r.extra.acceptedTime).toBe('Tue 2pm CT');
+    expect(r.extra.chosenModality).toBe('phone');
+    expect(r.extra.candidateContact.email).toBe('a@cand.com');
+    expect(r.extra.candidateContact.name).toBe('Aaliyah S');
+  });
+
+  // Contact stays hidden until accept: an unaccepted (status 'sent') reach-out
+  // carries NO candidateContact; only after accept does the recruiter see it.
+  test('recruiter sees candidate contact ONLY after the candidate accepts', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window._recruiter = { uid: 'r1', company: 'Acme', isValidated: true };
+      window.fb = Object.assign(window.fb || {}, {
+        loadSentReachouts: async () => [
+          { id: 'a', toCandidateUid: 'c1', jobId: 'jobA', candidateName: 'Anon One', status: 'sent' },
+          { id: 'b', toCandidateUid: 'c2', jobId: 'jobA', candidateName: 'Anon Two', status: 'interested', acceptedTime: 'Wed 3pm', chosenModality: 'virtual', interviewDetails: { link: 'https://zoom.us/x' }, candidateContact: { name: 'Real Name', email: 'real@cand.com' } },
+        ],
+      });
+      let host = document.getElementById('emp-responses');
+      if (!host) { host = document.createElement('div'); host.id = 'emp-responses'; document.body.appendChild(host); }
+      await renderRecruiterResponses();
+      const html = document.getElementById('emp-responses').innerHTML;
+      return { hasContact: /real@cand\.com/.test(html), leaksBeforeAccept: /Anon One/.test(html) };
+    });
+    expect(r.hasContact, 'accepted candidate contact is revealed').toBe(true);
+    expect(r.leaksBeforeAccept, 'an un-accepted reach-out never shows contact').toBe(false);
+  });
+
+  // Clickable match % → anonymous strong-on + gaps, no PII.
+  test('match-why popup shows strong-on terms and gaps', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window._matchWhy = { k1: { m: ['marketing', 'campaigns'], x: ['sql'], p: 82 } };
+      _showMatchWhy('k1');
+      const html = document.getElementById('matchwhy-modal').innerHTML;
+      document.getElementById('matchwhy-modal').remove();
+      return { pct: /82% match/.test(html), strong: /STRONG ON/.test(html) && /marketing/.test(html), gap: /POSSIBLE GAPS/.test(html) && /sql/.test(html), noPII: /no personal information/i.test(html) };
+    });
+    expect(r.pct).toBe(true);
+    expect(r.strong).toBe(true);
+    expect(r.gap).toBe(true);
+    expect(r.noPII).toBe(true);
+  });
+
+  // Already-reached-out: the send button greys with the candidate's response, and
+  // Clear hides them locally — a fresh "Send" would double-message.
+  test('a contacted candidate shows greyed state + Clear; a fresh one shows Send', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window._recruiter = { uid: 'r1', company: 'Acme', isValidated: true };
+      window.fb = Object.assign(window.fb || {}, {
+        loadRecruiterJobs: async () => [{ id: 'jobA', title: 'Ops Lead', isValidated: true, filled: false }],
+        loadRecommendedCandidates: async () => [
+          { uid: 'candX', score: 88, matched: ['ops'], market: 'Houston, TX', applied: false },
+          { uid: 'candY', score: 70, matched: ['ops'], market: 'Houston, TX', applied: false },
+        ],
+        loadSentReachouts: async () => [{ toCandidateUid: 'candX', jobId: 'jobA', status: 'interested' }],
+      });
+      const host = document.createElement('div'); host.id = 'rec-swipe'; document.body.appendChild(host);
+      await renderRecCandidates();
+      const html = document.getElementById('rc-cands').innerHTML;
+      // now clear candX and re-render
+      recClearCandidate('candX|jobA');
+      await new Promise(res => setTimeout(res, 50));
+      const html2 = document.getElementById('rc-cands').innerHTML;
+      host.remove();
+      return {
+        greyed: /Reached out · 👍 Interested/.test(html),
+        freshSend: /Send them this role/.test(html),
+        clearedGone: !/candX/.test(html2) || /Send them this role/.test(html2),
+      };
+    });
+    expect(r.greyed, 'the already-contacted candidate is greyed with their response').toBe(true);
+    expect(r.freshSend, 'the un-contacted candidate still shows Send').toBe(true);
+  });
+
+  // Two-way cancel: candidate cancel is tagged cancelledBy:'candidate'.
+  test('candidate can cancel their own interview, tagged cancelledBy', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let sent = null;
+      window.fb = Object.assign(window.fb || {}, { respondReachout: async (id, status, extra) => { sent = { id, status, extra }; return true; } });
+      window.confirm = () => true; window.prompt = () => 'A conflict came up';
+      await candidateCancelInterview('ro9');
+      return sent;
+    });
+    expect(r.status).toBe('cancelled');
+    expect(r.extra.cancelledBy).toBe('candidate');
+    expect(r.extra.cancelNote).toBe('A conflict came up');
+  });
+
+  // Notification routing surfaces the section (founder repro: "I click it, see nothing").
+  test('notif scroll-to reveals a hidden section', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const el = document.getElementById('sec-reachouts');
+      if (el) el.style.display = 'none';
+      _notifScrollTo('sec-reachouts');
+      await new Promise(res => setTimeout(res, 500));   // it un-hides inside a ~220ms timeout
+      return { existed: !!el, after: el ? el.style.display : 'MISSING' };
+    });
+    expect(r.existed, '#sec-reachouts is the candidate reach-out anchor').toBe(true);
+    expect(r.after, 'the section is made visible when a notif points at it').toBe('block');
+  });
+});

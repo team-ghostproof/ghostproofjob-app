@@ -430,6 +430,40 @@ describe('R5 — outreach is consent-gated + anti-ghost audited', () => {
     await assertSucceeds(setDoc(doc(asCandC(), 'reachouts/ro1'), ro({ status: 'reschedule-requested', rescheduleNote: 'Mornings work better.' }), { merge: true }));
     await assertFails(setDoc(doc(asCandC(), 'reachouts/ro1'), ro({ status: 'reschedule-requested', rescheduleNote: 'x'.repeat(400) }), { merge: true }));
   });
+  // v148 — interview modality offer + MUTUAL contact exchange on accept + two-way cancel
+  test('v148: recruiter CAN offer modalities + interview details + their own contact (bounded)', async () => {
+    await assertSucceeds(setDoc(doc(asRecruiterA(), 'reachouts/r2mod'), ro({
+      modalities: ['inperson', 'virtual'],
+      interviewDetails: { address: '100 Main St, Houston, TX', link: 'https://zoom.us/j/123' },
+      recruiterContact: { name: 'Dana Lee', email: 'dana@acme.com' },
+    })));
+    // an over-long address is rejected
+    await assertFails(setDoc(doc(asRecruiterA(), 'reachouts/r2modbad'), ro({
+      interviewDetails: { address: 'x'.repeat(250) },
+    })));
+    // too many modalities rejected
+    await assertFails(setDoc(doc(asRecruiterA(), 'reachouts/r2modmany'), ro({
+      modalities: ['a', 'b', 'c', 'd'],
+    })));
+  });
+  test('v148: accepting shares the candidate’s OWN contact + chosen modality (bounded)', async () => {
+    await assertSucceeds(setDoc(doc(asCandC(), 'reachouts/ro1'), ro({
+      status: 'interested', acceptedTime: 'Tue 2pm CT', chosenModality: 'virtual',
+      candidateContact: { name: 'Aaliyah S', email: 'a@candidate.com', phone: '281-555-0100' },
+    }), { merge: true }));
+    // an over-long candidate email is rejected
+    await assertFails(setDoc(doc(asCandC(), 'reachouts/ro1'), ro({
+      status: 'interested', candidateContact: { email: 'x'.repeat(130) },
+    }), { merge: true }));
+  });
+  test('v148: the candidate CAN cancel their own interview (respectful, optional reason)', async () => {
+    await assertSucceeds(setDoc(doc(asCandC(), 'reachouts/ro1'), ro({
+      status: 'cancelled', cancelledBy: 'candidate', cancelNote: 'A conflict came up.',
+    }), { merge: true }));
+  });
+  test('v148: a candidate still cannot forge the sender/job while cancelling', async () => {
+    await assertFails(setDoc(doc(asCandC(), 'reachouts/ro1'), { fromRecruiterUid: 'candC', toCandidateUid: 'candC', jobId: 'jobA', kind: 'reachout', status: 'cancelled', ts: 1 }));
+  });
 });
 
 describe('v113 SECURITY — a user cannot buy themselves a tier for free', () => {

@@ -415,6 +415,15 @@ service cloud.firestore {
         && request.resource.data.get('message', '').size() <= 800
         // R7: optional proposed interview slots ride along on a reach-out (bounded list of short strings)
         && request.resource.data.get('proposedTimes', []).size() <= 5
+        // v148: optional interview modality offer + the recruiter's (non-secret) contact.
+        // The CANDIDATE's contact is NEVER on a create — it is written only when the
+        // candidate accepts (see the candidate update rule), which is the consent gate.
+        && request.resource.data.get('modalities', []).size() <= 3
+        && request.resource.data.get('interviewDetails', {}).get('address', '').size() <= 200
+        && request.resource.data.get('interviewDetails', {}).get('link', '').size() <= 300
+        && request.resource.data.get('interviewDetails', {}).get('phone', '').size() <= 40
+        && request.resource.data.get('recruiterContact', {}).get('email', '').size() <= 120
+        && request.resource.data.get('recruiterContact', {}).get('name', '').size() <= 80
         && candidateReachable(request.resource.data.toCandidateUid, request.resource.data.jobId);
       // The recipient CANDIDATE may respond: accept/decline (R6), pick a proposed
       // interview slot (R7 acceptedTime), appeal a rejection (R5), or request a
@@ -425,10 +434,18 @@ service cloud.firestore {
         && request.resource.data.fromRecruiterUid == resource.data.fromRecruiterUid
         && request.resource.data.jobId == resource.data.jobId
         && request.resource.data.kind == resource.data.kind
-        && request.resource.data.status in ['interested', 'declined', 'appealed', 'reschedule-requested']
+        // v148: a candidate may also CANCEL a confirmed interview from their side.
+        && request.resource.data.status in ['interested', 'declined', 'appealed', 'reschedule-requested', 'cancelled']
         && request.resource.data.get('acceptedTime', '').size() <= 200
         && request.resource.data.get('appealMessage', '').size() <= 400
         && request.resource.data.get('rescheduleNote', '').size() <= 300
+        // v148: accepting shares the candidate's OWN contact + chosen modality; a
+        // candidate-side cancel carries an optional reason. All bounded.
+        && request.resource.data.get('chosenModality', '').size() <= 20
+        && request.resource.data.get('cancelNote', '').size() <= 300
+        && request.resource.data.get('candidateContact', {}).get('email', '').size() <= 120
+        && request.resource.data.get('candidateContact', {}).get('name', '').size() <= 80
+        && request.resource.data.get('candidateContact', {}).get('phone', '').size() <= 40
         // an appeal is only valid against a rejection notice (anti-ghosting accountability)
         && (request.resource.data.status != 'appealed' || resource.data.kind == 'rejection');
       // v127: the SENDING recruiter may reschedule (re-propose times -> 'sent') or
@@ -442,6 +459,8 @@ service cloud.firestore {
         && request.resource.data.kind == resource.data.kind
         && request.resource.data.status in ['sent', 'cancelled']
         && request.resource.data.get('proposedTimes', []).size() <= 5
+        // v148: a reschedule may re-offer modalities; a cancel carries an optional note.
+        && request.resource.data.get('modalities', []).size() <= 3
         && request.resource.data.get('cancelNote', '').size() <= 300;
       allow delete: if false;
     }
