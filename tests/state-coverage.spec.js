@@ -5324,3 +5324,71 @@ test.describe('[STATE-COVERAGE] v148 interview + contact-exchange flow', () => {
     expect(r.after, 'the section is made visible when a notif points at it').toBe('block');
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v149 — "my job data went away, then came back on re-login." fb.loadProfile
+   SWALLOWED a network error and returned null, indistinguishable from a brand-new
+   account: the restore then OPENED the write-gate and baselined the monotonic
+   guard EMPTY on a FAILED read, so real data vanished until a manual re-login.
+   Fix: loadProfileStrict throws on a real error (null only for a truly-absent doc);
+   loadTierFromProfile retries with backoff and, if the read never succeeds, keeps
+   the gate SHUT and reschedules — never overwriting data it hasn't seen.
+   ═══════════════════════════════════════════════════════════════════════════ */
+test.describe('[STATE-COVERAGE] v149 restore never strands the account', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.loadTierFromProfile === 'function' && typeof window._gpjScheduleRestoreRetry === 'function', null, { timeout: 15000 });
+  });
+
+  // 3) Interrupted/failed-network state — the actual bug.
+  test('a FAILED cloud read keeps the write-gate SHUT and does not baseline empty', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window._gpjRestoreBackoff = 1;                 // don't wait real backoff in the test
+      window._gpjCloudLoaded = false; window._gpjCloudListsSeen = null; window._gpjRestoreRetryPending = false;
+      let reads = 0;
+      window.fb = Object.assign(window.fb || {}, {
+        loadProfileStrict: async () => { reads++; throw new Error('network down'); },
+        current: () => ({ uid: 'u1' }),
+      });
+      await loadTierFromProfile({ uid: 'u1' });
+      return { reads, gateOpen: window._gpjCloudLoaded === true, baselinedEmpty: window._gpjCloudListsSeen !== null, retryPending: window._gpjRestoreRetryPending === true };
+    });
+    expect(r.reads, 'the read is retried, not attempted once').toBeGreaterThanOrEqual(4);
+    expect(r.gateOpen, 'a failed read must NOT open the write-gate (that overwrote data)').toBe(false);
+    expect(r.baselinedEmpty, 'a failed read must NOT baseline the monotonic guard empty').toBe(false);
+    expect(r.retryPending, 'the restore is rescheduled instead of stranding the account').toBe(true);
+  });
+
+  // 4) Empty/missing-data state — a genuinely absent profile (new account) must
+  // STILL open the gate + baseline empty, or a new account could never persist.
+  test('a genuinely absent profile (null) DOES open the gate + baseline empty', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window._gpjCloudLoaded = false; window._gpjCloudListsSeen = null;
+      window.fb = Object.assign(window.fb || {}, {
+        loadProfileStrict: async () => null,          // doc genuinely doesn't exist
+        current: () => ({ uid: 'newuser' }),
+      });
+      await loadTierFromProfile({ uid: 'newuser' });
+      return { gateOpen: window._gpjCloudLoaded === true, baselined: !!window._gpjCloudListsSeen };
+    });
+    expect(r.gateOpen, 'a real new account can sync from a clean slate').toBe(true);
+    expect(r.baselined, 'and its monotonic baseline is set (empty is correct here)').toBe(true);
+  });
+
+  // A recovered read after transient failures restores + opens the gate.
+  test('a read that succeeds after a couple of blips restores and opens the gate', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window._gpjRestoreBackoff = 1;
+      window._gpjCloudLoaded = false; window._gpjCloudListsSeen = null;
+      let n = 0;
+      window.fb = Object.assign(window.fb || {}, {
+        loadProfileStrict: async () => { n++; if (n < 3) throw new Error('blip'); return { lists: { applied: [{ t: 'Ops Lead', co: 'Acme', when: Date.now() }] } }; },
+        current: () => ({ uid: 'u2' }),
+      });
+      await loadTierFromProfile({ uid: 'u2' });
+      return { attempts: n, gateOpen: window._gpjCloudLoaded === true };
+    });
+    expect(r.attempts, 'it kept trying through the blips').toBe(3);
+    expect(r.gateOpen, 'a recovered read opens the gate so syncing resumes').toBe(true);
+  });
+});
