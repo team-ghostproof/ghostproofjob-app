@@ -5085,3 +5085,94 @@ test.describe('[STATE-COVERAGE] v146 hide all roles from a company (P2-6)', () =
     expect(r.hasName).toBe(true);
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v147 — founder live repro: applying to an internally-hosted job did nothing
+   ("shows a prompt, nothing populates") and left a phantom Applied row that read
+   "⚠ no longer on file". Root cause chain, all closed here:
+     (A) swipeCard recorded the Applied row BEFORE the multi-step apply modal was
+         ever completed → an orphan row with an id but no backing application doc.
+     (B) the pool dedupe chose a fold survivor purely by description length, so a
+         scraped harvester twin could evict the verified internal doc, stripping
+         its _docId/source → in-app apply silently failed.
+     (C) applyInternal() returned void on a missing id → a dead click.
+   ═══════════════════════════════════════════════════════════════════════════ */
+test.describe('[STATE-COVERAGE] v147 internal-apply routing', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.applyInternal === 'function' && typeof window._gpjDedupePool === 'function', null, { timeout: 15000 });
+  });
+
+  // (B) Authenticated / real-data state: a verified internal posting must survive
+  // the fold with its identity intact even when a scraped twin has a longer blurb.
+  test('dedupe keeps the VERIFIED internal doc (id + source) over a longer scraped twin', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const internal = { title: 'Marketing Manager', company: 'GPJ', location: 'Houston, TX', source: 'internal', _docId: 'intern-123', active: true, description: 'Short but real.' };
+      const scraped  = { title: 'Marketing Manager', company: 'GPJ', location: 'Houston, TX', source: 'indeed', description: 'A much much much longer scraped blurb '.repeat(10) };
+      // scraped listed first so length-only logic would have picked it
+      const out = _gpjDedupePool([scraped, internal]);
+      const survivor = out.find(j => (j.title === 'Marketing Manager'));
+      return { count: out.length, source: survivor && survivor.source, docId: survivor && survivor._docId };
+    });
+    expect(r.count, 'the twin folds to one row').toBe(1);
+    expect(r.source, 'the internal doc wins the fold').toBe('internal');
+    expect(r.docId, 'and keeps its doc id for in-app apply').toBe('intern-123');
+  });
+
+  // (C) Empty/missing-data state: an internal job with no id must never be a dead
+  // click — it shows a message and falls back, and creates NO application send.
+  test('applyInternal with a missing id is not a dead click (message + fallback, no send)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let sent = 0, toast = '', opened = null;
+      window.fb = Object.assign(window.fb || {}, { applyToInternalJob: async () => { sent++; return true; } });
+      showToast = (m) => { toast = m; };
+      openCompanyView = (co, o) => { opened = { co, o }; };
+      await applyInternal({ t: 'Marketing Manager', co: 'GPJ', url: '' });   // no id
+      return { sent, toast, openedCo: opened && opened.co };
+    });
+    expect(r.sent, 'no application is sent without an id').toBe(0);
+    expect(r.toast, 'the user is told, not left hanging').toMatch(/company|in-app apply/i);
+    expect(r.openedCo, 'and we fall back to the company view').toBe('GPJ');
+  });
+
+  // (A) Authenticated core fix: a swipe-right on an INTERNAL job hands off to the
+  // apply flow and does NOT pre-record an Applied row — the record only happens on
+  // a real send (inside applyInternal), so no "no longer on file" orphan.
+  test('swiping right on an internal job defers the Applied record to the real send', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      // satisfy the swipe guards
+      isSignedIn = () => true; profileComplete = () => true; isPaid = () => true;
+      registerApply = () => {}; advanceQueue = () => {}; showToast = () => {};
+      const job = { t: 'Marketing Manager', co: 'GPJ', loc: 'Houston, TX', id: 'intern-1', _internal: true, url: '' };
+      _currentTopJob = () => job;
+      deckJobs[0].t = 'Marketing Manager'; deckJobs[0].co = 'GPJ';   // deck non-empty guard
+      const recorded = []; let appliedCalls = 0;
+      recordSwipe = (dir, j) => { recorded.push({ dir, t: j && j.t }); };
+      applyInternal = () => { appliedCalls++; };
+      swipeCard('right');
+      await new Promise(res => setTimeout(res, 600));   // the swipe settles at ~480ms
+      return { recorded, appliedCalls };
+    });
+    expect(r.appliedCalls, 'the internal apply flow is invoked').toBe(1);
+    expect(r.recorded.length, 'NO Applied row is recorded before the send (was the orphan-row bug)').toBe(0);
+  });
+
+  // Contrast/guard: an EXTERNAL right-swipe still records immediately (unchanged).
+  test('an external right-swipe still records immediately (no regression)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      isSignedIn = () => true; profileComplete = () => true; isPaid = () => true;
+      registerApply = () => {}; advanceQueue = () => {}; showToast = () => {};
+      offerCoverLetter = () => {}; openSandbox = () => {}; openCompanyView = () => {};
+      const job = { t: 'Growth Lead', co: 'Acme', loc: 'Houston, TX', id: '', _internal: false, url: 'https://example.com/job' };
+      _currentTopJob = () => job;
+      deckJobs[0].t = 'Growth Lead'; deckJobs[0].co = 'Acme';
+      const recorded = [];
+      recordSwipe = (dir, j) => { recorded.push({ dir, t: j && j.t }); };
+      swipeCard('right');
+      await new Promise(res => setTimeout(res, 600));
+      return { recorded };
+    });
+    expect(r.recorded.length, 'external applies record right away').toBe(1);
+    expect(r.recorded[0].t).toBe('Growth Lead');
+  });
+});

@@ -2833,7 +2833,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v146</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v147</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -4453,13 +4453,21 @@ function swipeCard(dir){
     botCard.classList.remove('bot'); botCard.classList.add('mid');
     botCard.style.transform='scale(.95) translateY(12px)';
     topIndex++;
-    recordSwipe(dir, topJob);                               /* v133: the data-model job, never the DOM index */
+    /* v147 (founder repro — "shows a prompt, nothing populates" + "⚠ no longer on
+       file"): an INTERNAL apply is a multi-step in-app flow (the complete-your-
+       application modal) the user may never finish. Recording the Applied row HERE,
+       before applyInternal actually sends, left an orphan row with an id but NO
+       backing application doc — which is exactly what surfaces as "no longer on
+       file". For internal jobs, applyInternal OWNS the record (it calls recordSwipe
+       only on a real send); external/skip still record immediately as before. */
+    const _isInternalApply=(dir==='right' && topJob._internal && topJob.id);
+    if(!_isInternalApply){ recordSwipe(dir, topJob); }      /* v133: the data-model job, never the DOM index */
     if(dir!=='right'){ try{ advanceQueue(); }catch(e){} }   /* SKIP must refill the deck too — was only refilling on apply, causing skipped cards to recycle */
     if(dir==='right'){
       registerApply();
       /* v133: an employer's INTERNAL job has no external URL — apply IN-APP (was
          falling through to openCompanyView, so a swipe-right never truly applied). */
-      if(topJob._internal && topJob.id){ try{ applyInternal(topJob); }catch(e){} }
+      if(_isInternalApply){ try{ applyInternal(topJob); }catch(e){} }
       else {
         const jurl=topJob.url||'';
         if(jurl){ try{ openSandbox(jurl,topJob.t,topJob.co); }catch(e){ window.open(jurl,'_blank','noopener'); } }
@@ -4467,7 +4475,7 @@ function swipeCard(dir){
         offerCoverLetter(topJob.t, topJob.co, false);
       }
     }
-    showToast(dir==='right'?('❤️ '+topJob.co+' — opening the listing to apply…'):'🚫 Skipped · Algorithm updated');
+    showToast(dir==='right'?(_isInternalApply?('📨 '+topJob.co+' — complete your application to send it…'):('❤️ '+topJob.co+' — opening the listing to apply…')):'🚫 Skipped · Algorithm updated');
   },480);
 }
 let startX=0,startY=0,isDragging=false;
@@ -4908,7 +4916,18 @@ function _gpjDedupePool(arr){
       const k=g+'|'+city;
       const cur=best.get(k);
       if(!cur){ best.set(k,r); order.push({k:k}); }
-      else if(de(r).length>de(cur).length){ best.set(k,r); }
+      else {
+        /* v147: a VERIFIED internal (employer-hosted) posting must WIN its fold and
+           keep its _docId/source. Before this, the survivor was chosen purely by
+           description length, so a scraped harvester twin with a longer blurb could
+           evict the internal doc — the survivor then lost id+source, the mapper set
+           _internal=false/id='', and in-app apply silently failed ("shows a prompt,
+           nothing populates"). Prefer internal; among same-kind rows the longer
+           description still wins. */
+        const rI=(r&&r.source==='internal'), cI=(cur&&cur.source==='internal');
+        if(rI && !cI){ best.set(k,r); }
+        else if(rI===cI && de(r).length>de(cur).length){ best.set(k,r); }
+      }
     });
     return order.map(o=>o.r||best.get(o.k));
   }catch(e){ return arr; }
@@ -10610,7 +10629,16 @@ function _gpjResumeSnapshot(){
   }catch(e){ return {}; }
 }
 async function applyInternal(j, _answers, _details){
-  if(!j||!j.id){ return; }
+  if(!j){ return; }
+  if(!j.id){
+    /* v147: reaching here without an id means this internal job's identity was lost
+       upstream (a dedupe fold or a stale {t,co} stub). NEVER fail silently — that is
+       the "I clicked apply and nothing happened" repro. Tell the user and fall back
+       to the company view so the click is never a dead end. */
+    showToast('This role isn’t open for in-app apply right now — opening the company instead.');
+    try{ openCompanyView(j.co||'',{title:j.t||'',url:j.url||''}); }catch(e){}
+    return;
+  }
   if(typeof requireSignIn==='function' && !requireSignIn('apply to this role')) return;
   if(!(window.fb&&fb.applyToInternalJob)){ showToast('Apply unavailable right now'); return; }
   /* v121: honest duplicate guard — if this role is already on Applied, say WHEN
@@ -12456,8 +12484,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v146';
+const APP_VERSION = 'v147';
 const CHANGELOG = {
+  'v147':['internal-apply routing: defer record to real send (kills phantom \'no longer on file\' row), dedupe prefers verified internal, applyInternal never dies silent on missing id'],
   'v146':['P2-5 Browse filters accordion; P2-6 hide-all-roles-from-company; hosted-job apply button + Verified=hosted-here messaging; P-MATCH unified bidirectional scorer (candidate == recruiter number)'],
   'v145':['P1-4: full internal application (work-auth + sponsorship + contact) + voluntary EEO stored in an employer-invisible collection (eeo_responses, admin-only read)'],
   'v144':['P1-1: verified employer roles reachable (relevance-gated pin, cap 3) + listing quality floor & live strength meter'],
