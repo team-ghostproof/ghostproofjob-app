@@ -190,6 +190,95 @@
            only admin-approved internal jobs pass. Carry the doc id (_docId) so
            the in-app apply can write to jobs/{id}/applications. */
         const mapSnap = (snap)=>{ const out=[]; snap.forEach(d=>{ const v=d.data()||{}; if(v.title&&(v.direct_apply_url||v.source==='internal')) out.push(Object.assign({_docId:d.id},v)); }); return out; };
+        /* hoisted (v152): the pool path below needs it, and it is a pure helper. */
+        const mergeDocs=(a,b)=>{
+          const seen=new Set(), out=[];
+          for(const v of [...a,...b]){
+            const k=((v.title||'')+'|'+(v.company||'')+'|'+(v.location||'')).toLowerCase();
+            if(seen.has(k)) continue; seen.add(k); out.push(v);
+          }
+          return out;
+        };
+        /* ── D1 (v152) POOL-FIRST ─────────────────────────────────────────────
+           The single biggest Firestore cost was rebuilding the deck out of
+           INDIVIDUAL job reads on every session — the region query (up to 800)
+           plus the wide pull (up to 3,000). Job data is PUBLIC and identical for
+           every user, so scripts/build_job_pool.mjs pre-builds it once a day into
+           job_pools/* and we read a handful of AGGREGATE docs instead:
+
+               deck build:  up to ~3,800 reads  ->  ~6
+
+           EMPLOYER JOBS ARE NEVER POOLED. A newly approved internal job must show
+           up immediately (v118: "employer roles are FEW but must NEVER be buried"),
+           so the small live internal query still runs and is merged on top. It is
+           cheap — Firestore bills documents RETURNED, and there are only a handful.
+
+           EVERY failure path falls through to the original queries below: no pool
+           yet (before the first harvest), an empty pool, a stale pool, a rules or
+           network error. A missing pool costs correctness nothing, which is what
+           makes this safe to ship. */
+        const POOL_STALE_MS = 36*60*60*1000;   /* older than this = the harvest is failing; prefer live */
+        const _poolSlug=(s)=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60);
+        let _poolReads=0;
+        const _readPool=async(base)=>{
+          try{
+            _poolReads++;
+            const s0=await getDoc(doc(db,'job_pools',base+'-0'));
+            if(!s0.exists()) return null;
+            const d0=s0.data()||{};
+            if(!Array.isArray(d0.jobs)||!d0.jobs.length) return null;
+            if(!d0.builtAt||(Date.now()-d0.builtAt)>POOL_STALE_MS) return null;
+            let rows=d0.jobs;
+            const of=Math.min(parseInt(d0.of,10)||1,16);   /* bounded: a bad `of` must not fan out */
+            if(of>1){
+              const rest=await Promise.all(Array.from({length:of-1},(_,i)=>{
+                _poolReads++;
+                return getDoc(doc(db,'job_pools',base+'-'+(i+1)))
+                  .then(s=>(s.exists()&&Array.isArray((s.data()||{}).jobs))?s.data().jobs:[])
+                  .catch(()=>[]);
+              }));
+              rows=rows.concat(...rest);
+            }
+            return rows;
+          }catch(e){ return null; }
+        };
+        /* Shape guard: trust the pool only if it actually LOOKS like job docs. The
+           pool feeds every user's deck, so a malformed or half-written snapshot must
+           degrade to the live queries rather than paint broken cards. Sampling the
+           head is enough — the builder writes rows uniformly. */
+        const _poolLooksLikeJobs=(rows)=>{
+          if(!Array.isArray(rows)||!rows.length) return false;
+          const n=Math.min(rows.length,25); let ok=0;
+          for(let i=0;i<n;i++){
+            const r=rows[i];
+            if(r&&r.title&&(r.direct_apply_url||r.redirect_url||r.url||r.source==='internal')) ok++;
+          }
+          return ok>=Math.ceil(n*0.6);
+        };
+        if(!window.__gpjForceLiveJobs){
+          try{
+            let poolRows=[];
+            /* mirror the live semantics: metro slice + national slice, merged.
+               Slugging both sides also fixes the long-standing "Houston, TX" vs
+               "houston-tx" region-format mismatch that made exact-match queries
+               silently return nothing. */
+            if(region){ const m=await _readPool('metro-'+_poolSlug(region)); if(m&&m.length) poolRows=poolRows.concat(m); }
+            const allRows=await _readPool('all'); if(allRows&&allRows.length) poolRows=poolRows.concat(allRows);
+            if(poolRows.length && _poolLooksLikeJobs(poolRows)){
+              let internalLive=[];
+              try{
+                const qi=query(col, where('source','==','internal'), where('active','==',true), limit(300));
+                internalLive=mapSnap(await getDocs(qi));
+              }catch(e){ console.warn('[GPJ] internal jobs query failed (pool path):',e&&e.message); }
+              const merged=mergeDocs(internalLive, poolRows);
+              console.log('[GPJ] job pool HIT — '+merged.length+' jobs from '+_poolReads+' aggregate reads +'+internalLive.length+' employer docs (live queries skipped)');
+              return _stash(merged);
+            }
+            /* explicit MISS log so the rollout is diagnosable in production: seeing
+               this means the deck is still on the expensive live path. */
+            console.log('[GPJ] job pool miss ('+(poolRows.length?'failed shape check':'not built yet / stale')+') — using live queries');
+          }catch(e){ console.warn('[GPJ] job pool unavailable — falling back to live queries:',e&&e.message); }
+        }
         // 1) region-scoped (active only), newest first when index allows.
         //    B-POOL-MERGE (v80): region docs are COLLECTED and MERGED with the
         //    wide pull below — never returned alone. Returning early (pre-v74)
@@ -214,14 +303,7 @@
             }catch(e){ console.warn('[GPJ] region query failed:',e&&e.message); }
           }
         }
-        const mergeDocs=(a,b)=>{
-          const seen=new Set(), out=[];
-          for(const v of [...a,...b]){
-            const k=((v.title||'')+'|'+(v.company||'')+'|'+(v.location||'')).toLowerCase();
-            if(seen.has(k)) continue; seen.add(k); out.push(v);
-          }
-          return out;
-        };
+        /* (mergeDocs moved above in v152 — the pool path needs it earlier.) */
         /* v118: employer-posted roles are FEW but must NEVER be buried. The wide
            newest-3000 pull turns over in hours at 11-20k harvested docs/day, and
            pre-v118 internal docs carry no harvester region — so a live, admin-
@@ -2841,7 +2923,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v151</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v152</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -5084,6 +5166,22 @@ function _gpjDedupePool(arr){
     return order.map(o=>o.r||best.get(o.k));
   }catch(e){ return arr; }
 }
+/* D1 (v152): the text computeMatch() should score against.
+   A POOL row stores only a short description PREVIEW (the full posting lazy-loads
+   when the drawer is opened), so scoring the preview alone would make the same job
+   score lower in the deck than it does from the full document. The builder mines
+   `matchTerms` from the FULL description + requirements, so appending them restores
+   whole-document coverage and keeps the score stable either way.
+   For a LIVE Firestore doc there are no matchTerms and this returns the text
+   unchanged — so nothing about today's scoring moves. Declared as a function so
+   hoisting makes call-site order irrelevant. */
+function _gpjMatchText(r, desc){
+  const base = desc || (r && (r.description || r.desc)) || '';
+  try{
+    if(r && Array.isArray(r.matchTerms) && r.matchTerms.length) return base + ' ' + r.matchTerms.join(' ');
+  }catch(e){}
+  return base;
+}
 function mapFirestoreJob(r){
   if(!r||!r.title) return null;
   const co=(typeof r.company==='string'?r.company:(r.company&&r.company.display_name))||r.co||'Hiring Company';
@@ -5134,7 +5232,7 @@ function mapFirestoreJob(r){
     _verifiedCo:(r.source==='internal'&&r.isValidated===true),
     companyWebsite:r.companyWebsite||'', companyLinkedIn:r.companyLinkedIn||'', companyX:r.companyX||'',
     companyId:r.companyId||'', appQuestions:Array.isArray(r.appQuestions)?r.appQuestions.slice(0,5):[],
-    match:(typeof computeMatch==='function'?computeMatch(r.title||'',_desc||r.description||r.desc||''):0),
+    match:(typeof computeMatch==='function'?computeMatch(r.title||'',_gpjMatchText(r,_desc)):0),
     posting_age_days:_age,
     stale:_stale,
     jtype:(typeof jobTypeTag==='function'?jobTypeTag(r):''),
@@ -8451,7 +8549,7 @@ async function _fetchLiveMarketJobs(){
       _verifiedCo:(r.source==='internal'&&r.isValidated===true),
       companyWebsite:r.companyWebsite||'', companyLinkedIn:r.companyLinkedIn||'', companyX:r.companyX||'',
       companyId:r.companyId||'', appQuestions:Array.isArray(r.appQuestions)?r.appQuestions.slice(0,5):[],
-      match:computeMatch(r.title||'',r.description||r.desc||''),
+      match:computeMatch(r.title||'',_gpjMatchText(r,'')),   /* v152: pool rows contribute full-doc matchTerms */
       posting_age_days:jobAgeDays(r),
     jtype:(typeof jobTypeTag==='function'?jobTypeTag(r):''),
       job_type:(r.job_type||'').toLowerCase(),
@@ -12711,8 +12809,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v151';
+const APP_VERSION = 'v152';
 const CHANGELOG = {
+  'v152':['D1 client seam: fetchJobs reads pre-built job_pools first (deck build ~3800 reads -> ~6) with fallback on every failure path; employer jobs stay on the live query; pool rows carry matchTerms so match % keeps full-document coverage'],
   'v151':['notification emails (event-driven): interview-confirmed email to both parties + \'employer reached out\' email to candidate (Vercel, token-verified, suppression + send-once); Worker lifecycle templates (day-7, tier-change, booster) as a paste-ready reviewable module'],
   'v150':['CI green: 3 accept-flow tests updated to the v148 modal flow; v149 restore approach corrected — loadProfile itself now THROWS on a read error (drop the separate strict fn) so all existing loadProfile-stubbing tests keep working'],
   'v149':['restore resilience: loadProfile now THROWS on a read error (null only for a truly-absent doc) instead of swallowing it as an empty account; loadTierFromProfile retries with backoff + reschedules on total failure — a transient blip no longer strands the account (data-loss \'never goes back\')'],
