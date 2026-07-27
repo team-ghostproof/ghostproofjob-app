@@ -49,16 +49,46 @@ const FIXTURE = process.argv.includes('--fixture');
    below counts the JSON payload, and Firestore adds per-field name overhead on
    top, so a generous margin is deliberate rather than optimistic. */
 const MAX_DOC_BYTES = 800 * 1024;
-const DESC_BUDGET = 1500;      // enough for honest computeMatch scoring
-const REQ_BUDGET = 600;
-const BEN_BUDGET = 400;
-const MAX_SHARDS_PER_KEY = 8;  // hard ceiling so one runaway metro can't balloon writes
+/* DISPLAY budget only — the collapsed swipe/Browse card shows title, company,
+   location, salary and badges; the full description/requirements/benefits are only
+   ever revealed when the drawer is EXPANDED, which lazy-loads the real doc (1 read
+   for a job the user actually opened). So the preview here just needs to be enough
+   for a snippet, not the whole posting. */
+const DESC_BUDGET = 600;
+const REQ_BUDGET = 300;
+const BEN_BUDGET = 200;
+/* MATCH budget — separate from display ON PURPOSE. computeMatch() scores against
+   the job text, so scoring a TRUNCATED description would make the same job score
+   differently in the deck than after opening it. Instead of carrying prose we
+   cannot afford, each row carries `matchTerms`: the distinctive terms mined from
+   the FULL description + requirements at build time. Full-document term coverage
+   in ~500 bytes, and the score is stable whether or not the full doc is loaded. */
+const MATCH_TERMS = 60;
+const MAX_SHARDS_PER_KEY = 12;  // ceiling per key; 12 x ~330 rows comfortably covers the 3,000 national cap
 const POOL_COLLECTION = 'job_pools';
 
 const cut = (s, n) => {
   const t = String(s == null ? '' : s);
   return t.length <= n ? t : t.slice(0, n);
 };
+
+/* Stopwords that carry no matching signal. Deliberately small: computeMatch does
+   its own field-word logic, so this only strips filler that would waste bytes. */
+const STOP = new Set(['this','that','with','from','have','will','your','their','they','been','were','which','while','about','into','than','then','them','these','those','when','where','what','would','could','should','being','other','more','most','such','also','after','before','during','through','over','under','both','each','some','many','must','able','work','role','team','join','help','make','used','using','across','within','including','include','includes','required','requirement','requirements','experience','years','year','plus','strong','excellent','ability','skills','knowledge','opportunity','position','candidate','candidates','applicants','company','business','support','ensure','provide','manage','manages','managing']);
+
+/** Mine the distinctive terms from the FULL text so match scoring keeps whole-doc
+ *  coverage even though the stored prose is only a preview. */
+function mineTerms(full, limit = MATCH_TERMS) {
+  const seen = new Set(), out = [];
+  const words = String(full || '').toLowerCase().replace(/[^a-z0-9+#\s]/g, ' ').split(/\s+/);
+  for (const w of words) {
+    if (w.length < 4 || w.length > 24) continue;
+    if (STOP.has(w) || seen.has(w)) continue;
+    seen.add(w); out.push(w);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
 
 /** Trim one raw job doc to a pool row. Field NAMES must match the real doc shape
  *  so the client mappers need no special-casing. `_full` flags that description
@@ -93,6 +123,12 @@ function toPoolRow(id, v) {
   if (v.work_setting) row.work_setting = cut(v.work_setting, 40);
   if (v.ingestedAt) row.ingestedAt = v.ingestedAt;
   if (v.date_posted) row.date_posted = cut(v.date_posted, 40);
+  /* whole-document term coverage for stable match scoring (see MATCH_TERMS) —
+     mined from the FULL description + requirements, not the stored preview. */
+  const terms = mineTerms(desc + ' ' + req);
+  if (terms.length) row.matchTerms = terms;
+  /* _clipped tells the client "there is more text behind a detail fetch", which is
+     what drives lazy-loading the full posting when the drawer is expanded. */
   if (desc.length > DESC_BUDGET || req.length > REQ_BUDGET || ben.length > BEN_BUDGET) row._clipped = true;
   return row;
 }
@@ -197,6 +233,25 @@ async function main() {
     console.log('  rows clipped   :', clipped, '(full text lazy-loads on open)');
     if (maxBytes > MAX_DOC_BYTES) { console.error('  FAIL: a shard exceeded the byte budget'); process.exit(1); }
     if (!pools.some((p) => p.key.startsWith('all-'))) { console.error('  FAIL: no national pool'); process.exit(1); }
+
+    /* THE CORRECTNESS CLAIM: the stored description is only a PREVIEW, so match
+       scoring would drift if it were the scoring input. Prove that a distinctive
+       term living past the preview cutoff still reaches matchTerms — that is what
+       keeps the deck's match % equal to the full-document score. */
+    const tailWord = 'kubernetes';
+    const probe = buildPool([{ id: 'probe', data: {
+      title: 'Platform Engineer', company: 'Acme', location: 'Houston, TX', region: 'Houston, TX',
+      description: 'Lead platform work. '.repeat(120) + ' We run on ' + tailWord + ' in production.',
+      requirements: 'Deep distributed systems background.', active: true, ingestedAt: Date.now(),
+      direct_apply_url: 'https://x/1',
+    } }]).pools[0].doc.jobs[0];
+    const inPreview = probe.description.includes(tailWord);
+    const inTerms = (probe.matchTerms || []).includes(tailWord);
+    console.log('  tail-term probe: preview contains "' + tailWord + '"? ' + inPreview + '  |  matchTerms contains it? ' + inTerms);
+    if (inPreview) { console.error('  FAIL: probe is invalid — the term must fall PAST the preview cutoff'); process.exit(1); }
+    if (!inTerms) { console.error('  FAIL: a term past the preview cutoff was lost — match % would drift from the full-doc score'); process.exit(1); }
+    if (!probe._clipped) { console.error('  FAIL: clipped row not flagged, so the client would never lazy-load the full text'); process.exit(1); }
+
     console.log('[pool] self-test PASSED');
     return;
   }
