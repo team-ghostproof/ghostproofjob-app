@@ -5453,3 +5453,142 @@ test.describe('[STATE-COVERAGE] v151 notification-email trigger', () => {
     expect(r.body.reachoutId).toBe('ro9');
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v153 — founder full-sweep. THE P0: Firestore rejects an `undefined` field
+   value, and cloudSync built `prefs: undefined` whenever Match Preferences still
+   showed the shipped placeholders. setDoc threw, `.catch(()=>{})` swallowed it,
+   and so NOTHING synced — not the resume, not lists, not the reported-jobs set.
+   That is why old data "came back" (the cloud kept serving the last good
+   snapshot) and why a reported job reappeared.
+   Secondary: gpjIsExpired compared a RAW title|company key against the v138
+   BRAND-FOLDED key, so the cloud-synced hide never matched for any employer with
+   a legal suffix ("The Bexar Company" -> "the bexar").
+   ═══════════════════════════════════════════════════════════════════════════ */
+test.describe('[STATE-COVERAGE] v153 sync P0 + reported-job hide', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.gpjIsExpired === 'function' && typeof window.cloudSync === 'function', null, { timeout: 15000 });
+  });
+
+  // THE P0 — the payload shape that silently killed every write.
+  test('undefined field values are stripped, so a profile write never throws', async ({ page }) => {
+    await page.waitForFunction(() => typeof window._gpjStripUndefined === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      const s = window._gpjStripUndefined;
+      const out = s({ prefs: undefined, keep: 'yes', nested: { gone: undefined, stays: 1 }, arr: [1, undefined, 2], zero: 0, empty: '' });
+      return {
+        prefsOmitted: !('prefs' in out),
+        nestedOmitted: !('gone' in out.nested),
+        nestedKept: out.nested.stays === 1,
+        arr: out.arr,
+        falsyPreserved: out.zero === 0 && out.empty === '',   // 0 and '' are REAL values, not undefined
+      };
+    });
+    expect(r.prefsOmitted, 'the key is genuinely omitted (what {merge:true} needs)').toBe(true);
+    expect(r.nestedOmitted).toBe(true);
+    expect(r.nestedKept).toBe(true);
+    expect(r.arr).toEqual([1, 2]);
+    expect(r.falsyPreserved, 'falsy-but-real values must survive').toBe(true);
+  });
+
+  // 2) Authenticated: cloudSync must OMIT prefs on placeholders (never clobber),
+  //    and must still send everything else.
+  test('cloudSync omits prefs while placeholders show, but still syncs the rest', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let sent = null;
+      window.fb = Object.assign(window.fb || {}, {
+        current: () => ({ uid: 'u1' }),
+        saveProfile: async (uid, data) => { sent = data; return true; },
+      });
+      window._gpjCloudLoaded = true;                       // past the data-loss gate
+      // simulate a COMPLETED restore: without this baseline the v143 monotonic guard
+      // deliberately withholds `lists` (it will not write what it has not read).
+      window._gpjCloudListsSeen = { applied: [], responses: [], skipped: [], viewed: [] };
+      lists.applied = [{ t: 'Ops Lead', co: 'Acme', when: Date.now() }];
+      cloudSync();
+      await new Promise(res => setTimeout(res, 120));
+      return { sent, prefsValue: sent ? sent.prefs : null, hasResume: !!(sent && sent.resume), hasLists: !!(sent && sent.lists) };
+    });
+    expect(r.sent, 'cloudSync reached saveProfile').not.toBeNull();
+    expect(r.prefsValue, 'placeholders must never be written as real prefs').toBeFalsy();
+    expect(r.hasResume, 'the rest of the payload still syncs').toBe(true);
+    expect(r.hasLists, 'lists sync once a baseline exists').toBe(true);
+  });
+
+  // An industries-only edit used to be dropped: the old guard skipped the WHOLE
+  // prefs object whenever titles+salary were still placeholders.
+  test('an industries-only edit is saved (was silently dropped)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let sent = null;
+      window.fb = Object.assign(window.fb || {}, {
+        current: () => ({ uid: 'u1' }),
+        saveProfile: async (uid, data) => { sent = data; return true; },
+      });
+      window._gpjCloudLoaded = true;
+      document.getElementById('pref-industries').textContent = 'Healthcare, SaaS';
+      cloudSync();
+      await new Promise(res => setTimeout(res, 120));
+      return sent && sent.prefs;
+    });
+    expect(r, 'prefs object is written').toBeTruthy();
+    expect(r.industries).toBe('Healthcare, SaaS');
+    expect(r.titles, 'placeholder titles must NOT ride along').toBeUndefined();
+  });
+
+  // 4) Empty/missing data: an empty local expired set must not blank the cloud copy.
+  test('an empty reported-jobs set omits the key instead of overwriting with []', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let sent = null;
+      window.fb = Object.assign(window.fb || {}, {
+        current: () => ({ uid: 'u1' }),
+        saveProfile: async (uid, data) => { sent = data; return true; },
+      });
+      window._gpjCloudLoaded = true;
+      localStorage.setItem('gpj_expired', '[]');
+      cloudSync();
+      await new Promise(res => setTimeout(res, 120));
+      const empty = sent ? sent.expired : 'NOSEND';
+
+      localStorage.setItem('gpj_expired', JSON.stringify(['some role|acme']));
+      sent = null; cloudSync();
+      await new Promise(res => setTimeout(res, 120));
+      return { whenEmpty: empty, whenPopulated: sent ? sent.expired : null };
+    });
+    expect(r.whenEmpty, 'an empty set must NOT be written (it would un-hide every report)').toBeUndefined();
+    expect(r.whenPopulated).toEqual(['some role|acme']);
+  });
+
+  // THE FOUNDER REPRO: reported LinkedIn job kept reappearing.
+  test('a reported job stays hidden via the cloud-synced skip list (folded company key)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const T = 'Marketing Specialist', CO = 'The Bexar Company';
+      localStorage.setItem('gpj_expired', '[]');          // local set lost (post-wipe)
+      lists.skipped = [{ t: T, co: CO, when: Date.now() }]; // only the cloud copy survives
+      const folded = gpjExpiredKey(T, CO);
+      const raw = (T + '|' + CO).toLowerCase().replace(/\s+/g, ' ').trim();
+      return {
+        folded, raw,
+        keysDiffer: folded !== raw,                        // proves the old comparison could never match
+        hiddenViaSkipList: gpjIsExpired(T, CO),
+        mapperDropsIt: mapFirestoreJob({ title: T, company: CO, description: 'x', direct_apply_url: 'https://x' }) === null,
+      };
+    });
+    expect(r.keysDiffer, 'folded vs raw keys genuinely differ — the original bug').toBe(true);
+    expect(r.hiddenViaSkipList, 'the cloud-synced hide must match after a local wipe').toBe(true);
+    expect(r.mapperDropsIt, 'and the job never reaches the UI').toBe(true);
+  });
+
+  test('a job the user never reported is NOT hidden (no over-blocking)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_expired', '[]');
+      lists.skipped = [{ t: 'Marketing Specialist', co: 'The Bexar Company', when: Date.now() }];
+      return {
+        differentRole: gpjIsExpired('Operations Manager', 'The Bexar Company'),
+        differentCompany: gpjIsExpired('Marketing Specialist', 'Acme Industries'),
+      };
+    });
+    expect(r.differentRole).toBe(false);
+    expect(r.differentCompany).toBe(false);
+  });
+});
