@@ -31,6 +31,17 @@ api/match/
 # To bring an endpoint back: delete the line below and FIX THE FILENAME CASE first.
 api/jobs/
 
+# vercel.json was also cleaned up alongside this (rationale lives HERE because
+# vercel.json's schema is STRICT — it rejects unknown top-level keys, so you cannot
+# leave "_comment" notes in it; doing so fails the build with "should NOT have
+# additional property"):
+#   * the "functions" block for api/jobs/*.js was removed — with the directory
+#     excluded the pattern matches zero functions, which Vercel treats as an error,
+#     and `memory` is ignored anyway under Active CPU billing.
+#   * the daily cron on "/api/jobs/index" was removed — no such file has ever
+#     existed, so it resolved to nothing every night. The real harvest is
+#     .github/workflows/job_harvest.yml (Python, 05:00 UTC) → Firestore, unaffected.
+
 # api/notifications/ — sendAutomatedEmail.js is a LIBRARY, not an HTTP endpoint:
 # it exports { sendAutomatedEmail, sendBatch, ... } with no request handler, and
 # no deployed function imports it (verified). Vercel was turning it into a

@@ -27,7 +27,5 @@
         { "key": "Content-Security-Policy-Report-Only", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googleapis.com https://apis.google.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://ghostproofjob-worker.ghostproofjob.workers.dev https://flagcdn.com https://api.exchangerate.host; frame-src 'self' https://*.firebaseapp.com https://buy.stripe.com https://js.stripe.com; form-action 'self' https://buy.stripe.com; base-uri 'self'; object-src 'none'" }
       ]
     }
-  ],
-  "_comment_functions": "v152: the api/jobs/*.js block was REMOVED. That directory is no longer deployed (see .vercelignore), so the pattern would match zero functions — which Vercel treats as a build error — and Vercel now reports the `memory` setting as ignored under Active CPU billing anyway.",
-  "_comment_crons": "v152: the daily cron on '/api/jobs/index' was REMOVED. No such file has ever existed, so it resolved to nothing every night. The real harvest is .github/workflows/job_harvest.yml (Python, 05:00 UTC), which writes to Firestore directly and is unaffected."
+  ]
 }

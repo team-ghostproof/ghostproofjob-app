@@ -218,6 +218,23 @@ ok(`Vercel Hobby serverless functions ≤ ${VERCEL_HOBBY_FN_CAP}`,
    Vercel build error — easy to hit right after excluding a directory. */
 let vjson = null;
 try { vjson = JSON.parse(fs.readFileSync(ROOT + 'vercel.json', 'utf8')); } catch (e) {}
+
+/* vercel.json's schema is STRICT: any unrecognised top-level key fails the build
+   with "should NOT have additional property '<key>'". That bit us when a
+   "_comment_*" note was added for documentation — JSON.parse happily accepted it,
+   so syntax validation alone was NOT enough. Keep explanatory notes in
+   .vercelignore (which allows # comments) instead. */
+const VERCEL_TOP_LEVEL_KEYS = new Set([
+  'version', 'name', 'alias', 'scope', 'regions', 'public', 'github', 'git', 'images',
+  'env', 'build', 'builds', 'routes', 'cleanUrls', 'trailingSlash', 'redirects',
+  'rewrites', 'headers', 'functions', 'crons', 'framework', 'buildCommand',
+  'devCommand', 'installCommand', 'outputDirectory', 'ignoreCommand', 'rootDirectory',
+  'functionFailoverRegions', 'headersCacheControl',
+]);
+const badKeys = vjson ? Object.keys(vjson).filter(k => !VERCEL_TOP_LEVEL_KEYS.has(k)) : [];
+ok('vercel.json has no unrecognised top-level keys', badKeys.length === 0,
+   badKeys.length ? 'would fail Vercel schema validation: ' + badKeys.join(', ') + ' (put notes in .vercelignore)' : '');
+
 const fnPatterns = Object.keys((vjson && vjson.functions) || {});
 const orphanPatterns = fnPatterns.filter(p => {
   const rx = new RegExp('^' + p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*/g, '§').replace(/\*/g, '[^/]*').replace(/§/g, '.*') + '$');
