@@ -44,6 +44,9 @@ jobs:
       - run: npm run test:apply
       - run: npm run test:seo
       - run: npm run test:billing
+      # D1: the job-pool builder self-test runs OFFLINE (fixture, no creds) so the
+      # sharding/byte-budget math is protected without touching live Firestore.
+      - run: npm run pool:check
 
   rules:
     name: "Firestore rules (emulator)"

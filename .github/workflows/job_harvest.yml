@@ -48,3 +48,31 @@ jobs:
           SITES: ${{ vars.SITES || 'linkedin,indeed' }}
           BACKFILL_MAX: ${{ vars.BACKFILL_MAX || '0' }}
         run: python scripts/job_spy_harvester.py
+
+      # ---------------------------------------------------------------------
+      # D1: rebuild the pre-computed job pool immediately after the harvest, so
+      # the snapshot the app reads is as fresh as the data itself.
+      #
+      # WHY IT LIVES HERE: this is the read-cost fix. Every candidate session used
+      # to rebuild the deck from thousands of individual job reads; it now reads
+      # ~1-8 aggregate pool docs instead. Running it right after the harvest keeps
+      # the pool at most one cycle behind the source.
+      #
+      # `if: always()` — a PARTIAL harvest (budget timeout, a source erroring) still
+      # leaves a perfectly good pool to rebuild from. Skipping on failure would
+      # strand the app on yesterday's pool for no reason.
+      # `continue-on-error` — the pool is an OPTIMISATION, never a dependency: the
+      # client falls back to the live query whenever a pool is missing or stale, so
+      # a failure here must not turn the harvest red.
+      - name: Set up Node 20 (job pool builder)
+        if: always()
+        uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Rebuild the D1 job pool
+        if: always()
+        continue-on-error: true
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          npm install firebase-admin --no-save
+          node scripts/build_job_pool.mjs

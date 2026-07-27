@@ -77,6 +77,18 @@ service cloud.firestore {
     }
 
     // 1. PUBLIC READ ACCESS FOR JOBS
+    /* D1 job pool (v152): pre-built AGGREGATE snapshots of the public job pool,
+       written once a day by scripts/build_job_pool.mjs (GitHub Actions, admin SDK).
+       They exist so the app reads ~1-8 docs to build a deck instead of thousands —
+       the single biggest Firestore read cost. Contents are exactly the same PUBLIC
+       job data as /jobs (which is already `allow read: if true`), just batched, so
+       reading is public. Writing is BACKEND-ONLY: the admin SDK bypasses rules, and
+       no client path may forge a pool — a poisoned pool would feed every user's deck. */
+    match /job_pools/{poolId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /jobs/{jobId} {
       allow read: if true;
       // (A) was `if false`. Now scoped: admin, or a recruiter creating/editing

@@ -466,6 +466,25 @@ describe('R5 — outreach is consent-gated + anti-ghost audited', () => {
   });
 });
 
+describe('D1 v152 — job_pools is world-readable but client-unwritable', () => {
+  test('anyone (even signed-out) can READ a pool doc — it is public job data', async () => {
+    await assertSucceeds(getDoc(doc(asGuest(), 'job_pools/all-0')));
+    await assertSucceeds(getDoc(doc(asCandC(), 'job_pools/all-0')));
+  });
+  test('NO client may write a pool — a forged pool would poison every deck', async () => {
+    const pool = { key: 'all', shard: 0, of: 1, builtAt: 1, count: 1, jobs: [{ title: 'x' }] };
+    await assertFails(setDoc(doc(asCandC(), 'job_pools/all-0'), pool));
+    await assertFails(setDoc(doc(asRecruiterA(), 'job_pools/all-0'), pool));
+    await assertFails(setDoc(doc(asGuest(), 'job_pools/all-0'), pool));
+    // even an admin client is denied — pools are written by the admin SDK only
+    await assertFails(setDoc(doc(asAdmin(), 'job_pools/all-0'), pool));
+  });
+  test('no client may delete a pool either', async () => {
+    await assertFails(deleteDoc(doc(asCandC(), 'job_pools/all-0')));
+    await assertFails(deleteDoc(doc(asAdmin(), 'job_pools/all-0')));
+  });
+});
+
 describe('v113 SECURITY — a user cannot buy themselves a tier for free', () => {
   // profiles allowed the owner to write ANY field, and isPaid() reads profiles.tier —
   // so a user could simply write tier:'life' and unlock the paywall. Entitlement +
