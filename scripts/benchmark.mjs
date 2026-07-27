@@ -180,5 +180,78 @@ const sw = fs.readFileSync(ROOT + 'sw.js', 'utf8');
 const cacheV = (sw.match(/CACHE_VERSION\s*=\s*['"]gpj-v(\d+)/) || [])[1];
 ok('APP_VERSION / build-stamp / CACHE_VERSION agree', appV && appV === stamp && appV === cacheV, `APP_VERSION=${appV} build-stamp=${stamp} CACHE_VERSION=${cacheV}`);
 
+/* 8) FREE-TIER PLATFORM LIMITS (v152)
+   GPJ runs on free plans by design — the ONLY paid items are the AI helper and
+   Claude. A build that is perfect in code but exceeds a platform quota still
+   fails to deploy, so the quota is now a benchmark gate, not something to
+   remember. This has bitten twice: adding a handler under api/ silently raises
+   the Vercel Serverless Function count and every deploy hard-fails with
+   "No more than 12 Serverless Functions can be added ... on the Hobby plan". */
+console.log('\n[8] free-tier platform limits');
+const VERCEL_HOBBY_FN_CAP = 12;
+const SITEMAP_URL_CAP = 50000;          // sitemaps.org / Google hard limit per file
+
+const ignoreLines = fs.existsSync(ROOT + '.vercelignore')
+  ? fs.readFileSync(ROOT + '.vercelignore', 'utf8').split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#'))
+  : [];
+const isIgnored = (rel) => ignoreLines.some(i => rel === i || rel.startsWith(i.replace(/\/$/, '') + '/'));
+
+const walkJs = (dir, out = []) => {
+  if (!fs.existsSync(dir)) return out;
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const abs = path.join(dir, e.name);
+    if (e.isDirectory()) walkJs(abs, out);
+    else if (e.name.endsWith('.js')) out.push(path.relative(ROOT, abs).split(path.sep).join('/'));
+  }
+  return out;
+};
+const apiAll = walkJs(ROOT + 'api');
+const deployedFns = apiAll.filter(f => !isIgnored(f));
+ok(`Vercel Hobby serverless functions ≤ ${VERCEL_HOBBY_FN_CAP}`,
+   deployedFns.length <= VERCEL_HOBBY_FN_CAP,
+   `${deployedFns.length}/${VERCEL_HOBBY_FN_CAP} deployed` +
+   (deployedFns.length > VERCEL_HOBBY_FN_CAP
+     ? ` — OVER by ${deployedFns.length - VERCEL_HOBBY_FN_CAP}. Add helper/dead dirs to .vercelignore (only real HTTP handlers should deploy).`
+     : ` (${VERCEL_HOBBY_FN_CAP - deployedFns.length} slots free)`));
+
+/* A vercel.json `functions` pattern that matches ZERO deployed files is itself a
+   Vercel build error — easy to hit right after excluding a directory. */
+let vjson = null;
+try { vjson = JSON.parse(fs.readFileSync(ROOT + 'vercel.json', 'utf8')); } catch (e) {}
+const fnPatterns = Object.keys((vjson && vjson.functions) || {});
+const orphanPatterns = fnPatterns.filter(p => {
+  const rx = new RegExp('^' + p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*/g, '§').replace(/\*/g, '[^/]*').replace(/§/g, '.*') + '$');
+  return !deployedFns.some(f => rx.test(f));
+});
+ok('every vercel.json `functions` pattern matches a deployed file',
+   orphanPatterns.length === 0,
+   orphanPatterns.length ? 'orphaned: ' + orphanPatterns.join(', ') : (fnPatterns.length ? fnPatterns.join(', ') : 'no patterns declared'));
+
+/* Case-sensitivity trap (CLAUDE.md §5): Vercel's filesystem is case-SENSITIVE,
+   Windows/macOS are not — so a relative require can pass locally and throw in
+   production. Only DEPLOYED functions matter here. */
+const caseBroken = [];
+for (const f of deployedFns) {
+  let src = ''; try { src = fs.readFileSync(ROOT + f, 'utf8'); } catch (e) { continue; }
+  const dir = path.dirname(ROOT + f);
+  const rr = /require\(\s*['"](\.\.?\/[^'"]+)['"]\s*\)/g;
+  let m;
+  while ((m = rr.exec(src)) !== null) {
+    const spec = m[1];
+    const base = path.basename(spec).replace(/\.js$/, '') + '.js';
+    const targetDir = path.dirname(path.resolve(dir, spec));
+    if (!fs.existsSync(targetDir)) { caseBroken.push(`${f} → ${spec} (missing dir)`); continue; }
+    if (!fs.readdirSync(targetDir).includes(base)) caseBroken.push(`${f} → ${spec}`);
+  }
+}
+ok('deployed relative requires resolve with EXACT case', caseBroken.length === 0,
+   caseBroken.length ? caseBroken.join('; ') : '');
+
+if (fs.existsSync(ROOT + 'sitemap.xml')) {
+  const urlCount = (fs.readFileSync(ROOT + 'sitemap.xml', 'utf8').match(/<loc>/g) || []).length;
+  ok(`sitemap.xml under ${SITEMAP_URL_CAP.toLocaleString()} URLs`, urlCount <= SITEMAP_URL_CAP,
+     `${urlCount.toLocaleString()} URLs` + (urlCount > SITEMAP_URL_CAP ? ' — split into a sitemap index' : ''));
+}
+
 console.log(`\n${'='.repeat(58)}\n${fails === 0 ? 'BENCHMARK GREEN' : 'BENCHMARK RED — ' + fails + ' failure(s)'}\n${'='.repeat(58)}`);
 process.exit(fails === 0 ? 0 : 1);

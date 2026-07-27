@@ -12,6 +12,31 @@
 # the directory is safe and drops the function count to 9.
 api/match/
 
+# v152 — the SAME failure returned: v151 added api/interview-email.js and
+# api/reachout-email.js, taking the count 11 -> 13 and hard-failing every deploy
+# with "No more than 12 Serverless Functions ... on the Hobby plan".
+#
+# api/jobs/ — DEAD in the deployed runtime, and excluding it frees SIX slots:
+#   * index.html calls no /api/jobs/* path (verified by grep).
+#   * vercel.json's cron pointed at "/api/jobs/index" — a file that does not
+#     exist, so that cron has been a daily no-op. Cron removed alongside this.
+#   * Jobs are written by the PYTHON harvester (scripts/job_spy_harvester.py via
+#     .github/workflows/job_harvest.yml) straight to Firestore. The aggregator
+#     path was retired in v45 ("jobs come only from our Firestore harvester").
+#   * It could not have run anyway: on Vercel's case-SENSITIVE filesystem
+#     require('./atsIngest') and require('./redirectResolver') do not resolve —
+#     the real files are Atsingest.js and Redirectresolver.js. Exactly the
+#     CLAUDE.md §5 case trap, dormant only because nothing calls it.
+# The files stay in the repo (nothing is deleted); they are simply not deployed.
+# To bring an endpoint back: delete the line below and FIX THE FILENAME CASE first.
+api/jobs/
+
+# api/notifications/ — sendAutomatedEmail.js is a LIBRARY, not an HTTP endpoint:
+# it exports { sendAutomatedEmail, sendBatch, ... } with no request handler, and
+# no deployed function imports it (verified). Vercel was turning it into a
+# function that would 500 if it were ever hit. Frees a 7th slot.
+api/notifications/
+
 # Repo assets Vercel never serves or executes — keeps the upload lean.
 # NOTE: the GENERATOR is excluded; its OUTPUT (seo/*.html, sitemap.xml, robots.txt)
 # is committed and MUST ship — that's the whole point of the static SEO pages.

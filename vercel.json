@@ -28,16 +28,6 @@
       ]
     }
   ],
-  "functions": {
-    "api/jobs/*.js": {
-      "memory": 2048,
-      "maxDuration": 60
-    }
-  },
-  "crons": [
-    {
-      "path": "/api/jobs/index",
-      "schedule": "0 5 * * *"
-    }
-  ]
+  "_comment_functions": "v152: the api/jobs/*.js block was REMOVED. That directory is no longer deployed (see .vercelignore), so the pattern would match zero functions — which Vercel treats as a build error — and Vercel now reports the `memory` setting as ignored under Active CPU billing anyway.",
+  "_comment_crons": "v152: the daily cron on '/api/jobs/index' was REMOVED. No such file has ever existed, so it resolved to nothing every night. The real harvest is .github/workflows/job_harvest.yml (Python, 05:00 UTC), which writes to Firestore directly and is unaffected."
 }
