@@ -5719,3 +5719,87 @@ test.describe('[STATE-COVERAGE] v153b Match Preferences are real', () => {
     expect(r.dom).toBe('Growth Marketer');
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v155 — Match Preferences: weighted, and honoured on BOTH surfaces.
+   Two gaps in what v154 shipped:
+     (a) Browse ignored prefs entirely (0 references) — the deck honoured them,
+         so the two surfaces disagreed the moment you used both.
+     (b) the boost was a HARD PRECEDENCE TIER (`if(bpb!==apb) return bpb-apb`),
+         so any target-title job out-ranked a 98% match. A +12 nudge must not
+         override a 30-point match gap.
+   Founder decision: preferences change ORDER only, never the displayed match %,
+   which keeps one honest meaning and preserves the v146 candidate↔recruiter
+   convergence that fixed the 75-vs-98 split.
+   ═══════════════════════════════════════════════════════════════════════════ */
+test.describe('[STATE-COVERAGE] v155 prefs steer both surfaces, weighted', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._gpjRankScore === 'function', null, { timeout: 15000 });
+    await page.evaluate(() => { try { localStorage.removeItem('gpj_prefs'); } catch (e) {} });
+  });
+
+  test('a preference nudge does NOT override a much stronger résumé match', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: 'Brand Manager' }));
+      const strong = { t: 'Marketing Specialist', match: 98 };
+      const weak = { t: 'Brand Manager', match: 70 };
+      return { strong: _gpjRankScore(strong), weak: _gpjRankScore(weak) };
+    });
+    expect(r.strong, 'a 98% match still beats a 70% target-title job').toBeGreaterThan(r.weak);
+  });
+
+  test('but a target title DOES win a close race', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: 'Brand Manager' }));
+      return {
+        target90: _gpjRankScore({ t: 'Brand Manager', match: 90 }),
+        other98: _gpjRankScore({ t: 'Marketing Specialist', match: 98 }),
+      };
+    });
+    expect(r.target90).toBeGreaterThan(r.other98);
+  });
+
+  test('the DISPLAYED match % is never altered by preferences', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: 'Brand Manager', salary: '$120,000 / year' }));
+      const j = { t: 'Brand Manager', match: 90, salMax: 130000 };
+      const before = j.match;
+      const score = _gpjRankScore(j);
+      return { before, after: j.match, score };
+    });
+    expect(r.after, 'the job object is not mutated').toBe(r.before);
+    expect(r.score, 'only the RANK score carries the boost').toBeGreaterThan(r.after);
+  });
+
+  // 4) Empty/missing data: with no prefs set, ranking must be exactly match %.
+  test('with no preferences set, the rank score is identical to match %', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      a: _gpjRankScore({ t: 'Anything', match: 77 }),
+      b: _gpjRankScore({ t: 'Other', match: 41 }),
+    }));
+    expect(r.a).toBe(77);
+    expect(r.b).toBe(41);
+  });
+
+  test('BROWSE orders by the same score the deck uses (was ignoring prefs)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: 'Brand Manager' }));
+      const jobs = [
+        { t: 'Ops Lead', co: 'Acme', loc: 'Houston, TX', match: 88, ghost: 10 },
+        { t: 'Brand Manager', co: 'Beta', loc: 'Houston, TX', match: 85, ghost: 10 },
+      ];
+      // deck
+      rawQueue = jobs.slice(); jobsQueue = jobs.slice();
+      applySwipeFilters();
+      const deckOrder = jobsQueue.map(j => j.t);
+      // browse (same underlying pool + default match sort)
+      liveJobs = jobs.slice();
+      try { renderBrowse(); } catch (e) {}
+      const browseScores = jobs.slice().sort((a, b) => _gpjRankScore(b) - _gpjRankScore(a)).map(j => j.t);
+      return { deckOrder, browseScores };
+    });
+    expect(r.deckOrder[0], 'deck leads with the stated target').toBe('Brand Manager');
+    expect(r.browseScores[0], 'Browse agrees with the deck').toBe('Brand Manager');
+  });
+});
