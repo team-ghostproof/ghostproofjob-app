@@ -3411,9 +3411,14 @@ test.describe('[STATE-COVERAGE] v137 DATA-LOSS guard (founder P0: lists + prefs 
       fb.current = () => ({ uid: 'u1' });
       fb.saveProfile = async (uid, d) => { writes.push(d); return true; };
       window._gpjCloudLoaded = true;                     // gate open
-      // DOM still shows the markup placeholders
-      document.getElementById('pref-titles').textContent = 'Engineer, Developer, Tech Lead';
-      document.getElementById('pref-salary').textContent = '$120,000 / year';
+      // v153: prefs now live in a canonical store; clear it so this exercises the
+      // DOM fallback (the state right after a restore paints the text).
+      try { localStorage.removeItem('gpj_prefs'); } catch (e) {}
+      // DOM still shows the markup placeholders (read from the constant, so this
+      // test can never drift out of sync with the shipped placeholder text again)
+      document.getElementById('pref-titles').textContent = _GPJ_PREF_PLACEHOLDERS.titles;
+      document.getElementById('pref-salary').textContent = _GPJ_PREF_PLACEHOLDERS.salary;
+      document.getElementById('pref-industries').textContent = _GPJ_PREF_PLACEHOLDERS.industries;
       cloudSync();
       await new Promise((x) => setTimeout(x, 60));
       const placeholderWrite = writes[0] && writes[0].prefs;
@@ -5590,5 +5595,103 @@ test.describe('[STATE-COVERAGE] v153 sync P0 + reported-job hide', () => {
     });
     expect(r.differentRole).toBe(false);
     expect(r.differentCompany).toBe(false);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v153b — Match Preferences finally DO something (founder-approved).
+   They were displayed, editable, saved and restored — and read by NO matcher
+   (computeMatch / searchRankJobs / applySwipeFilters / _gpjScoreMatch all had
+   zero references). savePref also never persisted: it wrote DOM text, showed
+   "✅ Preference saved", and lost the edit on reload. The shipped values were
+   hardcoded demo text ("Engineer, Developer, Tech Lead"), a CLAUDE.md rule-5
+   violation shown as if it were the user's own setting.
+   ═══════════════════════════════════════════════════════════════════════════ */
+test.describe('[STATE-COVERAGE] v153b Match Preferences are real', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.gpjPrefs === 'function' && typeof window.gpjPrefBoost === 'function', null, { timeout: 15000 });
+    await page.evaluate(() => { try { localStorage.removeItem('gpj_prefs'); } catch (e) {} });
+  });
+
+  // 4) Empty/missing data — the shipped placeholders must never count as a value.
+  test('placeholder text is never treated as a real preference', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const p = gpjPrefs();
+      return {
+        titles: p.titles, minSalary: p.minSalary, industries: p.industries,
+        boost: gpjPrefBoost({ t: 'Marketing Manager', desc: 'x', salMax: 40000 }),
+        domStillPlaceholder: document.getElementById('pref-titles').textContent,
+      };
+    });
+    expect(r.titles).toEqual([]);
+    expect(r.minSalary).toBe(0);
+    expect(r.industries).toEqual([]);
+    expect(r.boost, 'no prefs set => zero steer, deck order unchanged').toBe(0);
+    expect(r.domStillPlaceholder, 'no fake demo data on screen').not.toContain('Engineer, Developer, Tech Lead');
+  });
+
+  test('titles / industries / salary parse into usable signals', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: 'Marketing Manager, Brand Manager', salary: '$120,000 / year', industries: 'SaaS, Healthcare' }));
+      const p = gpjPrefs();
+      localStorage.setItem('gpj_prefs', JSON.stringify({ salary: '120k' }));
+      const k = gpjPrefs().minSalary;
+      localStorage.setItem('gpj_prefs', JSON.stringify({ salary: '85' }));
+      const bare = gpjPrefs().minSalary;
+      return { titles: p.titles, industries: p.industries, salary: p.minSalary, k, bare };
+    });
+    expect(r.titles).toEqual(['marketing manager', 'brand manager']);
+    expect(r.industries).toEqual(['saas', 'healthcare']);
+    expect(r.salary).toBe(120000);
+    expect(r.k, '"120k" parses').toBe(120000);
+    expect(r.bare, '"85" means 85k, not $85').toBe(85000);
+  });
+
+  // 2) Authenticated: the steer is bounded and directional.
+  test('a target title boosts, off-target does not, low salary down-ranks (never hides)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: 'Marketing Manager', salary: '$120,000 / year', industries: 'SaaS' }));
+      return {
+        onTarget: gpjPrefBoost({ t: 'Marketing Manager', desc: 'SaaS growth', salMax: 130000 }),
+        offTarget: gpjPrefBoost({ t: 'Registered Nurse', desc: 'clinical', salMax: 130000 }),
+        underPaid: gpjPrefBoost({ t: 'Registered Nurse', desc: 'clinical', salMax: 60000 }),
+        noSalaryPosted: gpjPrefBoost({ t: 'Registered Nurse', desc: 'clinical', salMax: 0 }),
+      };
+    });
+    expect(r.onTarget).toBeGreaterThan(0);
+    expect(r.offTarget).toBe(0);
+    expect(r.underPaid, 'below the stated minimum is down-ranked').toBeLessThan(0);
+    expect(r.noSalaryPosted, 'MOST postings have no salary — they must NOT be penalised').toBe(0);
+  });
+
+  // The deck's final sort must actually honour it.
+  test('applySwipeFilters orders a target-title job above an equal-match one', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: 'Brand Manager' }));
+      const jobs = [
+        { t: 'Operations Lead', co: 'Acme', loc: 'Houston, TX', match: 70, ghost: 10 },
+        { t: 'Brand Manager', co: 'Beta', loc: 'Houston, TX', match: 70, ghost: 10 },
+      ];
+      rawQueue = jobs.slice(); jobsQueue = jobs.slice();
+      applySwipeFilters();
+      return jobsQueue.map(j => j.t);
+    });
+    expect(r[0], 'the stated target title leads on an equal match').toBe('Brand Manager');
+  });
+
+  // savePref must genuinely persist — it used to claim "saved" and lose the edit.
+  test('savePref persists to storage (was DOM-only, lost on reload)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.cloudSync = () => {};                 // isolate from the network
+      editPref('titles');
+      document.getElementById('pref-modal-input').value = 'Growth Marketer';
+      savePref();
+      const stored = JSON.parse(localStorage.getItem('gpj_prefs') || '{}');
+      return { stored, parsed: gpjPrefs().titles, dom: document.getElementById('pref-titles').textContent };
+    });
+    expect(r.stored.titles, 'the edit reaches durable storage').toBe('Growth Marketer');
+    expect(r.parsed).toEqual(['growth marketer']);
+    expect(r.dom).toBe('Growth Marketer');
   });
 });

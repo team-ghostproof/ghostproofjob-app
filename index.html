@@ -2856,8 +2856,8 @@
 
       <div class="pref-section" id="sec-match">
         <div class="pref-section-title">Match Preferences <span style="text-transform:none;font-weight:400;">(tap to edit — we'll advise as you go)</span></div>
-        <div class="pref-row" onclick="editPref('titles')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(0,245,160,.12);">🎯</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Job Titles</div><div style="font-size:11px;color:var(--mint);" id="pref-titles">Engineer, Developer, Tech Lead</div></div><div style="color:var(--muted);">✎</div></div>
-        <div class="pref-row" onclick="editPref('salary')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(181,95,230,.12);">💰</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Minimum Salary</div><div style="font-size:11px;color:var(--cyber);" id="pref-salary">$120,000 / year</div></div><div style="color:var(--muted);">✎</div></div>
+        <div class="pref-row" onclick="editPref('titles')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(0,245,160,.12);">🎯</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Job Titles</div><div style="font-size:11px;color:var(--mint);" id="pref-titles">Tap to add your target job titles</div></div><div style="color:var(--muted);">✎</div></div>
+        <div class="pref-row" onclick="editPref('salary')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(181,95,230,.12);">💰</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Minimum Salary</div><div style="font-size:11px;color:var(--cyber);" id="pref-salary">Tap to set your minimum salary</div></div><div style="color:var(--muted);">✎</div></div>
         <div class="pref-row" onclick="editPref('industries')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(255,179,71,.12);">🏭</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Industries</div><div style="font-size:11px;color:var(--warn);" id="pref-industries">Tap to set your industries</div></div><div style="color:var(--muted);">✎</div></div>
       </div>
 
@@ -2953,7 +2953,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v153</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v154</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -10454,6 +10454,16 @@ function applySwipeFilters(){
       const ai=(fw && (a.t||'').toLowerCase().includes(fw))?1:0;
       const bi=(fw && (b.t||'').toLowerCase().includes(fw))?1:0;
       if(bi!==ai) return bi-ai;
+      /* v153 (founder-approved): Match Preferences finally STEER the deck. Until now
+         titles/salary/industries were displayed, edited and saved — and read by no
+         matcher at all. The résumé stays primary (field-word ordering above is
+         untouched); prefs act as a bounded tie-breaker within it: +12 for a target
+         title, +5 for a target industry, -10 for a posted salary under the stated
+         minimum. Deliberately a RANKING signal, never a filter — a hard salary cut
+         would empty the deck, since most postings carry no salary at all. */
+      const apb=(typeof gpjPrefBoost==='function'?gpjPrefBoost(a):0);
+      const bpb=(typeof gpjPrefBoost==='function'?gpjPrefBoost(b):0);
+      if(bpb!==apb) return bpb-apb;
       return (b.match||0)-(a.match||0);
     },
     ghost:(a,b)=>(a.ghost??50)-(b.ghost??50),
@@ -10581,6 +10591,49 @@ toggleDrawer=function(e){
 };
 
 /* ---------- MATCH PROFILE EDITOR + MARKET ADVISOR ---------- */
+/* v153 (founder: "if I put a job title in Match Preferences, does it pair with my
+   resume to match jobs?"). The honest answer WAS no — nothing read them. This is
+   the canonical reader that makes them real.
+   Storage: localStorage 'gpj_prefs' is the source of truth; the DOM is only a
+   fallback for the moment right after a cloud restore paints the text but before
+   anything re-saves. Placeholder text NEVER counts as a value. */
+function gpjPrefs(){
+  let raw={};
+  try{ raw=JSON.parse(localStorage.getItem('gpj_prefs')||'{}')||{}; }catch(e){}
+  const fromEl=(id,ph)=>{ const el=document.getElementById(id); const v=el?String(el.textContent||'').trim():''; return (v&&v!==ph)?v:''; };
+  const titles=String(raw.titles||fromEl('pref-titles',_GPJ_PREF_PLACEHOLDERS.titles)||'').trim();
+  const salary=String(raw.salary||fromEl('pref-salary',_GPJ_PREF_PLACEHOLDERS.salary)||'').trim();
+  const industries=String(raw.industries||fromEl('pref-industries',_GPJ_PREF_PLACEHOLDERS.industries)||'').trim();
+  const split=(s)=>String(s||'').split(/[,;/|]|\band\b/i).map(x=>x.trim().toLowerCase()).filter(x=>x.length>1).slice(0,12);
+  /* "$120,000 / year" -> 120000 · "120k" -> 120000 · "85" -> 85000 */
+  const minSalary=(function(){
+    const t=String(salary).replace(/[,\s]/g,'');
+    const m=t.match(/(\d{2,7})\s*k?/i); if(!m) return 0;
+    let n=parseInt(m[1],10)||0;
+    if(/k/i.test(t.slice(m.index,m.index+m[0].length+1))) n*=1000;
+    if(n>0 && n<1000) n*=1000;                        /* "85" means 85k, not $85 */
+    return n>0 ? n : 0;
+  })();
+  return {titles:split(titles), industries:split(industries), minSalary:minSalary, raw:{titles:titles,salary:salary,industries:industries}};
+}
+/* Does this job hit the user's stated targets? Returns a small, BOUNDED steer —
+   the resume stays the primary signal (CLAUDE.md B1: matching is resume-led). */
+function gpjPrefBoost(j){
+  try{
+    const p=gpjPrefs();
+    if(!p.titles.length && !p.industries.length && !p.minSalary) return 0;
+    const t=String((j&&(j.t||j.title))||'').toLowerCase();
+    const blob=(t+' '+String((j&&(j.desc||j.description))||'')).toLowerCase();
+    let b=0;
+    if(p.titles.length && p.titles.some(x=>t.indexOf(x)>=0)) b+=12;          /* target title in the ROLE name */
+    if(p.industries.length && p.industries.some(x=>blob.indexOf(x)>=0)) b+=5; /* target industry mentioned */
+    if(p.minSalary){
+      const sm=(j&&(j.salMax||j.salary_max))||0;
+      if(sm && sm<p.minSalary) b-=10;                 /* under target: DOWN-rank, never hide */
+    }
+    return b;
+  }catch(e){ return 0; }
+}
 let editingPref=null;
 const prefMeta={
   titles:{label:'Job Titles (comma separated)',el:'pref-titles'},
@@ -10597,8 +10650,20 @@ function savePref(){
   const v=document.getElementById('pref-modal-input').value.trim();
   if(!v){ showToast('Enter a value or cancel'); return; }
   document.getElementById(prefMeta[editingPref].el).textContent=v;
+  /* v153: ACTUALLY persist. This used to write DOM text and nothing else — the edit
+     was lost on reload, and only reached the cloud if some unrelated action happened
+     to fire cloudSync later, all while the toast already claimed "saved". */
+  try{
+    const cur=JSON.parse(localStorage.getItem('gpj_prefs')||'{}')||{};
+    cur[editingPref]=v;
+    localStorage.setItem('gpj_prefs',JSON.stringify(cur));
+  }catch(e){}
+  try{ cloudSync(); }catch(e){}
   document.getElementById('pref-modal').classList.remove('open');
   showToast('✅ Preference saved');
+  /* re-rank right away so the change is visible instead of waiting for a refetch */
+  try{ if(typeof applySwipeFilters==='function') applySwipeFilters(); }catch(e){}
+  try{ if(typeof renderBrowse==='function') renderBrowse(); }catch(e){}
   showAdvice(prefAdvice(editingPref,v));
 }
 function prefAdvice(key,v){
@@ -11890,7 +11955,7 @@ window._gpjCloudLoaded=false;
    #pref-salary / #pref-industries). They are demo text, never a user's real setting,
    so they must never be written to the cloud as if they were. v153 adds `industries`
    — it was missing, so the industries placeholder could be saved as a real value. */
-const _GPJ_PREF_PLACEHOLDERS={titles:'Engineer, Developer, Tech Lead',salary:'$120,000 / year',industries:'Tap to set your industries'};
+const _GPJ_PREF_PLACEHOLDERS={titles:'Tap to add your target job titles',salary:'Tap to set your minimum salary',industries:'Tap to set your industries'};
 /* ===== v143 P0: MONOTONIC LISTS =============================================
    cloudSync used to send `lists` as a whole-document overwrite, so the cloud copy
    was only ever as good as whatever this device happened to hold at that instant.
@@ -11974,7 +12039,13 @@ function cloudSync(){
          value untouched (saveProfile merges). */
       prefs:(function(){
         const t=document.getElementById('pref-titles'), s=document.getElementById('pref-salary'), i=document.getElementById('pref-industries');
-        const tv=t?String(t.textContent||'').trim():'', sv=s?String(s.textContent||'').trim():'', iv=i?String(i.textContent||'').trim():'';
+        /* v153: prefer the canonical store (gpjPrefs) — the DOM is only a fallback,
+           and reading it directly is what let placeholder text masquerade as data. */
+        let _cp={titles:'',salary:'',industries:''};
+        try{ _cp=(typeof gpjPrefs==='function'?gpjPrefs().raw:_cp)||_cp; }catch(e){}
+        const tv=_cp.titles||(t?String(t.textContent||'').trim():''),
+              sv=_cp.salary||(s?String(s.textContent||'').trim():''),
+              iv=_cp.industries||(i?String(i.textContent||'').trim():'');
         /* v153: check EACH field independently. The old guard skipped the whole
            prefs object when titles+salary were placeholders — so a user who set
            ONLY their industries had that edit silently dropped, every time. */
@@ -12878,8 +12949,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v153';
+const APP_VERSION = 'v154';
 const CHANGELOG = {
+  'v154':['Match Preferences are REAL: canonical gpj_prefs store, savePref actually persists + syncs, prefs steer the deck\'s final sort (target title +12, industry +5, under-minimum salary -10, never a hard filter), and the hardcoded demo values are replaced with an honest empty state'],
   'v153':['P0: Firestore rejects undefined -> cloudSync\'s placeholder-prefs guard silently killed EVERY profile write (resume, lists, reported jobs). Strip undefined at saveProfile. Also: reported-job hide matched a raw key against the folded key; expired[] could blank the cloud copy; deck mapper never dropped reported jobs; industries-only pref edits were dropped; sync failures were silently swallowed'],
   'v152':['D1 client seam: fetchJobs reads pre-built job_pools first (deck build ~3800 reads -> ~6) with fallback on every failure path; employer jobs stay on the live query; pool rows carry matchTerms so match % keeps full-document coverage'],
   'v151':['notification emails (event-driven): interview-confirmed email to both parties + \'employer reached out\' email to candidate (Vercel, token-verified, suppression + send-once); Worker lifecycle templates (day-7, tier-change, booster) as a paste-ready reviewable module'],
@@ -16260,6 +16332,15 @@ async function loadTierFromProfile(u){
         setEl('pref-titles',p.prefs.titles);
         setEl('pref-salary',p.prefs.salary);
         setEl('pref-industries',p.prefs.industries);
+        /* v153: also seed the CANONICAL local store, so prefs survive a reload and
+           are readable by the matcher without depending on painted DOM text. */
+        try{
+          const cur=JSON.parse(localStorage.getItem('gpj_prefs')||'{}')||{};
+          ['titles','salary','industries'].forEach(function(k){
+            const v=p.prefs[k]; if(v && String(v).trim() && String(v).trim()!==_GPJ_PREF_PLACEHOLDERS[k]) cur[k]=String(v).trim();
+          });
+          localStorage.setItem('gpj_prefs',JSON.stringify(cur));
+        }catch(e){}
         dbg('match prefs restored from cloud');
       }catch(e){}
     }
