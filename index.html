@@ -1813,7 +1813,7 @@
   <div class="modal-scrim" id="ats-preview-modal" style="z-index:9100;">
     <div class="modal-box" style="text-align:left;max-height:85%;display:flex;flex-direction:column;">
       <div style="display:flex;align-items:center;margin-bottom:6px;">
-        <div style="font-size:15px;font-weight:800;flex:1;">🤖 What an ATS Sees</div>
+        <div style="font-size:15px;font-weight:800;flex:1;">🤖 ATS Readability Check</div>
         <div onclick="document.getElementById('ats-preview-modal').classList.remove('open')" style="color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;">✕</div>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5;">This is the plain, machine-readable text an Applicant Tracking System extracts from your PDF. If it reads cleanly here, parsers can read it too.</div>
@@ -2506,7 +2506,7 @@
           <div id="tpl-preview" style="display:none;background:#fff;border-radius:10px;padding:0;overflow:hidden;margin-bottom:12px;"></div>
 
           <div onclick="downloadResume()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:14px;font-size:14px;cursor:pointer;text-align:center;">📥 Download Resume (PDF)</div>
-          <div onclick="showAtsPreview()" style="background:var(--plum3);border:1px solid var(--plum4);color:var(--cyber);font-weight:800;border-radius:10px;padding:11px;font-size:12px;cursor:pointer;text-align:center;margin-top:8px;">🤖 Preview what an ATS sees</div>
+          <div onclick="showAtsPreview()" style="background:var(--plum3);border:1px solid var(--plum4);color:var(--cyber);font-weight:800;border-radius:10px;padding:11px;font-size:12px;cursor:pointer;text-align:center;margin-top:8px;">🤖 ATS Readability Check</div>
           <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:6px;">On iPhone, the PDF opens — tap Share → Save to Files to keep it.</div>
         </div>
 
@@ -2838,7 +2838,7 @@
             <div>🔖 <strong>Saved Jobs & Companies</strong> → Account page, under <em>My Activity</em> (right here).</div>
             <div>📝 <strong>Cover letters & tailored resumes</strong> → created when you tap <strong>✨ Optimize</strong> on a job; download or copy them right there. Your generated resume lives on the <strong>📄 Resume</strong> tab under <em>Download / Preview</em>.</div>
             <div>📊 <strong>Applied / Skipped / Responses</strong> → tracked automatically; see your counts on the Account page.</div>
-            <div>🤖 <strong>Preview what an ATS sees</strong> → on the Resume tab, under the Download button — shows exactly how applicant-tracking systems read your resume.</div>
+            <div>🤖 <strong>ATS Readability Check</strong> → on the Resume tab, under the Download button — shows the plain text an applicant-tracking system extracts from your resume, and flags formatting that breaks parsers. It is <strong>not</strong> a test against any one employer’s ATS — every company runs a different one.</div>
             <div style="height:1px;background:var(--plum4);margin:6px 0;"></div>
             <div style="font-weight:800;margin-bottom:2px;">📖 Button & term glossary</div>
             <div><strong style="color:var(--mint);">Match %</strong> — How well a job fits your title, skills, and work history. Higher = better fit for you.</div>
@@ -2953,7 +2953,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v158</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v159</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -7876,7 +7876,13 @@ function buildLetterText(c){
   const me=resumeData;
   const topJob=(me.jobs&&me.jobs[0])||null;
   const skillsTop=(me.skills||'').split(' · ').slice(0,3).join(', ');
-  const hl=topJob?String(topJob.b||'').split(/·|\n/).map(s=>s.trim()).filter(Boolean).slice(0,2).join('; '):'';
+  /* v159 (founder repro, CoverLetter_Fugro.txt): résumé bullets already END with a
+     period, so joining TWO of them with '; ' and then appending '.' in the template
+     produced "...strategic resource allocation.; Executed logistics ... and travel.."
+     — a period-semicolon and a double period in the opening paragraph. Two bullets
+     crammed into one sentence also read like a data dump rather than writing. Take
+     the STRONGEST single bullet and strip its terminal punctuation. */
+  const hl=topJob?(String(topJob.b||'').split(/·|\n/).map(s=>s.trim()).filter(Boolean)[0]||'').replace(/[.;,\s]+$/,''):'';
   /* B-THISROLE (v74): if the title/company are the display fallbacks (or missing),
      write grammatical copy — never "the this role position" / "Dear the hiring
      company Hiring Team". A real title still reads "the <title> position". */
@@ -7885,7 +7891,7 @@ function buildLetterText(c){
 
 I'm writing to apply for ${_t74?`the ${_t74} position`:'this role'}. As a ${me.title||'dedicated professional'}${topJob&&topJob.c?` — most recently at ${topJob.c} —`:''} I bring a track record that maps directly onto this role${hl?`: ${hl.charAt(0).toLowerCase()+hl.slice(1)}`:''}.
 
-What draws me to ${c.co} is the chance to apply ${skillsTop||'my core strengths'} on a team where measurable results matter. I work with clear outcomes in mind, and I bring the communication habits that keep those wins shipping.
+What draws me to ${_c74||'the hiring team'} is the chance to apply ${skillsTop||'my core strengths'} where measurable results matter.
 
 I'd welcome the chance to discuss how I can contribute from week one. Thank you for your time and consideration.
 
@@ -7934,7 +7940,10 @@ function tailorCoverLetter(c, level, meOverride){
   const hl=me.bullets[0]||'';
   /* B-THISROLE (v74): grammatical fallbacks \u2014 never "the this role position". */
   const _rc=_realCo(c.co), _rt=_realTitle(c.title);
-  const co=_rc||'the hiring company';
+  /* v159: reads naturally in all five slots ("what draws me to…", "help … succeed",
+     "…'s goals"). Founder-approved: when we genuinely don't know the employer, say
+     "the hiring team" rather than inventing or echoing a placeholder company name. */
+  const co=_rc||'the hiring team';
   const p1=(_rc?('Dear '+_rc+' Hiring Team,'):'Dear Hiring Team,')+'\n\nI\u2019m writing to apply for '+(_rt?('the '+_rt+' position'):'this role')+'. As a '+(me.title||'dedicated professional')+(me.topCo?(' \u2014 most recently at '+me.topCo+' \u2014'):'')+' I bring experience that maps directly onto what this role calls for.';
   let p2;
   if(lead.length){
@@ -7947,7 +7956,12 @@ function tailorCoverLetter(c, level, meOverride){
   } else {
     p2='What I\u2019d bring to '+co+' is the ability to apply '+skillsTop+' where measurable results matter.';
   }
-  let p3='What draws me to '+co+' is the chance to contribute '+(lead.length?_humanList(lead.slice(0,2)):skillsTop)+' on a team where outcomes matter. I work with clear goals in mind and bring the communication habits that keep wins shipping.';
+  /* v159: dropped the trailing "I work with clear goals in mind and bring the
+     communication habits that keep wins shipping." It said nothing, and because it
+     was hardcoded it appeared VERBATIM in every letter this builder produced — the
+     founder's two sample letters both carried it, which is exactly what makes a
+     cover letter read as machine-generated. */
+  let p3='What draws me to '+co+' is the chance to contribute '+(lead.length?_humanList(lead.slice(0,2)):skillsTop)+' where outcomes matter.';
   if(level>=3) p3+=' I\u2019m confident I can contribute to '+co+'\u2019s goals from week one.';
   const close='I\u2019d welcome the chance to discuss how I can help '+co+' succeed. Thank you for your time and consideration.\n\nBest regards,\n'+(me.name||'[Your name \u2014 complete Core Contact in the Resume tab]')+'\n'+(me.contact||'[Add your email & phone so applications auto-fill]');
   return [p1,p2,p3,close].join('\n\n');
@@ -11077,7 +11091,14 @@ function _gpjAdminDeviceLine(){
    identity — they must never be STORED on an Applied/Skipped/Responses row. These
    strip them at every write so a phantom "this role · X" row can never be created. */
 function _realTitle(t){ t=String(t||'').trim(); return /^this role$/i.test(t)?'':t; }
-function _realCo(c){ c=String(c||'').trim(); return /^the (hiring )?company$/i.test(c)?'':c; }
+/* v159 (founder repro, CoverLetter_HiringCompany.txt — a job at AuraOne AI opened
+   "Dear Hiring Company Hiring Team"): this MISSED the app's own fallback. When a
+   harvested job carries no company field, mapFirestoreJob substitutes the literal
+   'Hiring Company' — but this regex only matched "the company" / "the hiring
+   company", so the placeholder sailed straight through into cover letters and was
+   treated as a real employer name. _PLACEHOLDER_CO always had it right; the two
+   guards for the same concept had drifted apart. Now aligned. */
+function _realCo(c){ c=String(c||'').trim(); return /^(hiring company|the (hiring )?company)$/i.test(c)?'':c; }
 /* R2-C: apply IN-APP to an employer's internal job (no external redirect). Writes
    the application, records it to Applied, and advances the deck. */
 /* R9-C: a bounded résumé snapshot the applicant shares WITH THAT EMPLOYER by applying
@@ -13056,8 +13077,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v158';
+const APP_VERSION = 'v159';
 const CHANGELOG = {
+  'v159':['cover letter: fixed the Hiring Company placeholder leak, the period-semicolon and double-period punctuation bugs, and the hardcoded filler sentence that appeared verbatim in every letter; ATS Preview renamed to ATS Readability Check with an honest scope line'],
   'v158':['remove two orphaned functions (openCardCompanyProfile, recMarkFilled) — superseded duplicates with zero callers; live paths fullCompanyFromCard/openFillModal unchanged'],
   'v157':['Match to Job tailors a COPY (master resume never mutated), rewrites the professional summary toward the specific posting, and saves a restorable tailored version'],
   'v156':['Resume Rater is genuinely two-fold: separate Resume Quality + Role Fit scores, each labelled with its own fix list, and the fit half now benchmarks the TARGET role from Match Preferences instead of the job they already have'],
