@@ -5506,13 +5506,21 @@ test.describe('[STATE-COVERAGE] v153 sync P0 + reported-job hide', () => {
         current: () => ({ uid: 'u1' }),
         saveProfile: async (uid, data) => { sent = data; return true; },
       });
-      window._gpjCloudLoaded = true;                       // past the data-loss gate
+      // v154 test-hardening: the firebase module lands mid-test and its signed-out
+      // auth callback RE-ARMS the data-loss gate (_gpjCloudLoaded=false), so a second
+      // cloudSync() can silently no-op. Re-assert the gate immediately before each
+      // call and POLL for the write — fixed delays hide this race (CLAUDE.md).
+      const syncOnce = async () => {
+        window._gpjCloudLoaded = true;
+        cloudSync();
+        for (let i = 0; i < 60 && sent === null; i++) await new Promise(r => setTimeout(r, 25));
+        return sent;
+      };
       // simulate a COMPLETED restore: without this baseline the v143 monotonic guard
       // deliberately withholds `lists` (it will not write what it has not read).
       window._gpjCloudListsSeen = { applied: [], responses: [], skipped: [], viewed: [] };
       lists.applied = [{ t: 'Ops Lead', co: 'Acme', when: Date.now() }];
-      cloudSync();
-      await new Promise(res => setTimeout(res, 120));
+      await syncOnce();
       return { sent, prefsValue: sent ? sent.prefs : null, hasResume: !!(sent && sent.resume), hasLists: !!(sent && sent.lists) };
     });
     expect(r.sent, 'cloudSync reached saveProfile').not.toBeNull();
@@ -5530,10 +5538,18 @@ test.describe('[STATE-COVERAGE] v153 sync P0 + reported-job hide', () => {
         current: () => ({ uid: 'u1' }),
         saveProfile: async (uid, data) => { sent = data; return true; },
       });
-      window._gpjCloudLoaded = true;
+      // v154 test-hardening: the firebase module lands mid-test and its signed-out
+      // auth callback RE-ARMS the data-loss gate (_gpjCloudLoaded=false), so a second
+      // cloudSync() can silently no-op. Re-assert the gate immediately before each
+      // call and POLL for the write — fixed delays hide this race (CLAUDE.md).
+      const syncOnce = async () => {
+        window._gpjCloudLoaded = true;
+        cloudSync();
+        for (let i = 0; i < 60 && sent === null; i++) await new Promise(r => setTimeout(r, 25));
+        return sent;
+      };
       document.getElementById('pref-industries').textContent = 'Healthcare, SaaS';
-      cloudSync();
-      await new Promise(res => setTimeout(res, 120));
+      await syncOnce();
       return sent && sent.prefs;
     });
     expect(r, 'prefs object is written').toBeTruthy();
@@ -5549,15 +5565,23 @@ test.describe('[STATE-COVERAGE] v153 sync P0 + reported-job hide', () => {
         current: () => ({ uid: 'u1' }),
         saveProfile: async (uid, data) => { sent = data; return true; },
       });
-      window._gpjCloudLoaded = true;
+      // v154 test-hardening: the firebase module lands mid-test and its signed-out
+      // auth callback RE-ARMS the data-loss gate (_gpjCloudLoaded=false), so a second
+      // cloudSync() can silently no-op. Re-assert the gate immediately before each
+      // call and POLL for the write — fixed delays hide this race (CLAUDE.md).
+      const syncOnce = async () => {
+        window._gpjCloudLoaded = true;
+        cloudSync();
+        for (let i = 0; i < 60 && sent === null; i++) await new Promise(r => setTimeout(r, 25));
+        return sent;
+      };
       localStorage.setItem('gpj_expired', '[]');
-      cloudSync();
-      await new Promise(res => setTimeout(res, 120));
+      await syncOnce();
       const empty = sent ? sent.expired : 'NOSEND';
 
       localStorage.setItem('gpj_expired', JSON.stringify(['some role|acme']));
-      sent = null; cloudSync();
-      await new Promise(res => setTimeout(res, 120));
+      sent = null;
+      await syncOnce();
       return { whenEmpty: empty, whenPopulated: sent ? sent.expired : null };
     });
     expect(r.whenEmpty, 'an empty set must NOT be written (it would un-hide every report)').toBeUndefined();
