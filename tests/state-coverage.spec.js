@@ -5803,3 +5803,92 @@ test.describe('[STATE-COVERAGE] v155 prefs steer both surfaces, weighted', () =>
     expect(r.browseScores[0], 'Browse agrees with the deck').toBe('Brand Manager');
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v156 — Résumé Rater is genuinely TWO-FOLD (founder-approved [UI-REVIEW]).
+   It always computed two halves — structure (ATS/best-practice) and coverage
+   (role fit) — but blended them into ONE number, and benchmarked coverage against
+   _recentTitle(): the job you already HAVE. A Marketing Specialist aiming at Brand
+   Manager was scored against Marketing Specialist postings and told to add the
+   wrong keywords. Now: two labelled scores, and the fit half benchmarks the TARGET
+   role from Match Preferences (falling back to the current role, said out loud).
+   ═══════════════════════════════════════════════════════════════════════════ */
+test.describe('[STATE-COVERAGE] v156 rater: quality vs role-fit', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.rateResume === 'function' && typeof window.gpjPrefs === 'function', null, { timeout: 15000 });
+    await page.evaluate(() => {
+      try { localStorage.removeItem('gpj_prefs'); localStorage.removeItem('gpj_corpus_v1'); } catch (e) {}
+      window._roleCorpusCache = null;
+      resumeData.title = 'Marketing Specialist';
+      resumeData.contact = 'a@example.com · (281) 555-0100 · Houston, TX';
+      resumeData.summary = 'Marketing professional with 6 years running B2B campaigns.';
+      resumeData.skills = 'demand generation, HubSpot, content marketing, campaign strategy, budgeting, analytics, email';
+      resumeData.jobs = [{ t: 'Marketing Specialist', c: 'Acme', b: 'Owned demand generation across paid and email\nRan the content calendar and a $250k budget\nLifted MQLs 32% with sales\nBuilt reporting in HubSpot\nManaged brand content\nCoordinated 12 events a year' }];
+      try { buildFromProfile(); } catch (e) {}
+      // no network in CI: a stubbed corpus keeps this about the SCORING split
+      window.fb = Object.assign(window.fb || {}, {
+        mineRoleKeywords: async (role) => ({ matched: 40, terms: [
+          { term: 'brand', pct: 90 }, { term: 'positioning', pct: 80 }, { term: 'campaign', pct: 70 },
+          { term: 'budget', pct: 60 }, { term: 'hubspot', pct: 50 },
+        ] }),
+      });
+    });
+  });
+
+  test('shows TWO labelled scores, not one blended number', async ({ page }) => {
+    const t = await page.evaluate(async () => {
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: 'Brand Manager' }));
+      await rateResume();
+      return (document.getElementById('resume-rating-body') || {}).textContent || '';
+    });
+    expect(t).toContain('Résumé Quality');
+    expect(t).toContain('Role Fit');
+    expect(t, 'each score explains what it means').toMatch(/how well it’s built/);
+  });
+
+  test('the fit half benchmarks the TARGET role, not the current one', async ({ page }) => {
+    const t = await page.evaluate(async () => {
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: 'Brand Manager' }));
+      await rateResume();
+      return (document.getElementById('resume-rating-body') || {}).textContent || '';
+    });
+    expect(t, 'benchmarks the role they WANT').toContain('Brand Manager');
+    expect(t).toMatch(/the role you want/);
+  });
+
+  // 4) Empty/missing data: no target set must not break — it falls back and SAYS SO.
+  test('with no target set it falls back to the current role and says so', async ({ page }) => {
+    const t = await page.evaluate(async () => {
+      await rateResume();
+      return (document.getElementById('resume-rating-body') || {}).textContent || '';
+    });
+    expect(t).toContain('Marketing Specialist');
+    expect(t, 'tells them why, and how to change it').toMatch(/current<\/em>|current. role|Set a target/);
+  });
+
+  test('quality and fit move INDEPENDENTLY (that is the whole point)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: 'Brand Manager' }));
+      await rateResume();
+      const nums = ((document.getElementById('resume-rating-body') || {}).textContent || '').match(/(\d+)\s*\/\s*100/g) || [];
+      return nums.slice(0, 2);
+    });
+    expect(r.length, 'two separate /100 readouts').toBe(2);
+    expect(r[0], 'a well-built résumé scores high on quality').not.toBe(r[1]);
+  });
+
+  // Honesty: a fit score from a handful of postings must not pose as a benchmark.
+  test('a thin posting sample is disclosed, not presented as precision', async ({ page }) => {
+    const t = await page.evaluate(async () => {
+      window._roleCorpusCache = null;
+      try { localStorage.removeItem('gpj_corpus_v1'); } catch (e) {}
+      window.fb.mineRoleKeywords = async () => ({ matched: 2, terms: [{ term: 'brand', pct: 100 }] });
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: 'Brand Manager' }));
+      await rateResume();
+      return (document.getElementById('resume-rating-body') || {}).textContent || '';
+    });
+    expect(t, 'says how thin the sample is').toMatch(/Only 2 live/);
+    expect(t, 'and refuses to overclaim').toMatch(/rough signal — not a verdict/);
+  });
+});

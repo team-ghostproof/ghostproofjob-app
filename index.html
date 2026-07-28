@@ -2953,7 +2953,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v155</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v156</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -9280,7 +9280,20 @@ async function rateResume(){
   if(!(resumeData&&(resumeData.title||resumeData.skills||(resumeData.jobs&&resumeData.jobs.length)))){
     showToast('Add your resume first so we can rate it.'); return;
   }
-  const role=_recentTitle()||'your role';
+  /* v156 (founder): the rater is TWO-FOLD — how well the résumé is BUILT, and how
+     well it fits the jobs they WANT. It used to benchmark _recentTitle(), i.e. the
+     job they already HAVE, so a Marketing Specialist aiming at Brand Manager was
+     scored against Marketing Specialist postings and told to add the wrong words.
+     Match Preferences hold the target titles (real since v155), so use the first
+     one and fall back to the current role — labelled honestly either way. */
+  const _curRole=_recentTitle()||'';
+  let _tgtRole='';
+  try{
+    const _p=(typeof gpjPrefs==='function')?gpjPrefs():null;
+    if(_p&&_p.raw&&_p.raw.titles) _tgtRole=String(_p.raw.titles).split(',')[0].trim();   /* raw keeps their capitalisation */
+  }catch(e){}
+  const role=_tgtRole||_curRole||'your role';
+  const _roleIsTarget=!!_tgtRole;
   const safe=role.replace(/</g,'&lt;');
   const host=document.getElementById('resume-rating-body');
   if(host) host.innerHTML='<div style="text-align:center;padding:20px;font-size:12px;color:var(--muted);">📊 Scoring against live '+safe+' postings…</div>';
@@ -9327,10 +9340,45 @@ async function rateResume(){
   const good=score>=70;
   const label=score>=85?'Strong — callback-ready':score>=70?'Good — a few quick wins':score>=55?'Needs tightening':'Let’s build it up';
   const col=good?'var(--mint)':'var(--warn)';
-  const dash=Math.round(score/100*326.7);
-  const ring='<div style="position:relative;width:120px;height:120px;margin:0 auto 6px;"><svg viewBox="0 0 120 120" style="width:120px;height:120px;transform:rotate(-90deg);"><circle cx="60" cy="60" r="52" fill="none" stroke="var(--plum3)" stroke-width="10"/><circle cx="60" cy="60" r="52" fill="none" stroke="'+col+'" stroke-width="10" stroke-linecap="round" stroke-dasharray="'+dash+' 326.7"/></svg><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;"><div style="font-size:30px;font-weight:800;color:'+col+';">'+score+'</div><div style="font-size:9px;color:var(--muted);">/ 100</div></div></div>';
-  let html=ring+'<div style="text-align:center;font-size:14px;font-weight:800;color:'+col+';margin-bottom:2px;">'+label+'</div>'+
-    '<div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:14px;">Callback Readiness for <strong>'+safe+'</strong>'+((corpus&&corpus.matched)?(' · vs '+corpus.matched+' live postings'):'')+'</div>';
+  /* v156 (founder-approved [UI-REVIEW]): show the TWO scores separately, each
+     clearly labelled, because they mean different things and one number hid that.
+     A strong résumé aimed at the wrong role used to score mediocre with no
+     explanation; split, it can say "your résumé is well built — it just isn't
+     aimed at Brand Manager yet." Each ring keeps its own real fix list below. */
+  const qScore=Math.max(1,Math.min(100, st.max?Math.round(st.pts/st.max*100):1));
+  const fScore=covMax?Math.max(1,Math.min(100,Math.round(covPts/covMax*100))):null;
+  const _ringCol=(n)=>n>=70?'var(--mint)':(n>=50?'var(--warn)':'var(--danger)');
+  const _ring=(n,cap,sub)=>{
+    const c=(n==null)?'var(--muted)':_ringCol(n);
+    const d=(n==null)?0:Math.round(n/100*263.9);            /* r=42 → C≈263.9 */
+    return '<div style="flex:1;min-width:0;text-align:center;">'
+      +'<div style="position:relative;width:98px;height:98px;margin:0 auto 4px;">'
+      +'<svg viewBox="0 0 100 100" style="width:98px;height:98px;transform:rotate(-90deg);">'
+      +'<circle cx="50" cy="50" r="42" fill="none" stroke="var(--plum3)" stroke-width="9"/>'
+      +'<circle cx="50" cy="50" r="42" fill="none" stroke="'+c+'" stroke-width="9" stroke-linecap="round" stroke-dasharray="'+d+' 263.9"/></svg>'
+      +'<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">'
+      +'<div style="font-size:25px;font-weight:800;color:'+c+';">'+(n==null?'—':n)+'</div>'
+      +'<div style="font-size:9px;color:var(--muted);">/ 100</div></div></div>'
+      +'<div style="font-size:12px;font-weight:800;color:var(--off);line-height:1.3;">'+cap+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);line-height:1.5;margin-top:2px;">'+sub+'</div></div>';
+  };
+  const _fitSub=_roleIsTarget
+    ? ('how well it matches <strong>'+safe+'</strong>, the role you want')
+    : ('how well it matches <strong>'+safe+'</strong> — your <em>current</em> role. Set a target in Match Preferences to score against the jobs you actually want.');
+  let html='<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:6px;">'
+    +_ring(qScore,'Résumé Quality','how well it’s built — ATS-safe structure, metrics, strong verbs')
+    +_ring(fScore,'Role Fit',_fitSub)
+    +'</div>'
+    +'<div style="text-align:center;font-size:13px;font-weight:800;color:'+col+';margin-bottom:2px;">'+label+'</div>'
+    +'<div style="text-align:center;font-size:10.5px;color:var(--muted);margin-bottom:'+((corpus&&corpus.matched&&corpus.matched<5)?'6':'14')+'px;">Overall callback readiness '+score+'/100'
+    +((corpus&&corpus.matched)?(' · benchmarked against '+corpus.matched+' live '+safe+' posting'+(corpus.matched===1?'':'s')):' · live posting benchmark unavailable')+'</div>'
+    /* v156 HONESTY (CLAUDE.md §3.8): a Role Fit computed from a handful of postings
+       is not a real benchmark, and presenting it like one would be exactly the kind
+       of confident-but-hollow number v119 removed from ghost risk. Say the sample is
+       thin, in plain language, instead of letting the ring imply precision. */
+    +((corpus&&corpus.matched&&corpus.matched<5)
+      ? ('<div style="text-align:center;font-size:10px;color:var(--warn);margin-bottom:14px;line-height:1.5;">⚠ Only '+corpus.matched+' live '+safe+' posting'+(corpus.matched===1?'':'s')+' in your area right now, so Role Fit is a rough signal — not a verdict. It sharpens as more of these roles are posted.</div>')
+      : '');
   try{ window._rateMissingTerms=missing.slice(0,8).map(t=>t.term||t); window._rateCoveredTerms=covered.slice(0,10).map(t=>t.term||t); window._rateRole=role; }catch(e){}
   if(missing.length){
     html+='<div style="font-size:11px;font-weight:800;color:var(--cyber);margin-bottom:6px;">🎯 Biggest score gains available</div>';
@@ -12961,8 +13009,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v155';
+const APP_VERSION = 'v156';
 const CHANGELOG = {
+  'v156':['Resume Rater is genuinely two-fold: separate Resume Quality + Role Fit scores, each labelled with its own fix list, and the fit half now benchmarks the TARGET role from Match Preferences instead of the job they already have'],
   'v155':['Match Preferences: Browse now honours them too (it ignored them entirely), and the boost is WEIGHTED into the rank score instead of being a hard tier that let any target title beat a 98% match. Displayed match % unchanged.'],
   'v154':['Match Preferences are REAL: canonical gpj_prefs store, savePref actually persists + syncs, prefs steer the deck\'s final sort (target title +12, industry +5, under-minimum salary -10, never a hard filter), and the hardcoded demo values are replaced with an honest empty state'],
   'v153':['P0: Firestore rejects undefined -> cloudSync\'s placeholder-prefs guard silently killed EVERY profile write (resume, lists, reported jobs). Strip undefined at saveProfile. Also: reported-job hide matched a raw key against the folded key; expired[] could blank the cloud copy; deck mapper never dropped reported jobs; industries-only pref edits were dropped; sync failures were silently swallowed'],
