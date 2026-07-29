@@ -5892,3 +5892,76 @@ test.describe('[STATE-COVERAGE] v156 rater: quality vs role-fit', () => {
     expect(t, 'and refuses to overclaim').toMatch(/rough signal — not a verdict/);
   });
 });
+
+/* ===== v160 RC-1: the AI must receive the RIGHT job's text, never the DOM's =====
+   Founder-verified defect (OpenAI log 2026-07-28 22:28): a tailor for "Senior
+   Lifecycle Marketing Manager @ Jobgether" was written from "Director, Marketing
+   Communications @ Airspan" text, which was scraped from a DISPLAY container and
+   therefore also carried the app's own buttons ("Match to Job", "Cover Letter",
+   "Apply") into the prompt as if they were employer requirements. Two resumes
+   tailored for different jobs came out differing by three skill words. */
+test.describe('[STATE-COVERAGE] v160 RC-1 job context binds to the data model', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.clGatherJobText === 'function'
+      && typeof window.matchToJobFromCard === 'function', null, { timeout: 15000 });
+    await page.evaluate(() => {
+      window._cmJob = null;
+      try { jobsQueue = [{ t: 'Senior Lifecycle Marketing Manager', co: 'Jobgether',
+        desc: 'Own lifecycle email and retention programs end to end.',
+        req: 'Five years lifecycle marketing. HubSpot required.',
+        benefits: 'Remote first. Health cover.' }]; } catch (e) {}
+      try { seenJobKeys = new Set(); } catch (e) {}
+      try { localStorage.removeItem('gpj_expired'); } catch (e) {}
+    });
+  });
+
+  test('Q2 authed: the deck job supplies desc AND requirements (was desc-only)', async ({ page }) => {
+    const r = await page.evaluate(() => clGatherJobText('Senior Lifecycle Marketing Manager', 'Jobgether'));
+    expect(r.desc, 'the real posting text').toContain('lifecycle email');
+    // the DOM path could only ever pass dataset.jobdesc — requirements never reached the model
+    expect(r.req, 'requirements now reach the AI').toContain('HubSpot');
+  });
+
+  test('the WRONG job is refused rather than silently substituted', async ({ page }) => {
+    // company modal is showing Airspan while the letter is for Jobgether — the exact live defect
+    const r = await page.evaluate(() => {
+      window._cmJob = { t: 'Director, Marketing Communications', co: 'Airspan',
+        desc: 'Airspan comms leadership role.', req: '', benefits: '', summary: '' };
+      try { jobsQueue = []; } catch (e) {}
+      return clGatherJobText('Senior Lifecycle Marketing Manager', 'Jobgether');
+    });
+    expect(r.desc, 'never borrows another job\'s description').not.toContain('Airspan');
+    expect(r.desc, 'empty is the honest answer').toBe('');
+  });
+
+  test('the matching job in the company modal IS used', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window._cmJob = { t: 'Senior Lifecycle Marketing Manager', co: 'Jobgether',
+        desc: 'Lifecycle role from the company view.', req: 'Braze.', benefits: '', summary: '' };
+      try { jobsQueue = []; } catch (e) {}
+      return clGatherJobText('Senior Lifecycle Marketing Manager', 'Jobgether');
+    });
+    // Browse / saved jobs / company view must keep working — they have no deck card
+    expect(r.desc).toContain('company view');
+    expect(r.req).toContain('Braze');
+  });
+
+  test('the app\'s own UI chrome can never be sent as job requirements', async ({ page }) => {
+    const r = await page.evaluate(() => _clStripChrome(
+      '\u{1F4CB} Director, Marketing Communications · Summary Open the role below for full details.'
+      + ' \u{1F3AF} Match to Job ✨ Cover Letter ⚡ Apply'));
+    for (const junk of ['Match to Job', 'Cover Letter', 'Open the role below']) {
+      expect(r, 'strips ' + junk).not.toContain(junk);
+    }
+  });
+
+  test('Q4 empty: no job text anywhere returns empty and does not throw', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window._cmJob = null;
+      try { jobsQueue = []; } catch (e) {}
+      return clGatherJobText('Nothing', 'Nowhere');
+    });
+    expect(r).toEqual({ desc: '', req: '' });
+  });
+});

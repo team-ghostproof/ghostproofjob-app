@@ -7966,11 +7966,68 @@ function tailorCoverLetter(c, level, meOverride){
   const close='I\u2019d welcome the chance to discuss how I can help '+co+' succeed. Thank you for your time and consideration.\n\nBest regards,\n'+(me.name||'[Your name \u2014 complete Core Contact in the Resume tab]')+'\n'+(me.contact||'[Add your email & phone so applications auto-fill]');
   return [p1,p2,p3,close].join('\n\n');
 }
-function clGatherJobText(){
+/* v160 RC-1 (part 2): the cover letter's job text must belong to the job the
+   letter is FOR. This used to read `cm-jobsummary`.textContent — whatever the
+   company modal happened to be showing — then fall back to `.job-card.top`,
+   with no check that either belonged to the right job. Founder-verified via the
+   OpenAI log (2026-07-28 22:28): a letter for "Senior Lifecycle Marketing
+   Manager @ Jobgether" was written from "Director, Marketing Communications @
+   Airspan" text, and that text was a DISPLAY container's textContent, so it
+   also carried the app's own button labels ("Match to Job", "Cover Letter",
+   "Apply") into the AI prompt as if they were job requirements.
+
+   Unlike matchToJobFromCard this cannot simply bind to _currentTopJob(): cover
+   letters are also written from Browse, saved jobs and the company view, where
+   there IS no deck card. So instead every source is IDENTITY-CHECKED against the
+   job the caller named (offerCoverLetter always sets clContext.title/co
+   correctly — that was never the broken part). A source that doesn't match is
+   refused, and returning EMPTY is deliberate: no text at all degrades to an
+   honest generic letter, whereas another job's text produces a confident letter
+   about the wrong role. */
+function _clJobIdent(t,c){ return String((t||'')+'|'+(c||'')).toLowerCase().replace(/\s+/g,' ').trim(); }
+/* strip the app's own chrome so UI labels can never be sent as job requirements */
+function _clStripChrome(s){
+  return String(s||'')
+    .replace(/Match to Job|Cover Letter|Apply\b|Open the role below for full details\.?|Open Full Job Card|View Full Posting/gi,' ')
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,' ')
+    .replace(/[ \t]{2,}/g,' ').trim();
+}
+function clGatherJobText(expectTitle,expectCo){
+  const wantT=(expectTitle!=null)?expectTitle:((typeof clContext==='object'&&clContext)?clContext.title:'');
+  const wantC=(expectCo!=null)?expectCo:((typeof clContext==='object'&&clContext)?clContext.co:'');
+  const want=_clJobIdent(wantT,wantC);
   let desc='',req='';
-  try{ const cm=document.getElementById('cm-jobsummary'); if(cm){ desc=(cm.textContent||'').trim(); } }catch(e){}
-  if(!desc){ try{ const top=document.querySelector('.job-card.top'); if(top){ desc=top.dataset.jobdesc||''; req=top.dataset.jobreq||''; } }catch(e){} }
-  return {desc:desc,req:req};
+  /* 1. the data model — richest and never stale (carries req + benefits too) */
+  try{
+    const j=(typeof _currentTopJob==='function')?_currentTopJob():null;
+    if(j && (!want || _clJobIdent(j.t,j.co)===want)){
+      desc=j.desc||''; req=[j.req||'',j.benefits||''].filter(Boolean).join('\n\n');
+    }
+  }catch(e){}
+  /* 2. the company modal's JOB OBJECT (never its rendered text) — only when it
+        is the SAME job. window._cmJob is set wherever cm-jobsummary is painted. */
+  if(!desc){
+    try{
+      const cj=window._cmJob;
+      if(cj && (!want || _clJobIdent(cj.t,cj.co)===want)){
+        desc=cj.desc||cj.summary||'';
+        req=[cj.req||'',cj.benefits||''].filter(Boolean).join('\n\n');
+      }
+    }catch(e){}
+  }
+  /* 3. the painted deck card — only when it is the SAME job */
+  if(!desc){
+    try{
+      const top=document.querySelector('.job-card.top');
+      if(top){
+        const tT=top.querySelector('.s-title')?top.querySelector('.s-title').textContent.trim():'';
+        const tC=top.querySelector('.s-sub')?top.querySelector('.s-sub').textContent.split(' · ')[0].trim():'';
+        if(!want || _clJobIdent(tT,tC)===want){ desc=top.dataset.jobdesc||''; req=top.dataset.jobreq||''; }
+      }
+    }catch(e){}
+  }
+  if(!desc&&!req) dbg('cover letter: no job text matched '+(want||'(unnamed)')+' — writing from résumé only');
+  return {desc:_clStripChrome(desc),req:_clStripChrome(req)};
 }
 const MAX_CL_REVS=3;
 function clRevsKey(t,c){ return 'gpj_clrev_'+(String(t||'')+'|'+String(c||'')).toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,80); }
@@ -13007,6 +13064,15 @@ function openCompanyView(co,job){
         '<div onclick="applyFromDrawer(\''+jt+'\')" style="margin-top:8px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);border-radius:9px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">⚡ Apply</div>'+
         (job.url?('<div onclick="event.stopPropagation();applyVia(\''+job.url.replace(/'/g,'')+'\',\''+String(job.t||'').replace(/'/g,'')+'\',\''+String(job.co||'').replace(/'/g,'')+'\')" style="margin-top:8px;background:rgba(0,245,160,.08);border:1px solid rgba(0,245,160,.3);color:var(--mint);border-radius:8px;padding:8px;text-align:center;font-size:11px;font-weight:700;cursor:pointer;">View Full Posting ↗</div>'):'');
       js.dataset.joburl=job.url||'';
+      /* v160 RC-1: keep the JOB OBJECT (and its identity) alongside the rendered
+         markup. Reading this container's .textContent was how the app's own
+         button labels — "Match to Job", "Cover Letter", "Apply", and the
+         placeholder "Open the role below for full details." built directly above
+         — ended up in an AI prompt as if they were the employer's requirements.
+         The clean fields live here; nothing downstream needs to scrape display. */
+      js.dataset.jobtitle=String(job.title||job.t||'');
+      js.dataset.jobco=String(job.co||job.company||'');
+      try{ window._cmJob={t:(job.title||job.t||''),co:(job.co||job.company||''),desc:(job.desc||''),req:(job.req||''),benefits:(job.benefits||''),summary:(job.summary||'')}; }catch(e){}
       js.style.display='block';
     } else js.style.display='none';
   }
