@@ -67,7 +67,7 @@ jobs:
       - name: Set up Node 20 (job pool builder)
         if: always()
         uses: actions/setup-node@v4
-        with: { node-version: '20' }
+        with: { node-version: '24' }
       - name: Rebuild the D1 job pool
         if: always()
         continue-on-error: true

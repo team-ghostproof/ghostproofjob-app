@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "GhostProofJob global job sourcing pipeline (Firebase Cloud Functions)",
   "engines": {
-    "node": "20"
+    "node": "24"
   },
   "scripts": {
     "test": "playwright test",

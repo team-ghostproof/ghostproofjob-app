@@ -9189,7 +9189,13 @@ async function applyMatch2Job(){
          no NEW skills were added — this is what makes each target role produce
          a DIFFERENT rewrite instead of near-identical output. */
       const _kw=(added&&added.length)?added:((typeof clJobTerms==='function')?clJobTerms((m2jContext&&m2jContext.desc)||'',(m2jContext&&m2jContext.title)||''):[]);
+      /* v160 DIAGNOSTICS: with ?debug=true this shows exactly what the AI was given —
+         how many bullets, which keywords, and how much REAL posting text reached it.
+         A tiny desc here is the tell that the job context never arrived (the RC-1 bug),
+         which is what made every tailor a cosmetic paraphrase. */
+      dbg('AI tailor → '+bullets.length+' bullets · keywords: '+(_kw.join(', ')||'(none)')+' · job text: '+String((m2jContext&&m2jContext.desc)||'').length+' chars');
       const result=await fb.smartMatch(bullets, _kw, true, {jobContext:_aiJobContext((m2jContext&&m2jContext.title)||'',(m2jContext&&m2jContext.co)||'',(m2jContext&&m2jContext.desc)||''), avoid:((window._jettPrev&&window._jettPrev.match)||'')});
+      dbg('AI tailor ← '+(result&&Array.isArray(result.finalResume)?(result.finalResume.length+' bullets, '+((result.changedCount||0))+' changed'+(result.isAILimitHit?', CAP HIT (templates)':'')):'NOTHING (call failed or returned unusable JSON)'));
       try{ if(result&&Array.isArray(result.finalResume)) (window._jettPrev=window._jettPrev||{}).match=result.finalResume.join(' | '); }catch(e){}
       if(result && Array.isArray(result.finalResume) && result.finalResume.length){
         /* rebuild each job's bullet block from the rewritten array using the map */
@@ -9202,8 +9208,16 @@ async function applyMatch2Job(){
         const changed=result.changedCount||0;
         if(result.isAILimitHit) aiNote=' · used smart templates (AI cap reached)';
         else if(changed>0) aiNote=' · '+changed+' bullet'+(changed>1?'s':'')+' smart-tailored ✨';
-        else aiNote=' · keywords added (bullets already strong)';
+        /* v160 HONESTY: this used to read "bullets already strong" whenever the model
+           returned zero changes — indistinguishable from a total no-op, and reassuring
+           about work that did not happen. Say what actually occurred. */
+        else { aiNote=' · keywords added — the AI returned no bullet changes'; dbg('AI returned 0 changed bullets for '+(m2jContext&&m2jContext.title)); }
       } else {
+        /* v160 DIAGNOSTICS: we land here when smartMatch returned nothing usable —
+           previously silent, so a total failure looked identical to a success. NOTE the
+           fallback keys off `added` (the boxes the user ticked), so when nothing was
+           ticked it returns null immediately and tailors NOTHING. */
+        dbg('smartMatch returned no usable bullets — falling back to local tailoring (keywords='+((added&&added.length)||0)+')');
         const lt=localTailorBullets(bullets, added, m2jContext.title);
         if(lt && lt.changed){
           const perJob={};
@@ -9211,8 +9225,11 @@ async function applyMatch2Job(){
           Object.keys(perJob).forEach(ji=>{ if(resumeData.jobs[ji]) resumeData.jobs[ji].b=perJob[ji].filter(Boolean).join('\n'); });
           aiNote=' · '+lt.changed+' bullet'+(lt.changed>1?'s':'')+' tailored to this role';
         }
+        else { aiNote=' · keywords added — no bullet tailoring was possible'; dbg('local fallback tailored nothing (no keywords ticked, or no bullet matched them)'); }
       }
-    }catch(e){}
+      /* v160: this catch was BARE — every AI failure vanished silently, which is why a
+         total no-op was indistinguishable from a successful tailor for months. */
+    }catch(e){ dbg('AI tailor THREW: '+((e&&e.message)||e)); aiNote=' · AI tailoring unavailable — keywords added only'; }
   }
   /* v157: tailor the PROFESSIONAL SUMMARY to this posting too. Bullets and skills
      were already tailored; the summary — the first thing a human reads — was left
