@@ -8959,8 +8959,30 @@ function _ghostChipHtml(j){
    ones that are true, then generate + download an optimized resume labeled by
    company/role and store a record on the account page. */
 let m2jContext={title:'',co:'',desc:'',suggestions:[]};
+/* v160 RC-1: bind Match-to-Job to the DATA MODEL, not the rotating DOM card.
+   This function was the last survivor (with clGatherJobText) of the exact bug class
+   CLAUDE.md §5 warns about and v69/v70/v71 fixed everywhere else: reading
+   `.job-card.top` returns whatever card the DOM currently paints, which is NOT
+   reliably the job the user acted on. Founder-verified via the OpenAI log
+   (2026-07-28 22:28): TARGET ROLE was "Senior Lifecycle Marketing Manager @
+   Jobgether" while the POSTING text sent to the model came from a DIFFERENT job
+   ("Director, Marketing Communications @ Airspan") — so every tailor was written
+   against the wrong posting, which is why two different jobs produced résumés
+   differing only by three skill words.
+   Also: the DOM path could only ever pass `dataset.jobdesc`. The data-model job
+   carries `desc` + `req` + `benefits`, so the model now receives the REQUIREMENTS
+   it is being asked to tailor against. `_currentTopJob()` is the job the card face
+   actually paints; the DOM read stays as a fallback only. */
 function matchToJobFromCard(ev){
   if(ev) ev.stopPropagation();
+  const j=(typeof _currentTopJob==='function')?_currentTopJob():null;
+  if(j){
+    const rich=[j.desc||'',j.req||'',j.benefits||''].filter(Boolean).join('\n\n');
+    openMatch2Job(j.t||'',j.co||'',rich);
+    return;
+  }
+  /* fallback: model momentarily unavailable — keep the old behaviour rather than
+     dropping the action entirely */
   const top=document.querySelector('.job-card.top');
   if(!top){ return; }
   const title=top.querySelector('.s-title')?top.querySelector('.s-title').textContent.trim():'';
