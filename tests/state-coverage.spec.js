@@ -5965,3 +5965,80 @@ test.describe('[STATE-COVERAGE] v160 RC-1 job context binds to the data model', 
     expect(r).toEqual({ desc: '', req: '' });
   });
 });
+
+/* ===== v160: AI-tailored content must survive to the PDF =====
+   Founder repro: three résumés tailored for three different jobs came out
+   byte-identical except for a few appended skill words, while the OpenAI logs
+   showed the model returning properly rewritten bullets every time. Cause:
+   generateResumePDF's first line called syncProfileToResume(), which REBUILDS
+   resumeData.jobs from the DOM textareas and overwrites resumeData.summary —
+   discarding the AI's work one line before the PDF was drawn. Skills survived
+   only because they are merged rather than replaced, which is exactly the
+   signature the founder observed. */
+test.describe('[STATE-COVERAGE] v160 tailored résumé reaches the PDF', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.generateResumePDF === 'function'
+      && typeof window.syncProfileToResume === 'function', null, { timeout: 15000 });
+    await page.evaluate(() => {
+      resumeData.name = 'Test Person';
+      resumeData.contact = 't@example.com';
+      resumeData.jobs = [{ t: 'Marketing Specialist', c: 'Poolsure', d: '2024 – Present',
+                           b: 'ORIGINAL bullet from the form' }];
+      try { populateEmploymentRows(resumeData.jobs); } catch (e) {}
+    });
+  });
+
+  test('skipSync=true preserves AI-tailored bullets (the fix)', async ({ page }) => {
+    const b = await page.evaluate(() => {
+      resumeData.jobs[0].b = 'AI-TAILORED bullet aimed at this posting';
+      resumeData.summary = 'AI-TAILORED summary';
+      try { generateResumePDF('T', 'X', true); } catch (e) {}
+      return { bullet: resumeData.jobs[0].b, summary: resumeData.summary };
+    });
+    expect(b.bullet, 'AI bullet survives to the PDF').toContain('AI-TAILORED');
+    expect(b.summary, 'AI summary survives too').toContain('AI-TAILORED');
+  });
+
+  test('CONTROL: without skipSync the DOM still wins (normal export unchanged)', async ({ page }) => {
+    // proves the test is measuring the real mechanism, not passing vacuously
+    const b = await page.evaluate(() => {
+      resumeData.jobs[0].b = 'AI-TAILORED bullet aimed at this posting';
+      try { generateResumePDF('T', 'X'); } catch (e) {}
+      return resumeData.jobs[0].b;
+    });
+    expect(b, 'normal export still captures unsaved form typing').toContain('ORIGINAL');
+  });
+});
+
+/* ===== v160: fmtAgo must measure calendar days, not a rolling 24h window ===== */
+test.describe('[STATE-COVERAGE] v160 stat-row dates reflect real calendar days', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.fmtAgo === 'function', null, { timeout: 15000 });
+  });
+
+  test('an action taken late YESTERDAY is not labelled "today"', async ({ page }) => {
+    // the founder's exact repro: skipped ~10pm last night, viewed early afternoon today
+    const label = await page.evaluate(() => {
+      const n = new Date();
+      const y = new Date(n.getFullYear(), n.getMonth(), n.getDate() - 1, 22, 0, 0);
+      return fmtAgo(y.getTime());
+    });
+    expect(label, 'yesterday evening reads as 1d ago, not today').toBe('1d ago');
+  });
+
+  test('CONTROL: something done earlier TODAY still reads "today"', async ({ page }) => {
+    const label = await page.evaluate(() => {
+      const n = new Date();
+      const t = new Date(n.getFullYear(), n.getMonth(), n.getDate(), 0, 5, 0);
+      return fmtAgo(t.getTime());
+    });
+    expect(label).toBe('today');
+  });
+
+  test('Q4 empty: a row with no timestamp does not print NaN', async ({ page }) => {
+    expect(await page.evaluate(() => fmtAgo(0))).toBe('—');
+    expect(await page.evaluate(() => fmtAgo(undefined))).toBe('—');
+  });
+});

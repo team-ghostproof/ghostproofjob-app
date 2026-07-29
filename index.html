@@ -7700,8 +7700,20 @@ function showAtsPreview(){
   }
   document.getElementById('ats-preview-modal').classList.add('open');
 }
-function generateResumePDF(baseName, labelExtra){
-  try{ if(typeof syncProfileToResume==='function') syncProfileToResume(); }catch(e){}
+/* v160 (founder repro, three tailored résumés byte-identical except skills):
+   `skipSync` exists because syncProfileToResume() REBUILDS resumeData.jobs from the
+   DOM textareas (index.html:10921-10933 `if(jobs.length) resumeData.jobs=jobs;`) and
+   overwrites resumeData.summary from #pr-summary. For a normal export that is
+   correct — it captures the user's unsaved typing. But Match-to-Job puts AI-tailored
+   bullets and a re-aimed summary into resumeData WITHOUT touching the form, so this
+   sync silently reverted every one of them ONE LINE before the PDF was drawn. The
+   OpenAI call succeeded, was paid for, returned valid JSON, and its output was
+   discarded. Skills survived only because they are merged (10942), not replaced —
+   which is exactly why three résumés tailored for three different jobs differed by
+   nothing but a few skill words. Callers that have deliberately staged content in
+   resumeData pass skipSync=true. Default stays false: no change to normal export. */
+function generateResumePDF(baseName, labelExtra, skipSync){
+  try{ if(!skipSync && typeof syncProfileToResume==='function') syncProfileToResume(); }catch(e){}
   /* F-ADDR (v98): the PDF builds contact text directly (not via buildResumeHTML),
      so rebuild it here too — the exported file now honors the address toggles. */
   try{ if(typeof _rebuildContact==='function') _rebuildContact(); }catch(e){}
@@ -9135,6 +9147,15 @@ async function applyMatch2Job(){
      comes back even if a rewrite step throws).
      `resumeData` is a const BINDING — restore by mutating its properties; a
      reassignment would throw "Assignment to constant variable". */
+  /* v160: founder's OpenAI log showed TWO byte-identical bullet-rewrite requests for
+     ONE press of "Download resume for this role" — she was billed twice per tailor.
+     smartMatch itself does a single fetch with no retry, so a concurrent second entry
+     (double-fired click / touch+click) is the cause we can rule out here. This lock is
+     correct regardless of which end duplicated: applyMatch2Job must never run twice
+     concurrently, because the second run would also snapshot an ALREADY-TAILORED
+     résumé as its "master" and restore that, corrupting the user's real résumé. */
+  if(window._m2jInFlight){ dbg('Match-to-Job ignored — a tailor is already running'); return; }
+  window._m2jInFlight=true;
   const _master=JSON.parse(JSON.stringify(resumeData));
   const _restoreMaster=()=>{
     try{
@@ -9213,7 +9234,10 @@ async function applyMatch2Job(){
   const coLabel=(m2jContext.co||'Company').replace(/[^A-Za-z0-9]/g,'');
   const roleLabel=(m2jContext.title||'Role').replace(/[^A-Za-z0-9]/g,'').slice(0,24);
   const nm=(resumeData.name||'My').trim().replace(/\s+/g,'_').replace(/[^A-Za-z0-9_]/g,'');
-  const fname=generateResumePDF('Resume_'+nm,coLabel+'_'+roleLabel);
+  /* v160: skipSync=true — the tailored bullets + re-aimed summary live in resumeData
+     and are NOT in the form, so re-syncing from the DOM here would discard them (it
+     did, on every tailor, since v157). The master is still restored in `finally`. */
+  const fname=generateResumePDF('Resume_'+nm,coLabel+'_'+roleLabel,true);
   /* v157: store the tailored RESUME too, so this version can be re-opened later.
      It is the only copy — the master is restored below. */
   storeOptimizedResume(m2jContext.title,m2jContext.co,added,fname,JSON.parse(JSON.stringify(resumeData)));
@@ -9229,6 +9253,7 @@ async function applyMatch2Job(){
   showToast((added.length?('✓ Added '+added.length+' keyword(s) · tailored resume downloaded'):'📄 Tailored resume downloaded for this role')+aiNote+liftNote+' · your master resume is unchanged');
   }finally{
     /* the master comes back even if a rewrite threw part-way */
+    window._m2jInFlight=false;   /* v160: release the double-fire lock on every exit path */
     _restoreMaster();
     try{ if(typeof saveDraft==='function') saveDraft(); }catch(e){}
   }
@@ -11349,7 +11374,20 @@ function recordSwipe(dir,job){
      to drop it from BOTH Swipe and Browse. Splicing here is what used to desync the
      queue against the card-rotation pointer and cause the 3-card recycle. */
 }
-function fmtAgo(ts){const d=Math.floor((Date.now()-ts)/86400000);return d===0?'today':(d===1?'1d ago':d+'d ago');}
+/* v160 (founder repro): this measured a rolling 24-HOUR window, not calendar days —
+   `Math.floor((Date.now()-ts)/86400000)`. A job skipped at 10pm last night is only 16
+   hours old at 2pm today, so it reported "today" when the user knows it was yesterday.
+   Every Applied/Skipped/Viewed row inherited that, making our own record-keeping look
+   wrong to the one person who remembers what she actually did. Now compares LOCAL
+   midnight boundaries, so the label changes when the date changes. */
+function fmtAgo(ts){
+  if(!ts) return '—';
+  const a=new Date(ts), n=new Date();
+  const midA=new Date(a.getFullYear(),a.getMonth(),a.getDate()).getTime();
+  const midN=new Date(n.getFullYear(),n.getMonth(),n.getDate()).getTime();
+  const d=Math.round((midN-midA)/86400000);
+  return d<=0?'today':(d===1?'1d ago':d+'d ago');
+}
 
 function openStatModal(kind){
   const titles={applied:'❤️ Applied',responses:'📞 Responses',skipped:'🚫 Skipped',viewed:'👀 Viewed'};
