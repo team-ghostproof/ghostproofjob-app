@@ -4737,7 +4737,7 @@ function swipeCard(dir){
         const jurl=topJob.url||'';
         if(jurl){ try{ openSandbox(jurl,topJob.t,topJob.co); }catch(e){ window.open(jurl,'_blank','noopener'); } }
         else { try{ openCompanyView(topJob.co,{title:topJob.t,url:''}); }catch(e){} }
-        offerCoverLetter(topJob.t, topJob.co, false);
+        offerCoverLetter(topJob.t, topJob.co, false, topJob);   /* v160b: pass the job the user actually swiped — the deck has already advanced by now */
       }
     }
     showToast(dir==='right'?(_isInternalApply?('📨 '+topJob.co+' — complete your application to send it…'):('❤️ '+topJob.co+' — opening the listing to apply…')):'🚫 Skipped · Algorithm updated');
@@ -7841,14 +7841,26 @@ function downloadResumeHTMLFallback(){
 
 /* ---------- COVER LETTER ENGINE ---------- */
 let clContext={title:'',co:'',external:false};
-function offerCoverLetter(title,co,external){
+function offerCoverLetter(title,co,external,jobObj){
   title=title||'this role'; co=co||'the hiring company';   /* trade/non-tech cards never crash */
   dbg('cover-letter prompt: '+title+' @ '+co+(external?' (external)':' (queue paused for review)'));
   if(!resumeReady){
     if(external) showToast('↗ Opening posting… (upload a resume to unlock tailored cover letters)');
     return;
   }
+  /* v160b: carry the JOB OBJECT itself when the caller has it. The v160 identity check
+     could not work from the deck: swipeCard ADVANCES the deck before the letter renders,
+     so _currentTopJob() is already the NEXT job and identity never matched — which is why
+     the founder's live log read "cover letter: no job text matched marketing manager|sarin
+     energy inc. — writing from résumé only" and letters went generic. Threading the job
+     from the caller (which is holding the right one) is the fix; identity-checking a
+     moving target was the wrong approach. */
   clContext={title:title,co:co,external:external,url:(typeof pendingJobUrl!=='undefined'&&pendingJobUrl)||''};
+  try{
+    if(jobObj && (jobObj.desc||jobObj.req||jobObj.summary)){
+      clContext.job={t:(jobObj.t||title||''),co:(jobObj.co||co||''),desc:(jobObj.desc||''),req:(jobObj.req||''),benefits:(jobObj.benefits||''),summary:(jobObj.summary||'')};
+    }
+  }catch(e){}
   clContext.revs=clRevsGet(title,co);   /* restore per-job rewrite count so it doesn't reset on return */
   document.getElementById('cl-prompt-title').textContent='Cover letter for '+co+'?';
   document.getElementById('cl-prompt-text').textContent=external
@@ -8009,8 +8021,18 @@ function clGatherJobText(expectTitle,expectCo){
   const wantC=(expectCo!=null)?expectCo:((typeof clContext==='object'&&clContext)?clContext.co:'');
   const want=_clJobIdent(wantT,wantC);
   let desc='',req='';
-  /* 1. the data model — richest and never stale (carries req + benefits too) */
+  /* 0. the job THREADED FROM THE CALLER (v160b) — authoritative, needs no identity
+        check because the caller was holding the right job. This is the only source
+        that survives the deck advancing between the swipe and the letter. */
   try{
+    const cj0=(typeof clContext==='object'&&clContext)?clContext.job:null;
+    if(cj0 && (cj0.desc||cj0.req||cj0.summary)){
+      desc=cj0.desc||cj0.summary||'';
+      req=[cj0.req||'',cj0.benefits||''].filter(Boolean).join('\n\n');
+    }
+  }catch(e){}
+  /* 1. the data model — richest and never stale (carries req + benefits too) */
+  if(!desc) try{
     const j=(typeof _currentTopJob==='function')?_currentTopJob():null;
     if(j && (!want || _clJobIdent(j.t,j.co)===want)){
       desc=j.desc||''; req=[j.req||'',j.benefits||''].filter(Boolean).join('\n\n');

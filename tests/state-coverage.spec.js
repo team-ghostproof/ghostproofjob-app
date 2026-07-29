@@ -6042,3 +6042,42 @@ test.describe('[STATE-COVERAGE] v160 stat-row dates reflect real calendar days',
     expect(await page.evaluate(() => fmtAgo(undefined))).toBe('—');
   });
 });
+
+/* ===== v160b: the cover letter must use the job the user actually swiped =====
+   v160's identity check could not work from the deck: swipeCard advances the deck
+   BEFORE the letter renders, so _currentTopJob() is already the next job and identity
+   never matched. Founder's live log: "cover letter: no job text matched marketing
+   manager|sarin energy inc. — writing from résumé only". Letters went generic. */
+test.describe('[STATE-COVERAGE] v160b cover letter uses the swiped job', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.clGatherJobText === 'function'
+      && typeof window.offerCoverLetter === 'function', null, { timeout: 15000 });
+  });
+
+  test('the threaded job wins even after the deck has advanced', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      // simulate the real failure: deck already showing a DIFFERENT job
+      try { jobsQueue = [{ t: 'Some Other Role', co: 'Another Co', desc: 'WRONG job text.' }]; } catch (e) {}
+      window._cmJob = null;
+      clContext = { title: 'Marketing Manager', co: 'SARIN ENERGY INC.',
+        job: { t: 'Marketing Manager', co: 'SARIN ENERGY INC.',
+               desc: 'Lead integrated marketing strategy and paid campaigns.',
+               req: 'Google Ads and SEM required.', benefits: '', summary: '' } };
+      return clGatherJobText('Marketing Manager', 'SARIN ENERGY INC.');
+    });
+    expect(r.desc, 'uses the swiped job').toContain('integrated marketing');
+    expect(r.desc, 'never the advanced deck card').not.toContain('WRONG');
+    expect(r.req, 'requirements come through too').toContain('Google Ads');
+  });
+
+  test('CONTROL: with no threaded job it still refuses a mismatched source', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      try { jobsQueue = []; } catch (e) {}
+      window._cmJob = { t: 'Different Role', co: 'Different Co', desc: 'Mismatched text.' };
+      clContext = { title: 'Marketing Manager', co: 'SARIN ENERGY INC.' };
+      return clGatherJobText('Marketing Manager', 'SARIN ENERGY INC.');
+    });
+    expect(r.desc, 'honest empty beats the wrong job').toBe('');
+  });
+});
