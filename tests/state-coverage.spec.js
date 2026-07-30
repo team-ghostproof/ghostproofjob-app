@@ -6361,3 +6361,55 @@ test.describe('[STATE-COVERAGE] v163 employer prefix + tailored-skills tidy', ()
     expect(r.master, 'master résumé is restored untouched').toBe('Campaigns · Management · Campaign');
   });
 });
+
+/* ===== v164 #8: near-duplicate bullet detection + lead-verb variation =====
+   Founder repro: "Managed 100 / 50 / 500+ accounts and client relationships end-to-end" —
+   the same sentence three times with a different number (recruiter red flag). _healMetricDupes
+   only touches generated templates; these are the user's own. Detect by similarity, vary the
+   repeated ones' lead verb, keep every fact/number. */
+test.describe('[STATE-COVERAGE] v164 #8 near-duplicate bullets are varied honestly', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof window._gpjVaryDupeBullets === 'function'
+      && typeof window._gpjBulletsSimilar === 'function', null, { timeout: 15000 });
+  });
+
+  test('the founder\'s trio: same sentence, different number -> distinct lead verbs, facts kept', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const jobs = [
+        { b:'Utilized Salesforce to manage accounts.\nManaged 100 accounts and client relationships end-to-end' },
+        { b:'Monitored client accounts.\nManaged 50 accounts and client relationships end-to-end' },
+        { b:'Designed training procedures.\nManaged 500+ accounts and client relationships end-to-end' }
+      ];
+      const varied = _gpjVaryDupeBullets(jobs);
+      const verbs = jobs.map(j => (j.b.split('\n').pop().match(/^(\w+)/)||[])[1]);
+      const nums = jobs.map(j => (j.b.match(/\d[\d+]*/g)||[]).join(''));
+      return { varied, verbs, nums };
+    });
+    expect(r.varied).toBe(2);
+    expect(new Set(r.verbs).size, 'all three lead verbs are distinct').toBe(3);
+    expect(r.verbs[0]).toBe('Managed');
+    expect(r.nums).toEqual(['100', '50', '500+']);  // numbers preserved (incl. the "+")
+  });
+
+  test('CONTROL: genuinely distinct bullets are never altered', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const jobs = [{ b:'Optimized an $80K tradeshow budget.\nLaunched a nationwide email campaign.' }];
+      const before = jobs[0].b;
+      const varied = _gpjVaryDupeBullets(jobs);
+      return { varied, unchanged: jobs[0].b === before };
+    });
+    expect(r.varied).toBe(0);
+    expect(r.unchanged).toBe(true);
+  });
+
+  test('similarity: exact-modulo-number is a dupe; unrelated bullets are not', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      dupe: _gpjBulletsSimilar('Managed 100 accounts and client relationships end-to-end','Managed 50 accounts and client relationships end-to-end'),
+      distinct: _gpjBulletsSimilar('Optimized an $80K tradeshow budget.','Led a team of 8 Account Managers.')
+    }));
+    expect(r.dupe).toBe(true);
+    expect(r.distinct).toBe(false);
+  });
+});
