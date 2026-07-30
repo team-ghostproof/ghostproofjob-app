@@ -6278,3 +6278,45 @@ test.describe('[STATE-COVERAGE] v161 #32 cover-letter daily cap is separate from
     expect(r.distinct, 'separate storage keys').toBe(true);
   });
 });
+
+/* ===== v162 #29: recover the employer name from the ATS URL =====
+   Founder repro: the card showed "Hiring Company" for kyros-human-capital-llc.careerplug.com,
+   which also poisoned the résumé filename and the cover-letter greeting. Many harvested docs
+   carry no company field, but the employer is in the URL. */
+test.describe('[STATE-COVERAGE] v162 #29 employer recovered from ATS URL', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof window._gpjEmployerFromUrl === 'function'
+      && typeof window.mapFirestoreJob === 'function', null, { timeout: 15000 });
+  });
+
+  test('the founder\'s CareerPlug URL yields the real employer', async ({ page }) => {
+    expect(await page.evaluate(() => _gpjEmployerFromUrl('https://kyros-human-capital-llc.careerplug.com/jobs/3516154/apps/new')))
+      .toBe('Kyros Human Capital LLC');
+  });
+
+  test('common ATS shapes recover; unknown hosts return empty (never invent)', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      gh: _gpjEmployerFromUrl('https://boards.greenhouse.io/acmecorp/jobs/1'),
+      lever: _gpjEmployerFromUrl('https://jobs.lever.co/brightwave/x'),
+      bamboo: _gpjEmployerFromUrl('https://riverstone-partners.bamboohr.com/careers/42'),
+      linkedin: _gpjEmployerFromUrl('https://www.linkedin.com/jobs/view/1'),
+      indeed: _gpjEmployerFromUrl('https://www.indeed.com/job/x'),
+      junk: _gpjEmployerFromUrl('nope')
+    }));
+    expect(r.gh).toBeTruthy(); expect(r.lever).toBe('Brightwave'); expect(r.bamboo).toBe('Riverstone Partners');
+    expect(r.linkedin).toBe(''); expect(r.indeed).toBe(''); expect(r.junk).toBe('');
+  });
+
+  test('mapFirestoreJob recovers when company is missing, but NEVER overwrites a real company', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      recovered: mapFirestoreJob({ title:'Sales Rep', url:'https://kyros-human-capital-llc.careerplug.com/j/x' }).co,
+      control: mapFirestoreJob({ title:'Sales Rep', company:'Real Company Inc', url:'https://kyros-human-capital-llc.careerplug.com/j/x' }).co,
+      placeholder: mapFirestoreJob({ title:'Sales Rep', url:'https://www.indeed.com/job/x' }).co
+    }));
+    expect(r.recovered).toBe('Kyros Human Capital LLC');
+    expect(r.control, 'a real company field is authoritative').toBe('Real Company Inc');
+    expect(r.placeholder, 'unresolvable still falls back honestly').toBe('Hiring Company');
+  });
+});
