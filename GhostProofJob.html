@@ -10952,6 +10952,20 @@ function showAdvice(html){
 
 /* ---------- PROFILE ↔ RESUME SYNC ---------- */
 function syncProfileToResume(){
+  /* v161 (founder repro — the tailored résumé NEVER reached the PDF, five runs):
+     while a Match-to-Job tailor is in flight, resumeData holds the AI-tailored bullets
+     and the re-aimed summary, while the DOM form still holds the MASTER. The tailor calls
+     runPersonalizationCascade → renderSettingsIdentity → syncProfileToResume, and this
+     function's `if(jobs.length) resumeData.jobs=jobs` (jobs rebuilt from #jobs-container)
+     plus the #pr-summary rebuild silently reverted the tailored content from the stale DOM
+     ONE STEP before generateResumePDF read it. Skills survived only because they are MERGED
+     here, not replaced — the exact fingerprint the founder observed (skills change, bullets
+     + summary do not). PROVEN by runtime instrumentation of the call stack + a populated-DOM
+     reproduction, NOT by reading (two read-based fixes had already failed). During a tailor
+     resumeData is authoritative and the DOM is stale, so skip the whole DOM→model rebuild;
+     applyMatch2Job restores the master in its `finally` regardless. `generateResumePDF`
+     already guards its own call with skipSync — this closes the OTHER path into sync. */
+  if(window._m2jInFlight) return;
   const val=sel=>{const e=document.querySelector(sel);return e&&e.value.trim()?e.value.trim():null;};
   const first=val('.pf-first'), last=val('.pf-last');
   if(first||last) resumeData.name=[first,last].filter(Boolean).join(' ');

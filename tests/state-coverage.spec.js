@@ -6081,3 +6081,60 @@ test.describe('[STATE-COVERAGE] v160b cover letter uses the swiped job', () => {
     expect(r.desc, 'honest empty beats the wrong job').toBe('');
   });
 });
+
+/* ===== v161: the tailored résumé must reach the PDF EVEN WITH the DOM populated =====
+   Root cause (found by RUNTIME instrumentation, not reading): applyMatch2Job writes AI
+   bullets+summary into resumeData, then runPersonalizationCascade → renderSettingsIdentity
+   → syncProfileToResume rebuilt resumeData.jobs from #jobs-container and summary from
+   #pr-summary (both stale MASTER), one step before generateResumePDF read them. Skills
+   survived only because they are merged, not replaced — the founder's exact fingerprint.
+   My v160 tests missed it because they did NOT populate the DOM, so sync's
+   `if(jobs.length) resumeData.jobs=jobs` never fired. This test populates the DOM. */
+test.describe('[STATE-COVERAGE] v161 tailored résumé reaches PDF with a populated DOM', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.applyMatch2Job === 'function'
+      && typeof window.populateEmploymentRows === 'function', null, { timeout: 15000 });
+  });
+
+  test('Q2 authed: AI bullets+summary reach generateResumePDF, master restored after', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const R = {};
+      resumeData.name = 'T'; resumeData.title = 'Marketing Specialist'; resumeData.contact = 't@e.com';
+      resumeData.summary = 'MASTER SUMMARY driving client success strategies over 12 years.'; resumeData.skills = 'Excel';
+      resumeData.jobs = [{ t: 'Marketing Specialist', c: 'Poolsure', d: '2024',
+        b: 'MASTER bullet with $80K.' }];
+      resumeReady = true;
+      populateEmploymentRows(resumeData.jobs);              // the founder's real condition
+      const s = document.getElementById('pr-summary'); if (s) s.value = resumeData.summary;
+      R.domRows = document.querySelectorAll('#jobs-container > div').length;
+      window.generateResumePDF = function () {
+        R.pdf = { b: resumeData.jobs[0].b, s: resumeData.summary }; return 'x.pdf';
+      };
+      window.fb = window.fb || {};
+      window.fb.smartMatch = async (bul, kw, f, opts) => (opts && opts.mode === 'summary')
+        ? { finalResume: ['AI-TAILORED SUMMARY re-aimed at this specific posting.'], changedCount: 1 }
+        : { finalResume: bul.map((x, i) => 'AI-TAILORED bullet ' + i), changedCount: bul.length };
+      m2jContext = { title: 'Sales', co: 'Co', desc: 'posting '.repeat(30), suggestions: [], startPct: 90 };
+      await window.applyMatch2Job();
+      R.afterReturn = resumeData.jobs[0].b;
+      return R;
+    });
+    expect(r.domRows, 'DOM rows are populated (the missing condition)').toBeGreaterThan(0);
+    expect(r.pdf.b, 'AI bullets reach the PDF builder').toContain('AI-TAILORED');
+    expect(r.pdf.s, 'AI summary reaches the PDF builder').toContain('AI-TAILORED');
+    expect(r.afterReturn, 'master résumé is restored after the tailor').toContain('MASTER');
+  });
+
+  test('CONTROL: syncProfileToResume still rebuilds jobs when NOT tailoring', async ({ page }) => {
+    // proves the guard is scoped to the tailor and does not break normal sync
+    const r = await page.evaluate(() => {
+      window._m2jInFlight = false;
+      resumeData.jobs = [{ t: 'X', c: 'Y', b: 'stale model bullet' }];
+      populateEmploymentRows([{ t: 'DOMROLE', c: 'DOMCO', d: '2024', b: 'DOM bullet text' }]);
+      syncProfileToResume();
+      return resumeData.jobs.map(j => j.b).join('|');
+    });
+    expect(r, 'normal sync still reads the DOM').toContain('DOM bullet text');
+  });
+});
