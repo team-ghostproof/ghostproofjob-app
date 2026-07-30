@@ -6320,3 +6320,44 @@ test.describe('[STATE-COVERAGE] v162 #29 employer recovered from ATS URL', () =>
     expect(r.placeholder, 'unresolvable still falls back honestly').toBe('Hiring Company');
   });
 });
+
+/* ===== v163 refinements from the founder's live test =====
+   (a) iCIMS subdomains are "careers-{company}.icims.com" — strip the prefix.
+   (b) Match-to-Job never tidied the OUTPUT skills, so the master's "Campaign·Campaigns"
+       dupe survived into the tailored PDF. Tidy the working copy (master restored after). */
+test.describe('[STATE-COVERAGE] v163 employer prefix + tailored-skills tidy', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof window._gpjEmployerFromUrl === 'function'
+      && typeof window.applyMatch2Job === 'function', null, { timeout: 15000 });
+  });
+
+  test('iCIMS "careers-" prefix stripped, plain subdomain unchanged', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      prefixed: _gpjEmployerFromUrl('https://careers-ermcoeci.icims.com/jobs/6664/job'),
+      plain: _gpjEmployerFromUrl('https://acme.icims.com/jobs/1')
+    }));
+    expect(r.prefixed).toBe('Ermcoeci');   // not "Careers Ermcoeci"
+    expect(r.plain).toBe('Acme');
+  });
+
+  test('Match-to-Job tidies the tailored skills but never mutates the master', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let pdfSkills = null;
+      resumeData.name='T'; resumeData.title='Marketing Specialist'; resumeData.contact='t@e.com';
+      resumeData.summary='Marketing specialist with 12 years across campaigns.';
+      resumeData.skills='Campaigns · Management · Campaign';   // the founder's exact dupe
+      resumeData.jobs=[{t:'Marketing Specialist',c:'Poolsure',d:'2024',b:'MASTER bullet.'}];
+      resumeReady=true; populateEmploymentRows(resumeData.jobs);
+      window.generateResumePDF=function(){ pdfSkills=resumeData.skills; return 'x'; };
+      window.fb=window.fb||{};
+      window.fb.smartMatch=async(a,k,f,o)=> (o&&o.mode==='summary')?{finalResume:['Tighter summary.'],changedCount:1}:{finalResume:a.map(x=>'better '+x),changedCount:1};
+      m2jContext={title:'Sales',co:'Co',desc:'posting '.repeat(30),suggestions:[],startPct:90};
+      await window.applyMatch2Job();
+      return { pdfSkills, master: resumeData.skills };
+    });
+    expect(r.pdfSkills, 'tailored PDF skills are deduped').toBe('Campaigns · Management');
+    expect(r.master, 'master résumé is restored untouched').toBe('Campaigns · Management · Campaign');
+  });
+});
