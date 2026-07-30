@@ -1428,7 +1428,13 @@ test.describe('[STATE-COVERAGE] v101 stabilize (bugs 1-5 + AI quality 7-9)', () 
       const founder = _tidySkills('(PowerPoint · Word · Excel) Expert · Excel · CRM (Salesforce · HubSpot)Compliance · Account Retention · Retention account · Marketing Specialist · Account Manager');
       const legacy1 = _tidySkills('Excel · Mixology · Execution · excel');
       const legacy2 = _tidySkills('Excel · Professional · Digital Marketing · excel');
-      const many = _tidySkills(Array.from({ length: 20 }, (_, i) => 'Salesforce' + i).join(' · '));
+      /* v161 #9: 20 GENUINELY-DISTINCT skills — the old "Salesforce0..19" now correctly
+         folds under stem-dedupe (near-identical strings), so the cap test needs real,
+         distinct names to exercise the cap rather than the deduper. */
+      const many = _tidySkills(['Excel','Word','PowerPoint','Salesforce','HubSpot','Photoshop',
+        'Illustrator','Copywriting','Budgeting','Forecasting','Negotiation','Onboarding',
+        'Payroll','Merchandising','Wireframing','Bookkeeping','Purchasing','Underwriting',
+        'Provisioning','Calibration'].join(' · '));
       return { founder: founder.skills, removed: founder.removed, legacy1, legacy2, manyN: many.skills.split(' · ').length };
     });
     const list = r.founder.split(' · ');
@@ -6136,5 +6142,139 @@ test.describe('[STATE-COVERAGE] v161 tailored résumé reaches PDF with a popula
       return resumeData.jobs.map(j => j.b).join('|');
     });
     expect(r, 'normal sync still reads the DOM').toContain('DOM bullet text');
+  });
+});
+
+/* ===== v161 #9: skills stemmer dedupe + non-skill filter =====
+   Founder repro across 4 tailored résumés: keyword mining surfaced "Analyst · Analyze ·
+   Analytics" (one root ×3) + bare non-skills (Communicate, Customers), and _tidySkills
+   deduped by word-set but not stem so "Campaign · Campaigns" both survived. */
+test.describe('[STATE-COVERAGE] v161 #9 skills mining is clean', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof window._tidySkills === 'function'
+      && typeof window._gpjIsNonSkill === 'function' && typeof window.enrichMatchWithMarket === 'function',
+      null, { timeout: 15000 });
+  });
+
+  test('the founder\'s polluted line: plurals fold, junk drops, real skills stay', async ({ page }) => {
+    const r = await page.evaluate(() =>
+      _tidySkills('Campaigns · Management · Campaign · Analyst · Analyze · Communicate · Customers · Analytics').skills);
+    expect(r).toContain('Analytics');            // real skill kept
+    expect(r).toContain('Management');
+    expect(r).not.toMatch(/·\s*Campaign\b(?!s)/); // "Campaign" singular folded into "Campaigns"
+    expect(r).not.toContain('Analyst');          // role, not a skill
+    expect(r).not.toContain('Communicate');      // bare verb
+    expect(r).not.toContain('Customers');        // bare noun
+  });
+
+  test('a genuine skill is not evicted by a same-stem junk word', async ({ page }) => {
+    expect(await page.evaluate(() => _tidySkills('Analyst · Analytics').skills)).toBe('Analytics');
+  });
+
+  test('CONTROL: real single + multi-word skills all survive untouched', async ({ page }) => {
+    const r = await page.evaluate(() => _tidySkills('Customer Service · Google Analytics · Salesforce · HubSpot').skills);
+    for (const s of ['Customer Service', 'Google Analytics', 'Salesforce', 'HubSpot']) expect(r).toContain(s);
+  });
+
+  test('non-skill blocklist: bare words blocked, phrases + real skills pass', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      communicate: _gpjIsNonSkill('Communicate'), customers: _gpjIsNonSkill('Customers'),
+      phrase: _gpjIsNonSkill('Customer Service'), real: _gpjIsNonSkill('Salesforce')
+    }));
+    expect(r.communicate).toBe(true); expect(r.customers).toBe(true);
+    expect(r.phrase).toBe(false); expect(r.real).toBe(false);
+  });
+
+  test('mined checkbox terms are deduped by stem + stripped of non-skills', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      // stub the mined terms with the exact junk set the founder saw
+      window.fb = window.fb || {};
+      window.fb.mineRoleKeywords = async () => ({ matched: 12, terms: [
+        { term: 'analyst', pct: 90 }, { term: 'analyze', pct: 88 }, { term: 'analytics', pct: 80 },
+        { term: 'communicate', pct: 70 }, { term: 'customers', pct: 60 }, { term: 'campaign management', pct: 55 }
+      ]});
+      m2jContext = { title: 'Marketing Manager', co: 'X', desc: '', suggestions: [] };
+      if (!document.getElementById('m2j-market') && !document.getElementById('m2j-market-alt')) {
+        const d = document.createElement('div'); d.id = 'm2j-market'; document.body.appendChild(d);
+      }
+      await enrichMatchWithMarket('Marketing Manager', 'existing skills text');
+      return m2jContext.suggestions;
+    });
+    const low = r.map(s => s.toLowerCase());
+    expect(low.filter(s => /analy/.test(s)).length, 'analy family collapses to one').toBe(1);
+    expect(low, 'bare verb dropped').not.toContain('communicate');
+    expect(low, 'bare noun dropped').not.toContain('customers');
+    expect(low.join(' '), 'a real phrase survives').toContain('campaign management');
+  });
+});
+
+/* ===== v161 #33: tailoring quality — restore concise metric notation =====
+   Founder repro (Priority Power): the AI padded "40+/8+/500+" into wordier "over 40/8/500".
+   Restore the tight form deterministically (candidate's own numbers, never fabricated). */
+test.describe('[STATE-COVERAGE] v161 #33 concise metric notation survives tailoring', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof window._gpjTightenMetrics === 'function'
+      && typeof window.applyMatch2Job === 'function', null, { timeout: 15000 });
+  });
+
+  test('"over N" becomes "N+"; "over N%" is left alone', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      a: _gpjTightenMetrics('Executed logistics for over 40 tradeshows and over 500 accounts.'),
+      pct: _gpjTightenMetrics('grew signups by over 90% last year')
+    }));
+    expect(r.a).toContain('40+'); expect(r.a).toContain('500+');
+    expect(r.a).not.toContain('over 40'); expect(r.a).not.toContain('over 500');
+    expect(r.pct, 'percentages are not touched').toContain('over 90%');
+  });
+
+  test('the padded AI output reaches the PDF as tight notation', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let pdf = null;
+      resumeData.name='T'; resumeData.title='Marketing Specialist'; resumeData.contact='t@e.com';
+      resumeData.summary='Marketing specialist with 12 years across campaigns.'; resumeData.skills='Excel';
+      resumeData.jobs=[{t:'Marketing Specialist',c:'Poolsure',d:'2024',b:'MASTER bullet with 40+ shows.'}];
+      resumeReady=true; populateEmploymentRows(resumeData.jobs);
+      const s=document.getElementById('pr-summary'); if(s) s.value=resumeData.summary;
+      window.generateResumePDF=function(){ pdf={b:resumeData.jobs[0].b,s:resumeData.summary}; return 'x'; };
+      window.fb=window.fb||{};
+      window.fb.smartMatch=async(a,k,f,o)=> (o&&o.mode==='summary')
+        ? {finalResume:['Specialist with over 12 years across over 500 locations, driving growth.'],changedCount:1}
+        : {finalResume:['Executed logistics for over 40 annual tradeshows nationwide.'],changedCount:1};
+      m2jContext={title:'Sales',co:'Co',desc:'posting '.repeat(30),suggestions:[],startPct:90};
+      await window.applyMatch2Job();
+      return pdf;
+    });
+    expect(r.b, 'bullet tightened in the PDF').toContain('40+');
+    expect(r.b).not.toContain('over 40');
+    expect(r.s, 'summary tightened in the PDF').toContain('500+');
+  });
+});
+
+/* ===== v161 #32: cover letters get their OWN daily cap (founder decision 2026-07-30) =====
+   They used to gate on matchAllowed()/bumpMatch(), so Match-to-Job + a cover letter drained
+   one shared daily pool. Now each feature has an independent counter. */
+test.describe('[STATE-COVERAGE] v161 #32 cover-letter daily cap is separate from match', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof window.clAllowed === 'function' && typeof window.bumpCl === 'function'
+      && typeof window.matchUsed === 'function', null, { timeout: 15000 });
+  });
+
+  test('bumping a cover letter does NOT consume the match allowance, and vice versa', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_tier', 'free');
+      localStorage.removeItem(matchKey()); localStorage.removeItem(clKey());
+      bumpCl();  const afterCl = { m: matchUsed(), c: clUsed() };
+      bumpMatch(); const afterMatch = { m: matchUsed(), c: clUsed() };
+      return { afterCl, afterMatch, distinct: matchKey() !== clKey() };
+    });
+    expect(r.afterCl, 'cover letter moves only its own counter').toEqual({ m: 0, c: 1 });
+    expect(r.afterMatch, 'match moves only its own counter').toEqual({ m: 1, c: 1 });
+    expect(r.distinct, 'separate storage keys').toBe(true);
   });
 });
