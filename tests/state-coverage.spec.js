@@ -6413,3 +6413,49 @@ test.describe('[STATE-COVERAGE] v164 #8 near-duplicate bullets are varied honest
     expect(r.distinct).toBe(false);
   });
 });
+
+/* ===== v165 #10: safe mechanical prose cleanup + native spellcheck =====
+   Founder's live bugs: "allocation.; Executed" and "travel..". Fix only the unambiguous
+   mechanics; never touch ellipsis/decimals/abbreviations, never rewrite grammar. */
+test.describe('[STATE-COVERAGE] v165 #10 prose tidy is safe', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof window._gpjTidyProse === 'function'
+      && typeof window._gpjTightenMetrics === 'function', null, { timeout: 15000 });
+  });
+
+  test('fixes the founder\'s period-semicolon and double-period bugs', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      ps: _gpjTidyProse('allocation.; Executed logistics'),
+      dp: _gpjTidyProse('vendor sourcing and travel..'),
+      sp: _gpjTidyProse('accounts , clients ; done .'),
+      ds: _gpjTidyProse('Led  a   team')
+    }));
+    expect(r.ps).toBe('allocation. Executed logistics');
+    expect(r.dp).toBe('vendor sourcing and travel.');
+    expect(r.sp).toBe('accounts, clients; done.');
+    expect(r.ds).toBe('Led a team');
+  });
+
+  test('CONTROL: ellipsis, decimals, and abbreviations are never mangled', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      e: _gpjTidyProse('Wait for it... then deliver'),
+      d: _gpjTidyProse('Grew revenue 3.5M in Q4'),
+      a: _gpjTidyProse('Worked across the U.S. and Canada')
+    }));
+    expect(r.e).toBe('Wait for it... then deliver');
+    expect(r.d).toBe('Grew revenue 3.5M in Q4');
+    expect(r.a).toBe('Worked across the U.S. and Canada');
+  });
+
+  test('metric-tightening and prose-tidy compose in one pass', async ({ page }) => {
+    expect(await page.evaluate(() => _gpjTightenMetrics('Led over 8 managers and travel..')))
+      .toBe('Led 8+ managers and travel.');
+  });
+
+  test('résumé textareas carry native spellcheck', async ({ page }) => {
+    const r = await page.evaluate(() => (document.getElementById('pr-summary')||{}).getAttribute('spellcheck'));
+    expect(r).toBe('true');
+  });
+});
