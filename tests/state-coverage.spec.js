@@ -6459,3 +6459,59 @@ test.describe('[STATE-COVERAGE] v165 #10 prose tidy is safe', () => {
     expect(r).toBe('true');
   });
 });
+
+/* ===== v166 Phase 2a: quantify-a-bullet elicitation =====
+   The AI won't invent numbers (honesty). Detect achievement bullets with a countable noun
+   and no number, ask the user, insert their real figure — nothing added without a typed value. */
+test.describe('[STATE-COVERAGE] v166 Phase 2a quantify a bullet honestly', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof window._gpjUnquantifiedBullets === 'function'
+      && typeof window._gpjQuantifyBullet === 'function' && typeof window.applyMatch2Job === 'function',
+      null, { timeout: 15000 });
+  });
+
+  test('detects achievement bullets missing a number; ignores ones that have one', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      det: _gpjUnquantifiedBullets([{ b:'Managed accounts and client relationships end-to-end\nLed a team standardizing protocols\nOptimized an $80K budget' }]).map(d=>d.noun),
+      hasNumber: _gpjUnquantifiedBullets([{ b:'Managed 100 accounts' }]).length,
+      noNoun: _gpjUnquantifiedBullets([{ b:'Streamlined event planning frameworks' }]).length
+    }));
+    expect(r.det).toEqual(['accounts', 'team']);
+    expect(r.hasNumber).toBe(0);   // already quantified
+    expect(r.noNoun).toBe(0);      // nothing countable
+  });
+
+  test('insertion places the real number correctly; rejects non-numbers', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      acc: _gpjQuantifyBullet('Managed accounts and client relationships', '100', 'accounts'),
+      team: _gpjQuantifyBullet('Led a team standardizing protocols', '8', 'team'),
+      reject: _gpjQuantifyBullet('Managed accounts', 'several', 'accounts')
+    }));
+    expect(r.acc).toBe('Managed 100 accounts and client relationships');
+    expect(r.team).toBe('Led a team of 8 standardizing protocols');
+    expect(r.reject, 'a non-number is never inserted').toBe('Managed accounts');
+  });
+
+  test('end-to-end: a typed number reaches the tailored PDF; master restored', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      resumeData.name='T'; resumeData.title='Marketing Specialist'; resumeData.contact='t@e.com';
+      resumeData.summary='Specialist across campaigns.'; resumeData.skills='Excel';
+      resumeData.jobs=[{ t:'Account Specialist', c:'X', d:'2024', b:'Managed accounts and client relationships end-to-end' }];
+      resumeReady=true; populateEmploymentRows(resumeData.jobs);
+      if(!document.getElementById('m2j-quantify')){ const d=document.createElement('div'); d.id='m2j-quantify'; document.body.appendChild(d); }
+      _gpjRenderQuantify();
+      document.getElementById('m2j-q0').value='100';
+      let pdf=null;
+      window.generateResumePDF=function(){ pdf=resumeData.jobs[0].b; return 'x'; };
+      window.fb=window.fb||{};
+      window.fb.smartMatch=async(a,k,f,o)=> (o&&o.mode==='summary')?{finalResume:['S.'],changedCount:1}:{finalResume:a,changedCount:0};
+      m2jContext={title:'Sales',co:'Co',desc:'posting '.repeat(30),suggestions:[],startPct:90};
+      await window.applyMatch2Job();
+      return { pdf, master: resumeData.jobs[0].b };
+    });
+    expect(r.pdf, 'the user\'s number is in the tailored bullet').toBe('Managed 100 accounts and client relationships end-to-end');
+    expect(r.master, 'master restored to the unquantified original').toBe('Managed accounts and client relationships end-to-end');
+  });
+});

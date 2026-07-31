@@ -2953,7 +2953,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v166</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v167</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -9191,6 +9191,47 @@ function matchToJobForRole(title,co,desc){
   if(!requireSignIn('match your resume to this job')) return;
   openMatch2Job(title||'this role',co||'the company',desc||'');
 }
+/* ===== Phase 2a (founder-approved 2026-07-30): quantify-a-bullet elicitation =====
+   The AI won't invent numbers (honesty). Instead we DETECT achievement bullets that
+   describe something countable but carry no number, ASK the user for the real figure,
+   and insert it — then the tailor polishes. Nothing is added without a typed value. */
+const _QUANT_VERBS=/^(managed|led|grew|increased|reduced|cut|saved|drove|boosted|oversaw|handled|coordinated|delivered|generated|expanded|launched|streamlined|supervised|directed|processed|maintained|supported|serviced|built|ran)\b/i;
+const _QUANT_NOUNS=['accounts','clients','customers','team','people','staff','employees','members','projects','campaigns','locations','stores','sites','vendors','partners','reports','tickets','cases','calls','leads','events','products','users','markets','regions','stakeholders','deals','contracts','budgets','initiatives'];
+function _gpjUnquantifiedBullets(jobs){
+  const out=[];
+  (jobs||[]).forEach(function(j,ji){
+    String((j&&j.b)||'').split('\n').forEach(function(raw,li){
+      const b=String(raw||'').replace(/^[•\-\*\s]+/,'').trim();
+      if(!b || /\d/.test(b)) return;                 /* already has a number */
+      if(!_QUANT_VERBS.test(b)) return;              /* not an achievement bullet */
+      const noun=_QUANT_NOUNS.find(function(n){ return new RegExp('\\b'+n+'\\b','i').test(b); });
+      if(!noun) return;                              /* nothing countable to quantify */
+      out.push({ji:ji, li:li, bullet:b, noun:noun});
+    });
+  });
+  return out.slice(0,3);                             /* never ask more than 3 */
+}
+function _gpjQuantifyBullet(bullet,num,noun){
+  const n=String(num||'').trim(); if(!n||!/\d/.test(n)) return bullet;   /* only a real number */
+  const b=String(bullet||'');
+  if(/^team$|^teams$|^people$|^staff$|^employees$|^members$/i.test(noun)){
+    return b.replace(new RegExp('\\b('+noun+')\\b','i'),'$1 of '+n);     /* "team" → "team of 8" */
+  }
+  return b.replace(new RegExp('\\b('+noun+')\\b','i'),n+' $1');          /* "accounts" → "100 accounts" */
+}
+function _gpjRenderQuantify(){
+  const host=document.getElementById('m2j-quantify'); if(!host) return;
+  const items=_gpjUnquantifiedBullets(resumeData.jobs);
+  window._m2jQuant=items;
+  if(!items.length){ host.innerHTML=''; return; }
+  const q=function(noun){ return /team|people|staff|employees|members/i.test(noun)?('how many people?'):('how many '+noun+'?'); };
+  host.innerHTML='<div style="font-size:11px;font-weight:800;color:var(--mint);margin:14px 0 4px;">💪 Make it stronger — add real numbers</div>'+
+    '<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Recruiters reward metrics. These bullets could show one — enter your real figure, or skip. We never make numbers up.</div>'+
+    items.map(function(it,i){ return '<div style="background:var(--plum3);border-radius:9px;padding:9px 11px;margin-bottom:7px;">'+
+      '<div style="font-size:11px;color:var(--off);line-height:1.5;margin-bottom:5px;">'+it.bullet.replace(/</g,'&lt;')+'</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+q(it.noun)+'</span>'+
+      '<input id="m2j-q'+i+'" inputmode="numeric" placeholder="e.g. 100" style="flex:1;background:var(--plum2);border:1px solid var(--plum4);border-radius:7px;padding:6px 9px;font-size:12px;color:var(--off);" /></div></div>'; }).join('');
+}
 function openMatch2Job(title,co,desc){
   if(!resumeReady||!(resumeData&&(resumeData.title||resumeData.skills))){
     showToast('Upload your resume first so we can match it to this job.');
@@ -9227,14 +9268,18 @@ function openMatch2Job(title,co,desc){
       '<div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">This posting emphasizes the keywords below. If any of these are genuinely true for you, add them — it raises your match honestly. We only suggest realistic, relevant terms, never invented experience.</div>'+
       '<div id="m2j-checks">'+realistic.map((w,i)=>'<label style="display:flex;align-items:center;gap:10px;background:var(--plum3);border-radius:9px;padding:10px 12px;margin-bottom:7px;cursor:pointer;"><input type="checkbox" checked id="m2j-c'+i+'" style="accent-color:var(--mint);width:16px;height:16px;"/><span style="font-size:13px;font-weight:600;text-transform:capitalize;">'+w.replace(/</g,'')+'</span></label>').join('')+'</div>'+
       '<div id="m2j-market"></div>'+
+      '<div id="m2j-quantify"></div>'+
       '<div onclick="applyMatch2Job()" style="margin-top:12px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;text-align:center;">✓ Add selected & download optimized resume</div>'+
       '<div style="font-size:10px;color:var(--muted);text-align:center;margin-top:8px;">We add only what you check, then build a PDF tailored to this role.</div>';
   } else {
     body.innerHTML='<div style="font-size:13px;line-height:1.7;color:var(--muted);">🎉 Your resume already covers the key terms in this posting (match '+pct+'%). You can still download a copy tailored and labeled for this role.</div>'+
       '<div id="m2j-market-alt"></div>'+
+      '<div id="m2j-quantify"></div>'+
       '<div onclick="applyMatch2Job()" style="margin-top:14px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;text-align:center;">📄 Download resume for this role</div>';
   }
   document.getElementById('match2job-modal').classList.add('open');
+  /* Phase 2a: offer to quantify any achievement bullet that has no number */
+  try{ _gpjRenderQuantify(); }catch(e){}
   /* MATCH JOB v2: enrich with REAL market data mined from Firestore postings for
      this role — what employers actually ask for, and which of those the user is
      missing. Runs async so the modal opens instantly. */
@@ -9309,10 +9354,28 @@ async function applyMatch2Job(){
       if(!cur.some(s=>s.toLowerCase()===w.toLowerCase())){ cur.push(cap); resumeData.skills=cur.join(' · '); added.push(cap); }
     }
   });
+  /* Phase 2a: apply any numbers the user typed for unquantified bullets BEFORE the AI
+     collects them, so the tailor works from the real, quantified fact. The number is the
+     user's own; nothing is invented. */
+  let _quantN=0;
+  try{
+    (window._m2jQuant||[]).forEach(function(it,i){
+      const inp=document.getElementById('m2j-q'+i);
+      const val=inp?String(inp.value||'').trim():'';
+      if(val && /\d/.test(val) && resumeData.jobs[it.ji]){
+        const lines=String(resumeData.jobs[it.ji].b||'').split('\n');
+        if(lines[it.li]!=null && !/\d/.test(lines[it.li])){
+          lines[it.li]=_gpjQuantifyBullet(lines[it.li],val,it.noun);
+          resumeData.jobs[it.ji].b=lines.join('\n'); _quantN++;
+        }
+      }
+    });
+  }catch(e){}
   /* SMART REWRITE: send the resume bullets + target keywords for genuine
      sentence-level tailoring. forceRewrite=true so it tailors even if the score
      already passes (otherwise the just-added keywords short-circuit it). */
   let aiNote='';
+  if(_quantN) aiNote+=' · '+_quantN+' metric'+(_quantN>1?'s':'')+' added';
   if(window.fb && fb.smartMatch && (added.length || (m2jContext&&m2jContext.desc)) && resumeData.jobs && resumeData.jobs.length){
     showToast('✨ Tailoring your bullets to this role…');
     try{
@@ -13444,8 +13507,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v166';
+const APP_VERSION = 'v167';
 const CHANGELOG = {
+  'v167':['Phase 2a: quantify-a-bullet - Make it stronger step asks for real numbers on unquantified achievement bullets; typed figure lands in the tailored resume, nothing invented'],
   'v166':['#10: safe mechanical prose cleanup (period-semicolon, double-period, spacing) across every AI improve path + native spellcheck on resume textareas - completes Phase 1'],
   'v165':['#8: near-duplicate bullet detection - varies repeated bullets\' lead verbs (Managed/Oversaw/Directed) keeping every fact/number; Jett + Match-to-Job; AI avoid-repetition nudge'],
   'v164':['#29 refine: strip iCIMS careers- prefix; Match-to-Job tidies the tailored skills line (folds Campaign/Campaigns dupe, master untouched)'],
