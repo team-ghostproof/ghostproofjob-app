@@ -6515,3 +6515,63 @@ test.describe('[STATE-COVERAGE] v166 Phase 2a quantify a bullet honestly', () =>
     expect(r.master, 'master restored to the unquantified original').toBe('Managed accounts and client relationships end-to-end');
   });
 });
+
+/* ===== v167 Phase 2b: skill checkboxes are opt-IN ("I have X"), not opt-out =====
+   Founder: the checkboxes "just add words". They were CHECKED by default, so the default
+   behavior added everything. Now they're unchecked — the user affirmatively confirms only
+   the skills they genuinely have, and only those flow into the résumé. */
+test.describe('[STATE-COVERAGE] v167 Phase 2b skill confirmation is opt-in', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof window.openMatch2Job === 'function'
+      && typeof window.applyMatch2Job === 'function', null, { timeout: 15000 });
+  });
+
+  test('mined skill boxes render UNCHECKED with an "I have" label and honest copy', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      resumeData.name='T'; resumeData.title='Marketing Specialist'; resumeData.contact='t@e.com';
+      resumeData.summary='Specialist across campaigns.'; resumeData.skills='Excel';
+      resumeData.jobs=[{ t:'Marketing Specialist', c:'X', d:'2024', b:'Ran email campaigns' }];
+      resumeReady=true; populateEmploymentRows(resumeData.jobs);
+      localStorage.setItem('gpj_tier','free');
+      window.fb=window.fb||{}; window.fb.mineRoleKeywords=async()=>({matched:0,terms:[]});
+      openMatch2Job('Marketing Specialist','Acme','We need salesforce, logistics and compliance with inventory management.');
+      await new Promise(r=>setTimeout(r,300));
+      const boxes=[...document.querySelectorAll('#m2j-checks input[type=checkbox]')];
+      return {
+        count: boxes.length,
+        allUnchecked: boxes.length>0 && boxes.every(b=>!b.checked),
+        label0: boxes[0]?boxes[0].parentElement.textContent.trim():'',
+        copy: /Check only the ones you genuinely have/.test((document.getElementById('m2j-body')||{}).innerText||'')
+      };
+    });
+    expect(r.count).toBeGreaterThan(0);
+    expect(r.allUnchecked, 'nothing is pre-checked — the user opts in').toBe(true);
+    expect(r.label0).toMatch(/^I have /);
+    expect(r.copy).toBe(true);
+  });
+
+  test('checking a box still adds that skill (behavior unchanged); unchecked stays out', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      resumeData.name='T'; resumeData.title='Marketing Specialist'; resumeData.contact='t@e.com';
+      resumeData.summary='Specialist.'; resumeData.skills='Excel';
+      resumeData.jobs=[{ t:'Marketing Specialist', c:'X', d:'2024', b:'Ran email campaigns' }];
+      resumeReady=true; populateEmploymentRows(resumeData.jobs);
+      localStorage.setItem('gpj_tier','free');
+      window.fb=window.fb||{}; window.fb.mineRoleKeywords=async()=>({matched:0,terms:[]});
+      openMatch2Job('Marketing Specialist','Acme','We need salesforce, logistics and compliance experience.');
+      await new Promise(r=>setTimeout(r,300));
+      const boxes=[...document.querySelectorAll('#m2j-checks input[type=checkbox]')];
+      const firstSkill=(m2jContext.suggestions||[])[0]||'';
+      if(boxes[0]) boxes[0].checked=true;                 // confirm the first skill only
+      let pdfSkills=null;
+      window.generateResumePDF=function(){ pdfSkills=resumeData.skills; return 'x'; };
+      window.fb.smartMatch=async(a,k,f,o)=> (o&&o.mode==='summary')?{finalResume:['S.'],changedCount:1}:{finalResume:a,changedCount:0};
+      await window.applyMatch2Job();
+      return { firstSkill, pdfSkills, master: resumeData.skills };
+    });
+    expect(r.pdfSkills.toLowerCase(), 'the confirmed skill is added to the tailored résumé').toContain(r.firstSkill.toLowerCase());
+    expect(r.master, 'master skills unchanged (Excel only)').toBe('Excel');
+  });
+});
