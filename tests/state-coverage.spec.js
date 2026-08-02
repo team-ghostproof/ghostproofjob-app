@@ -6575,3 +6575,63 @@ test.describe('[STATE-COVERAGE] v167 Phase 2b skill confirmation is opt-in', () 
     expect(r.master, 'master skills unchanged (Excel only)').toBe('Excel');
   });
 });
+
+/* ===== v168 refinements from the founder's live test =====
+   (a) bare "Project" was offered as a skill — promote to the real phrase "Project Management".
+   (b) "boost team performance of 10" — don't quantify a people-noun that modifies an abstract
+       noun; only ask for a headcount when the bullet is actually about leading people. */
+test.describe('[STATE-COVERAGE] v168 smarter skill suggestions + quantify targeting', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof window._gpjCanonicalSkill === 'function'
+      && typeof window._gpjUnquantifiedBullets === 'function', null, { timeout: 15000 });
+  });
+
+  test('bare nouns become real skill phrases; proper casing and phrases preserved', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      project: _gpjCanonicalSkill('project'),
+      vendor: _gpjCanonicalSkill('vendor'),
+      analysis: _gpjCanonicalSkill('analysis'),
+      sf: _gpjCanonicalSkill('salesforce'),
+      crm: _gpjCanonicalSkill('crm'),
+      phrase: _gpjCanonicalSkill('project management')
+    }));
+    expect(r.project).toBe('Project Management');
+    expect(r.vendor).toBe('Vendor Management');
+    expect(r.analysis).toBe('Data Analysis');
+    expect(r.sf).toBe('Salesforce');            // casing kept
+    expect(r.crm).toBe('CRM');
+    expect(r.phrase).toBe('Project Management'); // no doubling
+  });
+
+  test('quantify skips abstract compounds but still asks on real headcount bullets', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      teamPerf: _gpjUnquantifiedBullets([{ b:'Streamlined frameworks to enhance team performance' }]).length,
+      ledTeam: _gpjUnquantifiedBullets([{ b:'Led a team standardizing protocols' }]).map(x=>x.noun),
+      accounts: _gpjUnquantifiedBullets([{ b:'Managed accounts and client relationships end-to-end' }]).map(x=>x.noun)
+    }));
+    expect(r.teamPerf, '"team performance" is not a headcount').toBe(0);
+    expect(r.ledTeam).toEqual(['team']);   // real leadership bullet still asked
+    expect(r.accounts).toEqual(['accounts']);
+  });
+
+  test('the mined checkboxes offer the canonical phrase, not the bare word', async ({ page }) => {
+    // the founder's live "Project" came from the mining path — inject it there
+    const r = await page.evaluate(async () => {
+      resumeData.name='T'; resumeData.title='Marketing Specialist'; resumeData.contact='t@e.com';
+      resumeData.summary='Specialist.'; resumeData.skills='Excel';
+      resumeData.jobs=[{ t:'Marketing Specialist', c:'X', d:'2024', b:'Ran email campaigns' }];
+      resumeReady=true; populateEmploymentRows(resumeData.jobs);
+      if (!document.getElementById('m2j-market')) { const d=document.createElement('div'); d.id='m2j-market'; document.body.appendChild(d); }
+      m2jContext = { title:'Marketing Coordinator', co:'X', desc:'', suggestions:[] };
+      window.fb=window.fb||{};
+      window.fb.mineRoleKeywords=async()=>({ matched:20, terms:[{term:'project',pct:80},{term:'vendor',pct:60}] });
+      await enrichMatchWithMarket('Marketing Coordinator', 'existing skills text');
+      return { html:(document.getElementById('m2j-market')||{}).innerText||'', suggestions:m2jContext.suggestions };
+    });
+    expect(r.html).toContain('Project Management');
+    expect(r.html).not.toMatch(/I have Project\b(?! Management)/);   // never the bare word
+    expect(r.suggestions).toContain('Project Management');
+  });
+});
