@@ -55,14 +55,33 @@ async function build({ write = true, companies = true } = {}) {
 
   const sitemap = buildSitemap(cities.concat(coList));
 
+  let pruned = 0;
   if (write) {
     fs.mkdirSync(OUT_DIR, { recursive: true });
     for (const p of pages) fs.writeFileSync(path.join(OUT_DIR, p.slug + '.html'), p.html, 'utf8');
     for (const p of coPages) fs.writeFileSync(path.join(OUT_DIR, p.slug + '.html'), p.html, 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'index.html'), index, 'utf8');
     fs.writeFileSync(SITEMAP, sitemap, 'utf8');
+    /* v174 (P2-2): PRUNE stale company pages. run.js only ever WROTE, so old slugs
+       (renamed by the v174 variant-fold, or companies that churned out of the pool)
+       piled up on disk — 834 files vs 313 sitemapped — where crawlers still find
+       them as duplicate/thin content, the exact negative signal we're removing.
+       Delete every co-*.html NOT in this build. City pages come from a static list
+       and never churn, so they are never touched.
+       SAFETY: only prune when this build actually produced company pages
+       (coPages.length > 0). A transient Firestore failure leaves coPages empty —
+       in that case we must NOT wipe every existing page, so we skip the prune and
+       let the last-good pages stand. */
+    if (companies && coPages.length) {
+      const keep = new Set(coPages.map((p) => p.slug + '.html'));
+      for (const f of fs.readdirSync(OUT_DIR)) {
+        if (/^co-.*\.html$/.test(f) && !keep.has(f)) {
+          try { fs.unlinkSync(path.join(OUT_DIR, f)); pruned++; } catch (e) { /* ignore */ }
+        }
+      }
+    }
   }
-  return { pages, index, sitemap, count: pages.length, companyCount: coPages.length };
+  return { pages, index, sitemap, count: pages.length, companyCount: coPages.length, pruned };
 }
 
 module.exports = { build, buildSitemap };
@@ -75,6 +94,7 @@ if (require.main === module) {
       (dry ? '[seo] DRY RUN — rendered ' : '[seo] wrote ') +
         r.count + ' city pages + index' +
         (r.companyCount ? (' + ' + r.companyCount + ' company pages') : '') +
+        (r.pruned ? (' · pruned ' + r.pruned + ' stale/duplicate company pages') : '') +
         (dry ? '' : ' → seo/ , sitemap.xml') +
         ' (static, zero runtime reads)'
     );

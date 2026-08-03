@@ -57,7 +57,31 @@ function val(v) {
 
 const JUNK = /^(unknown|confidential|n\/a|various|private|staffing|recruiting agency)$/i;
 
-/** Group live jobs by company → [{name, slug, count, roles:[{title,location}]}] */
+/* v174 (P2-2): fold company-name variants so "ABM Industries Inc" / "ABM Industries"
+   / "ABM Industries, LLC" resolve to ONE page. Uses the same CO_TAIL suffix list as
+   the app's _coKey (index.html:4947), so the two sides agree on what "one company"
+   is. Duplicate company pages were a live NEGATIVE SEO signal (312 of 313 pages
+   "Discovered — not indexed"); collapsing variants removes it.
+   SUPERSET of the app's version by design: the app does `.replace(/[.,&']/g,' ')`,
+   which splits a dotted abbreviation like "L.L.P." into single letters "l l p" that
+   never match a suffix and so never fold. Here we strip periods WITHOUT inserting a
+   space first ("L.L.P." → "llp", "Inc." → "inc"), so those variants fold too. The
+   app isn't changed to match — re-keying its stored hiddenCompanies is a separate,
+   migration-sensitive change — but this only ever folds a strict superset, never
+   less, so the two never disagree on a name the app already folds. */
+const CO_TAIL = new Set(['inc', 'llc', 'lp', 'llp', 'ltd', 'limited', 'corp', 'corporation', 'co', 'company', 'companies', 'plc', 'gmbh', 'ag', 'nv', 'sa', 'pvt', 'pte', 'holdings', 'holding', 'group', 'partners', 'consultants', 'consulting', 'international', 'worldwide', 'staffing', 'solutions', 'services', 'enterprises', 'industries']);
+function coKey(co) {
+  const raw = String(co == null ? '' : co).toLowerCase().replace(/\s+/g, ' ').trim();
+  const toks = raw
+    .replace(/\([^)]*\)/g, ' ')     // drop "(a B Corp)" parentheticals
+    .replace(/\./g, '')             // collapse dotted abbreviations: "l.l.p." → "llp", "inc." → "inc"
+    .replace(/[,&']/g, ' ')         // other separators → space
+    .replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  while (toks.length > 1 && CO_TAIL.has(toks[toks.length - 1])) toks.pop();
+  return toks.join(' ').trim() || raw;          // never reduce a name to nothing
+}
+
+/** Group live jobs by folded company key → [{slug, name, count, roles:[{title,location}]}] */
 function aggregate(jobs) {
   const by = new Map();
   for (const j of jobs || []) {
@@ -65,10 +89,11 @@ function aggregate(jobs) {
     if (name.length < 2 || name.length > 80 || JUNK.test(name)) continue;
     const title = String(j.title || '').trim();
     if (!title) continue;
-    const k = name.toLowerCase();
-    if (!by.has(k)) by.set(k, { name, count: 0, roles: [] });
+    const k = coKey(name);                        // v174: fold spelling variants
+    if (!by.has(k)) by.set(k, { key: k, name, count: 0, roles: [], names: new Map() });
     const c = by.get(k);
     c.count++;
+    c.names.set(name, (c.names.get(name) || 0) + 1);   // track spellings → pick a display name
     if (c.roles.length < MAX_ROLES_SHOWN) {
       c.roles.push({ title: title.slice(0, 90), location: String(j.location || (j.is_remote ? 'Remote' : '')).slice(0, 60) });
     }
@@ -79,10 +104,16 @@ function aggregate(jobs) {
     .sort((a, b) => b.count - a.count)
     .slice(0, MAX_COMPANIES)
     .map((c) => {
-      let slug = 'co-' + c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+      /* display the MOST-COMMON raw spelling (ties → the longer, more-complete one) */
+      let name = c.name, best = -1;
+      for (const [nm, cnt] of c.names) { if (cnt > best || (cnt === best && nm.length > name.length)) { name = nm; best = cnt; } }
+      /* slug from the CANONICAL key, never the display spelling — so the URL stays
+         STABLE week-to-week even if the most-common spelling flips (no churning,
+         de-indexing URL changes). */
+      let slug = 'co-' + c.key.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
       while (seenSlugs.has(slug)) slug += '-2';
       seenSlugs.add(slug);
-      return Object.assign({ slug }, c);
+      return { slug, name, count: c.count, roles: c.roles };
     });
 }
 
@@ -146,4 +177,4 @@ async function buildCompanies() {
   return { list, pages: list.map((c) => ({ slug: c.slug, html: renderCompanyPage(c) })) };
 }
 
-module.exports = { buildCompanies, aggregate, renderCompanyPage, MIN_ROLES, MAX_COMPANIES };
+module.exports = { buildCompanies, aggregate, renderCompanyPage, coKey, MIN_ROLES, MAX_COMPANIES };

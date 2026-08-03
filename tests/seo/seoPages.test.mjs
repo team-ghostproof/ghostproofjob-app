@@ -89,7 +89,7 @@ describe('HONESTY rules (CLAUDE.md) enforced on public marketing pages', () => {
 // neutral placeholder pages built from the company's own postings, with a
 // claim-your-page CTA. The safety model is enforced here as tests.
 describe('company pages — the "safest way" honesty model', () => {
-  const { aggregate, renderCompanyPage, MIN_ROLES } = require('../../seo-generator/companies.js');
+  const { aggregate, renderCompanyPage, coKey, MIN_ROLES } = require('../../seo-generator/companies.js');
   const fixture = [
     { company: 'Acme Logistics', title: 'Ops Manager', location: 'Houston, TX', active: true },
     { company: 'Acme Logistics', title: 'Dispatcher', location: 'Katy, TX', active: true },
@@ -121,6 +121,34 @@ describe('company pages — the "safest way" honesty model', () => {
   test('job-sourced text is escaped and nothing fetches at runtime', () => {
     assert.doesNotMatch(page, /<script>alert/, 'titles are escaped');
     assert.doesNotMatch(page, /\bfetch\s*\(|XMLHttpRequest|firestore/i, 'zero runtime reads');
+  });
+
+  // v174 (P2-2): name-variant folding — the fix for duplicate company pages
+  test('coKey folds corporate suffixes + punctuation (mirrors the app _coKey)', () => {
+    assert.equal(coKey('Baker Botts, L.L.P.'), coKey('Baker Botts'));
+    assert.equal(coKey('Baker Botts LLP'), coKey('Baker Botts'));
+    assert.equal(coKey('Acme (a B Corp) Holdings'), coKey('Acme'));
+    assert.ok(coKey('Anything Inc').length > 0, 'never reduces a name to nothing');
+  });
+  test('company-name variants collapse into ONE page with a stable slug', () => {
+    const dupes = aggregate([
+      { company: 'Baker Botts', title: 'Paralegal', location: 'Houston, TX', active: true },
+      { company: 'Baker Botts, L.L.P.', title: 'Associate', location: 'Dallas, TX', active: true },
+      { company: 'Baker Botts LLP', title: 'Legal Assistant', location: 'Austin, TX', active: true },
+    ]);
+    assert.equal(dupes.length, 1, 'all three spellings fold to one company page');
+    assert.equal(dupes[0].count, 3, 'every role counted under the folded company');
+    assert.equal(dupes[0].slug, 'co-baker-botts', 'slug from the canonical key — stable across spellings');
+    assert.ok(/Baker Botts/.test(dupes[0].name), 'a real display name is chosen');
+  });
+  test('distinct companies sharing a first word are NOT over-folded', () => {
+    const distinct = aggregate([
+      { company: 'ABM Industries', title: 'Custodian', location: 'Houston, TX', active: true },
+      { company: 'ABM Industries', title: 'Supervisor', location: 'Katy, TX', active: true },
+      { company: 'ABM Aviation', title: 'Ramp Agent', location: 'Houston, TX', active: true },
+      { company: 'ABM Aviation', title: 'Gate Agent', location: 'Austin, TX', active: true },
+    ]);
+    assert.equal(distinct.length, 2, 'ABM Industries and ABM Aviation stay separate (only trailing suffixes fold)');
   });
 });
 
