@@ -6803,3 +6803,35 @@ test.describe('[STATE-COVERAGE] v172 Role Fit out-of-field cap', () => {
     expect(r.outOfFieldNote, 'no out-of-field note when in field').toBeFalsy();
   });
 });
+
+/* ===== v173 #11: apply panel leads with the tailored cover letter, honest header ===== */
+test.describe('[STATE-COVERAGE] v173 apply-panel reorder', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof openApplyTokensThenTab === 'function'
+      && typeof resumeData !== 'undefined' && resumeData, null, { timeout: 15000 });
+  });
+
+  test('cover letter is the first item; header no longer claims auto-fill', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      resumeData.name = 'Aaliyah Sosa';
+      resumeData.contact = 'a@b.com · 832-000-0000 · Houston, TX';
+      resumeData.skills = 'Marketing · Salesforce';
+      try { window.resumeReady = true; } catch(e) {}
+      openApplyTokensThenTab('https://example.com/apply', 'Marketing Manager', 'Priority Power');
+      const body = document.getElementById('apply-tab-tokens');
+      const header = document.querySelector('#apply-tab-modal .modal-box').textContent;
+      return {
+        firstIsCoverLetter: /Cover Letter/i.test(body.children[0] ? body.children[0].textContent : ''),
+        hasQuickFillSubhead: [...body.children].some(c => /quick-fill fields/i.test(c.textContent)),
+        headerHonest: /tailored application/i.test(header) && !/auto-fill ready/i.test(header),
+        contactAfterLetter: body.children.length > 2 && /Name:/.test(body.textContent)
+      };
+    });
+    expect(r.firstIsCoverLetter, 'the tailored cover letter leads the panel').toBeTruthy();
+    expect(r.hasQuickFillSubhead, 'contact tokens grouped under a Quick-fill subhead').toBeTruthy();
+    expect(r.headerHonest, 'header stops claiming auto-fill the app cannot do').toBeTruthy();
+    expect(r.contactAfterLetter, 'contact fields still present, below the letter').toBeTruthy();
+  });
+});

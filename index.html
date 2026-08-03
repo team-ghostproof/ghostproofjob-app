@@ -1044,6 +1044,11 @@
     .key-hint{display:inline-block;background:var(--plum3);border:1px solid var(--plum4);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;color:var(--cyber);}
   }
 </style>
+<!-- Cloudflare Web Analytics (v173, founder-approved): privacy-first, cookieless, no
+     consent banner, zero PII — fits the no-ads/no-data-selling promise. External beacon
+     only; no runtime quota. Gives traffic/referrer visibility for SEO testing + tracking. -->
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "625d501f5e03409d91702c2cce963d3b"}'></script>
+<!-- End Cloudflare Web Analytics -->
 </head>
 <body>
 <!-- ===== DESKTOP PANES (hidden on mobile) ===== -->
@@ -1749,11 +1754,11 @@
   <div class="modal-scrim" id="apply-tab-modal" style="z-index:358;">
     <div class="modal-box" style="text-align:left;max-height:84vh;display:flex;flex-direction:column;">
       <div style="display:flex;align-items:center;margin-bottom:4px;">
-        <div style="font-size:15px;font-weight:800;flex:1;">⚡ One-tap auto-fill ready</div>
+        <div style="font-size:15px;font-weight:800;flex:1;">⚡ Your tailored application — ready</div>
         <div onclick="document.getElementById('apply-tab-modal').classList.remove('open')" style="color:var(--muted);cursor:pointer;font-size:16px;">✕</div>
       </div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:6px;" id="apply-tab-title"></div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5;">Grab your info first, then open the job. Copy any field below, tap <b>Open Application</b> to launch the posting in a new tab — your details stay one tap away the whole time.</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5;">Copy your cover letter or any field below, then tap <b>Open Application</b> to launch the posting in a new tab — everything stays one tap away the whole time.</div>
       <div style="display:flex;flex-direction:column;gap:8px;overflow-y:auto;" id="apply-tab-tokens"></div>
       <div onclick="applyTabGo()" style="margin-top:14px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:14px;text-align:center;font-size:14px;cursor:pointer;">Open Application ↗</div>
       <div id="apply-tab-done" style="display:none;margin-top:8px;background:var(--plum);border:1px solid var(--mint);color:var(--mint);font-weight:800;border-radius:12px;padding:12px;text-align:center;font-size:13px;cursor:pointer;" onclick="applyTabDone()">✓ Done — I Applied</div>
@@ -2953,7 +2958,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v172</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v173</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -13606,8 +13611,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v172';
+const APP_VERSION = 'v173';
 const CHANGELOG = {
+  'v173':['Apply panel leads with the tailored cover letter; honest header (no auto-fill claim)'],
   'v172':['Role Fit honesty: field-alignment gate (no generic-term inflation) + card-vs-role reconciliation + Jett explanation'],
   'v171':['Match Preferences: placeholders can never save as real values (editPref/savePref guard) + one-time self-heal of stale demo prefs (Engineer/$120k) with conservative signature match'],
   'v170':['#27: fix offerCoverLetter wrappers dropping the jobObj arg - cover-letter job threading (v160b) was silently defeated; now every caller\'s job context reaches the letter'],
@@ -14653,12 +14659,18 @@ function openApplyTokensThenTab(url,title,co){
   const tok=(label,val)=>val?('<div onclick="copyTok(this)" data-v="'+String(val).replace(/"/g,'&quot;')+'" style="background:var(--plum3);border:1px solid var(--plum4);border-radius:9px;padding:9px 12px;font-size:12px;font-weight:700;color:var(--off);cursor:pointer;display:flex;justify-content:space-between;gap:8px;"><span>'+label+'</span><span style="color:var(--mint);">tap to copy ⧉</span></div>'):'';
   const body=document.getElementById('apply-tab-tokens');
   if(body){
+    /* v173 (#11, founder-approved [UI-REVIEW]): the tailored COVER LETTER — the
+       highest-value asset — leads, instead of sitting last below the phone number.
+       Contact tokens follow under a "Quick-fill fields" subhead. Documents-first
+       mirrors the real apply sequence (attach, then fill fields). Pure reorder —
+       copyHudLetter / recording logic unchanged. */
     body.innerHTML=[
+      '<div onclick="copyHudLetter(\''+String(title||'this role').replace(/'/g,'')+'\',\''+String(co||'the company').replace(/'/g,'')+'\')" style="background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.5);border-radius:11px;padding:13px;font-size:13px;font-weight:800;color:var(--cyber);cursor:pointer;text-align:center;">📋 Copy Your Tailored Cover Letter</div>',
+      '<div style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:6px 0 -2px;">Quick-fill fields</div>',
       tok('Name: '+(me.name||''),me.name||''),
       tok('Email: '+(em?em[0]:''),em?em[0]:''),
       tok('Phone: '+(ph?ph[0]:''),ph?ph[0]:''),
-      tok('Top skills',(me.skills||'').split(' · ').slice(0,5).join(', ')),
-      '<div onclick="copyHudLetter(\''+String(title||'this role').replace(/'/g,'')+'\',\''+String(co||'the company').replace(/'/g,'')+'\')" style="background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.4);border-radius:9px;padding:9px 12px;font-size:12px;font-weight:800;color:var(--cyber);cursor:pointer;text-align:center;">📋 Copy Tailored Cover Letter</div>'
+      tok('Top skills',(me.skills||'').split(' · ').slice(0,5).join(', '))
     ].filter(Boolean).join('');
   }
   const tt=document.getElementById('apply-tab-title');
