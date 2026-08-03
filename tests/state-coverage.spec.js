@@ -6635,3 +6635,51 @@ test.describe('[STATE-COVERAGE] v168 smarter skill suggestions + quantify target
     expect(r.suggestions).toContain('Project Management');
   });
 });
+
+/* ===== v169 #27: cover-letter job threading (a real regression fix) =====
+   offerCoverLetter is wrapped twice (energy/overlimit gate + opt-out/quota); BOTH wrappers
+   had signature (title,co,external) and dropped the 4th arg jobObj — so v160b's threading was
+   silently defeated and letters lost their job context (masked by the _cmJob/deck fallbacks).
+   The wrappers now forward jobObj; every threaded caller works. */
+test.describe('[STATE-COVERAGE] v169 #27 cover-letter wrappers forward the job', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof window.offerCoverLetter === 'function'
+      && typeof window.clGatherJobText === 'function' && typeof window.applyFromViewed === 'function',
+      null, { timeout: 15000 });
+  });
+
+  test('a threaded job survives the wrappers and reaches the letter', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      resumeData.name='T'; resumeData.contact='t@e.com'; resumeData.summary='pro'; resumeData.jobs=[{t:'x',c:'y',b:'z'}]; resumeReady=true;
+      window._cmJob=null; try{ jobsQueue=[]; }catch(e){}
+      offerCoverLetter('Rep','Beta',true,{ t:'Rep', co:'Beta', desc:'THREADED desc.', req:'REQ here.' });
+      return clGatherJobText('Rep','Beta');
+    });
+    expect(r.desc).toBe('THREADED desc.');
+    expect(r.req).toContain('REQ here.');
+  });
+
+  test('applyFromViewed threads the viewed row through the wrappers', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      resumeData.name='T'; resumeData.contact='t@e.com'; resumeData.summary='pro'; resumeData.jobs=[{t:'x',c:'y',b:'z'}]; resumeReady=true;
+      window._cmJob=null; try{ jobsQueue=[]; }catch(e){}
+      lists.viewed=[{ t:'ViewRole', co:'ViewCo', desc:'VIEWED desc.', url:'' }];
+      applyFromViewed(0);
+      return clGatherJobText('ViewRole','ViewCo').desc;
+    });
+    expect(r).toBe('VIEWED desc.');
+  });
+
+  test('CONTROL: a letter with no threaded job clears the previous one (no stale leak)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      resumeData.name='T'; resumeData.contact='t@e.com'; resumeData.summary='pro'; resumeData.jobs=[{t:'x',c:'y',b:'z'}]; resumeReady=true;
+      window._cmJob=null; try{ jobsQueue=[]; }catch(e){}
+      offerCoverLetter('A','ACo',true,{ t:'A', co:'ACo', desc:'FIRST job.' });   // sets clContext.job
+      offerCoverLetter('B','BCo',true);                                          // no jobObj -> must clear it
+      return clGatherJobText('B','BCo').desc;
+    });
+    expect(r, 'the previous job never leaks into the next letter').toBe('');
+  });
+});
