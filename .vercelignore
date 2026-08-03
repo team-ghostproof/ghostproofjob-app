@@ -12,6 +12,13 @@
 # the directory is safe and drops the function count to 9.
 api/match/
 
+# api/rate/ — rateCore.js is the SHARED résumé-rating core (P1-1), a pure module
+# with NO request handler. It runs in the node --test suite and is INLINED into the
+# static /tools/resume-checker page at build time (seo-generator). Nothing in the
+# deployed runtime imports it, and like api/match/ it would otherwise become a
+# Serverless Function against the Hobby 12-function cap. Excluded.
+api/rate/
+
 # v152 — the SAME failure returned: v151 added api/interview-email.js and
 # api/reachout-email.js, taking the count 11 -> 13 and hard-failing every deploy
 # with "No more than 12 Serverless Functions ... on the Hobby plan".

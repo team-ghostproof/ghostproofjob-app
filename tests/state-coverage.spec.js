@@ -6835,3 +6835,48 @@ test.describe('[STATE-COVERAGE] v173 apply-panel reorder', () => {
     expect(r.contactAfterLetter, 'contact fields still present, below the letter').toBeTruthy();
   });
 });
+
+/* ===== P1-1: rateCore.js is the browser twin of index.html _ratingStructure ===== */
+const rateCore = require('../api/rate/rateCore.js');
+test.describe('[STATE-COVERAGE] rateCore convergence with the in-app rater', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof _ratingStructure === 'function'
+      && typeof resumeData !== 'undefined' && resumeData, null, { timeout: 15000 });
+  });
+
+  const fixtures = [
+    { name: 'marketing', resume: {
+      name: 'Aaliyah Sosa', contact: 'a@b.com · 832-000-0000 · Houston, TX',
+      summary: 'Marketing professional with 12+ years driving client success and revenue growth across a portfolio.',
+      skills: 'Photoshop · Excel · Salesforce · HubSpot · CRM · Leadership · Communication',
+      jobs: [{ b: 'Optimized an $80K tradeshow budget for cost-efficiency.\nExecuted logistics for 40+ nationwide tradeshows.\nManaged 100 accounts end-to-end.' },
+             { b: 'Led a team of 8 account managers.\nDrove revenue growth across 500+ locations.' }] } },
+    { name: 'thin', resume: { name: 'Sam', contact: '', summary: '', skills: 'Excel', jobs: [{ b: 'Did some things at work here.' }] } },
+    { name: 'empty', resume: { name: '', contact: '', summary: '', skills: '', jobs: [] } },
+  ];
+
+  for (const fx of fixtures) {
+    test('STRUCTURE score matches in-app for the "' + fx.name + '" résumé', async ({ page }) => {
+      const live = await page.evaluate((r) => {
+        Object.keys(resumeData).forEach(k => delete resumeData[k]);
+        Object.assign(resumeData, r);
+        const st = _ratingStructure();
+        return { pts: st.pts, max: st.max, needsMetrics: st.needsMetrics, labels: st.items.map(i => i[0] + '|' + i[1]) };
+      }, fx.resume);
+      const mine = rateCore.rateStructure(fx.resume);
+      expect(mine.pts, 'pts parity').toBe(live.pts);
+      expect(mine.max, 'max parity').toBe(live.max);
+      expect(mine.needsMetrics, 'needsMetrics parity').toBe(live.needsMetrics);
+      expect(mine.items.map(i => i[0] + '|' + i[1]), 'item labels + flags parity').toEqual(live.labels);
+    });
+  }
+
+  test('field-gate helper: out-of-field true for Engineer, false for in-field Marketing', () => {
+    const txt = 'marketing specialist led campaigns and managed budget for the brand team';
+    expect(rateCore.isOutOfField('Engineer', txt), 'marketing résumé is out-of-field for Engineer').toBe(true);
+    expect(rateCore.isOutOfField('Marketing Manager', txt), 'in-field for Marketing Manager').toBe(false);
+    expect(rateCore.isOutOfField('Specialist', txt), 'an all-generic target never gates').toBe(false);
+  });
+});
