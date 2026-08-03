@@ -6683,3 +6683,77 @@ test.describe('[STATE-COVERAGE] v169 #27 cover-letter wrappers forward the job',
     expect(r, 'the previous job never leaks into the next letter').toBe('');
   });
 });
+
+/* ===== v171 Match-Preferences: placeholder can never be saved as a real value =====
+   Founder repro: "Engineer, Developer, Tech Lead" demo data lived in her prefs (an old
+   placeholder saved as real). editPref read the DOM textContent (the placeholder) into the
+   edit modal, and savePref did not reject it. Now editPref pre-fills the REAL stored value
+   (empty if none/placeholder) and savePref rejects placeholder text. */
+test.describe('[STATE-COVERAGE] v171 match-pref placeholder never persists', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof window.editPref === 'function'
+      && typeof window.savePref === 'function' && typeof _GPJ_PREF_PLACEHOLDERS !== 'undefined',
+      null, { timeout: 15000 });
+  });
+
+  test('edit modal shows the real value, never the placeholder', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const out = {};
+      localStorage.removeItem('gpj_prefs');
+      editPref('titles');                                  // no stored value
+      out.emptyWhenNone = document.getElementById('pref-modal-input').value;
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: 'Marketing Manager, Brand Manager' }));
+      editPref('titles');                                  // real value
+      out.showsReal = document.getElementById('pref-modal-input').value;
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: _GPJ_PREF_PLACEHOLDERS.titles }));
+      editPref('titles');                                  // stored value == placeholder
+      out.emptyWhenPlaceholder = document.getElementById('pref-modal-input').value;
+      return out;
+    });
+    expect(r.emptyWhenNone).toBe('');
+    expect(r.showsReal).toBe('Marketing Manager, Brand Manager');
+    expect(r.emptyWhenPlaceholder).toBe('');
+  });
+
+  test('savePref rejects the placeholder text and never persists it', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.removeItem('gpj_prefs');
+      editingPref = 'titles';
+      document.getElementById('pref-modal-input').value = _GPJ_PREF_PLACEHOLDERS.titles;
+      savePref();
+      const saved = JSON.parse(localStorage.getItem('gpj_prefs') || '{}');
+      return { stored: saved.titles || null };
+    });
+    expect(r.stored, 'the placeholder is never written as a real pref').toBeNull();
+  });
+});
+
+/* ===== v171 self-heal: clear stale demo prefs, never a real value ===== */
+test.describe('[STATE-COVERAGE] v171 stale demo prefs self-heal', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof window._gpjHealStalePrefs === 'function'
+      && typeof _GPJ_PREF_PLACEHOLDERS !== 'undefined', null, { timeout: 15000 });
+  });
+
+  test('clears the exact demo signature but preserves plausibly-real values', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const heal = (prefs) => { localStorage.setItem('gpj_prefs', JSON.stringify(prefs)); _gpjHealStalePrefs(); return JSON.parse(localStorage.getItem('gpj_prefs') || '{}'); };
+      return {
+        demoSig: heal({ titles: 'Engineer, Developer, Tech Lead', salary: '$120,000 / year' }),
+        realEngineer: heal({ titles: 'Engineer, Developer, Tech Lead', salary: '$95,000' }),
+        placeholder: heal({ titles: _GPJ_PREF_PLACEHOLDERS.titles, salary: '$140,000' }),
+        realMarketing: heal({ titles: 'Marketing Manager', salary: '$110,000', industries: 'SaaS' })
+      };
+    });
+    expect(r.demoSig.titles, 'demo Engineer titles cleared').toBeUndefined();
+    expect(r.demoSig.salary, 'demo $120k salary cleared').toBeUndefined();
+    expect(r.realEngineer.titles, 'a real engineer (diff salary) is NOT clobbered').toBe('Engineer, Developer, Tech Lead');
+    expect(r.placeholder.titles, 'saved placeholder cleared').toBeUndefined();
+    expect(r.placeholder.salary, 'real salary alongside a placeholder is kept').toBe('$140,000');
+    expect(r.realMarketing.titles, 'real marketing prefs untouched').toBe('Marketing Manager');
+  });
+});
