@@ -6757,3 +6757,49 @@ test.describe('[STATE-COVERAGE] v171 stale demo prefs self-heal', () => {
     expect(r.realMarketing.titles, 'real marketing prefs untouched').toBe('Marketing Manager');
   });
 });
+
+/* ===== v172 #39: Role Fit field-alignment gate (no generic-term inflation) ===== */
+test.describe('[STATE-COVERAGE] v172 Role Fit out-of-field cap', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => typeof rateResume === 'function'
+      && typeof resumeData !== 'undefined' && resumeData, null, { timeout: 15000 });
+  });
+
+  async function rateAgainst(page, targetRole) {
+    return await page.evaluate(async (role) => {
+      // a genuine MARKETING résumé — contains generic business words but never "engineer"
+      resumeData.title = 'Marketing Specialist';
+      resumeData.skills = 'Marketing, Brand Management, Communication, Project Management, Budget, Leadership';
+      resumeData.jobs = [{ t: 'Marketing Specialist', c: 'Poolsure', b: 'Led marketing campaigns and managed budget, communication and project timelines for the leadership team.' }];
+      resumeData.summary = 'Marketing professional with project management and communication strengths.';
+      try { window.resumeReady = true; } catch(e) {}
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: role }));
+      // generic top-terms a role of ANY field shares — the inflation vector
+      const terms = ['management','communication','project','leadership','budget'].map(t => ({ term: t, pct: 60 }));
+      window._roleCorpusCache = { role: role, ts: Date.now(), corpus: { matched: 12, terms } };
+      await window.rateResume();
+      const body = document.getElementById('resume-rating-body');
+      // second ring is Role Fit; grab its big number
+      const nums = [...body.querySelectorAll('div')].map(d => d.textContent).filter(t => /^\d+$/.test(t.trim()));
+      const overall = (body.innerText.match(/readiness\s+(\d+)\/100/) || [])[1];
+      return { html: body.innerText, roleFitNum: Number(nums[1]), overallNum: Number(overall), outOfFieldNote: /transferable/.test(body.innerHTML) };
+    }, targetRole);
+  }
+
+  test('out-of-field target (Engineer) caps Role Fit AND overall, with a transferable-only note', async ({ page }) => {
+    const r = await rateAgainst(page, 'Engineer');
+    expect(r.roleFitNum, 'marketing résumé must NOT read as a strong Engineer fit').toBeLessThanOrEqual(35);
+    // the cap must also pull the blended overall down — no "Role Fit 35 / Overall 75" contradiction
+    expect(r.overallNum, 'overall reflects the field mismatch too, not just the ring').toBeLessThan(55);
+    expect(r.outOfFieldNote, 'shows the honest transferable-overlap note').toBeTruthy();
+  });
+
+  test('in-field target (Marketing Manager) is NOT capped', async ({ page }) => {
+    const r = await rateAgainst(page, 'Marketing Manager');
+    // same generic corpus, but the résumé IS in the marketing field → full coverage, not capped
+    expect(r.roleFitNum, 'an in-field résumé scores its real coverage, not the 35 cap').toBeGreaterThan(35);
+    expect(r.outOfFieldNote, 'no out-of-field note when in field').toBeFalsy();
+  });
+});
