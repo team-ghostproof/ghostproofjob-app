@@ -6914,3 +6914,43 @@ test.describe('[STATE-COVERAGE] v174 bullet coercion (smart-match object guard)'
     expect(r.joined, 'no [object Object] anywhere').not.toContain('[object Object]');
   });
 });
+
+/* ===== v175 A+B: card Cover Letter opens the review flow + threads the job text ===== */
+test.describe('[STATE-COVERAGE] v175 cover-letter flow (card button + job text)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof copyOptCard === 'function'
+      && typeof clGatherJobText === 'function' && typeof resumeData !== 'undefined', null, { timeout: 15000 });
+  });
+
+  test('card Cover Letter button opens the offer modal AND the letter gets the real posting text', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      resumeData.name = 'Aaliyah Sosa'; resumeData.title = 'Marketing Specialist';
+      resumeData.skills = 'SEO · Content Marketing · HubSpot';
+      resumeData.summary = 'Marketing pro with client success experience over many years.';
+      resumeData.jobs = [{ t: 'Marketing Specialist', c: 'Poolsure', b: 'Optimized an $80K tradeshow budget.\nRan SEO and content marketing campaigns that grew inbound leads.' }];
+      resumeData.contact = 'a@b.com · 832-000-0000 · Houston, TX';
+      resumeReady = true;   // bare module-level let
+      window._currentTopJob = () => ({ t: 'Senior Marketing Manager', co: 'Colibri Group', url: 'https://x',
+        desc: 'Own SEO, content marketing, lifecycle email, landing pages and conversion rate optimization.',
+        req: 'Google Analytics, HubSpot, 5+ years marketing.' });
+      copyOptCard(null);
+      await new Promise(res => setTimeout(res, 900));   // modal opens after 650ms
+      const promptOpen = document.getElementById('cl-prompt-modal').classList.contains('open');
+      const jt = clGatherJobText();
+      const letter = buildLetterText({ title: 'Senior Marketing Manager', co: 'Colibri Group', external: true });
+      return {
+        promptOpen,
+        descChars: (jt.desc || '').length,
+        realTerms: /SEO|content marketing|email|conversion/i.test(letter),
+        // the "squarely" bullet should be the SEO/content one, not the tradeshow one
+        coherent: /squarely where I work:[^.]*content marketing/i.test(letter),
+      };
+    });
+    expect(r.promptOpen, 'the offer→review modal opens (was a silent copy)').toBe(true);
+    expect(r.descChars, 'the posting description reaches the letter (no more "no job text matched")').toBeGreaterThan(30);
+    expect(r.realTerms, 'the letter uses the real posting terms').toBe(true);
+    expect(r.coherent, 'the "squarely where I work" bullet matches the emphasized terms').toBe(true);
+  });
+});
