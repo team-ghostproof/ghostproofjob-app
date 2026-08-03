@@ -6880,3 +6880,37 @@ test.describe('[STATE-COVERAGE] rateCore convergence with the in-app rater', () 
     expect(rateCore.isOutOfField('Specialist', txt), 'an all-generic target never gates').toBe(false);
   });
 });
+
+/* ===== v174 P0: a résumé bullet is ALWAYS a string (no more [object Object]) ===== */
+test.describe('[STATE-COVERAGE] v174 bullet coercion (smart-match object guard)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof _gpjBulletStr === 'function', null, { timeout: 15000 });
+  });
+
+  test('the model returning objects never corrupts a bullet to [object Object]', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      str:        _gpjBulletStr('Managed 100 accounts', 'FB'),
+      text:       _gpjBulletStr({ text: 'Rewrote it' }, 'FB'),
+      bullet:     _gpjBulletStr({ bullet: 'Changed it' }, 'FB'),
+      origRewrite:_gpjBulletStr({ original: 'old', rewritten: 'the improved longer bullet' }, 'FB'),
+      emptyObj:   _gpjBulletStr({}, 'FALLBACK'),
+      nullVal:    _gpjBulletStr(null, 'FALLBACK'),
+      // the exact production path: an array of objects joined the way a job's .b is built
+      joined: (function () {
+        const finalResume = [{ text: 'A' }, { bullet: 'B' }, 'C'];
+        const src = ['origA', 'origB', 'origC'];
+        return finalResume.map((x, i) => _gpjBulletStr(x, src[i])).join('\n');
+      })(),
+    }));
+    expect(r.str).toBe('Managed 100 accounts');
+    expect(r.text).toBe('Rewrote it');
+    expect(r.bullet).toBe('Changed it');
+    expect(r.origRewrite).toBe('the improved longer bullet');
+    expect(r.emptyObj).toBe('FALLBACK');
+    expect(r.nullVal).toBe('FALLBACK');
+    expect(r.joined).toBe('A\nB\nC');
+    expect(r.joined, 'no [object Object] anywhere').not.toContain('[object Object]');
+  });
+});

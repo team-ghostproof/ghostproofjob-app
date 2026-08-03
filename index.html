@@ -120,6 +120,29 @@
           });
           if(!resp.ok){ console.warn('[GPJ] smartMatch HTTP',resp.status); return null; }
           const data=await resp.json();
+          /* v174 P0 (founder repro: the 3 most-recent jobs became "[object Object]
+             [object Object]" after a Jett/Match rewrite — exactly the "11 changed"
+             bullets). ROOT CAUSE: the model sometimes returns finalResume items as
+             OBJECTS ({text/bullet/rewritten:...}) instead of bare strings, and every
+             consumer assumed strings — jettFullImprove's String(x) and Match-to-Job's
+             join('\n') both stringified the object to "[object Object]", DESTROYING
+             the user's real bullet (and leaving no keywords, so the score couldn't
+             rise). Fix ONCE at the boundary so every caller is protected: coerce each
+             item to a usable string, and if an object yields nothing sensible, fall
+             back to the ORIGINAL input bullet so a rewrite can never corrupt data. */
+          if(data && Array.isArray(data.finalResume)){
+            const _src=Array.isArray(userResumeBullets)?userResumeBullets:[];
+            data.finalResume=data.finalResume.map(function(x,i){
+              if(typeof x==='string') return x;
+              if(x && typeof x==='object'){
+                var cand=x.text||x.rewritten||x.bullet||x.content||x.value||x.line||x.result;
+                if(typeof cand==='string' && cand.trim()) return cand;
+                var strs=Object.keys(x).map(function(k){ return x[k]; }).filter(function(v){ return typeof v==='string' && v.trim(); });
+                if(strs.length) return strs.sort(function(a,b){ return b.length-a.length; })[0];
+              }
+              return (typeof _src[i]==='string')?_src[i]:'';   /* never lose the real bullet */
+            });
+          }
           return (data && Array.isArray(data.finalResume)) ? data : null;
         }catch(e){ console.warn('[GPJ] smartMatch unavailable, using local fallback:', e&&e.message); return null; }
       },
@@ -2958,7 +2981,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v173</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v174</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -9349,6 +9372,22 @@ async function enrichMatchWithMarket(title, haveText){
       return '<label style="display:flex;align-items:center;gap:10px;background:var(--plum3);border-radius:9px;padding:10px 12px;margin-bottom:7px;cursor:pointer;"><input type="checkbox" id="m2j-c'+i+'" style="accent-color:var(--cyber);width:16px;height:16px;"/><span style="flex:1;font-size:13px;font-weight:600;">I have '+_gpjCanonicalSkill(m.term).replace(/</g,'')+'</span><span style="font-size:10px;font-weight:800;color:var(--cyber);">'+m.pct+'% of postings</span></label>';
     }).join('');
 }
+/* v174 P0 (founder repro: recent jobs became "[object Object]"): a résumé bullet
+   must ALWAYS be a string. The smart-match model can return a rewritten bullet as
+   an OBJECT; if that reaches String()/join('\n') it renders literal "[object
+   Object]" and wipes the real bullet. The boundary (fb.smartMatch) already coerces,
+   but every write-back also coerces so a stray object can NEVER corrupt the résumé
+   — falling back to the original bullet, never to nothing. */
+function _gpjBulletStr(x, fallback){
+  if(typeof x==='string') return x;
+  if(x && typeof x==='object'){
+    var c=x.text||x.rewritten||x.bullet||x.content||x.value||x.line||x.result;
+    if(typeof c==='string' && c.trim()) return c;
+    var s=Object.keys(x).map(function(k){ return x[k]; }).filter(function(v){ return typeof v==='string' && v.trim(); });
+    if(s.length) return s.sort(function(a,b){ return b.length-a.length; })[0];
+  }
+  return (typeof fallback==='string')?fallback:'';
+}
 async function applyMatch2Job(){
   /* ── v157 (founder-approved): TAILOR A COPY — never the master ────────────────
      This used to rewrite `resumeData` IN PLACE, so tailoring for job B overwrote the
@@ -9434,6 +9473,7 @@ async function applyMatch2Job(){
         /* rebuild each job's bullet block from the rewritten array using the map */
         const perJob={};
         result.finalResume.forEach((text,idx)=>{
+          text=_gpjBulletStr(text, bullets[idx]);   /* v174 P0: never write an object into a bullet */
           if(idx<map.length){ const [ji,li]=map[idx]; (perJob[ji]=perJob[ji]||[])[li]=text; }
           else { /* extra appended template bullets land on the first job */ (perJob[0]=perJob[0]||[]).push(text); }
         });
@@ -9454,7 +9494,7 @@ async function applyMatch2Job(){
         const lt=localTailorBullets(bullets, added, m2jContext.title);
         if(lt && lt.changed){
           const perJob={};
-          lt.out.forEach((text,idx)=>{ if(idx<map.length){ const mm=map[idx]; (perJob[mm[0]]=perJob[mm[0]]||[])[mm[1]]=text; } });
+          lt.out.forEach((text,idx)=>{ text=_gpjBulletStr(text, bullets[idx]); if(idx<map.length){ const mm=map[idx]; (perJob[mm[0]]=perJob[mm[0]]||[])[mm[1]]=text; } });
           Object.keys(perJob).forEach(ji=>{ if(resumeData.jobs[ji]) resumeData.jobs[ji].b=perJob[ji].filter(Boolean).join('\n'); });
           aiNote=' · '+lt.changed+' bullet'+(lt.changed>1?'s':'')+' tailored to this role';
         }
@@ -9922,7 +9962,7 @@ async function jettFullImprove(){
         const _missing=(window._rateMissingTerms||[]).filter(function(t){ return (typeof _realSkillTerm!=='function')||_realSkillTerm(t); }).slice(0,6);
         const kw=((_missing.concat(_covered).join(' '))||skills);
         const res=await fb.smartMatch(bullets,kw,true,{avoid:'',jobContext:'GOAL: FULLY REWRITE every bullet for a '+((recent&&recent.t)||title||'professional')+' — restructure each sentence (new verb, tighter phrasing, outcome first where one exists); do NOT just sprinkle keywords into the old wording. Keep every real fact, quantify only where numbers already exist, max ~22 words each. Never invent achievements. NEVER remove numbers.'+(_covered.length?(' PRESERVE these exact terms wherever they already appear: '+_covered.join(', ')+'.'):'')});
-        if(res&&Array.isArray(res.finalResume)&&res.finalResume.length){ out=res.finalResume.map(function(x,i){ return String(x||bullets[i]||'').trim(); }); usedAI=true; }
+        if(res&&Array.isArray(res.finalResume)&&res.finalResume.length){ out=res.finalResume.map(function(x,i){ return _gpjBulletStr(x, bullets[i]).trim(); }); usedAI=true; }   /* v174 P0: was String(x) → "[object Object]" when the model returned an object */
       }
       const perJob={};
       /* v92: guarantee every FINAL bullet leads with a strong action verb —
@@ -13611,8 +13651,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v173';
+const APP_VERSION = 'v174';
 const CHANGELOG = {
+  'v174':['P0: smart-match objects can no longer corrupt resume bullets to [object Object]'],
   'v173':['Apply panel leads with the tailored cover letter; honest header (no auto-fill claim)'],
   'v172':['Role Fit honesty: field-alignment gate (no generic-term inflation) + card-vs-role reconciliation + Jett explanation'],
   'v171':['Match Preferences: placeholders can never save as real values (editPref/savePref guard) + one-time self-heal of stale demo prefs (Engineer/$120k) with conservative signature match'],
@@ -15229,14 +15270,18 @@ function renderGhostCompanies(){
   wrap.innerHTML='<div style="padding:0 16px 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);">'+heading+'</div>'+
     cards.map(p=>{
       const g=ghostRiskFor(p.co);
-      const c=g<=15?'var(--mint)':(g<=35?'var(--warn)':'var(--danger)');
+      /* v174 (founder repro: company cards showed "null%"): ghostRiskFor returns
+         null when there's no report data yet. This render coerced null+'%' → the
+         literal "null%"; the other ghost displays (10221, 11157) already show '—'.
+         Match them: '—' + a neutral color + an empty bar when there is no rating. */
+      const c=(g==null)?'var(--muted)':(g<=15?'var(--mint)':(g<=35?'var(--warn)':'var(--danger)'));
       const safeCo=p.co.replace(/'/g,"\\'").replace(/"/g,'&quot;');
       return '<div class="report-card" onclick="openCompanyView(\''+safeCo+'\')" style="cursor:pointer;">'+
         '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'+
         '<div style="font-size:22px;">🏢</div>'+
         '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;">'+p.co+'</div><div style="font-size:11px;color:var(--muted);">'+p.label+'</div></div>'+
-        '<div class="ghost-score" style="color:'+c+';">'+g+'%</div></div>'+
-        '<div class="report-bar-bg"><div class="report-bar-fill" style="width:'+g+'%;background:'+c+';"></div></div>'+
+        '<div class="ghost-score" style="color:'+c+';"'+(g==null?' title="No ghost reports yet"':'')+'>'+(g==null?'—':g+'%')+'</div></div>'+
+        '<div class="report-bar-bg"><div class="report-bar-fill" style="width:'+(g==null?0:g)+'%;background:'+c+';"></div></div>'+
         '<div onclick="event.stopPropagation();openCompanyView(\''+safeCo+'\')" style="margin-top:8px;background:var(--plum3);border:1px solid var(--plum4);color:var(--off);border-radius:9px;padding:7px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">🏢 Full Company View</div></div>';
     }).join('');
 }
