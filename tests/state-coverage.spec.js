@@ -6841,7 +6841,7 @@ const rateCore = require('../api/rate/rateCore.js');
 test.describe('[STATE-COVERAGE] rateCore convergence with the in-app rater', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(3500);   // index.html self-reloads (SW controllerchange + desktop breakpoint); let it settle before page.evaluate
     await page.waitForFunction(() => typeof _ratingStructure === 'function'
       && typeof resumeData !== 'undefined' && resumeData, null, { timeout: 15000 });
   });
