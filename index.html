@@ -2981,7 +2981,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v176</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v177</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -9420,6 +9420,13 @@ async function applyMatch2Job(){
   if(window._m2jInFlight){ dbg('Match-to-Job ignored — a tailor is already running'); return; }
   window._m2jInFlight=true;
   const _master=JSON.parse(JSON.stringify(resumeData));
+  /* v177 (founder-approved): the rater's "Add these with Jett" IMPROVES the master
+     résumé in place (the user is editing their REAL résumé on the Resume page), so in
+     improveMode the master is NOT restored — the confirmed skills + rewrites stick and
+     the re-rate finally MOVES. A pre-change snapshot is saved for one-tap undo. Job-card
+     Match-to-Job keeps its copy-and-restore behaviour (improveMode is false there). */
+  const _improve=!!(m2jContext&&m2jContext.improveMode);
+  if(_improve){ try{ if(typeof storeResumeSnapshot==='function') storeResumeSnapshot('My resume — before Add-with-Jett'); }catch(e){} }
   const _restoreMaster=()=>{
     try{
       Object.keys(resumeData).forEach(k=>{ delete resumeData[k]; });
@@ -9541,35 +9548,50 @@ async function applyMatch2Job(){
      ships the same sentence three times (working copy; master restored in finally). */
   try{ const _nd=_gpjVaryDupeBullets(resumeData.jobs); if(_nd) aiNote+=' · '+_nd+' repeated bullet'+(_nd>1?'s':'')+' varied'; }catch(e){}
   if(typeof runPersonalizationCascade==='function') runPersonalizationCascade();
-  /* v176 (founder: the rater's "Add these with Jett" download was named
-     "Resume_Name_Company_MarketingManager" — there is NO company on that path
-     (m2jContext.co is ''), so "Company" was misleading. Label it "Improved" when the
-     improvement isn't tied to a specific employer. */
-  const _hasCo=!!(m2jContext.co&&String(m2jContext.co).trim());
-  const coLabel=_hasCo?String(m2jContext.co).replace(/[^A-Za-z0-9]/g,''):'Improved';
-  const roleLabel=(m2jContext.title||'Role').replace(/[^A-Za-z0-9]/g,'').slice(0,24);
-  const nm=(resumeData.name||'My').trim().replace(/\s+/g,'_').replace(/[^A-Za-z0-9_]/g,'');
-  /* v160: skipSync=true — the tailored bullets + re-aimed summary live in resumeData
-     and are NOT in the form, so re-syncing from the DOM here would discard them (it
-     did, on every tailor, since v157). The master is still restored in `finally`. */
-  const fname=generateResumePDF('Resume_'+nm,coLabel+'_'+roleLabel,true);
-  /* v157: store the tailored RESUME too, so this version can be re-opened later.
-     It is the only copy — the master is restored below. */
-  storeOptimizedResume(m2jContext.title,m2jContext.co,added,fname,JSON.parse(JSON.stringify(resumeData)));
-  closeMatch2Job();
-  let liftNote='';
-  try{
-    if(typeof computeMatch==='function'){
-      const newPct=computeMatch(m2jContext.title, m2jContext.desc);
-      const oldPct=m2jContext.startPct||newPct;
-      liftNote=(newPct>oldPct)?(' · match '+oldPct+'% → '+newPct+'% 📈'):(' · match '+newPct+'%');
-    }
-  }catch(e){}
-  showToast((added.length?('✓ Added '+added.length+' keyword(s) · tailored resume downloaded'):'📄 Tailored resume downloaded for this role')+aiNote+liftNote+' · your master resume is unchanged');
+  if(_improve){
+    /* v177: COMMIT the improvement to the MASTER — push resumeData into the Resume
+       page fields, persist locally + to the cloud, close, and re-rate so the score
+       moves immediately. No throwaway copy, no download (this is a master edit). */
+    try{ if(typeof hydrateResumeFields==='function') hydrateResumeFields(); }catch(e){}
+    try{ (resumeData.jobs||[]).forEach(function(j,ji){ const ta=document.getElementById('duties-ta-'+ji); if(ta) ta.value=(j&&j.b)||''; }); }catch(e){}
+    try{ const sk=document.getElementById('pr-skills'); if(sk&&('value' in sk)) sk.value=resumeData.skills||''; }catch(e){}
+    try{ if(typeof saveDraft==='function') saveDraft(); }catch(e){}
+    try{ if(typeof updateProgress==='function') updateProgress(); }catch(e){}
+    try{ if(typeof cloudSync==='function') cloudSync(); }catch(e){}
+    /* v177 (founder-approved): also prompt a download of the improved MASTER, named as
+       the user's résumé (Resume_<Name>_Improved) — never a per-job "Company" copy. */
+    try{ const _nm=(resumeData.name||'My').trim().replace(/\s+/g,'_').replace(/[^A-Za-z0-9_]/g,''); generateResumePDF('Resume_'+_nm,'Improved',true); }catch(e){}
+    closeMatch2Job();
+    showToast('✓ '+(added.length?('Added '+added.length+' skill'+(added.length>1?'s':'')+' + '):'')+'improved your resume'+aiNote+' — saved to your account + downloaded. Re-rating…');
+    try{ rateResume(); }catch(e){}   /* re-score against the now-updated master */
+  } else {
+    /* v176: rater path was mislabeled "Company"; but that path is now improveMode.
+       This branch is the JOB-CARD Match-to-Job: tailor a COPY, download, keep master. */
+    const _hasCo=!!(m2jContext.co&&String(m2jContext.co).trim());
+    const coLabel=_hasCo?String(m2jContext.co).replace(/[^A-Za-z0-9]/g,''):'Improved';
+    const roleLabel=(m2jContext.title||'Role').replace(/[^A-Za-z0-9]/g,'').slice(0,24);
+    const nm=(resumeData.name||'My').trim().replace(/\s+/g,'_').replace(/[^A-Za-z0-9_]/g,'');
+    /* v160: skipSync=true — the tailored bullets + re-aimed summary live in resumeData
+       and are NOT in the form, so re-syncing from the DOM here would discard them. */
+    const fname=generateResumePDF('Resume_'+nm,coLabel+'_'+roleLabel,true);
+    /* v157: store the tailored RESUME too, so this version can be re-opened later. */
+    storeOptimizedResume(m2jContext.title,m2jContext.co,added,fname,JSON.parse(JSON.stringify(resumeData)));
+    closeMatch2Job();
+    let liftNote='';
+    try{
+      if(typeof computeMatch==='function'){
+        const newPct=computeMatch(m2jContext.title, m2jContext.desc);
+        const oldPct=m2jContext.startPct||newPct;
+        liftNote=(newPct>oldPct)?(' · match '+oldPct+'% → '+newPct+'% 📈'):(' · match '+newPct+'%');
+      }
+    }catch(e){}
+    showToast((added.length?('✓ Added '+added.length+' keyword(s) · tailored resume downloaded'):'📄 Tailored resume downloaded for this role')+aiNote+liftNote+' · your master resume is unchanged');
+  }
   }finally{
-    /* the master comes back even if a rewrite threw part-way */
+    /* the master comes back even if a rewrite threw part-way — EXCEPT in improveMode,
+       where the whole point is that the improvement STICKS to the master (v177). */
     window._m2jInFlight=false;   /* v160: release the double-fire lock on every exit path */
-    _restoreMaster();
+    if(!_improve) _restoreMaster();
     try{ if(typeof saveDraft==='function') saveDraft(); }catch(e){}
   }
 }
@@ -9985,7 +10007,7 @@ async function jettFullImprove(){
       /* v92: guarantee every FINAL bullet leads with a strong action verb —
          whether it came from the AI or the local pass — so the rater's
          "bullets start with a strong action verb" line actually moves. */
-      out.forEach(function(text,idx){ if(idx<map.length){ const ji=map[idx][0],li=map[idx][1]; (perJob[ji]=perJob[ji]||[])[li]=_gpjTidyProse(_leadWithVerb(text)); } });   /* v165 #10: mechanical prose cleanup */
+      out.forEach(function(text,idx){ if(idx<map.length){ const ji=map[idx][0],li=map[idx][1]; (perJob[ji]=perJob[ji]||[])[li]=_gpjTightenMetrics(_leadWithVerb(text)); } });   /* v165 #10 prose cleanup + v177 #33: tighten "over 40"→"40+" (was padding numbers) */
       Object.keys(perJob).forEach(function(ji){
         if(resumeData.jobs[ji]){
           resumeData.jobs[ji].b=perJob[ji].filter(Boolean).join('\n');
@@ -10010,7 +10032,10 @@ async function jettFullImprove(){
   try{ updateJettCounts(); }catch(e){}
   try{ if(typeof saveDraft==='function') saveDraft(); if(typeof updateProgress==='function') updateProgress(); if(typeof cloudSync==='function') cloudSync(); }catch(e){}
   if(btn){ btn.textContent=btn._t||'🚀 Improve My Whole Resume with Jett'; btn.style.pointerEvents='auto'; btn.style.opacity='1'; }
-  showToast((usedAI?'🚀 Full resume rewritten — review each section in the Resume tab and make it yours.':'🚀 Resume strengthened with internal polish — your AI rewrites are untouched.')+(_skillsRemoved.length?(' Removed filler skills: '+_skillsRemoved.join(', ')+'.'):'')+' Your previous version is saved under Tailored Resumes (↩ restore anytime).');
+  /* v177 (founder-approved): Improve-My-Whole-Resume updates the master AND prompts a
+     download of the improved master (Resume_<Name>_Improved). */
+  try{ const _nm=(resumeData.name||'My').trim().replace(/\s+/g,'_').replace(/[^A-Za-z0-9_]/g,''); generateResumePDF('Resume_'+_nm,'Improved',true); }catch(e){}
+  showToast((usedAI?'🚀 Full resume rewritten & downloaded — review each section in the Resume tab and make it yours.':'🚀 Resume strengthened & downloaded — your AI rewrites are untouched.')+(_skillsRemoved.length?(' Removed filler skills: '+_skillsRemoved.join(', ')+'.'):'')+' Your previous version is saved under Tailored Resumes (↩ restore anytime).');
   try{ rateResume(); }catch(e){}   /* re-score so the improvement is visible immediately */
 }
 /* Rate-My-Resume → Jett: take the mined "missing" terms and open the same
@@ -10024,7 +10049,7 @@ function fixResumeWithJett(){
   if(typeof aiHourlyAllowed==='function' && !aiHourlyAllowed('match')){ showToast('⚡ Hourly AI limit reached — try again shortly. Your daily total is untouched.'); return; }
   try{ if(typeof bumpMatch==='function') bumpMatch(); if(typeof bumpAiHour==='function') bumpAiHour('match'); }catch(e){}
   const role=(window._rateRole||_recentTitle()||'your role');
-  m2jContext={title:role, co:'', desc:miss.join(', '), suggestions:miss.slice()};
+  m2jContext={title:role, co:'', desc:miss.join(', '), suggestions:miss.slice(), improveMode:true};   /* v177: this improves the MASTER résumé in place, not a per-job copy */
   m2jContext.startPct=(typeof computeMatch==='function')?computeMatch(role, miss.join(' ')):60;
   const safe=String(role).replace(/</g,'&lt;');
   const roleEl=document.getElementById('m2j-role'); if(roleEl) roleEl.textContent='✨ Jett · add what live '+safe+' postings want';
@@ -13672,8 +13697,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v176';
+const APP_VERSION = 'v177';
 const CHANGELOG = {
+  'v177':['rater Add-with-Jett updates the master resume (score moves) + apply-panel cover letter opens the review flow'],
   'v176':['Un-save a company card + rater-improvement download named \'Improved\' not \'Company\''],
   'v175':['Cover Letter button opens the review flow everywhere + threads real posting text + coherent highlight bullet'],
   'v174':['P0: smart-match objects can no longer corrupt resume bullets to [object Object]'],
@@ -14729,7 +14755,7 @@ function openApplyTokensThenTab(url,title,co){
        mirrors the real apply sequence (attach, then fill fields). Pure reorder —
        copyHudLetter / recording logic unchanged. */
     body.innerHTML=[
-      '<div onclick="copyHudLetter(\''+String(title||'this role').replace(/'/g,'')+'\',\''+String(co||'the company').replace(/'/g,'')+'\')" style="background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.5);border-radius:11px;padding:13px;font-size:13px;font-weight:800;color:var(--cyber);cursor:pointer;text-align:center;">📋 Copy Your Tailored Cover Letter</div>',
+      '<div onclick="hudCoverLetter(\''+String(title||'this role').replace(/'/g,'')+'\',\''+String(co||'the company').replace(/'/g,'')+'\')" style="background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.5);border-radius:11px;padding:13px;font-size:13px;font-weight:800;color:var(--cyber);cursor:pointer;text-align:center;">📋 Write My Tailored Cover Letter</div>',
       '<div style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:6px 0 -2px;">Quick-fill fields</div>',
       tok('Name: '+(me.name||''),me.name||''),
       tok('Email: '+(em?em[0]:''),em?em[0]:''),
@@ -14945,6 +14971,14 @@ function sandboxNewTab(){
 function copyTok(el){
   const v=el.getAttribute('data-v')||'';
   navigator.clipboard.writeText(v).then(()=>showToast('⧉ Copied — paste into the form')).catch(()=>showToast('Copy blocked by browser — select manually'));
+}
+/* v177 (founder: the apply-panel "Copy Your Tailored Cover Letter" only COPIED — it
+   must open the SAME offer→review flow as swipe/apply). Routes through offerCoverLetter
+   with the job captured at apply-start, so the review box opens with the real posting
+   text (not a silent clipboard copy). */
+function hudCoverLetter(title,co){
+  try{ const aj=window._gpjApplyJob; if(aj&&aj.url && typeof pendingJobUrl!=='undefined') pendingJobUrl=aj.url; }catch(e){}
+  offerCoverLetter(title||'this role', co||'the hiring company', true, window._gpjApplyJob||null);
 }
 function copyHudLetter(title,co){
   if(!requireSignIn('save tailored cover letters to your profile')) return;

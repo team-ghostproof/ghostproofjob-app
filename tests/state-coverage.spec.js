@@ -6992,3 +6992,109 @@ test.describe('[STATE-COVERAGE] v176 un-save a company card', () => {
     expect(r.inHidden, 'added to the shared, undoable hidden-companies set').toBe(true);
   });
 });
+
+/* ===== v177: rater "Add these with Jett" updates the MASTER (score can move) ===== */
+test.describe('[STATE-COVERAGE] v177 Add-with-Jett improveMode commits to master', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof applyMatch2Job === 'function'
+      && typeof resumeData !== 'undefined', null, { timeout: 15000 });
+  });
+
+  async function run(page, improveMode) {
+    return await page.evaluate(async (improve) => {
+      resumeData.title = 'Marketing Specialist';
+      resumeData.skills = 'Photoshop · Excel · Salesforce';
+      resumeData.summary = 'Marketing pro with client success experience over the years.';
+      resumeData.jobs = [{ t: 'Marketing Specialist', c: 'Poolsure', b: 'Optimized an $80K tradeshow budget.\nManaged 100 accounts.' }];
+      resumeReady = true;
+      const before = resumeData.skills;
+      const ctx = { title: 'Marketing Manager', desc: 'social media', suggestions: ['Social Media'], startPct: 31 };
+      if (improve) ctx.improveMode = true; else ctx.co = 'Acme Corp';
+      m2jContext = ctx;
+      document.querySelectorAll('[id^="m2j-c"]').forEach(n => n.remove());
+      const box = document.createElement('div'); box.innerHTML = '<input type="checkbox" id="m2j-c0">';
+      document.body.appendChild(box);
+      document.getElementById('m2j-c0').checked = true;
+      await applyMatch2Job();
+      return { before, after: resumeData.skills };
+    }, improveMode);
+  }
+
+  test('improveMode PERSISTS the confirmed skill to the master résumé', async ({ page }) => {
+    const r = await run(page, true);
+    expect(r.after, 'the added skill sticks to the master').toMatch(/social media/i);
+    expect(r.after).not.toBe(r.before);
+  });
+  test('job-card path (no improveMode) still RESTORES the master', async ({ page }) => {
+    const r = await run(page, false);
+    expect(r.after, 'a per-job tailor never mutates the master').toBe(r.before);
+  });
+});
+
+/* ===== v177: apply-panel Cover Letter opens the review flow with the job text ===== */
+test.describe('[STATE-COVERAGE] v177 apply-panel cover letter opens the flow', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof hudCoverLetter === 'function' && typeof resumeData !== 'undefined', null, { timeout: 15000 });
+  });
+
+  test('hudCoverLetter opens the offer modal and threads the applying job', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      resumeData.name = 'Aaliyah Sosa'; resumeData.title = 'Marketing Specialist';
+      resumeData.skills = 'SEO · Marketing'; resumeData.summary = 'Marketing pro with client success experience over years.';
+      resumeData.jobs = [{ t: 'Marketing Specialist', c: 'Poolsure', b: 'Ran SEO and content marketing campaigns.' }];
+      resumeData.contact = 'a@b.com · 832-000-0000 · Houston, TX';
+      resumeReady = true;
+      window._gpjApplyJob = { t: 'Wholesale Sales & Marketing Manager', co: 'SendNonsense', url: 'https://x',
+        desc: 'Own wholesale sales and marketing, customer service, and channel growth.', req: '5+ years sales & marketing.' };
+      hudCoverLetter('Wholesale Sales & Marketing Manager', 'SendNonsense');
+      await new Promise(res => setTimeout(res, 900));
+      return {
+        opened: document.getElementById('cl-prompt-modal').classList.contains('open'),
+        descChars: (clGatherJobText().desc || '').length,
+      };
+    });
+    expect(r.opened, 'the apply-panel button opens the review flow (was a silent copy)').toBe(true);
+    expect(r.descChars, 'the real posting text reaches the letter').toBeGreaterThan(20);
+  });
+});
+
+/* ===== v177b: Jett buttons download the improved MASTER + tighten "over N"→"N+" ===== */
+test.describe('[STATE-COVERAGE] v177b Jett download + metric tightening', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof _gpjTightenMetrics === 'function'
+      && typeof applyMatch2Job === 'function', null, { timeout: 15000 });
+  });
+
+  test('_gpjTightenMetrics restores concise notation (over 40 -> 40+)', async ({ page }) => {
+    const out = await page.evaluate(() => _gpjTightenMetrics('Executed logistics for over 40 tradeshows and more than 500 clients'));
+    expect(out).toContain('40+');
+    expect(out).toContain('500+');
+    expect(out).not.toMatch(/over 40|more than 500/);
+  });
+
+  test('Add-with-Jett (improveMode) downloads the master as Resume_<Name>_Improved', async ({ page }) => {
+    const name = await page.evaluate(async () => {
+      resumeData.name = 'Aaliyah Sosa'; resumeData.title = 'Marketing Specialist'; resumeData.skills = 'Excel · Salesforce';
+      resumeData.summary = 'Marketing pro with client success experience over years.';
+      resumeData.jobs = [{ t: 'Marketing Specialist', c: 'Poolsure', b: 'Optimized budget.\nManaged 100 accounts.' }];
+      resumeReady = true;
+      let captured = null;
+      const orig = window.generateResumePDF;
+      window.generateResumePDF = (a, b) => { captured = a + '_' + b; return captured + '.pdf'; };
+      m2jContext = { title: 'Marketing Manager', desc: 'x', suggestions: ['Social Media'], improveMode: true, startPct: 31 };
+      document.querySelectorAll('[id^="m2j-c"]').forEach(n => n.remove());
+      const box = document.createElement('div'); box.innerHTML = '<input type="checkbox" id="m2j-c0">'; document.body.appendChild(box);
+      document.getElementById('m2j-c0').checked = true;
+      await applyMatch2Job();
+      window.generateResumePDF = orig;
+      return captured;
+    });
+    expect(name).toBe('Resume_Aaliyah_Sosa_Improved');
+  });
+});
