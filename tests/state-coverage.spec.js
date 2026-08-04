@@ -5848,9 +5848,9 @@ test.describe('[STATE-COVERAGE] v156 rater: quality vs role-fit', () => {
       await rateResume();
       return (document.getElementById('resume-rating-body') || {}).textContent || '';
     });
-    expect(t).toContain('Résumé Quality');
+    expect(t).toContain('Résumé Strength');   // v179: relabeled from "Résumé Quality"
     expect(t).toContain('Role Fit');
-    expect(t, 'each score explains what it means').toMatch(/how well it’s built/);
+    expect(t, 'each score explains what it means').toMatch(/how strong the writing is/);
   });
 
   test('the fit half benchmarks the TARGET role, not the current one', async ({ page }) => {
@@ -7129,5 +7129,42 @@ test.describe('[STATE-COVERAGE] v178 improve never prunes a metric', () => {
     expect(r.noMetric, 'no metric to protect → rewrite is fine').toBe('Partnered with the operations team.');
     expect(r.droppedOfTwo, 'losing ANY of several numbers → keep original').toBe('Led 8 people across 500 sites.');
     expect(r.emptyRewrite, 'empty rewrite never wins').toBe('Managed 100 accounts.');
+  });
+});
+
+/* ===== v179: "Résumé Strength" — deepened rubric (outcomes, variety, concision) ===== */
+test.describe('[STATE-COVERAGE] v179 Résumé Strength rubric', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof _ratingStructure === 'function'
+      && typeof resumeData !== 'undefined', null, { timeout: 15000 });
+  });
+
+  test('max is 60; outcome bullets score higher than scope-only; fluff is penalized', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const base = { name:'A', contact:'a@b.com · 1', summary:'Marketing pro with a decade of experience across brands.', skills:'Excel · Salesforce · SEO · Content · Email · Brand' };
+      const set = (jobs) => { Object.assign(resumeData, base, { jobs }); return _ratingStructure(); };
+      // scope-only: numbers but no result verbs ("managed 100", "oversaw 50")
+      const scope = set([{ t:'X', c:'Y', b:'Managed 100 client accounts.\nOversaw 50 vendor relationships.\nHandled 500 support tickets.\nMaintained 12 dashboards.' }]);
+      // outcome-heavy: numbers + result verbs
+      const outcome = set([{ t:'X', c:'Y', b:'Increased retention 20% across 100 accounts.\nReduced churn by 15% in one year.\nGrew revenue $2M through new channels.\nBoosted NPS from 30 to 55.' }]);
+      // fluffy: filler + passive
+      const fluff = set([{ t:'X', c:'Y', b:'Responsible for accounts and was tasked with duties.\nHard-working team player and results-driven self-starter.\nWas responsible for various things.\nDetail-oriented go-getter.' }]);
+      const outcomeItem = outcome.items.find(i => /OUTCOME/.test(i[1]));
+      const cleanItem = fluff.items.find(i => /filler|passive|tighten|clean/i.test(i[1]));
+      return {
+        max: outcome.max,
+        scorePct: (st) => Math.round(st.pts / st.max * 100),
+        scopePts: scope.pts, outcomePts: outcome.pts, fluffPts: fluff.pts,
+        outcomeChecked: outcomeItem ? outcomeItem[0] : null,
+        fluffCleanFlag: cleanItem ? cleanItem[0] : null,
+      };
+    });
+    expect(r.max, 'rubric is out of 60').toBe(60);
+    expect(r.outcomePts, 'outcome-heavy scores higher than scope-only').toBeGreaterThan(r.scopePts);
+    expect(r.outcomeChecked, 'the OUTCOME factor passes for result bullets').toBe(true);
+    expect(r.fluffPts, 'fluff/passive résumé scores lower than a clean outcome one').toBeLessThan(r.outcomePts);
+    expect(r.fluffCleanFlag, 'the clean/concision factor FAILS on a fluffy résumé').toBe(false);
   });
 });
