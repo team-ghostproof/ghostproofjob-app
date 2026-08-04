@@ -2981,7 +2981,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v179</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v180</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -9890,7 +9890,12 @@ async function rateResume(){
     const top=corpus.terms.filter(t=>t.pct>=25).slice(0,16);
     const list=top.length?top:corpus.terms.slice(0,12);
     let wSum=0, wHit=0;
-    list.forEach(t=>{ wSum+=t.pct; if(text.indexOf(t.term)>=0){ wHit+=t.pct; covered.push(t); } else missing.push(t); });
+    /* v180 (founder: "Add these with Jett only cleared 2 of 3 gains"): the gains list
+       DISPLAYS + ADDS the CANONICAL skill ("Social Media"), but coverage matched only
+       the raw mined term (e.g. "social media management"), so a shorter canonical add
+       never "covered" the longer raw term and it lingered. Match either the raw term OR
+       its canonical form, so a confirmed skill always clears. */
+    list.forEach(t=>{ wSum+=t.pct; const _canon=(typeof _gpjCanonicalSkill==='function'?String(_gpjCanonicalSkill(t.term)||'').toLowerCase():''); if(text.indexOf(t.term)>=0 || (_canon && _canon!==t.term && text.indexOf(_canon)>=0)){ wHit+=t.pct; covered.push(t); } else missing.push(t); });
     covPts=wSum?Math.round(wHit/wSum*covMax):0;
     if(_outOfField) covPts=Math.min(covPts,Math.round(covMax*0.35));   /* v172 #39: out-of-field ceiling (35%), feeds ring + overall */
   } else { covMax=0; }
@@ -9930,8 +9935,12 @@ async function rateResume(){
     +_ring(fScore,'Role Fit',_fitSub)
     +'</div>'
     +'<div style="text-align:center;font-size:13px;font-weight:800;color:'+col+';margin-bottom:2px;">'+label+'</div>'
-    +'<div style="text-align:center;font-size:10.5px;color:var(--muted);margin-bottom:'+((corpus&&corpus.matched&&corpus.matched<5)?'6':'14')+'px;">Overall callback readiness '+score+'/100'
-    +((corpus&&corpus.matched)?(' · benchmarked against '+corpus.matched+' live '+safe+' posting'+(corpus.matched===1?'':'s')):' · live posting benchmark unavailable')+'</div>'
+    /* v180 (founder repro: "Overall 60 but Role Fit 31, both for Marketing Manager —
+       how?"): the "Overall callback readiness" number was a BLEND of Résumé Strength +
+       Role Fit, so it read as a contradiction against the two rings. Removed — the two
+       rings each mean one clear thing; the benchmark line now frames the Role-Fit sample. */
+    +'<div style="text-align:center;font-size:10.5px;color:var(--muted);margin-bottom:'+((corpus&&corpus.matched&&corpus.matched<5)?'6':'14')+'px;">'
+    +((corpus&&corpus.matched)?('Role Fit benchmarked against '+corpus.matched+' live '+safe+' posting'+(corpus.matched===1?'':'s')):'Live posting benchmark unavailable')+'</div>'
     /* v156 HONESTY (CLAUDE.md §3.8): a Role Fit computed from a handful of postings
        is not a real benchmark, and presenting it like one would be exactly the kind
        of confident-but-hollow number v119 removed from ghost risk. Say the sample is
@@ -13741,8 +13750,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v179';
+const APP_VERSION = 'v180';
 const CHANGELOG = {
+  'v180':['remove blended Overall number (two clear rings) + canonical gains coverage + un-save = dismiss not hide'],
   'v179':['Résumé Strength rubric: honest deepened scoring (outcomes, quantification, verb variety, concision) replaces the shallow structural 100'],
   'v178':['metric-preservation guard: an AI improve can never drop a number the original bullet had'],
   'v177':['rater Add-with-Jett updates the master resume (score moves) + apply-panel cover letter opens the review flow'],
@@ -15369,9 +15379,15 @@ function loadMoreLive(){ if(typeof nextLivePage==='function') nextLivePage(); } 
 /* v176 (founder: parity with jobs' Remove — let users un-save a company card).
    Reuses the existing hideCompanyRoles path (syncs to the profile, undoable under
    Settings → Hidden companies) and refreshes this list so the card disappears. */
+/* v180 (founder: the ✕ on the "Around your hunt" list should JUST dismiss the card —
+   NOT hide all the company's roles from the deck/Browse. "Hide all roles" already lives
+   on the company card and is correct there.) A lightweight local dismiss set filters
+   only THIS list; the company's jobs still appear everywhere else. */
+function _gpjHuntDismissed(){ try{ return new Set(JSON.parse(localStorage.getItem('gpj_hunt_dismissed')||'[]')); }catch(e){ return new Set(); } }
 function _huntRemoveCo(co){
-  try{ if(typeof hideCompanyRoles==='function') hideCompanyRoles(co); }catch(e){}
+  try{ const s=_gpjHuntDismissed(); s.add(_coKey(co)); localStorage.setItem('gpj_hunt_dismissed',JSON.stringify(Array.from(s))); }catch(e){}
   try{ renderGhostCompanies(); }catch(e){}
+  try{ showToast('Removed '+String(co||'that company')+' from this list — their roles still show in your deck &amp; Browse.'); }catch(e){}
 }
 /* ---------- DYNAMIC GHOST COMPANIES (location/search/profile-aware) ---------- */
 function renderGhostCompanies(){
@@ -15384,7 +15400,8 @@ function renderGhostCompanies(){
      company the user removed here is added to the shared hidden-companies set and
      must not reappear in this list. */
   const _hidden=(typeof gpjHiddenCos==='function')?gpjHiddenCos():new Set();
-  const push=(co,label)=>{ if(co&&!seen.has(co)&&!_hidden.has(_coKey(co))&&picks.length<6){ seen.add(co); picks.push({co:co,label:label}); } };
+  const _dismissed=_gpjHuntDismissed();   /* v180: cards the user dismissed from THIS list (roles stay in deck/Browse) */
+  const push=(co,label)=>{ if(co&&!seen.has(co)&&!_hidden.has(_coKey(co))&&!_dismissed.has(_coKey(co))&&picks.length<6){ seen.add(co); picks.push({co:co,label:label}); } };
   lists.applied.slice(-8).reverse().forEach(r=>push(r.co,'from your applications'));
   liveJobs.slice(0,8).forEach(j=>push(j.co,'hiring near your search'));
   (userCompanies||[]).forEach(c=>push(c,'from your resume'));

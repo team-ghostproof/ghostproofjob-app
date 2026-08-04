@@ -6790,11 +6790,11 @@ test.describe('[STATE-COVERAGE] v172 Role Fit out-of-field cap', () => {
     }, targetRole);
   }
 
-  test('out-of-field target (Engineer) caps Role Fit AND overall, with a transferable-only note', async ({ page }) => {
+  test('out-of-field target (Engineer) caps Role Fit, with a transferable-only note', async ({ page }) => {
     const r = await rateAgainst(page, 'Engineer');
     expect(r.roleFitNum, 'marketing résumé must NOT read as a strong Engineer fit').toBeLessThanOrEqual(35);
-    // the cap must also pull the blended overall down — no "Role Fit 35 / Overall 75" contradiction
-    expect(r.overallNum, 'overall reflects the field mismatch too, not just the ring').toBeLessThan(55);
+    // v180: the blended "Overall callback readiness" number was REMOVED (it read as a
+    // contradiction against the rings), so there is no overall number to assert anymore.
     expect(r.outOfFieldNote, 'shows the honest transferable-overlap note').toBeTruthy();
   });
 
@@ -6974,7 +6974,7 @@ test.describe('[STATE-COVERAGE] v176 un-save a company card', () => {
       const before = document.getElementById('ghost-list').innerHTML;
       _huntRemoveCo('Serenity Healthcare');
       const after = document.getElementById('ghost-list').innerHTML;
-      // re-render again to prove it stays hidden (persisted in the hidden set)
+      // re-render again to prove it stays gone (persisted in the dismiss set)
       renderGhostCompanies();
       const afterRerender = document.getElementById('ghost-list').innerHTML;
       return {
@@ -6983,7 +6983,10 @@ test.describe('[STATE-COVERAGE] v176 un-save a company card', () => {
         serenityAfter: /Serenity Healthcare/.test(after),
         serenityAfterRerender: /Serenity Healthcare/.test(afterRerender),
         vanderStays: /Vanderbloemen/.test(afterRerender),
-        inHidden: gpjHiddenCos().has(_coKey('Serenity Healthcare')),
+        // v180: un-save DISMISSES the card from this list — it must NOT hide the company's
+        // roles from the deck/Browse, so it goes to the dismiss set, NOT gpjHiddenCos.
+        notHidden: !gpjHiddenCos().has(_coKey('Serenity Healthcare')),
+        dismissed: _gpjHuntDismissed().has(_coKey('Serenity Healthcare')),
       };
     });
     expect(r.hadRemove, 'company cards show a Remove control').toBe(true);
@@ -6991,7 +6994,8 @@ test.describe('[STATE-COVERAGE] v176 un-save a company card', () => {
     expect(r.serenityAfter, 'removed immediately').toBe(false);
     expect(r.serenityAfterRerender, 'stays gone on re-render (persisted)').toBe(false);
     expect(r.vanderStays, 'only the removed company is affected').toBe(true);
-    expect(r.inHidden, 'added to the shared, undoable hidden-companies set').toBe(true);
+    expect(r.notHidden, 'dismiss must NOT hide the company\'s roles from deck/Browse').toBe(true);
+    expect(r.dismissed, 'tracked in the lightweight dismiss set').toBe(true);
   });
 });
 
@@ -7166,5 +7170,48 @@ test.describe('[STATE-COVERAGE] v179 Résumé Strength rubric', () => {
     expect(r.outcomeChecked, 'the OUTCOME factor passes for result bullets').toBe(true);
     expect(r.fluffPts, 'fluff/passive résumé scores lower than a clean outcome one').toBeLessThan(r.outcomePts);
     expect(r.fluffCleanFlag, 'the clean/concision factor FAILS on a fluffy résumé').toBe(false);
+  });
+});
+
+/* ===== v180: remove the blended "Overall" number · canonical coverage · un-save = dismiss ===== */
+test.describe('[STATE-COVERAGE] v180 rating continuity + gains coverage + hunt dismiss', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof rateResume === 'function'
+      && typeof _huntRemoveCo === 'function' && typeof _gpjHuntDismissed === 'function'
+      && typeof renderGhostCompanies === 'function', null, { timeout: 15000 });
+  });
+
+  test('the confusing blended "Overall callback readiness" number is gone', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      resumeData.name='A'; resumeData.contact='a@b.com · 1'; resumeData.summary='Marketing pro with a decade of client success experience here.'; resumeData.skills='Excel · Salesforce · SEO · Content · Email · Brand';
+      resumeData.jobs=[{t:'Marketing Specialist',c:'Poolsure',b:'Optimized an $80K budget.\nManaged 100 accounts.\nExecuted 40+ tradeshows.'}];
+      resumeReady=true;
+      localStorage.setItem('gpj_prefs',JSON.stringify({titles:'Marketing Manager'}));
+      window._roleCorpusCache={role:'Marketing Manager',ts:Date.now(),corpus:{matched:12,terms:[{term:'campaign',pct:60},{term:'seo',pct:40}]}};
+      await rateResume();
+      const t=document.getElementById('resume-rating-body').innerText;
+      return { noOverall: !/Overall callback readiness/.test(t), benchmark: /benchmarked against 12 live/.test(t), rings: /Résumé Strength/.test(t)&&/Role Fit/.test(t) };
+    });
+    expect(r.noOverall, 'no blended "Overall callback readiness" number').toBe(true);
+    expect(r.rings, 'the two clear rings remain').toBe(true);
+    expect(r.benchmark, 'the posting benchmark context stays').toBe(true);
+  });
+
+  test('un-save DISMISSES a hunt card (roles NOT hidden from deck/Browse)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.removeItem('gpj_hidden_cos'); localStorage.removeItem('gpj_hunt_dismissed');
+      lists.applied=[{t:'x',co:'Karbon'},{t:'y',co:'Microvast'}];
+      renderGhostCompanies();
+      _huntRemoveCo('Karbon');
+      renderGhostCompanies();
+      const html=document.getElementById('ghost-list').innerHTML;
+      return { karbonGone: !/Karbon/.test(html), microvastStays: /Microvast/.test(html), notHidden: !gpjHiddenCos().has(_coKey('Karbon')), dismissed: _gpjHuntDismissed().has(_coKey('Karbon')) };
+    });
+    expect(r.karbonGone, 'removed from the hunt list').toBe(true);
+    expect(r.microvastStays, 'only the target is removed').toBe(true);
+    expect(r.notHidden, 'the company is NOT hidden — its roles still show in deck/Browse').toBe(true);
+    expect(r.dismissed, 'tracked in the lightweight dismiss set, not the hidden-companies set').toBe(true);
   });
 });
