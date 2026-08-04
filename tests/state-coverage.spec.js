@@ -6954,3 +6954,41 @@ test.describe('[STATE-COVERAGE] v175 cover-letter flow (card button + job text)'
     expect(r.coherent, 'the "squarely where I work" bullet matches the emphasized terms').toBe(true);
   });
 });
+
+/* ===== v176 F: un-save a company card (parity with jobs' Remove) ===== */
+test.describe('[STATE-COVERAGE] v176 un-save a company card', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof renderGhostCompanies === 'function'
+      && typeof _huntRemoveCo === 'function' && typeof gpjHiddenCos === 'function', null, { timeout: 15000 });
+  });
+
+  test('a hunt company card can be removed and does not reappear', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      try { localStorage.removeItem('gpj_hidden_cos'); } catch (e) {}
+      lists.applied = [{ t: 'Marketing Manager', co: 'Serenity Healthcare' }, { t: 'Brand Lead', co: 'Vanderbloemen' }];
+      renderGhostCompanies();
+      const before = document.getElementById('ghost-list').innerHTML;
+      _huntRemoveCo('Serenity Healthcare');
+      const after = document.getElementById('ghost-list').innerHTML;
+      // re-render again to prove it stays hidden (persisted in the hidden set)
+      renderGhostCompanies();
+      const afterRerender = document.getElementById('ghost-list').innerHTML;
+      return {
+        hadRemove: /✕ Remove/.test(before),
+        serenityBefore: /Serenity Healthcare/.test(before),
+        serenityAfter: /Serenity Healthcare/.test(after),
+        serenityAfterRerender: /Serenity Healthcare/.test(afterRerender),
+        vanderStays: /Vanderbloemen/.test(afterRerender),
+        inHidden: gpjHiddenCos().has(_coKey('Serenity Healthcare')),
+      };
+    });
+    expect(r.hadRemove, 'company cards show a Remove control').toBe(true);
+    expect(r.serenityBefore).toBe(true);
+    expect(r.serenityAfter, 'removed immediately').toBe(false);
+    expect(r.serenityAfterRerender, 'stays gone on re-render (persisted)').toBe(false);
+    expect(r.vanderStays, 'only the removed company is affected').toBe(true);
+    expect(r.inHidden, 'added to the shared, undoable hidden-companies set').toBe(true);
+  });
+});
