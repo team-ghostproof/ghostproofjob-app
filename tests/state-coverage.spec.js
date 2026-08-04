@@ -6120,7 +6120,9 @@ test.describe('[STATE-COVERAGE] v161 tailored résumé reaches PDF with a popula
       window.fb = window.fb || {};
       window.fb.smartMatch = async (bul, kw, f, opts) => (opts && opts.mode === 'summary')
         ? { finalResume: ['AI-TAILORED SUMMARY re-aimed at this specific posting.'], changedCount: 1 }
-        : { finalResume: bul.map((x, i) => 'AI-TAILORED bullet ' + i), changedCount: bul.length };
+        // v178: a good rewrite PRESERVES the original's metric ($80K); otherwise the
+        // metric-preservation guard (correctly) keeps the original bullet instead.
+        : { finalResume: bul.map((x, i) => 'AI-TAILORED bullet ' + i + ' with $80K'), changedCount: bul.length };
       m2jContext = { title: 'Sales', co: 'Co', desc: 'posting '.repeat(30), suggestions: [], startPct: 90 };
       await window.applyMatch2Job();
       R.afterReturn = resumeData.jobs[0].b;
@@ -7096,5 +7098,36 @@ test.describe('[STATE-COVERAGE] v177b Jett download + metric tightening', () => 
       return captured;
     });
     expect(name).toBe('Resume_Aaliyah_Sosa_Improved');
+  });
+});
+
+/* ===== v178: metric-preservation guard — improve can never drop a number ===== */
+test.describe('[STATE-COVERAGE] v178 improve never prunes a metric', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof _gpjPreserveMetrics === 'function', null, { timeout: 15000 });
+  });
+
+  test('a rewrite that drops a number falls back to the original; one that keeps it wins', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const P = _gpjPreserveMetrics;
+      return {
+        droppedCount: P('Managed 100 client accounts.', 'Managed client accounts.'),
+        keptCount:    P('Managed 100 client accounts.', 'Oversaw 100 client accounts end-to-end.'),
+        keptBudget:   P('Optimized an $80K+ budget.', 'Owned a budget of $80K+.'),
+        droppedBudget:P('Optimized an $80K+ budget.', 'Owned the budget for cost-efficiency.'),
+        noMetric:     P('Collaborated with operations.', 'Partnered with the operations team.'),
+        droppedOfTwo: P('Led 8 people across 500 sites.', 'Led a team of 8.'),
+        emptyRewrite: P('Managed 100 accounts.', ''),
+      };
+    });
+    expect(r.droppedCount, 'dropped metric → keep original').toBe('Managed 100 client accounts.');
+    expect(r.keptCount, 'kept metric → use the improved rewrite').toBe('Oversaw 100 client accounts end-to-end.');
+    expect(r.keptBudget).toBe('Owned a budget of $80K+.');
+    expect(r.droppedBudget, '$80K dropped → keep original').toBe('Optimized an $80K+ budget.');
+    expect(r.noMetric, 'no metric to protect → rewrite is fine').toBe('Partnered with the operations team.');
+    expect(r.droppedOfTwo, 'losing ANY of several numbers → keep original').toBe('Led 8 people across 500 sites.');
+    expect(r.emptyRewrite, 'empty rewrite never wins').toBe('Managed 100 accounts.');
   });
 });
