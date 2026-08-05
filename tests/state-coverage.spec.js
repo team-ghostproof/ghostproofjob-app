@@ -7276,3 +7276,35 @@ test.describe('[STATE-COVERAGE] v181 outcome elicitation (85% engine)', () => {
     expect(opened, 'pressing Improve opens the outcome questions first').toBe(true);
   });
 });
+
+/* ===== v182 (Sprint 2): un-apply/un-skip survive the cloud merge (removal tombstone) ===== */
+test.describe('[STATE-COVERAGE] v182 put-back removal tombstone', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof _gpjMonotonicLists === 'function'
+      && typeof gpjTombstone === 'function' && typeof _gpjListKey === 'function', null, { timeout: 15000 });
+  });
+
+  test('a removed job stays gone through the union merge; a genuine re-apply survives', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      try { localStorage.removeItem('gpj_tomb'); localStorage.removeItem('gpj_lists_reset'); } catch (e) {}
+      const cloud = () => ({ applied: [{ t: 'Job A', co: 'Co X', when: 1000 }, { t: 'Job B', co: 'Co Y', when: 1000 }], responses: [], skipped: [], viewed: [] });
+      // control: local dropped Job A, but the union merge re-adds it (the bug)
+      window._gpjCloudListsSeen = cloud(); lists.applied = [{ t: 'Job B', co: 'Co Y', when: 1000 }]; lists.responses = []; lists.skipped = []; lists.viewed = [];
+      const control = _gpjMonotonicLists().applied.map(x => x.t);
+      // with the removal tombstone (what unApply writes)
+      gpjTombstone('applied', _gpjListKey({ t: 'Job A', co: 'Co X' }));
+      window._gpjCloudListsSeen = cloud(); lists.applied = [{ t: 'Job B', co: 'Co Y', when: 1000 }];
+      const withTomb = _gpjMonotonicLists().applied.map(x => x.t);
+      // re-apply: a NEWER Job A row must survive the tombstone
+      window._gpjCloudListsSeen = cloud(); lists.applied = [{ t: 'Job A', co: 'Co X', when: Date.now() + 5000 }, { t: 'Job B', co: 'Co Y', when: 1000 }];
+      const reapply = _gpjMonotonicLists().applied.map(x => x.t);
+      return { control, withTomb, reapply };
+    });
+    expect(r.control, 'without a tombstone the merge re-adds the removed job (the bug)').toContain('Job A');
+    expect(r.withTomb, 'with the tombstone the removed job stays gone').not.toContain('Job A');
+    expect(r.withTomb).toContain('Job B');
+    expect(r.reapply, 'a genuine re-apply (newer row) survives the tombstone').toContain('Job A');
+  });
+});
