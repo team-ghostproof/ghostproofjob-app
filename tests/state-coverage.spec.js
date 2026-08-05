@@ -7215,3 +7215,64 @@ test.describe('[STATE-COVERAGE] v180 rating continuity + gains coverage + hunt d
     expect(r.dismissed, 'tracked in the lightweight dismiss set, not the hidden-companies set').toBe(true);
   });
 });
+
+/* ===== v181: outcome elicitation — Improve asks for results, weaves real numbers in ===== */
+test.describe('[STATE-COVERAGE] v181 outcome elicitation (85% engine)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof _gpjOutcomeQuestionsFor === 'function'
+      && typeof _gpjWeaveOutcome === 'function' && typeof openOutcomeElicit === 'function'
+      && typeof jettFullImprove === 'function' && typeof _jettFullRun === 'function', null, { timeout: 15000 });
+  });
+
+  test('detects scope bullets (no result), weaves the real answer, and Improve opens the modal', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      resumeData.name='A'; resumeData.contact='a@b.com'; resumeData.summary='Marketing pro for a decade of client success here.'; resumeData.skills='Excel · SEO';
+      resumeData.jobs = [
+        { t: 'Marketing Specialist', c: 'Poolsure', b: 'Managed 100 client accounts from start to finish.\nIncreased retention by 20% year over year.\nOversaw 50 vendor relationships.' },
+        { t: 'Account Manager', c: 'Cogent', b: 'Led a team of 8 account managers.' },
+      ];
+      resumeReady = true;
+      const qs = _gpjOutcomeQuestionsFor();
+      // weave
+      const weave = _gpjWeaveOutcome('Managed 100 client accounts.', 'Grew retention 20%');
+      const weaveMoney = _gpjWeaveOutcome('Oversaw 50 vendors', 'saving $30K annually');
+      // submit path: answer the first question, confirm it weaves into that bullet
+      openOutcomeElicit();
+      const modalInputs = document.querySelectorAll('#outcome-modal input').length;
+      const el = document.querySelector('#outcome-modal input#oq-0');
+      const targetJi = parseInt(el.dataset.ji, 10), targetLi = parseInt(el.dataset.li, 10);
+      el.value = 'cut onboarding time 40%';
+      submitOutcomeElicit();   // weaves + would call _jettFullRun; we just check the bullet
+      const wovenBullet = String(resumeData.jobs[targetJi].b).split('\n')[targetLi];
+      return {
+        qCount: qs.length,
+        excludesResult: !qs.some(q => /increased retention/i.test(q.bullet)),
+        includesScope: qs.some(q => /managed 100 client accounts/i.test(q.bullet)),
+        weave, weaveMoney,
+        modalInputs,
+        wovenBullet,
+      };
+    });
+    expect(r.excludesResult, 'a bullet that already shows a result is not asked about').toBe(true);
+    expect(r.includesScope, 'scope/task bullets are detected').toBe(true);
+    expect(r.weave, 'lowercases the lead + keeps the number').toBe('Managed 100 client accounts, grew retention 20%.');
+    expect(r.weaveMoney, 'preserves $ tokens').toBe('Oversaw 50 vendors, saving $30K annually.');
+    expect(r.modalInputs, 'one input per detected scope bullet').toBeGreaterThan(0);
+    expect(r.wovenBullet, 'the answer is woven into the exact bullet').toMatch(/cut onboarding time 40%/);
+  });
+
+  test('Improve opens the elicitation when scope bullets exist', async ({ page }) => {
+    const opened = await page.evaluate(async () => {
+      resumeData.name='A'; resumeData.contact='a@b.com'; resumeData.summary='Marketing pro for a decade of client success here.'; resumeData.skills='Excel';
+      resumeData.jobs = [{ t: 'X', c: 'Y', b: 'Managed 100 client accounts.\nOversaw 50 vendors.' }];
+      resumeReady = true;
+      const old = document.getElementById('outcome-modal'); if (old) old.remove();
+      jettFullImprove();   // gate: should open the elicitation, NOT run the rewrite yet
+      await new Promise(r => setTimeout(r, 100));
+      return !!document.getElementById('outcome-modal');
+    });
+    expect(opened, 'pressing Improve opens the outcome questions first').toBe(true);
+  });
+});
