@@ -7308,3 +7308,77 @@ test.describe('[STATE-COVERAGE] v182 put-back removal tombstone', () => {
     expect(r.reapply, 'a genuine re-apply (newer row) survives the tombstone').toContain('Job A');
   });
 });
+
+/* ===== v183: light-mode toggle (opt-in; dark stays the default identity) ===== */
+test.describe('[STATE-COVERAGE] v183 light-mode toggle', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof gpjToggleTheme === 'function'
+      && typeof gpjApplyTheme === 'function' && typeof gpjCurrentTheme === 'function', null, { timeout: 15000 });
+  });
+
+  /* Q4 empty/missing data: no stored preference → dark is the default identity */
+  test('default (no stored preference) is dark', async ({ page }) => {
+    const t = await page.evaluate(() => {
+      try { localStorage.removeItem('gpj_theme'); } catch (e) {}
+      return { attr: document.documentElement.getAttribute('data-theme'), cur: gpjCurrentTheme() };
+    });
+    expect(t.attr, 'no data-theme attribute means dark').toBeNull();
+    expect(t.cur).toBe('dark');
+  });
+
+  /* the toggle flips the live theme, the tokens, and persists the choice */
+  test('toggle flips the theme, the tokens, and persists', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const readOff = () => getComputedStyle(document.documentElement).getPropertyValue('--off').trim().toUpperCase();
+      const readBg  = () => getComputedStyle(document.documentElement).getPropertyValue('--plum').trim().toUpperCase();
+      gpjApplyTheme('dark');
+      const darkOff = readOff(), darkBg = readBg();
+      gpjToggleTheme();                    // → light
+      const afterToggle = { theme: gpjCurrentTheme(), stored: localStorage.getItem('gpj_theme'), off: readOff(), bg: readBg() };
+      gpjToggleTheme();                    // → back to dark
+      const backToDark = { theme: gpjCurrentTheme(), stored: localStorage.getItem('gpj_theme'), off: readOff() };
+      return { darkOff, darkBg, afterToggle, backToDark };
+    });
+    // dark: near-white text on near-black bg
+    expect(r.darkOff).toBe('#F0EEF8');
+    expect(r.darkBg).toBe('#120F1D');
+    // light: dark ink text on a light bg — the tokens genuinely swapped
+    expect(r.afterToggle.theme).toBe('light');
+    expect(r.afterToggle.stored).toBe('light');
+    expect(r.afterToggle.off).toBe('#1A1526');
+    expect(r.afterToggle.bg).toBe('#F4F2F9');
+    // and it flips back + re-persists
+    expect(r.backToDark.theme).toBe('dark');
+    expect(r.backToDark.stored).toBe('dark');
+    expect(r.backToDark.off).toBe('#F0EEF8');
+  });
+
+  /* Q1 guest / no-flash: a persisted 'light' is applied BEFORE first paint by the
+     <head> pre-paint script — no auth, no flash of the wrong theme on reload */
+  test('a persisted light preference is applied on reload without auth (no flash)', async ({ page }) => {
+    await page.evaluate(() => { try { localStorage.setItem('gpj_theme', 'light'); } catch (e) {} });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    // check immediately — the pre-paint <head> script must already have set it
+    const attr = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+    expect(attr, 'the <head> pre-paint script applied the saved light theme').toBe('light');
+    // and the on-accent button text uses var(--plum), which flipped WITH the theme
+    const plum = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--plum').trim().toUpperCase());
+    expect(plum).toBe('#F4F2F9');
+    await page.evaluate(() => { try { localStorage.removeItem('gpj_theme'); } catch (e) {} });
+  });
+
+  /* the menu label reflects the CURRENT mode so the tap target is honest */
+  test('the profile-menu theme label tracks the current mode', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      gpjApplyTheme('light'); gpjSyncThemeLabel();
+      const lightLbl = (document.getElementById('pm-theme-lbl') || {}).textContent;
+      gpjApplyTheme('dark'); gpjSyncThemeLabel();
+      const darkLbl = (document.getElementById('pm-theme-lbl') || {}).textContent;
+      return { lightLbl, darkLbl };
+    });
+    expect(r.lightLbl).toBe('Light mode');
+    expect(r.darkLbl).toBe('Dark mode');
+  });
+});

@@ -709,13 +709,33 @@
 <script>if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>/* v183: apply the saved theme BEFORE the stylesheet paints — no flash of the wrong theme. Dark stays the default. */
+try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 <style>
   :root {
     --plum:#120F1D;--plum2:#1C1830;--plum3:#251F3A;--plum4:#2E2850;
     --mint:#00F5A0;--mint2:#00C880;--mint3:#00A066;
     --cyber:#B55FE6;--cyber2:#9340CC;--cyber3:#6E2599;
     --off:#F0EEF8;--muted:#9B93B8;--danger:#FF4D6A;--warn:#FFB347;
+    color-scheme:dark;
   }
+  /* ===== v183 LIGHT MODE (opt-in; dark stays the default identity) =====
+     Redefining the tokens flips every var(--*) usage at once. Dark accents are
+     BRIGHT on a dark ground; light accents must be DARKER to read on white AND
+     to pair with on-accent text — which is color:var(--plum), so it flips WITH
+     the theme (dark ink in dark mode, light ink in light mode) and stays
+     correctly contrasting on the accent fills with zero per-button edits. */
+  :root[data-theme="light"]{
+    --plum:#F4F2F9;--plum2:#FFFFFF;--plum3:#E7E1F3;--plum4:#D6CCEC;
+    --mint:#00875A;--mint2:#00734D;--mint3:#005F40;
+    --cyber:#7C3AED;--cyber2:#6D28D9;--cyber3:#5B21B6;
+    --off:#1A1526;--muted:#5E5676;--danger:#D62B49;--warn:#B7791F;
+    color-scheme:light;
+  }
+  /* the few intentionally-dark components (written with literal darks so dark
+     mode is byte-untouched) get repainted for light mode here, additively. */
+  html[data-theme="light"] .gpj-tip .gpj-tip-body{background:var(--plum2);color:var(--off);border-color:var(--plum4);box-shadow:0 8px 24px rgba(60,40,90,.18);}
+  html[data-theme="light"] .gpj-tip .gpj-tip-body::after{border-top-color:var(--plum2);}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{height:100%;margin:0;padding:0;font-family:'Inter',sans-serif;background:var(--plum);color:var(--off);overflow:hidden;}
   #app{height:100dvh;display:flex;flex-direction:column;max-width:430px;margin:0 auto;position:relative;overflow:hidden;background:var(--plum);}
@@ -976,6 +996,8 @@
   @media(min-width:431px){
     body{display:flex;align-items:center;justify-content:center;background:#0A0812;}
     #app{border-radius:40px;overflow:hidden;box-shadow:0 0 60px rgba(0,0,0,.8);}
+    html[data-theme="light"] body{background:#DED7EE;}
+    html[data-theme="light"] #app{box-shadow:0 10px 50px rgba(60,40,90,.22);}
   }
 
   /* ===== DESKTOP MULTI-PANE LAYER (additive — mobile untouched) ===== */
@@ -1049,6 +1071,22 @@
     body.desk #view-resume,body.desk #view-ghost,body.desk #view-profile,body.desk #view-account{
       background:var(--plum2);border:1px solid var(--plum3);border-radius:18px;padding:20px;color:var(--off);
     }
+    /* v183 light-mode: the desktop "neon logo" slate sidebar + feed-card text are
+       written with literal darks/lights for the dark ground — repaint for light. */
+    html[data-theme="light"] body.desk #desk-rail{background:var(--plum2);border-right-color:var(--plum3);}
+    html[data-theme="light"] body.desk #desk-rail-brand{color:var(--cyber);text-shadow:none;}
+    html[data-theme="light"] body.desk .desk-rail-btn{color:var(--muted);}
+    html[data-theme="light"] body.desk .desk-rail-btn:hover{background:var(--plum3);color:var(--off);}
+    html[data-theme="light"] body.desk .desk-rail-btn.active{background:rgba(11,110,120,.12);color:#0E7490;box-shadow:inset 3px 0 0 #0891B2;}
+    html[data-theme="light"] body.desk .gpj-light .s-title{color:var(--off);}
+    html[data-theme="light"] body.desk .gpj-light .s-sub{color:var(--muted);}
+    html[data-theme="light"] body.desk .gpj-light .salary-badge,html[data-theme="light"] body.desk .gpj-light .location-badge{color:var(--muted);}
+    html[data-theme="light"] body.desk .gpj-light .match-badge{color:#0E7490;}
+    html[data-theme="light"] body.desk .gpj-light .card-body div[onclick*="copyOptCard"],
+    html[data-theme="light"] body.desk .gpj-light .card-body div[onclick*="matchToJobFromCard"]{color:#0E7490!important;}
+    html[data-theme="light"] body.desk .gpj-light .green-flag{color:#059669!important;}
+    html[data-theme="light"] body.desk .gpj-light .red-flag{color:var(--danger)!important;}
+    html[data-theme="light"] body.desk .gpj-light .s-ghost{color:var(--danger);}
   }
   @keyframes gpjViewIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
   .gpj-empty-logo{animation:gpjFadeIn .4s ease-out;}
@@ -1111,6 +1149,7 @@
           <div id="profile-menu" style="display:none;position:fixed;right:10px;top:60px;z-index:400;background:var(--plum2);border:1px solid var(--plum4);border-radius:14px;padding:6px;min-width:200px;box-shadow:0 12px 34px rgba(0,0,0,.6);">
             <div class="pm-item" id="pm-profile" onclick="pmGo('profile')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">🙂 Account / Profile</div>
             <div class="pm-item" onclick="pmGo('account')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">⚙️ Settings</div>
+            <div class="pm-item" id="pm-theme" onclick="gpjToggleTheme()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;"><span id="pm-theme-ic">🌙</span> <span id="pm-theme-lbl">Dark mode</span></div>
             <div class="pm-item" id="pm-viewed" onclick="pmViewedJobs()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">👀 Viewed Jobs <span id="pm-viewed-count" style="margin-left:auto;background:var(--plum4);border-radius:8px;padding:1px 7px;font-size:11px;color:var(--muted);">0</span></div>
             <div class="pm-item" onclick="openContactModal()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;">📬 Contact Us</div>
             <div class="pm-item" id="pm-booster" onclick="openBoosterModal()" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--mint);">💚 Request Booster</div>
@@ -2981,7 +3020,7 @@
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v182</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v183</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -5064,16 +5103,16 @@ function gpjExplainReports(n){
     wrap.id='reports-explain-modal';
     wrap.style.cssText='position:fixed;inset:0;z-index:365;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.6);';
     const box=document.createElement('div');
-    box.style.cssText='max-width:460px;width:100%;background:var(--card,#1A1626);border:1px solid rgba(181,95,230,.45);border-radius:16px;padding:20px 20px 16px;box-shadow:0 18px 50px rgba(0,0,0,.55);max-height:80vh;overflow:auto;';
+    box.style.cssText='max-width:460px;width:100%;background:var(--plum2);border:1px solid rgba(181,95,230,.45);border-radius:16px;padding:20px 20px 16px;box-shadow:0 18px 50px rgba(0,0,0,.55);max-height:80vh;overflow:auto;';
     box.innerHTML=''
       +'<div style="font-weight:800;font-size:1.05rem;margin-bottom:10px;">🚩 What "'+cnt+' reported" means</div>'
-      +'<div style="line-height:1.55;font-size:.93rem;color:var(--text,#EDE9F5);">'
+      +'<div style="line-height:1.55;font-size:.93rem;color:var(--off);">'
       +'<b>'+who+'</b> flagged this exact posting as <b>no longer accepting applications</b> — usually because it’s still listed but the role is already filled or closed.</div>'
       +'<div style="line-height:1.55;font-size:.9rem;color:var(--muted,#9C93B3);margin-top:12px;">'
       +'It’s a community signal, not a verdict from us. Each person can report a posting <b>once</b>, so the number is people — not clicks. We store no names and no comments, only the count.</div>'
       +'<div style="line-height:1.55;font-size:.9rem;color:var(--muted,#9C93B3);margin-top:10px;">'
       +'A high count is a good reason to spend your time elsewhere. Seen it yourself? Use <b>⚑ No longer accepting applications?</b> on the card to warn the next hunter.</div>'
-      +'<button type="button" id="reports-explain-close" style="margin-top:16px;width:100%;padding:11px;border-radius:10px;border:0;background:var(--accent,#00F5A0);color:#0B0913;font-weight:800;cursor:pointer;">Got it</button>';
+      +'<button type="button" id="reports-explain-close" style="margin-top:16px;width:100%;padding:11px;border-radius:10px;border:0;background:var(--mint);color:var(--plum);font-weight:800;cursor:pointer;">Got it</button>';
     wrap.appendChild(box);
     const close=function(){ try{ wrap.remove(); }catch(e){} try{ document.removeEventListener('keydown',esc); }catch(e){} };
     const esc=function(ev){ if(ev.key==='Escape') close(); };
@@ -12445,6 +12484,39 @@ function profileDisplayName(user){
   return handle||'User Profile';
 }
 /* ---------- PROFILE DROPDOWN MENU ---------- */
+/* ===== v183 light-mode toggle =====
+   Dark is the default identity; light is an opt-in device preference persisted
+   in localStorage (no account needed — works for guests too). The pre-paint
+   script in <head> applies the saved choice before first paint (no flash);
+   these keep the live toggle + label in sync. */
+function gpjApplyTheme(v){
+  try{
+    if(v==='light') document.documentElement.setAttribute('data-theme','light');
+    else document.documentElement.removeAttribute('data-theme');
+    var m=document.querySelector('meta[name="theme-color"]');
+    if(m) m.setAttribute('content', v==='light' ? '#F4F2F9' : '#120F1D');
+  }catch(e){}
+  gpjSyncThemeLabel();
+}
+function gpjCurrentTheme(){
+  try{ return document.documentElement.getAttribute('data-theme')==='light' ? 'light' : 'dark'; }catch(e){ return 'dark'; }
+}
+function gpjSyncThemeLabel(){
+  try{
+    var light=gpjCurrentTheme()==='light';
+    var ic=document.getElementById('pm-theme-ic'), lbl=document.getElementById('pm-theme-lbl');
+    /* label shows the CURRENT mode; tapping switches to the other */
+    if(ic) ic.textContent=light?'☀️':'🌙';
+    if(lbl) lbl.textContent=light?'Light mode':'Dark mode';
+  }catch(e){}
+}
+function gpjToggleTheme(){
+  var next=gpjCurrentTheme()==='light'?'dark':'light';
+  try{ localStorage.setItem('gpj_theme',next); }catch(e){}
+  gpjApplyTheme(next);
+  try{ var pm=document.getElementById('profile-menu'); if(pm) pm.style.display='none'; }catch(e){}
+}
+try{ gpjSyncThemeLabel(); }catch(e){}
 function toggleProfileMenu(){
   if(!(window.fb&&fb.current())){ openAuth(); return; }
   const pm=document.getElementById('profile-menu');
@@ -12452,6 +12524,7 @@ function toggleProfileMenu(){
   if(pm){
     const opening=pm.style.display==='none';
     pm.style.display=opening?'block':'none';
+    if(opening) gpjSyncThemeLabel();
     /* anchor the menu just under the profile chip (works despite header clip) */
     if(opening&&chip){
       const r=chip.getBoundingClientRect();
@@ -13838,8 +13911,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v182';
+const APP_VERSION = 'v183';
 const CHANGELOG = {
+  'v183':['light-mode toggle (opt-in; dark stays default)'],
   'v182':['put-back removal tombstone: un-apply/un-skip survive the cloud union merge + restore, across devices'],
   'v181':['Outcome Elicitation: Improve My Whole Resume asks for measurable results on scope bullets + weaves the user real number in (the 85% engine)'],
   'v180':['remove blended Overall number (two clear rings) + canonical gains coverage + un-save = dismiss not hide'],
