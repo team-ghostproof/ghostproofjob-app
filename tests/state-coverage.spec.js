@@ -7382,3 +7382,50 @@ test.describe('[STATE-COVERAGE] v183 light-mode toggle', () => {
     expect(r.darkLbl).toBe('Dark mode');
   });
 });
+
+/* ===== v184: AI-honesty + polish (stale CTA, semantic cover-letter match) ===== */
+test.describe('[STATE-COVERAGE] v184 honesty + polish', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof _gpjHasResume === 'function'
+      && typeof _gpjSyncNoResumeCTA === 'function' && typeof tailorCoverLetter === 'function', null, { timeout: 15000 });
+  });
+
+  /* #13: the "No resume yet?" onboarding link hides once a résumé exists */
+  test('the "No resume yet?" CTA hides when a résumé exists (Q2/Q4)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const cta = document.getElementById('no-resume-cta');
+      // Q4 empty: no résumé → CTA shown
+      resumeReady = false;
+      try { resumeData.name=''; resumeData.title=''; resumeData.summary=''; resumeData.jobs=[]; } catch(e){}
+      _gpjSyncNoResumeCTA();
+      const emptyShown = cta && cta.style.display !== 'none';
+      // Q2 has a résumé → CTA hidden
+      resumeData.name = 'Aaliyah Sosa'; resumeData.title = 'Marketing Specialist';
+      _gpjSyncNoResumeCTA();
+      const withResumeHidden = cta && cta.style.display === 'none';
+      return { emptyShown, withResumeHidden, hasFn: _gpjHasResume() };
+    });
+    expect(r.emptyShown, 'with no résumé the onboarding CTA is visible').toBe(true);
+    expect(r.withResumeHidden, 'once a résumé exists the CTA is hidden').toBe(true);
+    expect(r.hasFn).toBe(true);
+  });
+
+  /* semantic cover-letter match: whole-word, so a posting term "design" no longer
+     grabs the generic verb "designed" — and a quantified bullet wins the tie */
+  test('the "squarely where I work" line quotes the whole-word, quantified bullet', async ({ page }) => {
+    const letter = await page.evaluate(() => {
+      const me = {
+        name: 'Aaliyah Sosa', contact: 'a@b.com', title: 'Designer', topCo: 'Bright Labs',
+        skills: ['Design', 'Branding'],
+        bullets: ['Designed training programs for 200 new staff', 'Ran design systems and brand campaigns, cut costs 30%']
+      };
+      const c = { title: 'Designer', co: 'Acme', desc: 'We need strong design skills. design design design brand.', req: 'design brand' };
+      return tailorCoverLetter(c, 1, me);
+    });
+    // must quote the real design bullet, not the "designed training" false match
+    expect(letter).toContain('design systems and brand campaigns');
+    expect(letter).not.toContain('training programs');
+  });
+});

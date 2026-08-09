@@ -2207,7 +2207,7 @@ try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setA
         <div style="font-size:11px;color:var(--muted);margin-top:4px;">PDF, DOCX, or TXT · Parsed on-device, never sold</div>
         <input type="file" id="resume-file" accept=".pdf,.doc,.docx,.txt" style="display:none;" onchange="startParse(this)"/>
       </div>
-      <div style="text-align:center;margin:-6px 16px 10px;">
+      <div id="no-resume-cta" style="text-align:center;margin:-6px 16px 10px;">
         <span onclick="buildFromProfile()" style="font-size:12px;color:var(--cyber);cursor:pointer;text-decoration:underline;">No resume yet? Build one from your profile instead →</span>
       </div>
 
@@ -3020,7 +3020,7 @@ try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setA
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v183</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v184</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -6262,6 +6262,7 @@ function startParse(input){
           document.getElementById('parsed-sections').style.display='block';
   {const _pb=document.getElementById('resume-progress-bar');if(_pb)_pb.style.display='block';const _ed=document.getElementById('studio-editor');if(_ed)_ed.style.display='block';const _col=document.getElementById('studio-collapsed');if(_col)_col.style.display='none';}
           resumeReady=true;
+          try{ _gpjSyncNoResumeCTA(); }catch(e){}   /* v184 #13: résumé now exists → drop the onboarding prompt */
           try{ _gpjMarkReferralOnboarded&&_gpjMarkReferralOnboarded(); }catch(e){}   /* v107: resume set up → referral reward-eligible */
           let foundCompanies=[];
           const realParse=!!(rawText&&rawText.trim().length>40);
@@ -8141,8 +8142,20 @@ function tailorCoverLetter(c, level, meOverride){
   try{
     const _leadWords=lead.join(' ').toLowerCase().split(/\s+/).filter(function(w){ return w.length>3; });
     if(me.bullets.length>1 && _leadWords.length){
-      let _best=-1;
-      me.bullets.forEach(function(b){ const bl=String(b).toLowerCase(); let s=0; _leadWords.forEach(function(w){ if(bl.indexOf(w)>=0) s++; }); if(s>_best){ _best=s; hl=b; } });
+      /* v184: WHOLE-WORD match. The old substring test matched the posting's skill
+         term "design" against the generic verb "designed" in "designed training
+         programs" (founder v175) — a word that isn't about design at all. A word
+         boundary requires the actual term, so the quoted bullet genuinely follows
+         "That's squarely where I work:". Tie-break toward a bullet that also carries
+         a NUMBER — a quantified line is the stronger proof point to lead with. */
+      const _wb=function(word,text){ try{ return new RegExp('\\b'+word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b').test(text); }catch(e){ return text.indexOf(word)>=0; } };
+      let _best=0;   /* 0 = require a REAL whole-word hit before overriding bullets[0] */
+      me.bullets.forEach(function(b){
+        const bl=String(b).toLowerCase();
+        let s=0; _leadWords.forEach(function(w){ if(_wb(w,bl)) s++; });
+        if(s>0 && /\d/.test(bl)) s+=0.5;
+        if(s>_best){ _best=s; hl=b; }
+      });
     }
   }catch(e){}
   /* B-THISROLE (v74): grammatical fallbacks \u2014 never "the this role position". */
@@ -8322,6 +8335,15 @@ function generateCoverLetter(){
   try{ updateReviseUI(); }catch(e){}
   if(!me.name||!me.contact){
     showAdvice('\u270d\ufe0f Your letter is using placeholder contact details. Complete <strong>Core Contact</strong> in the \ud83d\udcc4 Resume tab and every letter + application auto-fills with YOUR info.');
+  } else {
+    /* v184 #3 refuse-and-tell: when the posting itself was too thin to tailor to,
+       say so honestly instead of passing off a generic letter as tailored. */
+    try{
+      var _jt=((c&&c.desc||'')+' '+(c&&c.req||'')).replace(/\s+/g,' ').trim();
+      if(_jt.length<200){
+        showAdvice('\u2139\ufe0f This posting didn\u2019t include enough detail to tailor to \u2014 so this is a strong <strong>general</strong> letter written from your r\u00e9sum\u00e9, not a job-specific one. Paste a few lines from the job description and tap \u201cTailor it more\u201d to sharpen it.');
+      }
+    }catch(e){}
   }
 }
 function clWordCount(){
@@ -13911,8 +13933,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v183';
+const APP_VERSION = 'v184';
 const CHANGELOG = {
+  'v184':['AI honesty + polish: stale No-resume CTA hides, cover-letter whole-word semantic match, refuse-and-tell for thin postings'],
   'v183':['light-mode toggle (opt-in; dark stays default)'],
   'v182':['put-back removal tombstone: un-apply/un-skip survive the cloud union merge + restore, across devices'],
   'v181':['Outcome Elicitation: Improve My Whole Resume asks for measurable results on scope bullets + weaves the user real number in (the 85% engine)'],
@@ -17528,6 +17551,19 @@ async function loadTierFromProfile(u){
     if(_readOk) window._gpjCloudLoaded=true;
   }
 }
+/* v184 #13: the "No resume yet? Build one from your profile" prompt is onboarding
+   copy — it must disappear once the user actually HAS a résumé, or it reads as a
+   stale, contradictory link. "Has a résumé" = the ready flag OR any real content. */
+function _gpjHasResume(){
+  try{
+    if(typeof resumeReady!=='undefined' && resumeReady) return true;
+    var r=(typeof resumeData!=='undefined'&&resumeData)?resumeData:{};
+    return !!((r.name&&r.name.trim())||(r.title&&r.title.trim())||(r.summary&&r.summary.trim())||(Array.isArray(r.jobs)&&r.jobs.length));
+  }catch(e){ return false; }
+}
+function _gpjSyncNoResumeCTA(){
+  try{ var el=document.getElementById('no-resume-cta'); if(el) el.style.display=_gpjHasResume()?'none':''; }catch(e){}
+}
 function hydrateResumeFields(){
   /* write the value OR clear the field when empty — clearing is essential so a
      wiped resumeData (after user-switch/sign-out) doesn't leave stale values
@@ -17537,6 +17573,7 @@ function hydrateResumeFields(){
   set('pr-name',resumeData.name); set('pr-title',resumeData.title);
   set('pr-years',resumeData.years); set('pr-edu',resumeData.edu);
   set('pr-summary',resumeData.summary);
+  try{ _gpjSyncNoResumeCTA(); }catch(e){}   /* v184 #13: hide the "No resume yet?" prompt once a résumé exists */
   /* ADDRESS: repopulate the privacy-protected Core Contact fields on every load */
   const a=resumeData.addr||{};
   set('res-city',a.city); set('res-state',a.state);
