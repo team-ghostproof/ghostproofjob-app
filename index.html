@@ -686,7 +686,7 @@
      - On sign-out → wipe local cache entirely (nothing lingers on the device).
      This is what stops one account's data bleeding into another's session.
      ============================================================ */
-  window.GPJ_USER_KEYS = [ 'gpj_expired',
+  window.GPJ_USER_KEYS = [ 'gpj_expired', 'gpj_seen_keys',
     'gpj_profile','gpj_account','gpj_lists','gpj_install_date','gpj_tier',
     'gpj_saved_jobs','gpj_saved_cos','gpj_user_cos','gpj_corate','gpj_reports',
     'gpj_optimized','gpj_coverletters','gpj_draft','gpj_apply_log','gpj_applies',
@@ -3032,7 +3032,7 @@ try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setA
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v185</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v186</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -5009,6 +5009,20 @@ function salaryFromText(text){
    and the company's ghost reports tick up (warning the next person). Combined with
    the posting-age badge + stale flag, this keeps filled roles from lingering. */
 function gpjExpiredSet(){ try{ return JSON.parse(localStorage.getItem('gpj_expired')||'[]'); }catch(e){ return []; } }
+/* ── v186 Sprint 2b: the compact "Hide Ledger" ──────────────────────────────
+   The rich applied/skipped lists are capped at 60 rows (display + the Firestore
+   1 MB per-doc budget), and seenJobKeys() derived the deck de-recycle set from
+   those 60 — so once a user passed 60 apply/skips, the 61st-oldest fell out of
+   the hide-set and RECYCLED back into the deck. This is a keys-ONLY parallel
+   memory: title|company (the SAME normalization as jobKey()), capped at 5,000
+   (~250 KB worst case, comfortably inside the 1 MB doc), cloud-synced exactly
+   like `expired`, and unioned into seenJobKeys() so nothing recycles at scale.
+   Rollback: window.gpjClearSeenLedger() wipes it locally + in the cloud. */
+var GPJ_SEEN_CAP=5000;
+function gpjSeenLedger(){ try{ const a=JSON.parse(localStorage.getItem('gpj_seen_keys')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function gpjAddSeen(key){ try{ const k=String(key||'').toLowerCase().replace(/\s+/g,' ').trim(); if(!k||k==='|') return; const s=gpjSeenLedger(); if(s.indexOf(k)>=0) return; s.push(k); localStorage.setItem('gpj_seen_keys', JSON.stringify(s.slice(-GPJ_SEEN_CAP))); }catch(e){} }
+/* rollback / support command — clears the durable de-recycle memory everywhere */
+window.gpjClearSeenLedger=function(){ try{ localStorage.removeItem('gpj_seen_keys'); }catch(e){} try{ if(window.fb&&fb.current()) fb.saveProfile(fb.current().uid,{seenKeys:[],savedAt:Date.now()}).catch(()=>{}); }catch(e){} try{ console.log('[GPJ] seen ledger cleared (local + cloud)'); }catch(e){} };
 /* v138 (founder repro): the SAME role kept appearing twice and re-flagging never
    stuck, because the key was raw `title|company` — and the harvester stores the
    same employer under several names ("Terracon" vs "Terracon Consultants Inc").
@@ -11701,6 +11715,9 @@ function seenJobKeys(){
      from the deck after one look + a re-login). */
   try{ ['applied','skipped'].forEach(k=>{ (lists[k]||[]).forEach(it=>s.add(jobKey(it))); }); }catch(_){}
   try{ (savedJobs()||[]).forEach(it=>s.add(jobKey(it))); }catch(_){}
+  /* v186 Sprint 2b: the durable compact ledger remembers applied/skipped jobs
+     PAST the 60-row list cap, so a heavy user's older jobs never recycle back. */
+  try{ gpjSeenLedger().forEach(k=>s.add(k)); }catch(_){}
   return s;
 }
 /* DURABLE DECK-HIDE SET: the shared seen-set (viewed/applied/skipped/saved) PLUS the
@@ -12019,6 +12036,7 @@ function recordSwipe(dir,job){
       return;
     }
     lists.applied.push(rec);
+    try{ gpjAddSeen(k); }catch(e){}   /* v186: durable de-recycle memory (survives past the 60-row cap) */
   }
   else {
     /* FIX (v41): de-dupe skipped. Swiping left on the same listing twice (or on a
@@ -12028,6 +12046,7 @@ function recordSwipe(dir,job){
     const k=((job.t||'')+'|'+(job.co||'')).toLowerCase().replace(/\s+/g,' ').trim();
     lists.skipped=(lists.skipped||[]).filter(r=>(((r.t||'')+'|'+(r.co||'')).toLowerCase().replace(/\s+/g,' ').trim())!==k);
     lists.skipped.push(rec);
+    try{ gpjAddSeen(k); }catch(e){}   /* v186: durable de-recycle memory (survives past the 60-row cap) */
   }
   saveLists(); updateStatCounters(); cloudSync();
   /* We deliberately do NOT splice jobsQueue here. The deck renders the first 3
@@ -13015,6 +13034,10 @@ function cloudSync(){
          whole-document-overwrite class as the v143 lists bug. Omitting the key
          (undefined is now stripped, not thrown) leaves the stored value intact. */
       expired:(function(){ try{ const a=gpjExpiredSet(); return (Array.isArray(a)&&a.length)?a.slice(-500):undefined; }catch(e){ return undefined; } })(),
+      /* v186 Sprint 2b: the compact de-recycle ledger, cloud-backed so a job you
+         applied to on your phone doesn't reappear on your laptop. Same omit-on-empty
+         guard as `expired` — never overwrite the cloud copy with an empty local one. */
+      seenKeys:(function(){ try{ const a=gpjSeenLedger(); return (Array.isArray(a)&&a.length)?a.slice(-GPJ_SEEN_CAP):undefined; }catch(e){ return undefined; } })(),
       /* v137 second, independent guard: even past the gate, never persist the
          markup placeholders over real prefs. Omitting the key leaves the stored
          value untouched (saveProfile merges). */
@@ -13945,8 +13968,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v185';
+const APP_VERSION = 'v186';
 const CHANGELOG = {
+  'v186':['Sprint 2b compact seen-ledger (de-recycle past 60-cap, 5000 keys, cloud-synced) + D1 pool harvest guardrail'],
   'v185':['SEO: root self-canonical + OG/Twitter tags (consolidate homepage variants; fixes duplicate-without-canonical)'],
   'v184':['AI honesty + polish: stale No-resume CTA hides, cover-letter whole-word semantic match, refuse-and-tell for thin postings'],
   'v183':['light-mode toggle (opt-in; dark stays default)'],
@@ -16642,7 +16666,12 @@ async function adminResetMyCards(){
      monotonic baseline too, or the next cloudSync would union the cleared rows
      straight back in and the reset would appear to undo itself. */
   window._gpjCloudListsSeen={applied:[],responses:[],skipped:[],viewed:[]};
-  try{ if(window.fb&&fb.current()) await fb.saveProfile(fb.current().uid,{lists:lists,listsResetAt:_resetAt,savedAt:_resetAt}); }catch(e){}
+  /* v186 Sprint 2b: a reset must also clear the durable de-recycle ledger, or
+     seenJobKeys() would keep every applied/skipped job hidden and the deck could
+     not repopulate — the whole point of a reset. gpj_expired (explicitly FLAGGED
+     "no longer accepting") is deliberately left intact, same as before. */
+  try{ localStorage.removeItem('gpj_seen_keys'); }catch(e){}
+  try{ if(window.fb&&fb.current()) await fb.saveProfile(fb.current().uid,{lists:lists,listsResetAt:_resetAt,seenKeys:[],savedAt:_resetAt}); }catch(e){}
   try{ updateStatCounters(); }catch(e){}
   try{ window._failoverPass=false; }catch(e){}
   try{ if(typeof fetchLiveMarketJobs==='function') fetchLiveMarketJobs(); }catch(e){}
@@ -17436,6 +17465,16 @@ async function loadTierFromProfile(u){
         const merged=[...new Set([...local,...p.expired])].slice(-500);
         localStorage.setItem('gpj_expired', JSON.stringify(merged));
       }
+    }catch(e){}
+    /* v186 Sprint 2b: restore + union the compact de-recycle ledger (cloud ∪ local,
+       cap 5,000). Also BACKFILL from the lists we just loaded, so pre-v186 history
+       (up to the 60 rows kept per list) seeds the durable ledger from here on. */
+    try{
+      const _localSeen=gpjSeenLedger();
+      const _cloudSeen=Array.isArray(p.seenKeys)?p.seenKeys:[];
+      const _back=[]; try{ const cl=p.lists||{}; ['applied','skipped'].forEach(function(k){ (cl[k]||[]).forEach(function(it){ const kk=((it&&it.t||'')+'|'+(it&&it.co||'')).toLowerCase().replace(/\s+/g,' ').trim(); if(kk&&kk!=='|') _back.push(kk); }); }); }catch(e){}
+      const _merged=[...new Set([..._localSeen,..._cloudSeen,..._back])].slice(-GPJ_SEEN_CAP);
+      localStorage.setItem('gpj_seen_keys', JSON.stringify(_merged));
     }catch(e){}
     /* VIEWED / APPLIED / SAVED lists */
     if(p.lists){

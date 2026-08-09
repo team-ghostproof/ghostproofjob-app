@@ -74,5 +74,30 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error title=D1 pool NOT built::FIREBASE_SERVICE_ACCOUNT secret is missing — the app is stuck on the expensive live-query path. Add it in repo Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
           npm install firebase-admin --no-save
           node scripts/build_job_pool.mjs
+
+      # ── D1 GUARDRAIL (v186) ────────────────────────────────────────────────
+      # The build above is continue-on-error so a pool failure never turns the
+      # harvest red — which is EXACTLY how the pool stayed silently unbuilt for
+      # months (the step reported "success" while writing nothing). This step
+      # reads the PUBLIC manifest back and FAILS VISIBLY if the pool was not
+      # freshly written this run, so the breakage can never hide again. Jobs are
+      # already harvested + written by this point, so a red here means ONLY the
+      # read-cost optimisation is off, not that the harvest failed.
+      - name: Verify the D1 pool was written
+        if: always()
+        run: |
+          MAN=$(curl -s --max-time 25 "https://firestore.googleapis.com/v1/projects/ghostproofjob-app/databases/(default)/documents/job_pools/_manifest")
+          echo "manifest response (head):"; echo "$MAN" | head -c 500; echo
+          BUILT=$(echo "$MAN" | grep -oE '"builtAt"[^,}]*' | head -1)
+          if [ -n "$BUILT" ]; then
+            echo "::notice title=D1 pool OK::job_pools/_manifest present ($BUILT). The app reads the pool instead of thousands of live docs."
+          else
+            echo "::error title=D1 pool MISSING::job_pools/_manifest was NOT written this run — the app is on the expensive live-query fallback. Jobs harvested fine; only the D1 optimisation is off. Fix: check the 'Rebuild the D1 job pool' step log + the FIREBASE_SERVICE_ACCOUNT secret."
+            exit 1
+          fi

@@ -7429,3 +7429,51 @@ test.describe('[STATE-COVERAGE] v184 honesty + polish', () => {
     expect(letter).not.toContain('training programs');
   });
 });
+
+/* ===== v186 Sprint 2b: compact "Hide Ledger" — de-recycle past the 60-row cap ===== */
+test.describe('[STATE-COVERAGE] v186 compact seen-ledger', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof gpjAddSeen === 'function'
+      && typeof gpjSeenLedger === 'function' && typeof seenJobKeys === 'function'
+      && typeof window.gpjClearSeenLedger === 'function', null, { timeout: 15000 });
+  });
+
+  /* the core fix: a job remembered ONLY in the ledger (not in the 60-row list)
+     still de-recycles — seenJobKeys() must include it */
+  test('a ledger-only job de-recycles even when it fell off the 60-row list', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      try { localStorage.removeItem('gpj_seen_keys'); } catch(e){}
+      try { lists.applied = []; lists.skipped = []; } catch(e){}
+      gpjAddSeen('Old Marketing Job | Acme Corp');
+      const inLedger = gpjSeenLedger().includes('old marketing job | acme corp'.replace(/\s+/g,' ').trim());
+      const seen = seenJobKeys();               // a Set of normalized keys
+      const inSeen = seen.has('old marketing job | acme corp'.replace(/\s+/g,' ').trim());
+      return { inLedger, inSeen };
+    });
+    expect(r.inLedger, 'the key is stored in the ledger').toBe(true);
+    expect(r.inSeen, 'seenJobKeys() includes the ledger key so the deck hides it').toBe(true);
+  });
+
+  /* Q-scale: the ledger caps at 5,000, evicting the OLDEST and keeping the newest */
+  test('the ledger caps at 5,000 — oldest evicted, newest kept', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      try { localStorage.removeItem('gpj_seen_keys'); } catch(e){}
+      for (let i = 0; i < 5005; i++) gpjAddSeen('job' + i + '|co');
+      const led = gpjSeenLedger();
+      return { len: led.length, hasNewest: led.includes('job5004|co'), hasOldest: led.includes('job0|co') };
+    });
+    expect(r.len, 'capped at the 5,000 ceiling').toBe(5000);
+    expect(r.hasNewest, 'the newest key survives').toBe(true);
+    expect(r.hasOldest, 'the oldest key is evicted').toBe(false);
+  });
+
+  /* the rollback command clears the durable memory */
+  test('gpjClearSeenLedger() wipes the ledger', async ({ page }) => {
+    const empty = await page.evaluate(() => {
+      gpjAddSeen('x|y'); window.gpjClearSeenLedger(); return gpjSeenLedger().length;
+    });
+    expect(empty).toBe(0);
+  });
+});
