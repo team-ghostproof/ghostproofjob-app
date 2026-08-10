@@ -7642,3 +7642,27 @@ test.describe('[STATE-COVERAGE] v193 signup theme picker', () => {
     expect(r.dark.theme).toBe('dark'); expect(r.dark.stored).toBe('dark');
   });
 });
+
+/* ===== v194: progressive keyword search — Enter searches the whole region DB ===== */
+test.describe('[STATE-COVERAGE] v194 progressive keyword search', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof searchAllJobsForKeyword === 'function', null, { timeout: 15000 });
+  });
+
+  test('the keyword box wires Enter to the whole-region search', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const kw = document.getElementById('f-keyword');
+      const onkd = kw ? (kw.getAttribute('onkeydown') || '') : '';
+      return {
+        exists: !!kw,
+        entersWholeRegion: /Enter/.test(onkd) && /searchAllJobsForKeyword\(false\)/.test(onkd),
+        placeholderHints: /Enter/i.test(kw ? (kw.getAttribute('placeholder') || '') : ''),
+      };
+    });
+    expect(r.exists).toBe(true);
+    expect(r.entersWholeRegion, 'Enter runs searchAllJobsForKeyword(false) — the whole regional DB').toBe(true);
+    expect(r.placeholderHints, 'the placeholder tells the user Enter searches their area').toBe(true);
+  });
+});
