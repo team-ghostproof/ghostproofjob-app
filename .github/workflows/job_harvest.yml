@@ -74,12 +74,23 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
+          # The SAME secret is proven-valid: the Python harvester above writes jobs
+          # with it every day. So a failure here is in THIS Node step, not the creds.
+          # Each stage below fails with a distinct titled annotation so the ONE thing
+          # that's actually wrong is unmistakable in the run summary.
           if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
-            echo "::error title=D1 pool NOT built::FIREBASE_SERVICE_ACCOUNT secret is missing — the app is stuck on the expensive live-query path. Add it in repo Settings -> Secrets and variables -> Actions."
+            echo "::error title=D1 pool: secret missing::FIREBASE_SERVICE_ACCOUNT resolved empty in this run."
             exit 1
           fi
-          npm install firebase-admin --no-save
-          node scripts/build_job_pool.mjs
+          echo "node $(node --version) · npm $(npm --version)"
+          echo "→ installing firebase-admin (pinned to the repo's ^12.1.0)…"
+          npm install firebase-admin@^12.1.0 --no-save --no-audit --no-fund \
+            || { echo "::error title=D1 pool: npm install failed::firebase-admin did not install — see the npm error above."; exit 1; }
+          node -e "import('firebase-admin').then(m=>console.log('✓ firebase-admin '+m.default.SDK_VERSION+' loaded')).catch(e=>{console.error('::error title=D1 pool: firebase-admin load failed::'+e.message);process.exit(1);})" \
+            || exit 1
+          echo "→ running the pool builder (it prints the active-job count it read, then any failure)…"
+          node scripts/build_job_pool.mjs \
+            || { echo "::error title=D1 pool: build_job_pool.mjs failed::see the [pool] failed: … line above for the exact reason (read/write/OOM/timeout)."; exit 1; }
 
       # ── D1 GUARDRAIL (v186) ────────────────────────────────────────────────
       # The build above is continue-on-error so a pool failure never turns the

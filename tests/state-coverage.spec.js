@@ -7477,3 +7477,48 @@ test.describe('[STATE-COVERAGE] v186 compact seen-ledger', () => {
     expect(empty).toBe(0);
   });
 });
+
+/* ===== v187 Sprint 4 #17: matching reads education + certs (positive-only) ===== */
+test.describe('[STATE-COVERAGE] v187 education + cert signals', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof _gpjScoreMatch === 'function', null, { timeout: 15000 });
+  });
+
+  /* a named cert the posting asks for boosts a RELEVANT-but-not-maxed job (so the
+     boost has headroom to show — a saturated 98 match would hide it) */
+  test('a named cert the posting names boosts a relevant job', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      // partial relevance (title overlaps on "analyst", skill doesn't appear in the
+      // posting) → a mid-range base with room for the cert to move it
+      const cand = { title: 'Analyst', roles: [], skills: ['powerpoint'], summary: '' };
+      const job = { title: 'Financial Analyst', desc: 'CPA preferred. financial modeling, forecasting, GAAP.' };
+      const base = _gpjScoreMatch(cand, job);
+      const withCert = _gpjScoreMatch(Object.assign({}, cand, { certs: ['CPA'] }), job);
+      return { base, withCert };
+    });
+    expect(r.base, 'base leaves headroom (not already maxed)').toBeLessThan(98);
+    expect(r.withCert, 'holding the CPA the posting asks for scores higher').toBeGreaterThan(r.base);
+  });
+
+  /* a degree is a small nudge, NOT a cross-field inflator — the guard still caps */
+  test('a matching degree does NOT make a marketing résumé fit an engineer role', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const job = { title: 'Software Engineer', desc: "Bachelor's degree required. kubernetes, golang, distributed systems." };
+      const noCred = _gpjScoreMatch({ title: 'Marketing Specialist', roles: [], skills: ['seo', 'content', 'social media'], summary: '' }, job);
+      const withDegree = _gpjScoreMatch({ title: 'Marketing Specialist', roles: [], skills: ['seo', 'content', 'social media'], summary: '', creds: 'Bachelor of Arts, Marketing, State University' }, job);
+      return { noCred, withDegree };
+    });
+    expect(r.withDegree, 'the cross-field cap holds — a degree alone cannot inflate an unrelated field').toBeLessThanOrEqual(32);
+  });
+
+  /* omitting education/certs is safe (backward-compatible, no crash) */
+  test('education/certs are optional — scoring still returns a valid number without them', async ({ page }) => {
+    const ok = await page.evaluate(() => {
+      const a = _gpjScoreMatch({ title: 'Marketing Manager', roles: [], skills: ['seo'], summary: '' }, { title: 'Marketing Manager', desc: 'seo content marketing' });
+      return typeof a === 'number' && a >= 18 && a <= 98;
+    });
+    expect(ok).toBe(true);
+  });
+});
