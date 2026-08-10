@@ -7345,10 +7345,11 @@ test.describe('[STATE-COVERAGE] v183 light-mode toggle', () => {
     expect(r.darkOff).toBe('#F0EEF8');
     expect(r.darkBg).toBe('#120F1D');
     // light: dark ink text on a light bg — the tokens genuinely swapped
+    // (v188 softened the light palette: ink #1A1526→#332E45, bg #F4F2F9→#F3F1F9)
     expect(r.afterToggle.theme).toBe('light');
     expect(r.afterToggle.stored).toBe('light');
-    expect(r.afterToggle.off).toBe('#1A1526');
-    expect(r.afterToggle.bg).toBe('#F4F2F9');
+    expect(r.afterToggle.off).toBe('#332E45');
+    expect(r.afterToggle.bg).toBe('#F3F1F9');
     // and it flips back + re-persists
     expect(r.backToDark.theme).toBe('dark');
     expect(r.backToDark.stored).toBe('dark');
@@ -7365,7 +7366,7 @@ test.describe('[STATE-COVERAGE] v183 light-mode toggle', () => {
     expect(attr, 'the <head> pre-paint script applied the saved light theme').toBe('light');
     // and the on-accent button text uses var(--plum), which flipped WITH the theme
     const plum = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--plum').trim().toUpperCase());
-    expect(plum).toBe('#F4F2F9');
+    expect(plum).toBe('#F3F1F9');   // v188 softened light page ground
     await page.evaluate(() => { try { localStorage.removeItem('gpj_theme'); } catch (e) {} });
   });
 
