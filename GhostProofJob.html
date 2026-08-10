@@ -3037,7 +3037,7 @@ try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setA
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v189</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v190</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -5702,6 +5702,21 @@ async function ensureBrowsePool(force){
   liveJobs=_gpjDedupePool(raw).map(mapFirestoreJob).filter(Boolean);   /* v101 #1: collapse doc-ID twins */
   _browsePoolKey=key; window._browseOwnsLive=true;
 }
+/* v190 (founder live repro: searching "Account" surfaced a "Project Coordinator"):
+   intuitive keyword→job matching. A keyword/TITLE search should return jobs whose
+   ROLE is about that word, so we match the TITLE (+ company) — never the
+   description, which is what let a Project Coordinator match "account" because its
+   posting happened to mention accounts. A single word matches as a substring, so
+   "account" catches Account Manager / Accountant / Account Executive; a multi-word
+   phrase matches when the exact phrase OR ALL its words appear in the title (any
+   order), so "account retention" catches "Account Manager, Retention". */
+function _gpjKeywordMatch(kw, title, company){
+  kw=String(kw||'').toLowerCase().trim(); if(!kw) return true;
+  const hay=((title||'')+' '+(company||'')).toLowerCase();
+  if(hay.indexOf(kw)>=0) return true;
+  const words=kw.split(/\s+/).filter(function(w){ return w.length>=2; });
+  return words.length>1 && words.every(function(w){ return hay.indexOf(w)>=0; });
+}
 function refreshBrowse(){
   clearTimeout(window._browseTimer);
   window._browseTimer=setTimeout(async function(){
@@ -5758,10 +5773,9 @@ async function searchAllJobsForKeyword(nationwide){
       else if(loc.city && loc.state) regionKey=(loc.city.charAt(0).toUpperCase()+loc.city.slice(1))+', '+loc.state;
     }
     const pool=await fb.fetchJobs((!nationwide&&regionKey)?regionKey:'', 3000);
-    let matches=(pool||[]).filter(v=>{
-      const blob=((v.title||'')+' '+(v.company||v.co||'')+' '+(v.description||v.desc||'')).toLowerCase();
-      return blob.includes(kw);
-    });
+    /* v190: title-based match (see _gpjKeywordMatch) — an "Account" search returns
+       account roles, not every posting whose description mentions an account. */
+    let matches=(pool||[]).filter(v=>_gpjKeywordMatch(kw, v.title, v.company||v.co));
     if(!matches.length){ window._kwNoLocal=false; window._kwNationwideCount=0; liveJobs=[]; livePage=1; renderBrowse(); showToast('No live openings found for "'+kw+'" anywhere in the feed'); return; }
     /* scope to the region using the SAME matcher the deck uses (local + genuine remote) */
     if(!nationwide && loc && (loc.metro||loc.city||loc.state) && typeof jobMatchesLocation==='function'){
@@ -5941,8 +5955,10 @@ function renderBrowse(){
       if(maxMi>0){ const d=_jobDistanceMiles(j); if(d!==null && d>maxMi) return false; }
       if(hasSal&&!(j.salMax>0)) return false;
       if(salL&&j.salMax&&Math.round(j.salMax/1000)<salL) return false;
-      /* keyword filters live cards by title/company/description */
-      if(kw){ const blob=(j.t+' '+j.co+' '+(j.desc||'')).toLowerCase(); if(!blob.includes(kw)) return false; }
+      /* v190: keyword filters live cards by TITLE (+ company), not description —
+         so "account" no longer surfaces a Project Coordinator that merely mentions
+         accounts. Shared with searchAllJobsForKeyword + the browseJobs path. */
+      if(kw && !_gpjKeywordMatch(kw, j.t, j.co)) return false;
       /* work style: use the structured work_setting field first (accurate), then
          fall back to location/desc text for jobs that didn't carry it */
       if(styVal&&styVal!=='Any'){
@@ -6034,7 +6050,7 @@ function renderBrowse(){
   document.getElementById('f-sal-out').textContent=sal>0?('$'+sal+'K'):'Any';   /* F-GEO (v97): distance slider removed */
   const out=document.getElementById('browse-results');
   const hits=browseJobs.filter(j=>
-    (!kw||j.t.toLowerCase().includes(kw)||j.co.toLowerCase().includes(kw))&&
+    (!kw||_gpjKeywordMatch(kw,j.t,j.co))&&
     (!ind||j.ind===ind)&&(!sty||j.style===sty)&&
     (!jt||j.type===jt)&&(!lv||j.lvl===lv)&&
     (!(document.getElementById('f-hassal')&&document.getElementById('f-hassal').classList.contains('on'))||j.max>0)&&
@@ -8998,7 +9014,14 @@ async function _fetchLiveMarketJobs(){
     }
     const widened=jobsQueue.some(j=>j.widened);
     if(status) status.textContent='✅ Live: '+jobsQueue.length+' openings'+(widened?' (broadened to fill your deck)':'')+'.';
-    showToast('✅ '+jobsQueue.length+' live jobs loaded — start swiping!');
+    /* v190 (founder live repro): the swipe DECK is résumé-anchored and ignores the
+       f-keyword field by design — so this toast counted the AREA pool, not the
+       keyword. Typing "Account Retention" then reading "288 loaded — start swiping!"
+       looked like we FOUND 288 account-retention roles, while Browse honestly showed
+       0. When a keyword is active, stay silent here and let Browse's own honest
+       count / "No '<kw>' roles… Search nationwide" message speak. */
+    var _kwActive=((document.getElementById('f-keyword')||{}).value||'').trim();
+    if(!_kwActive) showToast('✅ '+jobsQueue.length+' live jobs loaded — start swiping!');
   }catch(err){
     dbg('live fetch failed: '+(err&&err.message||err));
     if(status) status.textContent='Couldn\u2019t reach the live feed — tap retry.';
@@ -14003,8 +14026,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v189';
+const APP_VERSION = 'v190';
 const CHANGELOG = {
+  'v190':['keyword search: intuitive title-based matching (Account no longer returns Project Coordinator) + honest no-keyword-aware toast'],
   'v189':['fix literal &amp; in the un-save-company toast (rendered as text, now a plain &)'],
   'v188':['light-mode contrast softened (calmer ink + off-white panels) + Quick Start theme-toggle instructions'],
   'v187':['Sprint 4 #17: matching reads education + certs (bounded positive-only, cross-field cap preserved) + D1 pool-build step self-diagnostics'],

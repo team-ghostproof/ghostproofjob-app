@@ -7523,3 +7523,30 @@ test.describe('[STATE-COVERAGE] v187 education + cert signals', () => {
     expect(ok).toBe(true);
   });
 });
+
+/* ===== v190: intuitive keyword→job matching (title-based, not description) ===== */
+test.describe('[STATE-COVERAGE] v190 keyword search association', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof _gpjKeywordMatch === 'function', null, { timeout: 15000 });
+  });
+
+  /* the exact founder repro: "Account" must NOT match a "Project Coordinator" */
+  test('a keyword matches the TITLE, not the description', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      accountMgr:      _gpjKeywordMatch('account', 'Account Manager', 'Acme'),
+      accountant:      _gpjKeywordMatch('account', 'Accountant', 'Acme'),
+      projectCoord:    _gpjKeywordMatch('account', 'Project Coordinator', 'Saddleback Communications'),
+      phraseAllWords:  _gpjKeywordMatch('account retention', 'Account Manager, Retention', 'X'),
+      phraseMiss:      _gpjKeywordMatch('account retention', 'Project Coordinator', 'X'),
+      empty:           _gpjKeywordMatch('', 'anything', 'x'),
+    }));
+    expect(r.accountMgr, '"account" matches Account Manager').toBe(true);
+    expect(r.accountant, '"account" matches Accountant').toBe(true);
+    expect(r.projectCoord, '"account" must NOT match Project Coordinator (the bug)').toBe(false);
+    expect(r.phraseAllWords, 'multi-word matches when all words are in the title').toBe(true);
+    expect(r.phraseMiss, 'multi-word misses when the title lacks the words').toBe(false);
+    expect(r.empty, 'empty keyword passes everything').toBe(true);
+  });
+});
