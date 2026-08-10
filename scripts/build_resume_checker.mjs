@@ -71,6 +71,10 @@ const UI_JS = [
 "    $('rc-out').innerHTML = '<div style=\"display:flex;gap:20px;align-items:center;flex-wrap:wrap;justify-content:center;margin-bottom:14px\">'+ring(pct)+'<div style=\"min-width:220px\"><div style=\"font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#B55FE6\">Résumé Strength</div><div style=\"font-size:18px;font-weight:800;margin:2px 0 4px\">'+band+'</div><div style=\"font-size:12px;color:#9B93B8\">How strong the writing is \\u2014 outcomes, metrics, strong verbs, tight &amp; clean.</div></div></div>'+items+tip+'<div style=\"margin-top:18px;text-align:center\"><a href=\"https://ghostproofjob.com/\" style=\"display:inline-block;background:linear-gradient(90deg,#00F5A0,#00C880);color:#120F1D;font-weight:800;text-decoration:none;border-radius:12px;padding:12px 22px;font-size:14px\">Get your role-specific match + AI tailoring \\u2192</a><div style=\"font-size:11px;color:#6E667F;margin-top:8px\">Free to join \\u2014 the AI tailors a copy to each job using only your real experience.</div></div>';",
 "    $('rc-out').style.display='block';",
 "  }",
+"  function setText(t){ var el=$('rc-input'); if(el) el.value=String(t||'').trim(); var s=$('rc-filestatus'); var ok=!!(t&&String(t).trim()); if(s) s.textContent = ok?'\\u2713 Loaded \\u2014 scoring…':''; if(ok) run(); }",
+"  function extractPdf(buf){ if(!window.pdfjsLib){ var s=$('rc-filestatus'); if(s) s.textContent='PDF reader still loading \\u2014 try again in a second, or paste the text.'; return; } pdfjsLib.getDocument({data:buf}).promise.then(function(pdf){ var out=[]; var chain=Promise.resolve(); for(var i=1;i<=pdf.numPages;i++){ (function(p){ chain=chain.then(function(){ return pdf.getPage(p).then(function(pg){ return pg.getTextContent().then(function(tc){ out[p]=tc.items.map(function(it){return it.str;}).join(' '); }); }); }); })(i); } chain.then(function(){ setText(out.join('\\n')); }); }).catch(function(){ var s=$('rc-filestatus'); if(s) s.textContent='Could not read that PDF \\u2014 try pasting the text.'; }); }",
+"  function extractDocx(buf){ if(!window.mammoth){ var s=$('rc-filestatus'); if(s) s.textContent='DOCX reader unavailable \\u2014 paste the text.'; return; } mammoth.extractRawText({arrayBuffer:buf}).then(function(res){ setText(res.value); }).catch(function(){ var s=$('rc-filestatus'); if(s) s.textContent='Could not read that file \\u2014 try pasting the text.'; }); }",
+"  var fi = $('rc-file'); if(fi) fi.addEventListener('change', function(e){ var f=e.target.files&&e.target.files[0]; if(!f) return; var nm=f.name.toLowerCase(); var s=$('rc-filestatus'); if(s) s.textContent='Reading '+f.name+'…'; var r=new FileReader(); if(/\\.txt$/.test(nm)){ r.onload=function(){ setText(r.result); }; r.readAsText(f); } else if(/\\.pdf$/.test(nm)){ r.onload=function(){ extractPdf(r.result); }; r.readAsArrayBuffer(f); } else if(/\\.docx?$/.test(nm)){ r.onload=function(){ extractDocx(r.result); }; r.readAsArrayBuffer(f); } else { if(s) s.textContent='Unsupported file \\u2014 use PDF, DOCX, or TXT.'; } });",
 "  var btn = document.getElementById('rc-go'); if(btn) btn.addEventListener('click', run);",
 "})();"
 ].join("\n");
@@ -87,6 +91,9 @@ const html =
 '<meta property="og:description" content="Instant, honest résumé strength score with the exact fixes named. Free, private, in your browser."/>\n' +
 '<meta property="og:url" content="https://ghostproofjob.com/resume-checker.html"/>\n' +
 '<meta name="twitter:card" content="summary_large_image"/>\n' +
+'<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>\n' +
+'<script>if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";}</script>\n' +
+'<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>\n' +
 '<style>\n' +
 '  :root{--plum:#120F1D;--plum2:#1C1830;--plum3:#251F3A;--mint:#00F5A0;--cyber:#B55FE6;--off:#F0EEF8;--muted:#9B93B8;--line:rgba(181,95,230,.18)}\n' +
 '  *{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(0,245,160,.10),transparent 60%),radial-gradient(800px 460px at 10% 0,rgba(181,95,230,.12),transparent 55%),var(--plum);color:var(--off);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6;padding:0 20px 80px}\n' +
@@ -110,11 +117,16 @@ const html =
 '  <header>\n' +
 '    <div class="gm">👻</div>\n' +
 '    <h1>Free <span class="g">Résumé</span> <span class="p">Strength</span> Checker</h1>\n' +
-'    <p class="lede">Paste your résumé for an instant, honest strength score — outcomes, metrics, strong verbs, and concision — with the exact fixes named. Runs in your browser; nothing is uploaded or stored.</p>\n' +
+'    <p class="lede">Upload your résumé (PDF, DOCX or TXT) or paste it — or your LinkedIn profile — for an instant, honest strength score: outcomes, metrics, strong verbs, and concision, with the exact fixes named. It all runs in your browser; your file never leaves your device.</p>\n' +
 '  </header>\n' +
 '  <div class="card">\n' +
-'    <label for="rc-input" style="font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--cyber)">Paste your résumé text</label>\n' +
-'    <textarea id="rc-input" placeholder="Paste the full text of your résumé here — summary, experience bullets, skills…"></textarea>\n' +
+'    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">\n' +
+'      <label for="rc-file" style="cursor:pointer;background:linear-gradient(90deg,var(--cyber),#9340CC);color:#fff;font-weight:800;border-radius:10px;padding:11px 16px;font-size:13px">📄 Upload résumé — PDF, DOCX or TXT</label>\n' +
+'      <input type="file" id="rc-file" accept=".pdf,.doc,.docx,.txt" style="display:none"/>\n' +
+'      <span id="rc-filestatus" style="font-size:12px;color:var(--muted)"></span>\n' +
+'    </div>\n' +
+'    <label for="rc-input" style="font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--cyber)">…or paste your résumé (or LinkedIn profile) text</label>\n' +
+'    <textarea id="rc-input" placeholder="Paste the full text of your résumé — or your LinkedIn profile — here: summary, experience bullets, skills…"></textarea>\n' +
 '    <button class="go" id="rc-go">Check my résumé strength →</button>\n' +
 '    <div class="note">100% private — the scoring runs entirely in your browser. We never see, store, or sell your résumé.</div>\n' +
 '    <div id="rc-out"></div>\n' +
