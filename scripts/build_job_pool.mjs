@@ -161,27 +161,25 @@ function shard(keyBase, rows, builtAt) {
 const slug = (s) => String(s || '')
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'unknown';
 
-/** Pure: raw docs -> the full set of pool documents to write. Unit-testable. */
-export function buildPool(docs, opts = {}) {
+/** Pure: TRIMMED pool rows -> the full set of pool documents to write. This is
+ *  the sharding half, split out from buildPool so main() can trim each doc as it
+ *  STREAMS off Firestore (see below) instead of buffering every raw ~7KB doc in
+ *  memory — the v192-era daily build OOM-crashed the runner on the grown
+ *  collection ("JavaScript heap out of memory"). Rows here are already ~1.5KB. */
+export function poolsFromRows(rows, opts = {}) {
   const builtAt = opts.now || Date.now();
   const perMetroCap = opts.perMetroCap || 2500;
   const nationalCap = opts.nationalCap || 3000;
 
-  const live = docs.filter((d) => d.data && d.data.title && d.data.active !== false);
-  /* newest first — the deck and Browse both lead with recency */
-  const sorted = live.slice().sort((a, b) => (b.data.ingestedAt || 0) - (a.data.ingestedAt || 0));
-  const rows = sorted.map((d) => toPoolRow(d.id, d.data));
+  /* newest first — the deck and Browse both lead with recency (rows carry ingestedAt) */
+  const sorted = rows.slice().sort((a, b) => (b.ingestedAt || 0) - (a.ingestedAt || 0));
 
   const out = [];
-
-  /* 1) NATIONAL pool — the dominant path since v74: the client pulls wide and
-        scopes by location text, so this is what most sessions actually read. */
-  out.push(...shard('all', rows.slice(0, nationalCap), builtAt));
-
-  /* 2) PER-METRO pools — a session that knows its region reads a smaller,
-        denser slice. Keyed off the same `region` string the harvester writes. */
+  /* 1) NATIONAL pool — the dominant path since v74. */
+  out.push(...shard('all', sorted.slice(0, nationalCap), builtAt));
+  /* 2) PER-METRO pools — keyed off the same `region` string the harvester writes. */
   const byMetro = new Map();
-  for (const r of rows) {
+  for (const r of sorted) {
     const k = slug(r.region);
     if (k === 'unknown') continue;
     if (!byMetro.has(k)) byMetro.set(k, []);
@@ -190,7 +188,16 @@ export function buildPool(docs, opts = {}) {
   }
   for (const [k, arr] of byMetro) out.push(...shard('metro-' + k, arr, builtAt));
 
-  return { pools: out, stats: { live: live.length, metros: byMetro.size, docs: out.length, builtAt } };
+  return { pools: out, stats: { live: rows.length, metros: byMetro.size, docs: out.length, builtAt } };
+}
+
+/** Pure: raw docs -> pool documents. Unit-testable wrapper over poolsFromRows
+ *  (trims then shards). The live path streams + trims instead — see main(). */
+export function buildPool(docs, opts = {}) {
+  const rows = docs
+    .filter((d) => d.data && d.data.title && d.data.active !== false)
+    .map((d) => toPoolRow(d.id, d.data));
+  return poolsFromRows(rows, opts);
 }
 
 /* ------------------------------- fixture ---------------------------------- */
@@ -262,13 +269,27 @@ async function main() {
   if (!admin.apps.length) admin.initializeApp({ credential: admin.credential.cert(JSON.parse(svc)) });
   const db = admin.firestore();
 
-  console.log('[pool] reading live jobs (ONE server-side pass — replaces thousands of per-session reads)…');
-  const snap = await db.collection('jobs').where('active', '==', true).get();
-  const docs = [];
-  snap.forEach((d) => docs.push({ id: d.id, data: d.data() || {} }));
-  console.log('[pool] read', docs.length, 'active job docs');
+  /* STREAM the read and TRIM each doc on arrival, so peak memory is bounded by the
+     ~1.5KB pool rows — NOT by buffering every raw ~7KB active doc into one
+     QuerySnapshot (that OOM-crashed the runner: "JavaScript heap out of memory").
+     Node's default old-space is ~2GB; the workflow also passes a higher
+     --max-old-space-size as a backstop. */
+  console.log('[pool] streaming live jobs (trims each doc on arrival — memory-safe)…');
+  const rows = [];
+  let scanned = 0;
+  await new Promise((resolve, reject) => {
+    const stream = db.collection('jobs').where('active', '==', true).stream();
+    stream.on('data', (d) => {
+      scanned++;
+      const data = (d && typeof d.data === 'function') ? (d.data() || {}) : {};
+      if (data && data.title && data.active !== false) rows.push(toPoolRow(d.id, data));
+    });
+    stream.on('error', reject);
+    stream.on('end', resolve);
+  });
+  console.log('[pool] scanned', scanned, 'active docs → trimmed to', rows.length, 'pool rows in memory');
 
-  const { pools, stats } = buildPool(docs);
+  const { pools, stats } = poolsFromRows(rows);
   let maxBytes = 0;
   for (const p of pools) maxBytes = Math.max(maxBytes, bytes(p.doc));
   console.log('[pool] built', stats.docs, 'pool docs across', stats.metros, 'metros; largest', (maxBytes / 1024).toFixed(1) + 'KB');

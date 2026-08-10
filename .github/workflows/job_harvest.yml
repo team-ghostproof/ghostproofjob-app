@@ -88,8 +88,8 @@ jobs:
             || { echo "::error title=D1 pool: npm install failed::firebase-admin did not install — see the npm error above."; exit 1; }
           node -e "import('firebase-admin').then(m=>console.log('✓ firebase-admin '+m.default.SDK_VERSION+' loaded')).catch(e=>{console.error('::error title=D1 pool: firebase-admin load failed::'+e.message);process.exit(1);})" \
             || exit 1
-          echo "→ running the pool builder (it prints the active-job count it read, then any failure)…"
-          node scripts/build_job_pool.mjs \
+          echo "→ running the pool builder (streams + trims; higher heap as a backstop)…"
+          node --max-old-space-size=6144 scripts/build_job_pool.mjs \
             || { echo "::error title=D1 pool: build_job_pool.mjs failed::see the [pool] failed: … line above for the exact reason (read/write/OOM/timeout)."; exit 1; }
 
       # ── D1 GUARDRAIL (v186) ────────────────────────────────────────────────
