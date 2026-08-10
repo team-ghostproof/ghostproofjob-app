@@ -25,6 +25,10 @@ function buildSitemap(list) {
   const today = new Date().toISOString().slice(0, 10);
   const urls = [
     { loc: SITE + '/', pri: '1.0' },
+    /* the public Résumé Strength Checker — a genuinely-useful, unique tool page
+       (built by scripts/build_resume_checker.mjs). This is the SEO asset worth
+       indexing, unlike the thin templated city/company pages. */
+    { loc: SITE + '/resume-checker.html', pri: '0.9' },
     { loc: SITE + '/seo/index.html', pri: '0.8' },
     ...list.map((c) => ({ loc: SITE + '/seo/' + c.slug + '.html', pri: '0.7' })),
   ];

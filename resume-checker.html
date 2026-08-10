@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Free Résumé Strength Checker — score your résumé in seconds | GhostProofJob</title>
+<meta name="description" content="Paste your résumé and get an instant, honest strength score — outcomes, metrics, strong verbs, and concision — with the exact fixes named. Free, runs in your browser, nothing stored."/>
+<link rel="canonical" href="https://ghostproofjob.com/resume-checker.html"/>
+<meta property="og:type" content="website"/>
+<meta property="og:title" content="Free Résumé Strength Checker — GhostProofJob"/>
+<meta property="og:description" content="Instant, honest résumé strength score with the exact fixes named. Free, private, in your browser."/>
+<meta property="og:url" content="https://ghostproofjob.com/resume-checker.html"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<style>
+  :root{--plum:#120F1D;--plum2:#1C1830;--plum3:#251F3A;--mint:#00F5A0;--cyber:#B55FE6;--off:#F0EEF8;--muted:#9B93B8;--line:rgba(181,95,230,.18)}
+  *{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(0,245,160,.10),transparent 60%),radial-gradient(800px 460px at 10% 0,rgba(181,95,230,.12),transparent 55%),var(--plum);color:var(--off);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6;padding:0 20px 80px}
+  .wrap{max-width:760px;margin:0 auto}
+  header{text-align:center;padding:56px 0 20px}
+  .gm{font-size:46px}
+  h1{font-size:clamp(28px,5vw,40px);line-height:1.05;margin:12px 0 6px;letter-spacing:-.02em}
+  h1 .g{color:var(--mint)}h1 .p{color:var(--cyber)}
+  .lede{color:#D7D2EA;max-width:560px;margin:14px auto 0;font-size:16.5px}
+  .card{background:var(--plum2);border:1px solid var(--line);border-radius:18px;padding:20px}
+  textarea{width:100%;min-height:220px;background:var(--plum);border:1px solid var(--plum3);border-radius:12px;color:var(--off);font-size:13.5px;padding:14px;font-family:ui-monospace,Menlo,Consolas,monospace;resize:vertical}
+  .go{margin-top:12px;width:100%;background:linear-gradient(90deg,var(--mint),#00C880);color:var(--plum);font-weight:800;border:none;border-radius:12px;padding:14px;font-size:15px;cursor:pointer}
+  .note{font-size:11.5px;color:var(--muted);text-align:center;margin-top:10px}
+  #rc-out{display:none;margin-top:18px;background:var(--plum2);border:1px solid var(--line);border-radius:18px;padding:20px}
+  .how{margin-top:26px}
+  .how h2{font-size:20px;margin:0 0 8px}
+  .how p{color:#C6C0DD;font-size:14px}
+  footer{text-align:center;color:var(--muted);font-size:12.5px;padding-top:36px}
+  a.brand{color:var(--cyber);text-decoration:none;font-weight:800}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="gm">👻</div>
+    <h1>Free <span class="g">Résumé</span> <span class="p">Strength</span> Checker</h1>
+    <p class="lede">Paste your résumé for an instant, honest strength score — outcomes, metrics, strong verbs, and concision — with the exact fixes named. Runs in your browser; nothing is uploaded or stored.</p>
+  </header>
+  <div class="card">
+    <label for="rc-input" style="font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--cyber)">Paste your résumé text</label>
+    <textarea id="rc-input" placeholder="Paste the full text of your résumé here — summary, experience bullets, skills…"></textarea>
+    <button class="go" id="rc-go">Check my résumé strength →</button>
+    <div class="note">100% private — the scoring runs entirely in your browser. We never see, store, or sell your résumé.</div>
+    <div id="rc-out"></div>
+  </div>
+  <div class="how">
+    <h2>What this checks</h2>
+    <p>The same structural rubric our signed-in rater uses: whether your bullets show <b>measurable outcomes</b> (not just tasks), how many are <b>quantified</b>, whether your <b>verbs are strong and varied</b>, and whether the writing is <b>tight and clean</b>. It scores how your résumé is <em>written</em> — not any one job. For a role-specific match score and AI tailoring to a posting, <a class="brand" href="https://ghostproofjob.com/">join GhostProofJob free</a>.</p>
+  </div>
+  <footer>
+    <div><a class="brand" href="https://ghostproofjob.com/">👻 GhostProofJob</a> — the ethical, free-until-hired job search.</div>
+    <div style="margin-top:6px">No ads · no data selling · your résumé never leaves your device on this page.</div>
+  </footer>
+</div>
+<script>
+/* GPJRateCore — inlined verbatim from api/rate/rateCore.js (single source of truth) */
+'use strict';
+// ============================================================================
+// GhostProofJob — SHARED résumé rating core (P1-1, the zero-read foundation).
+// ----------------------------------------------------------------------------
+// WHY: the public "free résumé checker" (/tools/resume-checker) must score a
+// résumé with ZERO Firestore reads and WITHOUT diverging from the in-app rater.
+// The in-app rater's live corpus mine (`mineRoleKeywords`) costs ~1,200 reads
+// per call — fatal for anonymous SEO traffic — so the checker uses (a) this pure
+// STRUCTURAL scorer (the genuinely-free "Résumé Quality" half) and (b) a static
+// pre-computed per-role corpus for Role Fit (zero reads).
+//
+// This module is the SINGLE source of truth for the STRUCTURE score + the v172
+// field-alignment gate. `index.html`'s `_ratingStructure()` is its browser twin
+// and MUST stay in lock-step — a convergence test (tests/rate/rateCore.test.mjs)
+// runs the live in-app function and asserts identical output.
+//
+// UMD: require() in Node/tests; inlined into the static checker page it exposes
+// `GPJRateCore` on the page global. Pure — no I/O, no globals read.
+// ============================================================================
+(function (root, factory) {
+  const api = factory();
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.GPJRateCore = api;
+}(typeof self !== 'undefined' ? self : this, function () {
+
+  // Kept in lock-step with index.html:8980 (also the twin of scoreCore.js).
+  const GENERIC_ROLE_WORDS = new Set([
+    'specialist', 'manager', 'assistant', 'coordinator', 'associate', 'analyst',
+    'representative', 'administrator', 'officer', 'agent', 'clerk', 'lead', 'senior',
+    'junior', 'staff', 'team', 'member', 'supervisor', 'director', 'executive',
+    'professional', 'consultant', 'generalist', 'intern', 'trainee', 'worker',
+    'technician', 'support', 'services', 'service', 'general',
+  ]);
+
+  // Twin of index.html:6700 — same list, same two spelling relaxations so the
+  // verb match is stem-tolerant ("optimized"/"optimize", "spearheaded"/"spearhead").
+  const STRONG_VERBS = ['led', 'built', 'drove', 'grew', 'managed', 'created', 'launched', 'delivered', 'improved', 'reduced', 'increased', 'designed', 'developed', 'owned', 'negotiated', 'trained', 'implemented', 'streamlined', 'coordinated', 'achieved', 'generated', 'expanded', 'optimized', 'spearheaded', 'oversaw', 'directed', 'boosted', 'handled', 'processed', 'maintained', 'supported', 'resolved', 'executed', 'organized', 'analyzed', 'produced', 'established'];
+  const STRONG_VERBS_RX = new RegExp('^(?:' + STRONG_VERBS.join('|').replace('optimized', 'optimi').replace('spearheaded', 'spearhead') + ')', 'i');
+
+  // v179: "Résumé Strength" rubric — outcomes, quantification, verb strength+variety,
+  // concision. LOCK-STEP with index.html _ratingStructure (convergence test).
+  const OUTCOME_RX = /\b(increas|grew|grow|reduc|improv|drove|driv|boost|cut |saved|saving|generat|expand|rais|lower|accelerat|doubl|tripl|decreas|gain|earned|won|achiev|exceed|surpass|streamlin|optimi|deliver|drove|led to|resulting)/i;
+  const FILLER_RX = /responsible for|duties included|tasked with|hard[\s-]?working|team player|results?[\s-]driven|detail[\s-]oriented|go-getter|self-starter|synergy|think outside the box|proven track record|dynamic professional|hit the ground running|wear(s|ing)? many hats/i;
+  const PASSIVE_RX = /\b(was|were|been|being)\s+[a-z]+(ed|en)\b/i;
+
+  /**
+   * STRENGTH score — how strong the résumé is (not just structurally complete). Pure
+   * port of index.html's `_ratingStructure()`, parameterized on the résumé object.
+   *   resume: { name, contact, summary, skills, jobs:[{b}] }
+   * Returns { pts, max:60, items:[[ok,label]], needsMetrics }.
+   */
+  function rateStructure(resume) {
+    const me = resume || {};
+    const skills = String(me.skills || '').split(/[·,]/).map(function (x) { return x.trim(); }).filter(Boolean);
+    const bullets = [];
+    (me.jobs || []).forEach(function (j) {
+      String((j && j.b) || '').split(/\n/).forEach(function (b) { b = b.trim(); if (b.length > 8) bullets.push(b); });
+    });
+    const nB = bullets.length || 1;
+    const quantified = bullets.filter(function (b) { return /\d|%|\$/.test(b); }).length;
+    const strongStart = bullets.filter(function (b) { return STRONG_VERBS_RX.test(b.replace(/^[•\-\s]+/, '')); }).length;
+    const impact = bullets.filter(function (b) { return (/\d|%|\$/.test(b)) && OUTCOME_RX.test(b); }).length;
+    const leads = {}; bullets.forEach(function (b) { const w = b.replace(/^[•\-\s]+/, '').split(/\s+/)[0]; if (w) leads[w.toLowerCase()] = 1; });
+    const variety = bullets.length ? Object.keys(leads).length / bullets.length : 0;
+    const fillerN = bullets.filter(function (b) { return FILLER_RX.test(b); }).length;
+    const passiveN = bullets.filter(function (b) { return PASSIVE_RX.test(b); }).length;
+    const bloatN = bullets.filter(function (b) { return b.split(/\s+/).length > 34; }).length;
+    const cleanIssues = (fillerN > 0 ? 1 : 0) + (passiveN > 0 ? 1 : 0) + (bloatN > 0 ? 1 : 0);
+
+    const items = []; let pts = 0;
+    const contact = !!(me.name && me.contact); pts += contact ? 6 : 0; items.push([contact, 'Contact details complete']);
+    const hasSummary = !!(me.summary && me.summary.length > 30); pts += hasSummary ? 4 : 0; items.push([hasSummary, 'Has a professional summary']);
+    const skOk = skills.length >= 6; pts += skOk ? 5 : Math.round(skills.length / 6 * 5); items.push([skOk, skills.length + ' skills listed (aim 6+)']);
+    const blOk = bullets.length >= 6; pts += blOk ? 5 : Math.round(bullets.length / 6 * 5); items.push([blOk, bullets.length + ' experience bullets (aim 6+)']);
+    const qFrac = quantified / nB; pts += Math.round(Math.min(1, qFrac / 0.4) * 12); items.push([qFrac >= 0.3, quantified + ' of ' + bullets.length + ' bullets are quantified']);
+    const impFrac = impact / nB; pts += Math.round(Math.min(1, impFrac / 0.35) * 12); items.push([impFrac >= 0.3, impact + ' bullets show a measurable OUTCOME (not just a task)']);
+    const vFrac = strongStart / nB; pts += Math.round(Math.min(1, vFrac / 0.5) * 6) + Math.round(Math.min(1, variety / 0.7) * 2); items.push([vFrac >= 0.4 && variety >= 0.6, 'Verbs are strong and varied']);
+    const cleanPts = Math.max(0, 8 - cleanIssues * 3); pts += cleanPts; items.push([cleanIssues === 0, cleanIssues === 0 ? 'Tight & clean — no filler or passive phrasing' : ((fillerN + passiveN + bloatN) + ' phrase(s) to tighten (filler / passive / too long)')]);
+    return { pts: Math.min(60, pts), max: 60, items: items, needsMetrics: (bullets.length > 0 && qFrac < 0.3) };
+  }
+
+  /** Strength score 1–100 (the ring the public checker shows for free). */
+  function qualityScore(resume) {
+    const st = rateStructure(resume);
+    return Math.max(1, Math.min(100, st.max ? Math.round(st.pts / st.max * 100) : 1));
+  }
+
+  /**
+   * v172 field-alignment gate. If the target role names a FIELD word (non-generic,
+   * len>3) and NONE of those words appear in the résumé text, the résumé is out of
+   * that field → Role Fit must be capped (transferable overlap only). Pure twin of
+   * the guard in index.html's rateResume().
+   */
+  function isOutOfField(role, resumeText) {
+    const toks = String(role || '').toLowerCase().split(/\s+/).filter(function (w) {
+      return w.length > 3 && !GENERIC_ROLE_WORDS.has(w);
+    });
+    if (!toks.length) return false;
+    const rt = String(resumeText || '').toLowerCase();
+    return !toks.some(function (w) { return rt.indexOf(w) >= 0; });
+  }
+
+  return { rateStructure: rateStructure, qualityScore: qualityScore, isOutOfField: isOutOfField, GENERIC_ROLE_WORDS: GENERIC_ROLE_WORDS, STRONG_VERBS: STRONG_VERBS };
+}));
+
+</script>
+<script>
+(function(){
+  var RC = window.GPJRateCore;
+  function $(id){ return document.getElementById(id); }
+  function parseResume(text){
+    var lines = String(text||'').split('\n').map(function(l){return l.trim();});
+    var ne = lines.filter(Boolean);
+    var email = (text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/)||[])[0]||'';
+    var name = (ne[0] && ne[0].length<60 && !/\d/.test(ne[0]) && ne[0].split(' ').length<=5) ? ne[0] : '';
+    var skills='';
+    for(var i=0;i<ne.length;i++){ if(/^skills?\b/i.test(ne[i])){ skills = (ne[i].replace(/^skills?\s*:?\s*/i,'')) || (ne[i+1]||''); break; } }
+    if(!skills){ var cand = ne.find(function(l){ return l.split(/[,\u00b7|]/).length>=4 && l.length<200; }); if(cand) skills=cand; }
+    var summary='';
+    for(var j=0;j<ne.length;j++){ if(/^(summary|profile|objective|about)\b/i.test(ne[j])){ summary=(ne[j].replace(/^(summary|profile|objective|about)\s*:?\s*/i,''))||(ne[j+1]||''); break; } }
+    var bullets = ne.filter(function(l){
+      if(l===name||l===summary||l===skills) return false;
+      if(/@/.test(l)) return false;
+      return /^[\u2022\u2013\-\*]/.test(l) || (l.length>20 && /\s/.test(l));
+    });
+    return { name:name, contact:email, summary:summary, skills:skills, jobs:[{ b: bullets.join('\n') }] };
+  }
+  function ring(pct){
+    var c = 2*Math.PI*52, off = c*(1-pct/100);
+    var col = pct>=75?'#00F5A0':(pct>=50?'#FFB347':'#FF4D6A');
+    return '<svg width="140" height="140" viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,.10)" stroke-width="10"/><circle cx="60" cy="60" r="52" fill="none" stroke="'+col+'" stroke-width="10" stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" fill="#F0EEF8" font-size="30" font-weight="800">'+pct+'</text><text x="60" y="78" text-anchor="middle" fill="#9B93B8" font-size="11">/ 100</text></svg>';
+  }
+  function run(){
+    var text = ($('rc-input')||{}).value || '';
+    if(text.trim().length<40){ $('rc-out').innerHTML='<p style="color:#9B93B8">Paste a bit more of your résumé (at least a few lines) and try again.</p>'; $('rc-out').style.display='block'; return; }
+    var st = RC.rateStructure(parseResume(text));
+    var pct = st.max ? Math.round(st.pts/st.max*100) : 1;
+    var band = pct>=75?'Strong — callback-ready writing':(pct>=50?'Decent — a few quick lifts will help':'Needs work — big, easy gains here');
+    var items = st.items.map(function(it){ var ok=it[0]; return '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid rgba(181,95,230,.14)"><span style="color:'+(ok?'#00F5A0':'#6E667F')+';font-weight:800">'+(ok?'\u2713':'\u25CB')+'</span><span style="font-size:13.5px;color:'+(ok?'#C6C0DD':'#F0EEF8')+'">'+it[1]+'</span></div>'; }).join('');
+    var tip = st.needsMetrics ? '<div style="margin-top:12px;background:rgba(0,245,160,.10);border:1px solid rgba(0,245,160,.3);border-radius:12px;padding:12px 14px;font-size:13px;color:#C6C0DD">\uD83D\uDCA1 Your biggest lever: <b style="color:#00F5A0">add real numbers</b> to more bullets. "Managed accounts" \u2192 "Managed 100 accounts, grew retention 20%". Recruiters reward outcomes, not tasks.</div>' : '';
+    $('rc-out').innerHTML = '<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;justify-content:center;margin-bottom:14px">'+ring(pct)+'<div style="min-width:220px"><div style="font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#B55FE6">Résumé Strength</div><div style="font-size:18px;font-weight:800;margin:2px 0 4px">'+band+'</div><div style="font-size:12px;color:#9B93B8">How strong the writing is \u2014 outcomes, metrics, strong verbs, tight &amp; clean.</div></div></div>'+items+tip+'<div style="margin-top:18px;text-align:center"><a href="https://ghostproofjob.com/" style="display:inline-block;background:linear-gradient(90deg,#00F5A0,#00C880);color:#120F1D;font-weight:800;text-decoration:none;border-radius:12px;padding:12px 22px;font-size:14px">Get your role-specific match + AI tailoring \u2192</a><div style="font-size:11px;color:#6E667F;margin-top:8px">Free to join \u2014 the AI tailors a copy to each job using only your real experience.</div></div>';
+    $('rc-out').style.display='block';
+  }
+  var btn = document.getElementById('rc-go'); if(btn) btn.addEventListener('click', run);
+})();
+</script>
+</body>
+</html>
