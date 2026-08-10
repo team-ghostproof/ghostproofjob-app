@@ -7585,3 +7585,34 @@ test.describe('[STATE-COVERAGE] v191 Improve-✕ cancels', () => {
     expect(r.ranImprove, 'cancel NEVER runs the improve (no résumé overwrite)').toBe(false);
   });
 });
+
+/* ===== v192: a checked Match-to-Job skill survives the 15-cap (front-loaded) ===== */
+test.describe('[STATE-COVERAGE] v192 confirmed skill survives the cap', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof _tidySkills === 'function', null, { timeout: 15000 });
+  });
+
+  /* the founder repro: a 15-skill résumé + a confirmed "Campaigns". Appended to the
+     END it is trimmed by the cap (the bug); front-loaded it survives (the fix). */
+  test('a confirmed skill is trimmed at the end but kept at the front (the fix rationale)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const base15 = 'Photoshop · Excel · PowerPoint · Salesforce · HubSpot · Sales · CRM · Compliance · Training · Leadership · Communication · Scheduling · Documentation · Word · Data-Driven Decision Making';
+      // isolate _tidySkills from résumé-title dropping
+      try { resumeData.title = ''; resumeData.jobs = []; } catch (e) {}
+      const atEnd = _tidySkills(base15 + ' · Campaigns').skills;
+      const atFront = _tidySkills('Campaigns · ' + base15).skills;
+      return {
+        baseCount: base15.split(' · ').length,
+        endHas: /(^|·\s)Campaigns(\s·|$)/i.test(atEnd) || /Campaigns/i.test(atEnd),
+        frontHas: /Campaigns/i.test(atFront),
+        frontCount: atFront.split(' · ').length,
+      };
+    });
+    expect(r.baseCount, 'the résumé is exactly at the 15 cap').toBe(15);
+    expect(r.endHas, 'appended at the end, the confirmed skill is trimmed by the cap (the bug)').toBe(false);
+    expect(r.frontHas, 'front-loaded, the confirmed skill survives (the v192 fix)').toBe(true);
+    expect(r.frontCount, 'still capped at 15 — an older tail skill drops instead').toBe(15);
+  });
+});
