@@ -7550,3 +7550,38 @@ test.describe('[STATE-COVERAGE] v190 keyword search association', () => {
     expect(r.empty, 'empty keyword passes everything').toBe(true);
   });
 });
+
+/* ===== v191: the ✕ on the Improve prompt CANCELS (no accidental résumé overwrite) ===== */
+test.describe('[STATE-COVERAGE] v191 Improve-✕ cancels', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof cancelOutcomeElicit === 'function'
+      && typeof openOutcomeElicit === 'function' && typeof skipOutcomeElicit === 'function', null, { timeout: 15000 });
+  });
+
+  test('the ✕ is wired to cancel, and confirming closes WITHOUT running the improve', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      openOutcomeElicit([{ bullet: 'Managed 100 accounts', ji: 0, li: 0 }]);
+      const opened = !!document.getElementById('outcome-modal');
+      const xWiredToCancel = !!document.querySelector('#outcome-modal [onclick*="cancelOutcomeElicit"]');
+      const xNotSkip = !document.querySelector('#outcome-modal [onclick="skipOutcomeElicit()"][style*="font-size:16px"]');
+      // spy: the improve must NOT run on cancel
+      let ran = false; const origRun = window._jettFullRun; window._jettFullRun = function () { ran = true; };
+      const origConfirm = window.confirm;
+      // "no" keeps it open
+      window.confirm = () => false; cancelOutcomeElicit();
+      const stillOpen = !!document.getElementById('outcome-modal');
+      // "yes" closes it, still no improve
+      window.confirm = () => true; cancelOutcomeElicit();
+      const closed = !document.getElementById('outcome-modal');
+      window.confirm = origConfirm; window._jettFullRun = origRun;
+      return { opened, xWiredToCancel, xNotSkip, stillOpen, closed, ranImprove: ran };
+    });
+    expect(r.opened, 'the outcome prompt opens').toBe(true);
+    expect(r.xWiredToCancel, 'the ✕ calls cancelOutcomeElicit').toBe(true);
+    expect(r.stillOpen, 'declining the confirm keeps the prompt open').toBe(true);
+    expect(r.closed, 'confirming closes the prompt').toBe(true);
+    expect(r.ranImprove, 'cancel NEVER runs the improve (no résumé overwrite)').toBe(false);
+  });
+});
