@@ -1490,7 +1490,16 @@ try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setA
   <div class="modal-scrim" id="auth-modal" style="z-index:340;">
     <div class="modal-box" style="text-align:left;position:relative;">
       <div style="font-size:15px;font-weight:800;margin-bottom:2px;" id="auth-title">Create your account</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Saves your profile & resume history securely to the cloud so you never lose progress.</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Saves your profile & resume history securely to the cloud so you never lose progress.</div>
+      <!-- v193: dark/light choice at signup (founder-approved) — a new user can pick
+           their theme up front and see it apply live. Persists like the menu toggle. -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span style="font-size:11px;color:var(--muted);">Appearance</span>
+        <div style="display:inline-flex;background:var(--plum3);border:1px solid var(--plum4);border-radius:999px;padding:2px;">
+          <div id="auth-theme-dark" onclick="gpjSetThemeFromAuth('dark')" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:999px;cursor:pointer;">🌙 Dark</div>
+          <div id="auth-theme-light" onclick="gpjSetThemeFromAuth('light')" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:999px;cursor:pointer;">☀️ Light</div>
+        </div>
+      </div>
       <!-- R2-A account-type fork (founder-approved): only in SIGNUP mode. Candidate
            ("job hunting") is the default/active path — its fields + flow are
            untouched. "I'm hiring" routes to the employer signup so it's finally
@@ -3037,7 +3046,7 @@ try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setA
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v192</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v193</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3122,6 +3131,7 @@ function closeOnboard(dest){
 let authMode='signup';
 function showAuthModal(mode){
   authMode=(mode==='login')?'login':'signup';
+  try{ gpjSyncThemeLabel(); }catch(e){}   /* v193: highlight the Appearance control to the current theme on open */
   const t=document.getElementById('auth-title');
   if(t) t.textContent=authMode==='login'?'Welcome back — log in':'Create your account';
   const sf=document.getElementById('auth-signup-fields');
@@ -12634,6 +12644,13 @@ function gpjSyncThemeLabel(){
     /* label shows the CURRENT mode; tapping switches to the other */
     if(ic) ic.textContent=light?'☀️':'🌙';
     if(lbl) lbl.textContent=light?'Light mode':'Dark mode';
+    /* v193: keep the signup Appearance segmented control in sync too */
+    var da=document.getElementById('auth-theme-dark'), li=document.getElementById('auth-theme-light');
+    if(da&&li){
+      var styA='background:var(--mint);color:var(--plum);', styB='background:transparent;color:var(--muted);';
+      da.style.cssText='font-size:11px;font-weight:700;padding:4px 12px;border-radius:999px;cursor:pointer;'+(light?styB:styA);
+      li.style.cssText='font-size:11px;font-weight:700;padding:4px 12px;border-radius:999px;cursor:pointer;'+(light?styA:styB);
+    }
   }catch(e){}
 }
 function gpjToggleTheme(){
@@ -12641,6 +12658,12 @@ function gpjToggleTheme(){
   try{ localStorage.setItem('gpj_theme',next); }catch(e){}
   gpjApplyTheme(next);
   try{ var pm=document.getElementById('profile-menu'); if(pm) pm.style.display='none'; }catch(e){}
+}
+/* v193: signup Appearance picker — persist + apply live so a new user sees their
+   theme immediately. Reuses the same gpj_theme key + gpjApplyTheme as the menu toggle. */
+function gpjSetThemeFromAuth(v){
+  try{ localStorage.setItem('gpj_theme', v==='light'?'light':'dark'); }catch(e){}
+  gpjApplyTheme(v==='light'?'light':'dark');
 }
 try{ gpjSyncThemeLabel(); }catch(e){}
 function toggleProfileMenu(){
@@ -14041,8 +14064,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v192';
+const APP_VERSION = 'v193';
 const CHANGELOG = {
+  'v193':['dark/light choice during signup (Appearance picker on the auth modal, applies live + persists)'],
   'v192':['Match-to-Job: a checked \'I have X\' skill now leads the skills line so it survives the 15-cap (was pushed to the end + trimmed — never reached the PDF)'],
   'v191':['the X on the Improve-My-Whole-Resume prompt now CANCELS (confirm) instead of forcing the improve — no accidental master overwrite'],
   'v190':['keyword search: intuitive title-based matching (Account no longer returns Project Coordinator) + honest no-keyword-aware toast'],

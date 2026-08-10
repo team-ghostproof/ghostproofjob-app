@@ -7616,3 +7616,29 @@ test.describe('[STATE-COVERAGE] v192 confirmed skill survives the cap', () => {
     expect(r.frontCount, 'still capped at 15 — an older tail skill drops instead').toBe(15);
   });
 });
+
+/* ===== v193: dark/light choice during signup ===== */
+test.describe('[STATE-COVERAGE] v193 signup theme picker', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof gpjSetThemeFromAuth === 'function'
+      && typeof showAuthModal === 'function', null, { timeout: 15000 });
+  });
+
+  test('the signup Appearance picker sets + persists the theme (guest, pre-auth)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      showAuthModal('signup');
+      const controlExists = !!document.getElementById('auth-theme-light') && !!document.getElementById('auth-theme-dark');
+      gpjSetThemeFromAuth('light');
+      const light = { theme: gpjCurrentTheme(), stored: localStorage.getItem('gpj_theme') };
+      gpjSetThemeFromAuth('dark');
+      const dark = { theme: gpjCurrentTheme(), stored: localStorage.getItem('gpj_theme') };
+      try { localStorage.removeItem('gpj_theme'); } catch (e) {}
+      return { controlExists, light, dark };
+    });
+    expect(r.controlExists, 'the Appearance control is on the signup modal').toBe(true);
+    expect(r.light.theme).toBe('light'); expect(r.light.stored).toBe('light');
+    expect(r.dark.theme).toBe('dark'); expect(r.dark.stored).toBe('dark');
+  });
+});
