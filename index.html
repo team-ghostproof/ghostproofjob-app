@@ -686,7 +686,7 @@
      - On sign-out → wipe local cache entirely (nothing lingers on the device).
      This is what stops one account's data bleeding into another's session.
      ============================================================ */
-  window.GPJ_USER_KEYS = [ 'gpj_expired', 'gpj_seen_keys',
+  window.GPJ_USER_KEYS = [ 'gpj_expired', 'gpj_seen_keys', 'gpj_msg_dismissed',
     'gpj_profile','gpj_account','gpj_lists','gpj_install_date','gpj_tier',
     'gpj_saved_jobs','gpj_saved_cos','gpj_user_cos','gpj_corate','gpj_reports',
     'gpj_optimized','gpj_coverletters','gpj_draft','gpj_apply_log','gpj_applies',
@@ -2964,7 +2964,7 @@ try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setA
            verified employers, with Interested / Not interested responses. Only
            populated when a candidate opted in (discoverable) or applied. -->
       <div class="pref-section" id="sec-reachouts" style="display:none;">
-        <div class="pref-section-title">📬 Messages from employers</div>
+        <div class="pref-section-title" onclick="try{var b=document.getElementById('reachouts-list');var c=document.getElementById('ro-caret');if(b){var h=(b.style.display==='none');b.style.display=h?'':'none';if(c)c.textContent=h?'▾':'▸';}}catch(e){}" style="cursor:pointer;display:flex;align-items:center;gap:6px;">📬 Messages from employers <span id="ro-caret" style="margin-left:auto;color:var(--muted);font-weight:400;">▾</span></div>
         <div id="reachouts-list" style="margin-top:2px;"></div>
       </div>
 
@@ -3046,7 +3046,7 @@ try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setA
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v195</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v196</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -13600,11 +13600,26 @@ function claimReferralBooster(n){
   showToast('💚 Booster requested for '+(parseInt(n,10)||1)+' referral'+((parseInt(n,10)||1)===1?'':'s')+' — we approve these personally, usually within a day.');
 }
 /* R6: candidate's employer-message tray (reach-outs + respectful declines). */
+/* v196 (founder: messages had no way to dismiss + felt buried): a per-message ✕
+   that HIDES a message from your list without deleting the underlying record — the
+   anti-ghosting history stays intact for the audit, you just tidy your view. Cloud-
+   synced so a dismiss on your phone holds on your laptop. Rollback: gpjClearDismissedMsgs(). */
+function gpjMsgDismissed(){ try{ const a=JSON.parse(localStorage.getItem('gpj_msg_dismissed')||'[]'); return new Set(Array.isArray(a)?a:[]); }catch(e){ return new Set(); } }
+function gpjDismissMsg(id){
+  try{ if(!id) return; const s=gpjMsgDismissed(); s.add(id); const arr=Array.from(s).slice(-500); localStorage.setItem('gpj_msg_dismissed', JSON.stringify(arr));
+    if(window.fb&&fb.current&&fb.current()) fb.saveProfile(fb.current().uid,{dismissedMsgs:arr,savedAt:Date.now()}).catch(function(){});
+  }catch(e){}
+  try{ renderMyReachouts(); }catch(e){}
+  try{ showToast('Dismissed — the record stays in your history.'); }catch(e){}
+}
+window.gpjClearDismissedMsgs=function(){ try{ localStorage.removeItem('gpj_msg_dismissed'); }catch(e){} try{ if(window.fb&&fb.current&&fb.current()) fb.saveProfile(fb.current().uid,{dismissedMsgs:[],savedAt:Date.now()}); }catch(e){} try{ renderMyReachouts(); }catch(e){} };
 async function renderMyReachouts(){
   const sec=document.getElementById('sec-reachouts'), box=document.getElementById('reachouts-list');
   if(!sec||!box) return;
   if(!(window.fb&&fb.loadMyReachouts&&fb.current&&fb.current())){ sec.style.display='none'; return; }
-  const list=await fb.loadMyReachouts();
+  const _all=await fb.loadMyReachouts();
+  const _dis=gpjMsgDismissed();
+  const list=(_all||[]).filter(function(r){ return !(r&&r.id&&_dis.has(r.id)); });
   if(!list.length){ sec.style.display='none'; return; }
   sec.style.display='block';
   window._myRO={}; list.forEach(function(r){ if(r&&r.id) window._myRO[r.id]=r; });
@@ -13651,8 +13666,9 @@ async function renderMyReachouts(){
     else if(r.status==='cancelled'){ action='<div style="font-size:11px;color:var(--muted);margin-top:7px;line-height:1.5;">✖ '+dt(r.company||'The employer')+' cancelled this interview'+(r.cancelNote?(' — “'+dt(r.cancelNote)+'”'):'')+'<br><span style="color:var(--mint);">They told you instead of ghosting. 💚</span></div>'; }
     else if(r.status==='reschedule-requested'){ action='<div style="font-size:11px;color:var(--cyber);font-weight:700;margin-top:7px;">🔁 You asked to reschedule — the employer will propose new times.</div>'; }
     else { action='<div style="font-size:11px;color:'+(r.status==='interested'?'var(--mint)':'var(--muted)')+';font-weight:700;margin-top:7px;">You replied: '+(r.status==='interested'?'👍 Interested':'Not now')+'</div>'; }
-    return '<div style="background:var(--plum2);border:1px solid var(--plum3);border-radius:11px;padding:12px 13px;margin-bottom:8px;">'
-      +'<div style="font-size:12px;">'+head+'</div>'+msg+slotBlock+action+'</div>';
+    return '<div style="background:var(--plum2);border:1px solid var(--plum3);border-radius:11px;padding:12px 13px;margin-bottom:8px;position:relative;">'
+      +'<div onclick="gpjDismissMsg(\''+dt(r.id)+'\')" title="Dismiss this message" style="position:absolute;top:7px;right:9px;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;">✕</div>'
+      +'<div style="font-size:12px;padding-right:18px;">'+head+'</div>'+msg+slotBlock+action+'</div>';
   }).join('');
 }
 async function respondToReachout(id,status){
@@ -14071,8 +14087,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v195';
+const APP_VERSION = 'v196';
 const CHANGELOG = {
+  'v196':['messages: per-message dismiss (cloud-synced, record kept) + collapsible section — interim before the full Inbox tab'],
   'v195':['homepage footer link to the public résumé checker (internal linking for SEO)'],
   'v194':['progressive keyword search: Enter searches the whole regional DB (local+remote), with an \'Also search nationwide\' expand on results'],
   'v193':['dark/light choice during signup (Appearance picker on the auth modal, applies live + persists)'],
@@ -17587,6 +17604,14 @@ async function loadTierFromProfile(u){
       const _back=[]; try{ const cl=p.lists||{}; ['applied','skipped'].forEach(function(k){ (cl[k]||[]).forEach(function(it){ const kk=((it&&it.t||'')+'|'+(it&&it.co||'')).toLowerCase().replace(/\s+/g,' ').trim(); if(kk&&kk!=='|') _back.push(kk); }); }); }catch(e){}
       const _merged=[...new Set([..._localSeen,..._cloudSeen,..._back])].slice(-GPJ_SEEN_CAP);
       localStorage.setItem('gpj_seen_keys', JSON.stringify(_merged));
+    }catch(e){}
+    /* v196: restore + union the dismissed-messages set (cloud ∪ local) so a message
+       you dismissed on one device stays dismissed on the next. */
+    try{
+      const _localD=Array.from(gpjMsgDismissed());
+      const _cloudD=Array.isArray(p.dismissedMsgs)?p.dismissedMsgs:[];
+      const _dm=[...new Set([..._localD,..._cloudD])].slice(-500);
+      localStorage.setItem('gpj_msg_dismissed', JSON.stringify(_dm));
     }catch(e){}
     /* VIEWED / APPLIED / SAVED lists */
     if(p.lists){

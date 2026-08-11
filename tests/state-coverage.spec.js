@@ -7666,3 +7666,29 @@ test.describe('[STATE-COVERAGE] v194 progressive keyword search', () => {
     expect(r.placeholderHints, 'the placeholder tells the user Enter searches their area').toBe(true);
   });
 });
+
+/* ===== v196: per-message dismiss (interim before the full Inbox tab) ===== */
+test.describe('[STATE-COVERAGE] v196 message dismiss', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof gpjMsgDismissed === 'function'
+      && typeof gpjDismissMsg === 'function' && typeof window.gpjClearDismissedMsgs === 'function', null, { timeout: 15000 });
+  });
+
+  test('dismiss adds to the set + persists + syncs; clear wipes it (record is never deleted)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      try { localStorage.removeItem('gpj_msg_dismissed'); } catch (e) {}
+      const before = gpjMsgDismissed().has('msg-abc');
+      try { gpjDismissMsg('msg-abc'); } catch (e) {}   // also re-renders + toasts; the set-add is what we assert
+      const after = gpjMsgDismissed().has('msg-abc');
+      const stored = JSON.parse(localStorage.getItem('gpj_msg_dismissed') || '[]');
+      window.gpjClearDismissedMsgs();
+      return { before, after, storedHas: stored.indexOf('msg-abc') >= 0, clearedSize: gpjMsgDismissed().size };
+    });
+    expect(r.before, 'not dismissed to start').toBe(false);
+    expect(r.after, 'after dismiss the id is in the set').toBe(true);
+    expect(r.storedHas, 'persisted to localStorage (+ cloud on sign-in)').toBe(true);
+    expect(r.clearedSize, 'the rollback command wipes the set').toBe(0);
+  });
+});
