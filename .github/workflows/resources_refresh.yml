@@ -1,0 +1,59 @@
+name: Resources Article
+
+# Publishes ONE data-grounded Resources article per run into /resources/, rebuilds
+# the hub + manifest, and commits the static files back to the repo. The market
+# numbers are read from the tiny resources/_market_stats doc that the Daily Job
+# Harvest's pool builder writes for free — this job does NOT scan the jobs
+# collection, so it costs ~1 Firestore read ([FREE-TIER]).
+#
+# GO-LIVE GATE: manual (workflow_dispatch) is ON so the founder can publish the
+# FIRST real article and review it. The every-other-day schedule below is COMMENTED
+# until that review passes — uncomment the two `cron` lines to turn the cadence on.
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: '0 13 2-30/2 * *'   # 13:00 UTC, every other day — flip on AFTER the seed is approved
+
+permissions:
+  contents: write   # needed to commit the generated article back to the repo
+
+concurrency:
+  group: resources-refresh
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with: { node-version: '24' }
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate the next article
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -e
+          # If the market snapshot isn't there yet (pool builder hasn't run since
+          # the D1 fix), the generator exits 0 without publishing — not an error.
+          node scripts/build_resources.mjs
+
+      - name: Commit the new article
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add resources/
+          if git diff --cached --quiet; then
+            echo "No new article this run (no fresh stats, or duplicate) — nothing to commit."
+          else
+            git commit -m "resources: publish the next data-grounded article [skip ci]"
+            git push
+            echo "::notice title=Resources::Published a new article. The sitemap picks it up on the next SEO refresh."
+          fi

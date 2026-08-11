@@ -21,6 +21,16 @@ const { renderPage, renderIndex, SITE } = require('./template');
 const OUT_DIR = path.join(__dirname, '..', 'seo');
 const SITEMAP = path.join(__dirname, '..', 'sitemap.xml');
 
+/* Published Resources articles, read from the manifest build_resources.mjs writes.
+   Missing/empty = no articles yet (only the hub is listed). */
+function resourceArticles() {
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, '..', 'resources', '_index.json'), 'utf8');
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((a) => a && a.slug) : [];
+  } catch { return []; }
+}
+
 function buildSitemap(list) {
   const today = new Date().toISOString().slice(0, 10);
   const urls = [
@@ -29,6 +39,11 @@ function buildSitemap(list) {
        (built by scripts/build_resume_checker.mjs). This is the SEO asset worth
        indexing, unlike the thin templated city/company pages. */
     { loc: SITE + '/resume-checker.html', pri: '0.9' },
+    /* the Resources hub + its data-grounded articles (scripts/build_resources.mjs).
+       Original analysis from our own jobs DB — the kind of unique content worth
+       indexing, unlike the thin templated city/company pages below. */
+    { loc: SITE + '/resources/', pri: '0.9' },
+    ...resourceArticles().map((a) => ({ loc: SITE + '/resources/' + a.slug + '.html', pri: '0.8' })),
     { loc: SITE + '/seo/index.html', pri: '0.8' },
     ...list.map((c) => ({ loc: SITE + '/seo/' + c.slug + '.html', pri: '0.7' })),
   ];

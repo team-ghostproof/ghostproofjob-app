@@ -42,6 +42,8 @@
  * Env: FIREBASE_SERVICE_ACCOUNT (same secret the reverse-match nightly uses).
  */
 
+import { newStats, tally } from './market_taxonomy.mjs';
+
 const DRY = process.argv.includes('--dry-run');
 const FIXTURE = process.argv.includes('--fixture');
 
@@ -276,18 +278,24 @@ async function main() {
      --max-old-space-size as a backstop. */
   console.log('[pool] streaming live jobs (trims each doc on arrival — memory-safe)…');
   const rows = [];
+  /* Resources SEO engine piggyback: fold each doc into a tiny market tally IN THE
+     SAME STREAM we already pay for, so the daily article numbers cost ZERO extra
+     reads ([FREE-TIER]). O(1) per doc, no allocation growth — safe inside the
+     memory-bounded pool stream. Written below as resources/_market_stats. */
+  const mstats = newStats();
   let scanned = 0;
   await new Promise((resolve, reject) => {
     const stream = db.collection('jobs').where('active', '==', true).stream();
     stream.on('data', (d) => {
       scanned++;
       const data = (d && typeof d.data === 'function') ? (d.data() || {}) : {};
-      if (data && data.title && data.active !== false) rows.push(toPoolRow(d.id, data));
+      if (data && data.title && data.active !== false) { rows.push(toPoolRow(d.id, data)); tally(mstats, data); }
     });
     stream.on('error', reject);
     stream.on('end', resolve);
   });
   console.log('[pool] scanned', scanned, 'active docs → trimmed to', rows.length, 'pool rows in memory');
+  console.log('[pool] market tally: ' + mstats.total + ' jobs, ' + mstats.remote + ' remote, ' + Object.keys(mstats.byField).length + ' fields, ' + Object.keys(mstats.byCity).length + ' cities');
 
   const { pools, stats } = poolsFromRows(rows);
   let maxBytes = 0;
@@ -309,7 +317,11 @@ async function main() {
     builtAt: stats.builtAt, docs: stats.docs, metros: stats.metros, liveJobs: stats.live,
     keys: pools.map((p) => p.key),
   });
-  console.log('[pool] wrote', wrote, 'pool docs +1 manifest —', wrote + 1, 'writes total');
+  /* Resources engine: the daily market snapshot, computed FREE in the stream above.
+     build_resources.mjs reads this ONE doc (not the whole collection) to write an
+     article — that is the [FREE-TIER] seam. Tiny doc, well under 1MiB. */
+  await db.collection('resources').doc('_market_stats').set({ builtAt: stats.builtAt, ...mstats });
+  console.log('[pool] wrote', wrote, 'pool docs +1 manifest +1 market_stats —', wrote + 2, 'writes total');
 }
 
 if (!process.env.GPJ_POOL_NO_MAIN) {
