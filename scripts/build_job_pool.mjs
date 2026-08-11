@@ -305,11 +305,21 @@ async function main() {
 
   if (DRY) { console.log('[pool] --dry-run: nothing written'); return; }
 
-  let wrote = 0, batch = db.batch(), pending = 0;
+  /* A Firestore commit is capped on TWO axes: 500 writes AND ~10 MiB total request
+     PAYLOAD. Pool shards run up to ~800 KB each, so batching by COUNT alone packed
+     ~40 near-max docs into one commit (~32 MB) and Firestore rejected it with
+     "INVALID_ARGUMENT: Request payload size exceeds the limit" — which is exactly
+     why the pool had NEVER been written. Flush on whichever cap hits first: byte
+     budget (safe margin under 10 MiB) or the write count. */
+  const MAX_BATCH_BYTES = 8 * 1024 * 1024;   // margin under Firestore's ~10 MiB request limit
+  let wrote = 0, batch = db.batch(), pending = 0, batchBytes = 0;
   for (const p of pools) {
+    const b = bytes(p.doc);
+    if (pending && (pending >= 400 || batchBytes + b > MAX_BATCH_BYTES)) {
+      await batch.commit(); batch = db.batch(); pending = 0; batchBytes = 0;
+    }
     batch.set(db.collection(POOL_COLLECTION).doc(p.key), p.doc);
-    wrote++; pending++;
-    if (pending >= 400) { await batch.commit(); batch = db.batch(); pending = 0; }
+    wrote++; pending++; batchBytes += b;
   }
   if (pending) await batch.commit();
   /* a tiny manifest so the client can discover keys without guessing */
@@ -319,8 +329,16 @@ async function main() {
   });
   /* Resources engine: the daily market snapshot, computed FREE in the stream above.
      build_resources.mjs reads this ONE doc (not the whole collection) to write an
-     article — that is the [FREE-TIER] seam. Tiny doc, well under 1MiB. */
-  await db.collection('resources').doc('_market_stats').set({ builtAt: stats.builtAt, ...mstats });
+     article — that is the [FREE-TIER] seam. Trim the long-tail maps (6k+ cities) to
+     the top slice the articles actually use, so the doc stays tiny and can never
+     approach the 1 MiB doc limit. */
+  const _top = (obj, n) => Object.fromEntries(Object.entries(obj || {}).sort((a, b) => b[1] - a[1]).slice(0, n));
+  await db.collection('resources').doc('_market_stats').set({
+    builtAt: stats.builtAt,
+    total: mstats.total, remote: mstats.remote, salaryPosted: mstats.salaryPosted, verified: mstats.verified,
+    byField: mstats.byField, byRemoteField: mstats.byRemoteField,
+    byCity: _top(mstats.byCity, 200), bySource: _top(mstats.bySource, 40),
+  });
   console.log('[pool] wrote', wrote, 'pool docs +1 manifest +1 market_stats —', wrote + 2, 'writes total');
 }
 
