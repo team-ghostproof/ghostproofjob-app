@@ -1329,7 +1329,7 @@ try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setA
   </div>
 
   <!-- ===== COVER LETTER PROMPT MODAL ===== -->
-  <div class="modal-scrim" id="cl-prompt-modal" style="z-index:330;">
+  <div class="modal-scrim" id="cl-prompt-modal" style="z-index:365;">
     <div class="modal-box">
       <div style="font-size:30px;margin-bottom:8px;">✉️</div>
       <div style="font-size:16px;font-weight:800;margin-bottom:6px;" id="cl-prompt-title">Tailored cover letter?</div>
@@ -1343,7 +1343,7 @@ try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setA
   </div>
 
   <!-- ===== COVER LETTER REVIEW MODAL ===== -->
-  <div class="modal-scrim" id="cl-review-modal" style="z-index:330;">
+  <div class="modal-scrim" id="cl-review-modal" style="z-index:365;">
     <div class="modal-box" style="text-align:left;max-height:85%;display:flex;flex-direction:column;">
       <div style="display:flex;align-items:center;margin-bottom:2px;"><div style="font-size:15px;font-weight:800;flex:1;">✉️ Review your cover letter</div><div onclick="document.getElementById('cl-review-modal').classList.remove('open')" style="color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;">✕</div></div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Edit anything — it's yours. <span id="cl-wordcount" style="color:var(--mint);font-weight:700;"></span></div>
@@ -3046,7 +3046,7 @@ try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setA
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v197</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v198</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -5727,6 +5727,18 @@ function _gpjKeywordMatch(kw, title, company){
   const words=kw.split(/\s+/).filter(function(w){ return w.length>=2; });
   return words.length>1 && words.every(function(w){ return hay.indexOf(w)>=0; });
 }
+/* v198: how MANY of the query's significant words appear in the title/company —
+   0 means no relation. Used ONLY as a fallback when the strict all-words match
+   above finds nothing on a multi-word search, so "Account Retention" (few titles
+   hold BOTH words) still surfaces Account + Retention roles, ranked by overlap.
+   Still title/company only — the v190 "no description false-positives" rule holds. */
+function _gpjKeywordScore(kw, title, company){
+  kw=String(kw||'').toLowerCase().trim(); if(!kw) return 0;
+  const hay=((title||'')+' '+(company||'')).toLowerCase();
+  const words=kw.split(/\s+/).filter(function(w){ return w.length>=2; });
+  if(words.length<2) return hay.indexOf(kw)>=0?1:0;
+  var n=0; words.forEach(function(w){ if(hay.indexOf(w)>=0) n++; }); return n;
+}
 function refreshBrowse(){
   clearTimeout(window._browseTimer);
   window._browseTimer=setTimeout(async function(){
@@ -5787,6 +5799,16 @@ async function searchAllJobsForKeyword(nationwide){
     /* v190: title-based match (see _gpjKeywordMatch) — an "Account" search returns
        account roles, not every posting whose description mentions an account. */
     let matches=(pool||[]).filter(v=>_gpjKeywordMatch(kw, v.title, v.company||v.co));
+    /* v198: a multi-word search like "Account Retention" rarely has a title holding
+       BOTH words. When the strict match finds nothing, fall back to ANY-word title
+       matches, ranked by how many words overlap — so related roles (Account Manager,
+       Retention Specialist) surface instead of a dead end. Title/company only. */
+    var _kwLoose=false;
+    if(!matches.length && kw.split(/\s+/).filter(function(w){return w.length>=2;}).length>1){
+      matches=(pool||[]).map(function(v){ return {v:v, s:_gpjKeywordScore(kw, v.title, v.company||v.co)}; })
+        .filter(function(x){ return x.s>0; }).sort(function(a,b){ return b.s-a.s; }).map(function(x){ return x.v; });
+      _kwLoose=matches.length>0;
+    }
     if(!matches.length){ window._kwNoLocal=false; window._kwNationwideCount=0; liveJobs=[]; livePage=1; renderBrowse(); showToast('No live openings found for "'+kw+'" anywhere in the feed'); return; }
     /* scope to the region using the SAME matcher the deck uses (local + genuine remote) */
     if(!nationwide && loc && (loc.metro||loc.city||loc.state) && typeof jobMatchesLocation==='function'){
@@ -5801,7 +5823,7 @@ async function searchAllJobsForKeyword(nationwide){
     } else { window._kwNoLocal=false; }
     liveJobs=_gpjDedupePool(matches).map(mapFirestoreJob).filter(Boolean);   /* v101 #1: collapse doc-ID twins */
     livePage=1; _browsePoolKey='__nationwide__'; window._browseOwnsLive=true; renderBrowse();
-    showToast('✅ '+liveJobs.length+' "'+kw+'" opening(s)'+(nationwide?' (nationwide)':' in your area'));
+    showToast('✅ '+liveJobs.length+(_kwLoose?' related':' "'+kw+'"')+' opening(s)'+(nationwide?' (nationwide)':' in your area')+(_kwLoose?' — showing roles matching part of "'+kw+'"':''));
   }catch(e){ showToast('Search failed — try again'); }
 }
 /* Open the full company profile for a live browse job (same modal the swipe card uses) */
@@ -6074,7 +6096,13 @@ function renderBrowse(){
     j.max>=sal
   );
   if(!hits.length){
-    out.innerHTML=browseJobs.length
+    /* v198: when a keyword is typed but the whole-area DB search hasn't run yet, the
+       loaded batch legitimately has no match — don't flash a dead "no jobs", guide
+       the user to press Enter (which searches the entire region, not just the batch). */
+    var _kwNow=((document.getElementById('f-keyword')||{}).value||'').trim();
+    out.innerHTML=_kwNow
+      ? '<div style="text-align:center;padding:34px 24px;color:var(--muted);font-size:13px;line-height:1.7;">🔍 Press <strong style="color:var(--off);">Enter</strong> to search all of your area for <strong style="color:var(--mint);">“'+_kwNow.replace(/</g,'&lt;')+'”</strong>.<br/>The loaded batch has no match yet — Enter searches the whole database.</div>'
+      : browseJobs.length
       ? '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">👻 No jobs match these filters.<br/>Try widening salary or distance.</div>'
       : '<div style="text-align:center;padding:36px 24px;color:var(--muted);font-size:13px;line-height:1.7;">🔍 <strong style="color:var(--off);">Search to see live openings.</strong><br/>Enter a keyword or location above (or set your location) and we\'ll pull real, current jobs — no sample data here.</div>';
     return;
@@ -8228,13 +8256,19 @@ function tailorCoverLetter(c, level, meOverride){
      "…'s goals"). Founder-approved: when we genuinely don't know the employer, say
      "the hiring team" rather than inventing or echoing a placeholder company name. */
   const co=_rc||'the hiring team';
+  /* v198: matched THEMES are pulled from the posting as capitalized keywords
+     ("Marketing", "Reporting"). Dropped in raw they read like keyword-stuffing
+     ("emphasizes Marketing and Reporting") and break grammar ("contribute
+     Marketing and Reporting"). Lowercase them for mid-sentence use, but keep
+     acronyms intact (SEO, CRM, B2B), and frame them as areas, not bare objects. */
+  const _lcTheme=function(s){ return String(s||'').split(/\s+/).map(function(w){ return /^[A-Z0-9]{2,}$/.test(w)?w:(w.charAt(0).toLowerCase()+w.slice(1)); }).join(' '); };
   const p1=(_rc?('Dear '+_rc+' Hiring Team,'):'Dear Hiring Team,')+'\n\nI\u2019m writing to apply for '+(_rt?('the '+_rt+' position'):'this role')+'. As a '+(me.title||'dedicated professional')+(me.topCo?(' \u2014 most recently at '+me.topCo+' \u2014'):'')+' I bring experience that maps directly onto what this role calls for.';
   let p2;
   if(lead.length){
     /* v101b B (live repro "allocation.. In a recent role"): bullets already end
        with periods \u2014 strip terminal punctuation before the template adds its own */
     const _nodot=function(x){ return String(x||'').trim().replace(/[.!?]+$/,''); };
-    p2='Your posting emphasizes '+_humanList(lead)+'. That\u2019s squarely where I work: '+(hl?_lc(_nodot(hl)):('I apply '+skillsTop+' to deliver measurable results'))+'.';
+    p2='Your posting emphasizes '+_lcTheme(_humanList(lead))+'. That\u2019s squarely where I work: '+(hl?_lc(_nodot(hl)):('I apply '+skillsTop+' to deliver measurable results'))+'.';
     if(level>=2 && me.bullets[1]) p2+=' In a recent role I '+_lc(_nodot(me.bullets[1]))+'.';
     if(level>=3 && me.bullets[2]) p2+=' I\u2019ve also '+_lc(_nodot(me.bullets[2]))+'.';
   } else {
@@ -8245,7 +8279,7 @@ function tailorCoverLetter(c, level, meOverride){
      was hardcoded it appeared VERBATIM in every letter this builder produced — the
      founder's two sample letters both carried it, which is exactly what makes a
      cover letter read as machine-generated. */
-  let p3='What draws me to '+co+' is the chance to contribute '+(lead.length?_humanList(lead.slice(0,2)):skillsTop)+' where outcomes matter.';
+  let p3='What draws me to '+co+' is the chance to apply my strengths in '+(lead.length?_lcTheme(_humanList(lead.slice(0,2))):skillsTop)+' where outcomes matter.';
   if(level>=3) p3+=' I\u2019m confident I can contribute to '+co+'\u2019s goals from week one.';
   const close='I\u2019d welcome the chance to discuss how I can help '+co+' succeed. Thank you for your time and consideration.\n\nBest regards,\n'+(me.name||'[Your name \u2014 complete Core Contact in the Resume tab]')+'\n'+(me.contact||'[Add your email & phone so applications auto-fill]');
   return [p1,p2,p3,close].join('\n\n');
@@ -14087,8 +14121,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v197';
+const APP_VERSION = 'v198';
 const CHANGELOG = {
+  'v198':['cover-letter z-index + keyword any-word fallback + honest empty-state + CL phrasing'],
   'v197':['Resources SEO engine (data-grounded articles) + footer link'],
   'v196':['messages: per-message dismiss (cloud-synced, record kept) + collapsible section — interim before the full Inbox tab'],
   'v195':['homepage footer link to the public résumé checker (internal linking for SEO)'],

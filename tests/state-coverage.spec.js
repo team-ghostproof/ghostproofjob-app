@@ -7692,3 +7692,42 @@ test.describe('[STATE-COVERAGE] v196 message dismiss', () => {
     expect(r.clearedSize, 'the rollback command wipes the set').toBe(0);
   });
 });
+
+/* ===== v198: keyword any-word fallback + cover-letter modal stacking ===== */
+test.describe('[STATE-COVERAGE] v198 search fallback + CL z-index', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof _gpjKeywordScore === 'function', null, { timeout: 15000 });
+  });
+
+  /* the founder repro: "Account Retention" — no title holds BOTH words, so the strict
+     matcher returns 0; the score-based fallback must still surface related roles. */
+  test('_gpjKeywordScore ranks partial multi-word matches so "Account Retention" is not a dead end', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      strictBoth:   _gpjKeywordMatch('account retention', 'Account Manager', 'Acme'), // false: only one word
+      scoreAcct:    _gpjKeywordScore('account retention', 'Account Manager', 'Acme'),  // 1
+      scoreRet:     _gpjKeywordScore('account retention', 'Client Retention Specialist', 'Acme'), // 1
+      scoreBoth:    _gpjKeywordScore('account retention', 'Account Retention Lead', 'Acme'), // 2
+      scoreNone:    _gpjKeywordScore('account retention', 'Software Engineer', 'Acme'), // 0
+      singleWord:   _gpjKeywordScore('account', 'Account Manager', 'Acme'),  // 1 (substring)
+    }));
+    expect(r.strictBoth, 'strict all-words fails on Account Manager').toBe(false);
+    expect(r.scoreAcct, 'fallback scores the account half').toBe(1);
+    expect(r.scoreRet, 'fallback scores the retention half').toBe(1);
+    expect(r.scoreBoth, 'both words present scores highest').toBe(2);
+    expect(r.scoreNone, 'unrelated title scores zero (never surfaces)').toBe(0);
+    expect(r.singleWord, 'single-word still works via substring').toBe(1);
+  });
+
+  /* the founder blocker: the cover-letter modal opened BEHIND the apply panel (358) */
+  test('cover-letter modals stack ABOVE the apply panel', async ({ page }) => {
+    const z = await page.evaluate(() => ({
+      prompt: +getComputedStyle(document.getElementById('cl-prompt-modal')).zIndex,
+      review: +getComputedStyle(document.getElementById('cl-review-modal')).zIndex,
+      apply:  +getComputedStyle(document.getElementById('apply-tab-modal')).zIndex,
+    }));
+    expect(z.prompt, 'cl-prompt above apply panel').toBeGreaterThan(z.apply);
+    expect(z.review, 'cl-review above apply panel').toBeGreaterThan(z.apply);
+  });
+});
