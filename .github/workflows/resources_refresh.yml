@@ -33,14 +33,24 @@ jobs:
         uses: actions/setup-node@v4
         with: { node-version: '24' }
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install firebase-admin
+        # package-lock.json is gitignored, so `npm ci` can't run here — install the
+        # one dep the generator needs directly (same pattern the harvest's pool step
+        # uses). The generator reads the market snapshot via the admin SDK, which
+        # bypasses Firestore rules (there is deliberately no public `resources` rule).
+        run: |
+          echo "node $(node --version) · npm $(npm --version)"
+          npm install firebase-admin@^12.1.0 --no-save --no-audit --no-fund \
+            || { echo "::error title=Resources: npm install failed::firebase-admin did not install."; exit 1; }
 
       - name: Generate the next article
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
           set -e
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::warning title=Resources::FIREBASE_SERVICE_ACCOUNT is empty — the generator can't read the market snapshot. Nothing published."
+          fi
           # If the market snapshot isn't there yet (pool builder hasn't run since
           # the D1 fix), the generator exits 0 without publishing — not an error.
           node scripts/build_resources.mjs
