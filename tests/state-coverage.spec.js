@@ -7851,3 +7851,33 @@ test.describe('[STATE-COVERAGE] v201 gamify data', () => {
     expect(r.gap, 'a gap resets the streak to 1').toBe(1);
   });
 });
+
+/* ===== v202: employer wow #1 — download résumé/cover from the Applicant Card ===== */
+test.describe('[STATE-COVERAGE] v202 applicant-card downloads', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3000);
+    await page.waitForFunction(() => typeof _recDownloadApplicant === 'function' && typeof _recResumeText === 'function', null, { timeout: 15000 });
+  });
+
+  test('résumé text is built from the snapshot; downloads fire with sane names; no-cover is a safe no-op', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window._recApps = { J1: [{ resume: { name: 'Jane Q Doe', title: 'Marketing Manager', contact: 'jane@x.com', summary: 'Strong summary', skills: 'seo, email', roles: [{ t: 'Lead', c: 'Acme', b: 'did great work' }] }, coverLetter: 'Dear team,' }] };
+      const names = []; const origCreate = URL.createObjectURL; URL.createObjectURL = () => 'blob:x';
+      const origClick = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { names.push(this.download); };
+      _recDownloadApplicant('J1', 0, 'resume');
+      _recDownloadApplicant('J1', 0, 'cover');
+      window._recApps.J1[0].coverLetter = '';
+      const before = names.length; _recDownloadApplicant('J1', 0, 'cover'); const noCoverNoDownload = names.length === before;
+      URL.createObjectURL = origCreate; HTMLAnchorElement.prototype.click = origClick;
+      const txt = _recResumeText(window._recApps.J1[0].resume);
+      return { names, txtHasName: /Jane Q Doe/.test(txt), txtHasSummary: /SUMMARY/.test(txt) && /Strong summary/.test(txt), txtHasExp: /EXPERIENCE/.test(txt) && /Lead/.test(txt), noCoverNoDownload };
+    });
+    expect(r.names).toContain('Resume_Jane_Q_Doe.txt');
+    expect(r.names).toContain('CoverLetter_Jane_Q_Doe.txt');
+    expect(r.txtHasName, 'résumé text carries the name').toBe(true);
+    expect(r.txtHasSummary, 'résumé text has the summary section').toBe(true);
+    expect(r.txtHasExp, 'résumé text has the experience section').toBe(true);
+    expect(r.noCoverNoDownload, 'no cover letter → no download fired').toBe(true);
+  });
+});
