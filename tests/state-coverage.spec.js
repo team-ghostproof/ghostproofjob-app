@@ -7881,3 +7881,34 @@ test.describe('[STATE-COVERAGE] v202 applicant-card downloads', () => {
     expect(r.noCoverNoDownload, 'no cover letter → no download fired').toBe(true);
   });
 });
+
+/* ===== v203: earned Anti-Ghosting badge surfaces on the company chip (honest) ===== */
+test.describe('[STATE-COVERAGE] v203 responsive badge chip', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3000);
+    await page.waitForFunction(() => typeof _gpjMarkRespBadge === 'function', null, { timeout: 15000 });
+  });
+
+  test('shield appears only when the badge is genuinely earned (>=5 replies); never fabricated', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const mk = () => { const d = document.createElement('div'); d.textContent = '🏢 Acme Robotics'; return d; };
+      const out = {};
+      // earned: 5 replies -> shield added once
+      window.fb = window.fb || {}; window.fb.countMyReachouts = async () => 5;
+      const c1 = mk(); await _gpjMarkRespBadge(c1); await _gpjMarkRespBadge(c1); // idempotent
+      out.earned = c1.textContent.includes('🛡️'); out.once = (c1.textContent.match(/🛡️/g) || []).length;
+      // not earned: 2 replies -> no shield
+      window.fb.countMyReachouts = async () => 2;
+      const c2 = mk(); await _gpjMarkRespBadge(c2); out.notEarned = c2.textContent.includes('🛡️');
+      // zero -> no shield
+      window.fb.countMyReachouts = async () => 0;
+      const c3 = mk(); await _gpjMarkRespBadge(c3); out.zero = c3.textContent.includes('🛡️');
+      return out;
+    });
+    expect(r.earned, '>=5 replies earns the shield').toBe(true);
+    expect(r.once, 'shield is added at most once (idempotent)').toBe(1);
+    expect(r.notEarned, '<5 replies: no shield (never fabricated)').toBe(false);
+    expect(r.zero, '0 replies: no shield').toBe(false);
+  });
+});
