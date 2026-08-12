@@ -7731,3 +7731,46 @@ test.describe('[STATE-COVERAGE] v198 search fallback + CL z-index', () => {
     expect(z.review, 'cl-review above apply panel').toBeGreaterThan(z.apply);
   });
 });
+
+/* ===== v199: deck-level undo (rewindLastSwipe) reuses the tested put-back ===== */
+test.describe('[STATE-COVERAGE] v199 undo last swipe', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3500);
+    await page.waitForFunction(() => typeof rewindLastSwipe === 'function' && typeof recordSwipe === 'function', null, { timeout: 15000 });
+  });
+
+  test('recordSwipe remembers the last swipe; rewind reverses it via recoverToDeck', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.lists = window.lists || { applied: [], skipped: [] };
+      window.rawQueue = Array.isArray(window.rawQueue) ? window.rawQueue : [];
+      lists.skipped = []; lists.applied = [];
+      // 1) a left swipe records to skipped AND remembers it
+      recordSwipe('left', { t: 'Undo Role', co: 'UndoCo', url: '' });
+      const captured = !!(window._lastSwipeRec && window._lastSwipeRec.list === 'skipped');
+      const inSkipped = lists.skipped.some(r => r.co === 'UndoCo');
+      const rqBefore = rawQueue.length;
+      // 2) undo it — job leaves skipped, comes back to the deck queue, memory clears
+      rewindLastSwipe();
+      return {
+        captured, inSkipped,
+        removedFromSkipped: !lists.skipped.some(r => r.co === 'UndoCo'),
+        backInDeck: rawQueue.length > rqBefore,
+        memoryCleared: window._lastSwipeRec === null,
+      };
+    });
+    expect(r.captured, 'recordSwipe set _lastSwipeRec').toBe(true);
+    expect(r.inSkipped, 'the swipe landed in skipped').toBe(true);
+    expect(r.removedFromSkipped, 'undo removed it from skipped').toBe(true);
+    expect(r.backInDeck, 'undo put the job back in the deck queue').toBe(true);
+    expect(r.memoryCleared, 'undo cleared the last-swipe memory (no double-undo)').toBe(true);
+  });
+
+  test('undo with nothing to undo is a safe no-op (no throw)', async ({ page }) => {
+    const ok = await page.evaluate(() => {
+      window._lastSwipeRec = null;
+      try { rewindLastSwipe(); return true; } catch (e) { return false; }
+    });
+    expect(ok, 'rewind with no last swipe does not throw').toBe(true);
+  });
+});

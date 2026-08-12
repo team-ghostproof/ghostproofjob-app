@@ -3046,7 +3046,7 @@ try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setA
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v198</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v199</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -10796,6 +10796,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='ArrowLeft'){ e.preventDefault(); swipeCard('left'); }
   else if(e.key==='ArrowRight'){ e.preventDefault(); swipeCard('right'); }
   else if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggleDrawer(); }
+  else if(e.key==='z'||e.key==='Z'){ e.preventDefault(); if(typeof rewindLastSwipe==='function') rewindLastSwipe(); }   /* v199: undo last swipe */
 });
 
 /* ---------- 120-DAY LIMIT CLAMP ---------- */
@@ -12161,6 +12162,7 @@ function recordSwipe(dir,job){
     }
     lists.applied.push(rec);
     try{ gpjAddSeen(k); }catch(e){}   /* v186: durable de-recycle memory (survives past the 60-row cap) */
+    window._lastSwipeRec={rec:rec,list:'applied'};   /* v199: remember the last swipe so rewindLastSwipe() can undo it */
   }
   else {
     /* FIX (v41): de-dupe skipped. Swiping left on the same listing twice (or on a
@@ -12171,6 +12173,7 @@ function recordSwipe(dir,job){
     lists.skipped=(lists.skipped||[]).filter(r=>(((r.t||'')+'|'+(r.co||'')).toLowerCase().replace(/\s+/g,' ').trim())!==k);
     lists.skipped.push(rec);
     try{ gpjAddSeen(k); }catch(e){}   /* v186: durable de-recycle memory (survives past the 60-row cap) */
+    window._lastSwipeRec={rec:rec,list:'skipped'};   /* v199: remember the last swipe so rewindLastSwipe() can undo it */
   }
   saveLists(); updateStatCounters(); cloudSync();
   /* We deliberately do NOT splice jobsQueue here. The deck renders the first 3
@@ -12368,6 +12371,26 @@ function unApply(i){
   applySwipeFilters(); saveLists(); cloudSync();
   showToast('↩ '+rec.co+' is back in your deck ('+recoveryUsedToday()+'/5 today)');
 }
+/* v199 (wow pass — undo): a deck-level "undo my last swipe" for the ↩ control + the
+   Z key. Reuses the SAME tested put-back the Applied/Skipped ↩ buttons use
+   (recoverToDeck + gpjTombstone + splice), so it inherits the 5/day recovery cap
+   and the cloud-merge tombstone — no new list logic, no regression surface. */
+function rewindLastSwipe(){
+  const ls=window._lastSwipeRec;
+  if(!ls||!ls.rec){ try{ showToast('Nothing to undo yet'); }catch(e){} return; }
+  const arr=lists[ls.list]||[]; const k=_gpjListKey(ls.rec);
+  const i=arr.findIndex(r=>_gpjListKey(r)===k);
+  if(i<0){ window._lastSwipeRec=null; try{ showToast('Nothing to undo yet'); }catch(e){} return; }
+  const rec=arr[i];
+  if(!recoverToDeck(rec)) return;                 /* respects the 5/day cap + shows its own toast */
+  try{ gpjTombstone(ls.list, k); }catch(e){}
+  arr.splice(i,1); updateStatCounters();
+  try{ renderStatList(ls.list); }catch(e){}
+  applySwipeFilters(); saveLists(); cloudSync();
+  window._lastSwipeRec=null;
+  showToast('↩ '+(rec.co||'that job')+' brought back to your deck');
+}
+window.rewindLastSwipe=rewindLastSwipe;
 
 /* ---------- JOB FRESHNESS PILLS ---------- */
 let swFreshDays=0;
@@ -14121,8 +14144,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v198';
+const APP_VERSION = 'v199';
 const CHANGELOG = {
+  'v199':['wow pass #1: deck-level undo last swipe (Z key + rewindLastSwipe), reuses put-back'],
   'v198':['cover-letter z-index + keyword any-word fallback + honest empty-state + CL phrasing'],
   'v197':['Resources SEO engine (data-grounded articles) + footer link'],
   'v196':['messages: per-message dismiss (cloud-synced, record kept) + collapsible section — interim before the full Inbox tab'],
