@@ -7808,3 +7808,46 @@ test.describe('[STATE-COVERAGE] v200 employer default theme', () => {
     expect(r.candExplicitLight, 'candidate explicit light stays light').toBe('light');
   });
 });
+
+/* ===== v201: gamify data layer — honest streak + weekly count ===== */
+test.describe('[STATE-COVERAGE] v201 gamify data', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3000);
+    await page.waitForFunction(() => typeof _gpjStreak === 'function' && typeof _gpjWeeklyApplyCount === 'function', null, { timeout: 15000 });
+  });
+
+  test('weekly count is derived from REAL Applied rows this week; goal is a number', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.lists = window.lists || { applied: [], skipped: [] };
+      const wkStart = (function(){ var d=new Date(); d.setHours(0,0,0,0); var m=(d.getDay()+6)%7; d.setDate(d.getDate()-m); return d.getTime(); })();
+      lists.applied = [
+        { t: 'A', co: 'X', when: Date.now() },                 // this week
+        { t: 'B', co: 'Y', when: wkStart + 1000 },             // this week
+        { t: 'C', co: 'Z', when: wkStart - 8 * 86400000 },     // last week (excluded)
+      ];
+      return { count: _gpjWeeklyApplyCount(), goal: _gpjWeeklyGoal() };
+    });
+    expect(r.count, 'only this-week applies count').toBe(2);
+    expect(typeof r.goal === 'number' && r.goal > 0, 'goal is a positive number').toBe(true);
+  });
+
+  test('streak: yesterday→+1, same-day idempotent, gap→reset to 1', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const day = 86400000; const t = new Date(); t.setHours(0,0,0,0); const today = t.getTime();
+      const set = (d, n) => localStorage.setItem('gpj_streak', JSON.stringify({ d, n }));
+      const out = {};
+      // consecutive: last active yesterday, streak 4 -> 5
+      set(today - day, 4); out.consecutive = _gpjStreak();
+      // idempotent: calling again same day stays 5
+      out.sameDay = _gpjStreak();
+      // gap: last active 3 days ago -> reset to 1
+      set(today - 3 * day, 9); out.gap = _gpjStreak();
+      localStorage.removeItem('gpj_streak');
+      return out;
+    });
+    expect(r.consecutive, 'yesterday + streak 4 -> 5').toBe(5);
+    expect(r.sameDay, 'same-day call does not double-count').toBe(5);
+    expect(r.gap, 'a gap resets the streak to 1').toBe(1);
+  });
+});
