@@ -7774,3 +7774,37 @@ test.describe('[STATE-COVERAGE] v199 undo last swipe', () => {
     expect(ok, 'rewind with no last swipe does not throw').toBe(true);
   });
 });
+
+/* ===== v200: employer side defaults to light (explicit choice always wins) ===== */
+test.describe('[STATE-COVERAGE] v200 employer default theme', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3000);
+    await page.waitForFunction(() => typeof _gpjApplyRoleDefaultTheme === 'function', null, { timeout: 15000 });
+  });
+
+  test('recruiter with NO saved theme gets light; candidate gets dark; explicit choice wins', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const theme = () => document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+      const out = {};
+      // 1) recruiter, no preference -> light
+      localStorage.removeItem('gpj_theme'); gpjApplyTheme('dark');
+      _gpjApplyRoleDefaultTheme(true); out.recNoPref = theme();
+      // 2) candidate, no preference -> dark
+      localStorage.removeItem('gpj_theme'); gpjApplyTheme('light');
+      _gpjApplyRoleDefaultTheme(false); out.candNoPref = theme();
+      // 3) recruiter who explicitly chose DARK -> stays dark (explicit wins)
+      localStorage.setItem('gpj_theme', 'dark'); gpjApplyTheme('dark');
+      _gpjApplyRoleDefaultTheme(true); out.recExplicitDark = theme();
+      // 4) candidate who explicitly chose LIGHT -> stays light (explicit wins)
+      localStorage.setItem('gpj_theme', 'light'); gpjApplyTheme('light');
+      _gpjApplyRoleDefaultTheme(false); out.candExplicitLight = theme();
+      localStorage.removeItem('gpj_theme');
+      return out;
+    });
+    expect(r.recNoPref, 'recruiter, no preference -> light').toBe('light');
+    expect(r.candNoPref, 'candidate, no preference -> dark').toBe('dark');
+    expect(r.recExplicitDark, 'recruiter explicit dark stays dark').toBe('dark');
+    expect(r.candExplicitLight, 'candidate explicit light stays light').toBe('light');
+  });
+});

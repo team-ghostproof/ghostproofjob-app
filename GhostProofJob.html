@@ -721,8 +721,11 @@
 <script>if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script>/* v183: apply the saved theme BEFORE the stylesheet paints — no flash of the wrong theme. Dark stays the default. */
-try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
+<script>/* v183: apply the saved theme BEFORE the stylesheet paints — no flash of the wrong theme.
+   Dark stays the candidate default. v199: EMPLOYERS default to LIGHT (corporate first
+   impression) when they have NOT explicitly chosen a theme — an explicit gpj_theme
+   always wins for either role. */
+try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_role');if(_gt==='light'||(!_gt&&_gr==='recruiter'))document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 <style>
   :root {
     --plum:#120F1D;--plum2:#1C1830;--plum3:#251F3A;--plum4:#2E2850;
@@ -3046,7 +3049,7 @@ try{if(localStorage.getItem('gpj_theme')==='light')document.documentElement.setA
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v199</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v200</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3879,6 +3882,17 @@ function _gpjApplyRecruiterSkin(){
   try{ _gpjApplyRecruiterChrome(on); }catch(e){}
   try{ _gpjSyncEmployerNav(); }catch(e){}
   if(on){ try{ _gpjRenderRecPanel(_gpjCurrentView()); }catch(e){} }
+  try{ _gpjApplyRoleDefaultTheme(on); }catch(e){}   /* v199: employers → light default */
+}
+/* v199: employers default to LIGHT (a corporate first impression), candidates to DARK
+   (the brand identity) — but ONLY when the user has NOT explicitly picked a theme. An
+   explicit gpj_theme (from the profile toggle or the signup picker) always wins, for
+   either role. Safe to call repeatedly; it no-ops once a preference exists. */
+function _gpjApplyRoleDefaultTheme(isRec){
+  try{
+    if(localStorage.getItem('gpj_theme')) return;                 /* explicit choice wins */
+    if(typeof gpjApplyTheme==='function') gpjApplyTheme(isRec?'light':'dark');
+  }catch(e){}
 }
 /* v111: the header chrome a company sees — their company name + 🏢 (the company-card
    emoji) instead of a person, their PLAN instead of the candidate day-counter and
@@ -14144,8 +14158,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v199';
+const APP_VERSION = 'v200';
 const CHANGELOG = {
+  'v200':['wow pass #2: employer side defaults to light (explicit theme choice always wins)'],
   'v199':['wow pass #1: deck-level undo last swipe (Z key + rewindLastSwipe), reuses put-back'],
   'v198':['cover-letter z-index + keyword any-word fallback + honest empty-state + CL phrasing'],
   'v197':['Resources SEO engine (data-grounded articles) + footer link'],
