@@ -7912,3 +7912,37 @@ test.describe('[STATE-COVERAGE] v203 responsive badge chip', () => {
     expect(r.zero, '0 replies: no shield').toBe(false);
   });
 });
+
+/* ===== v204: employer metrics strip — real derived numbers, no fabrication ===== */
+test.describe('[STATE-COVERAGE] v204 employer metrics strip', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3000);
+    await page.waitForFunction(() => typeof _recFillMetrics === 'function', null, { timeout: 15000 });
+  });
+
+  test('tiles are derived from real fb data (applicants sum, replies, interviews, active roles)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      document.body.insertAdjacentHTML('beforeend', '<div id="ra-metrics"></div>');
+      window.fb = window.fb || {};
+      window.fb.countJobApplicants = async (id) => (id === 'J1' ? 3 : id === 'J2' ? 2 : 0);
+      window.fb.countMyReachouts = async () => 7;
+      window.fb.loadSentReachouts = async () => ([
+        { status: 'interested', acceptedTime: 'Tue 2pm' },   // interview
+        { status: 'interested' },                            // no time — not an interview
+        { status: 'sent' },
+      ]);
+      const jobs = [
+        { id: 'J1', isValidated: true, filled: false },
+        { id: 'J2', isValidated: true, filled: false },
+        { id: 'J3', isValidated: true, filled: true },        // filled — not active
+      ];
+      await _recFillMetrics(jobs);
+      return document.getElementById('ra-metrics').innerText.replace(/\s+/g, ' ');
+    });
+    expect(r).toContain('5 APPLICANTS');    // 3 + 2
+    expect(r).toContain('7 REPLIES SENT');
+    expect(r).toContain('1 INTERVIEWS');    // only the accepted-time one
+    expect(r).toContain('2 ACTIVE ROLES');  // J1, J2 (J3 filled)
+  });
+});
