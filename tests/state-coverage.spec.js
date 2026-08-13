@@ -7946,3 +7946,39 @@ test.describe('[STATE-COVERAGE] v204 employer metrics strip', () => {
     expect(r).toContain('2 ACTIVE ROLES');  // J1, J2 (J3 filled)
   });
 });
+
+/* ===== v205: employer hiring pipeline (kanban) — grouping + stage move + persist ===== */
+test.describe('[STATE-COVERAGE] v205 pipeline kanban', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3000);
+    await page.waitForFunction(() => typeof _recRenderKanban === 'function' && typeof _recMoveStage === 'function' && typeof _recStageOf === 'function', null, { timeout: 15000 });
+  });
+
+  test('stage defaults to applied; kanban renders columns; moving persists + updates locally', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      document.body.insertAdjacentHTML('beforeend', '<div id="ra-J1" style="display:block"></div>');
+      window._recApps = { J1: [ { uid: 'u1', resume: { name: 'A One' }, match: 96 }, { uid: 'u2', resume: { name: 'B Two' }, stage: 'interview', match: 88 } ] };
+      window._recJobTitle = { J1: 'Marketing Manager' };
+      window.fb = window.fb || {}; const wrote = []; window.fb.setApplicationStage = async (j, u, s) => { wrote.push(j + '/' + u + '/' + s); return true; };
+      const out = {};
+      out.defaultApplied = _recStageOf(window._recApps.J1[0]);       // 'applied' (no stage)
+      out.explicitStage = _recStageOf(window._recApps.J1[1]);        // 'interview'
+      out.invalidToApplied = _recStageOf({ stage: 'bogus' });        // 'applied'
+      _recRenderKanban('J1');
+      const html = document.getElementById('ra-J1').innerHTML;
+      out.hasApplied = /Applied/.test(html); out.hasInterview = /Interview/.test(html); out.hasHired = /Hired/.test(html);
+      await _recMoveStage('J1', 'u1', 'offer');
+      await new Promise(r => setTimeout(r, 10));   // let the fire-and-forget write resolve
+      out.movedLocal = window._recApps.J1[0].stage;                 // 'offer'
+      out.wrote = wrote;
+      return out;
+    });
+    expect(r.defaultApplied).toBe('applied');
+    expect(r.explicitStage).toBe('interview');
+    expect(r.invalidToApplied, 'unknown stage falls back to applied').toBe('applied');
+    expect(r.hasApplied && r.hasInterview && r.hasHired, 'all stage columns render').toBe(true);
+    expect(r.movedLocal, 'moving updates the local stage optimistically').toBe('offer');
+    expect(r.wrote).toContain('J1/u1/offer');
+  });
+});

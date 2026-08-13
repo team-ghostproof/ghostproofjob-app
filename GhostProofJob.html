@@ -611,6 +611,10 @@
          can see when the employer actually OPENED it (anti-ghosting, both ways). */
       withdrawApplication: async (jobId)=>{ try{ const u=auth.currentUser; if(!u||!jobId) return false; await deleteDoc(doc(db,'jobs',jobId,'applications',u.uid)); return true; }catch(e){ console.warn('[GPJ] withdrawApplication',e&&e.message); return false; } },
       markApplicationViewed: async (jobId,candUid)=>{ try{ if(!jobId||!candUid) return false; await setDoc(doc(db,'jobs',jobId,'applications',candUid),{viewedByEmployer:true,viewedAt:Date.now()},{merge:true}); return true; }catch(e){ return false; } },
+      /* v205 (employer pipeline): the owner-recruiter moves a candidate through the
+         hiring stages. Same doc + same rule as markApplicationViewed (owner-recruiter
+         update). Rollback: gpjClearAllStages() clears every stage back to 'applied'. */
+      setApplicationStage: async (jobId,candUid,stage)=>{ try{ if(!jobId||!candUid||!stage) return false; await setDoc(doc(db,'jobs',jobId,'applications',candUid),{stage:String(stage),stageAt:Date.now()},{merge:true}); return true; }catch(e){ console.warn('[GPJ] setApplicationStage',e&&e.message); return false; } },
       myApplicationStatus: async (jobId)=>{ try{ const u=auth.currentUser; if(!u||!jobId) return null; const st=await getDoc(doc(db,'jobs',jobId,'applications',u.uid)); return st.exists()?st.data():null; }catch(e){ return null; } },
       countJobApplicants: async (jobId)=>{ try{ const s=await getCountFromServer(collection(db,'jobs',jobId,'applications')); return s.data().count; }catch(e){ return null; } },
       /* R9-C: list a job's applicants (owner-recruiter read, gated by rules). Applicants
@@ -3049,7 +3053,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v204</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v205</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -4508,6 +4512,16 @@ async function renderRecApplicants(){
   }));
   wrap.innerHTML=rows.join('');
 }
+/* v205 (employer wow #4): the hiring PIPELINE / kanban. Tapping a role expands its
+   applicants grouped into stage columns (Applied → Reviewed → Interview → Offer →
+   Hired → Closed). Move a candidate by DRAG or the per-card dropdown; the stage is
+   written to the application doc (fb.setApplicationStage — same owner-recruiter rule
+   markApplicationViewed uses, no rules change). Reskin-only. The reach-out / kind-
+   decline actions move INTO the Applicant Card so the anti-ghosting response path is
+   preserved, not lost. Rollback: gpjClearAllStages(). */
+var _REC_STAGES=[['applied','Applied'],['reviewed','Reviewed'],['interview','Interview'],['offer','Offer'],['hired','✓ Hired'],['closed','Closed']];
+function _recStageOf(a){ var s=(a&&a.stage)||'applied'; for(var i=0;i<_REC_STAGES.length;i++){ if(_REC_STAGES[i][0]===s) return s; } return 'applied'; }
+function _recStageLabel(s){ for(var i=0;i<_REC_STAGES.length;i++){ if(_REC_STAGES[i][0]===s) return _REC_STAGES[i][1]; } return s; }
 async function recToggleApplicants(jobId,title){
   const el=document.getElementById('ra-'+jobId); if(!el) return;
   if(el.style.display!=='none'){ el.style.display='none'; return; }
@@ -4515,25 +4529,61 @@ async function recToggleApplicants(jobId,title){
   const apps=(window.fb&&fb.loadJobApplicants)?await fb.loadJobApplicants(jobId):[];
   if(!apps.length){ el.innerHTML='<div style="font-size:11.5px;color:var(--muted);padding:6px 0;">No applicants yet.</div>'; return; }
   window._recApps=window._recApps||{}; window._recApps[jobId]=apps;
-  el.innerHTML=apps.map((a,i)=>{
-    const nm=(a.resume&&a.resume.name)||'Applicant';
-    const ttl=(a.resume&&a.resume.title)||a.title||'';
-    const m=(typeof a.match==='number')?(' · <span style="color:var(--mint);">'+a.match+'% match</span>'):'';
-    /* v123 (founder-approved): respond WITHOUT leaving the list. From here there
-       was previously NO response mechanism at all — the path of least resistance
-       was ghosting. One tap makes an answer the default; both feed the
-       Anti-Ghosting Badge responsiveness stat. */
-    const nmq=String(nm).replace(/['"<>\\]/g,'');
-    const tq=String(title||'this role').replace(/['"<>\\]/g,'');
-    const acts=a.uid
-      ? ('<div style="display:flex;gap:6px;padding:2px 4px 9px 40px;">'
-        +'<div onclick="event.stopPropagation();reachOutTo(\''+_esc(a.uid)+'\',\''+_esc(jobId)+'\',\''+tq+'\',\''+nmq+'\',\'reachout\')" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:8px;padding:7px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">💬 Reach out</div>'
-        +'<div onclick="event.stopPropagation();reachOutTo(\''+_esc(a.uid)+'\',\''+_esc(jobId)+'\',\''+tq+'\',\''+nmq+'\',\'rejection\')" style="flex:1;background:rgba(255,77,106,.10);border:1px solid rgba(255,77,106,.35);color:var(--danger);border-radius:8px;padding:7px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">💌 Send kind decline</div>'
-        +'</div>')
-      : '';
-    return '<div onclick="event.stopPropagation();openCandidateCard(\''+_esc(jobId)+'\','+i+')" style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-top:1px solid var(--plum3);cursor:pointer;"><div style="width:30px;height:30px;border-radius:50%;background:var(--plum3);display:grid;place-items:center;font-size:15px;">🧑</div><div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:var(--off);">'+_esc(nm)+'</div><div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_esc(ttl)+m+'</div></div><div style="color:var(--muted);">→</div></div>'+acts;
-  }).join('');
+  window._recJobTitle=window._recJobTitle||{}; window._recJobTitle[jobId]=title||'';   /* for reach-out from the Applicant Card */
+  _recRenderKanban(jobId);
 }
+function _recRenderKanban(jobId){
+  const el=document.getElementById('ra-'+jobId); if(!el) return;
+  const apps=(window._recApps&&window._recApps[jobId])||[];
+  const cols=_REC_STAGES.map(function(st){
+    const stage=st[0], label=st[1];
+    const cards=apps.map(function(a,i){ return {a:a,i:i}; }).filter(function(x){ return _recStageOf(x.a)===stage; });
+    const body=cards.map(function(x){
+      const a=x.a, i=x.i;
+      const nm=(a.resume&&a.resume.name)||'Applicant';
+      const m=(typeof a.match==='number')?(a.match+'%'):'';
+      const opts=_REC_STAGES.map(function(s){ return '<option value="'+s[0]+'"'+(s[0]===stage?' selected':'')+'>'+s[1]+'</option>'; }).join('');
+      /* v205: the anti-ghosting response path (reach-out + kind decline) stays one tap
+         away on every card — it must never live only behind the detail modal. */
+      const _rNm=String(nm).replace(/['"<>\\]/g,'');
+      const _rJt=String((window._recJobTitle&&window._recJobTitle[jobId])||'this role').replace(/['"<>\\]/g,'');
+      const actions=a.uid?('<div style="display:flex;gap:5px;margin-top:6px;">'
+        +'<div onclick="event.stopPropagation();reachOutTo(\''+_esc(a.uid)+'\',\''+_esc(jobId)+'\',\''+_rJt+'\',\''+_rNm+'\',\'reachout\')" title="Reach out" style="flex:1;text-align:center;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:6px;padding:4px;font-size:11px;font-weight:800;cursor:pointer;">💬</div>'
+        +'<div onclick="event.stopPropagation();reachOutTo(\''+_esc(a.uid)+'\',\''+_esc(jobId)+'\',\''+_rJt+'\',\''+_rNm+'\',\'rejection\')" title="Kind decline" style="flex:1;text-align:center;background:rgba(255,77,106,.10);border:1px solid rgba(255,77,106,.35);color:var(--danger);border-radius:6px;padding:4px;font-size:11px;font-weight:800;cursor:pointer;">💌</div>'
+        +'</div>'):'';
+      return '<div class="rk-card" draggable="true" ondragstart="_recDragStart(event,\''+_esc(jobId)+'\',\''+_esc(a.uid||'')+'\')" onclick="if(event.target.tagName!==\'SELECT\')openCandidateCard(\''+_esc(jobId)+'\','+i+')" style="background:var(--plum2);border:1px solid var(--plum3);border-radius:9px;padding:8px;margin-bottom:6px;cursor:grab;">'
+        +'<div style="display:flex;align-items:center;gap:6px;"><div style="font-size:12px;font-weight:700;color:var(--off);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_esc(nm)+'</div>'+(m?'<span style="font-size:10px;font-weight:800;color:var(--mint);">'+m+'</span>':'')+'</div>'
+        +'<select onchange="_recMoveStage(\''+_esc(jobId)+'\',\''+_esc(a.uid||'')+'\',this.value)" onclick="event.stopPropagation();" style="width:100%;margin-top:6px;font-size:10.5px;background:var(--plum3);color:var(--muted);border:1px solid var(--plum4);border-radius:6px;padding:3px;">'+opts+'</select>'
+        +actions
+        +'</div>';
+    }).join('')||'<div style="font-size:10px;color:var(--faint);padding:6px;text-align:center;">—</div>';
+    return '<div class="rk-col" ondragover="event.preventDefault();this.style.background=\'rgba(181,95,230,.10)\';" ondragleave="this.style.background=\'\';" ondrop="_recDrop(event,\''+_esc(jobId)+'\',\''+stage+'\');this.style.background=\'\';" style="flex:0 0 132px;min-width:132px;background:var(--plum3);border:1px solid var(--plum4);border-radius:10px;padding:8px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--cyber);">'+label+'</span><span style="font-size:9px;color:var(--muted);">'+cards.length+'</span></div>'
+      +body+'</div>';
+  }).join('');
+  el.innerHTML='<div style="font-size:10px;color:var(--muted);margin-bottom:6px;">Drag a card (or use its dropdown) to move a candidate through your pipeline · tap a card to open their résumé.</div><div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;">'+cols+'</div>';
+}
+async function _recMoveStage(jobId,uid,stage){
+  try{
+    const apps=(window._recApps&&window._recApps[jobId])||[]; const a=apps.filter(function(x){return (x.uid||'')===uid;})[0]; if(!a) return;
+    a.stage=stage;   /* optimistic local update, then persist */
+    if(window.fb&&fb.setApplicationStage) fb.setApplicationStage(jobId,uid,stage).catch(function(){});
+    _recRenderKanban(jobId);
+    try{ showToast('Moved to '+_recStageLabel(stage)); }catch(e){}
+  }catch(e){}
+}
+function _recDragStart(e,jobId,uid){ try{ e.dataTransfer.setData('text/plain',jobId+'|'+uid); e.dataTransfer.effectAllowed='move'; }catch(_){} }
+function _recDrop(e,jobId,stage){ try{ e.preventDefault(); const d=(e.dataTransfer.getData('text/plain')||'').split('|'); if(d[0]===jobId && d[1]) _recMoveStage(jobId,d[1],stage); }catch(_){} }
+/* rollback [WRITE]: reset every candidate's stage to 'applied' across the recruiter's roles */
+async function gpjClearAllStages(){
+  try{
+    if(!(window._recruiter&&window.fb&&fb.loadRecruiterJobs&&fb.loadJobApplicants&&fb.setApplicationStage)) return 'unavailable';
+    const jobs=await fb.loadRecruiterJobs(window._recruiter.uid); let n=0;
+    for(const j of jobs){ const apps=await fb.loadJobApplicants(j.id); for(const a of apps){ if(a.stage&&a.stage!=='applied'){ await fb.setApplicationStage(j.id,a.uid,'applied'); n++; } } }
+    try{ showToast('Reset '+n+' stage(s) to Applied'); }catch(e){} return n;
+  }catch(e){ return 'error'; }
+}
+window._recMoveStage=_recMoveStage; window._recRenderKanban=_recRenderKanban; window._recDragStart=_recDragStart; window._recDrop=_recDrop; window.gpjClearAllStages=gpjClearAllStages; window._recStageOf=_recStageOf;
 /* ---- CANDIDATE CARD (applicant detail: resume + cover letter) ---- */
 /* v202 (employer wow #1): let an employer DOWNLOAD the résumé + cover letter right
    from the Applicant Card. Uses the snapshot the candidate applied with (a.resume /
@@ -4561,6 +4611,10 @@ window._recDownloadApplicant=_recDownloadApplicant; window._recResumeText=_recRe
 function openCandidateCard(jobId,idx){
   const a=(window._recApps&&window._recApps[jobId]&&window._recApps[jobId][idx])||null; if(!a) return;
   const r=a.resume||{};
+  /* v205: reach-out / kind-decline moved here from the (now kanban) list, so the
+     anti-ghosting response path is preserved. Sanitized for the inline handlers. */
+  const _rNm=String(r.name||'Applicant').replace(/['"<>\\]/g,'');
+  const _rJt=String((window._recJobTitle&&window._recJobTitle[jobId])||'this role').replace(/['"<>\\]/g,'');
   const roles=(r.roles||[]).map(j=>'<div style="margin-bottom:8px;"><div style="font-size:12.5px;font-weight:700;color:var(--off);">'+_esc(j.t)+(j.c?(' · <span style="color:var(--muted);font-weight:400;">'+_esc(j.c)+'</span>'):'')+'</div><div style="font-size:11.5px;color:var(--muted);line-height:1.5;white-space:pre-wrap;">'+_esc(j.b)+'</div></div>').join('');
   const skills=(r.skills||'').split(/·|,/).map(s=>s.trim()).filter(Boolean).slice(0,14).map(s=>'<span style="background:rgba(181,95,230,.14);color:var(--cyber);border-radius:6px;padding:2px 8px;font-size:10.5px;font-weight:700;margin:0 5px 5px 0;display:inline-block;">'+_esc(s)+'</span>').join('');
   const cl=a.coverLetter?('<div class="rec-sec-title" style="margin-top:14px;">Cover letter</div><div style="font-size:12px;color:var(--off);line-height:1.6;white-space:pre-wrap;">'+_esc(a.coverLetter)+'</div>'):'';
@@ -4580,6 +4634,10 @@ function openCandidateCard(jobId,idx){
       +'<div onclick="_recDownloadApplicant(\''+_esc(jobId)+'\','+idx+',\'resume\')" style="flex:1;background:var(--cyber);color:#fff;border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">⬇ Download résumé</div>'
       +(a.coverLetter?('<div onclick="_recDownloadApplicant(\''+_esc(jobId)+'\','+idx+',\'cover\')" style="flex:1;background:var(--plum3);color:var(--off);border:1px solid var(--plum4);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">⬇ Cover letter</div>'):'')
       +'</div><div style="font-size:10.5px;color:var(--faint);margin-bottom:12px;">Résumé they applied with'+(a.coverLetter?' · cover letter attached':'')+'</div>')
+    +(a.uid?('<div style="display:flex;gap:8px;margin-bottom:14px;">'
+      +'<div onclick="reachOutTo(\''+_esc(a.uid)+'\',\''+_esc(jobId)+'\',\''+_rJt+'\',\''+_rNm+'\',\'reachout\');var s=document.getElementById(\'candcard-scrim\');if(s)s.remove();" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">💬 Reach out</div>'
+      +'<div onclick="reachOutTo(\''+_esc(a.uid)+'\',\''+_esc(jobId)+'\',\''+_rJt+'\',\''+_rNm+'\',\'rejection\');var s=document.getElementById(\'candcard-scrim\');if(s)s.remove();" style="flex:1;background:rgba(255,77,106,.10);border:1px solid rgba(255,77,106,.35);color:var(--danger);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">💌 Kind decline</div>'
+      +'</div>'):'')
     +(r.summary?('<div class="rec-sec-title">Summary</div><div style="font-size:12.5px;color:var(--off);line-height:1.6;margin-bottom:12px;">'+_esc(r.summary)+'</div>'):'')
     +(skills?('<div class="rec-sec-title">Skills</div><div style="margin-bottom:12px;">'+skills+'</div>'):'')
     +(roles?('<div class="rec-sec-title">Experience</div>'+roles):'')
@@ -14242,8 +14300,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v204';
+const APP_VERSION = 'v205';
 const CHANGELOG = {
+  'v205':['employer wow #4: hiring pipeline kanban (drag + stage select), reach-out/decline preserved on Applicant Card'],
   'v204':['employer wow #3: metrics strip on Applicants view (applicants/replies/interviews/active roles)'],
   'v203':['employer wow #2: surface earned Anti-Ghosting badge as a shield on the company chip'],
   'v202':['employer wow #1: download resume + cover letter from the Applicant Card (snapshot)'],
