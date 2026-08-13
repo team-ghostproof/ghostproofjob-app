@@ -8028,3 +8028,47 @@ test.describe('[STATE-COVERAGE] v206 employer wow — honest Hired feed + role-g
     expect(r.labels.join(' | ')).toContain('Post a new role');
   });
 });
+
+test.describe('[STATE-COVERAGE] v207 employer wow — kanban bulk stage-move', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._recBulkMove === 'function' && typeof window._recSetSelMode === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('select mode reveals a bulk bar; bulk-move persists every selected card in one action', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window._gpjRecruiterAuthApply = () => {};
+      document.body.insertAdjacentHTML('beforeend', '<div id="ra-JB" style="display:block"></div>');
+      window._recApps = { JB: [
+        { uid: 'u1', resume: { name: 'A One' }, match: 96 },
+        { uid: 'u2', resume: { name: 'B Two' }, match: 90 },
+        { uid: 'u3', resume: { name: 'C Three' }, match: 70 },
+      ] };
+      window._recJobTitle = { JB: 'Marketing Manager' };
+      window.fb = window.fb || {}; const wrote = []; window.fb.setApplicationStage = async (j, u, s) => { wrote.push(u + '/' + s); return true; };
+      const out = {};
+      _recRenderKanban('JB');
+      out.noBulkBarByDefault = !/\d+ selected/.test(document.getElementById('ra-JB').innerHTML);
+      _recSetSelMode('JB', true);
+      out.selectHint = /Tap candidates to select/.test(document.getElementById('ra-JB').innerHTML);
+      _recToggleSel('JB', 'u1'); _recToggleSel('JB', 'u3');
+      out.barShowsCount = /2 selected/.test(document.getElementById('ra-JB').innerHTML);
+      await _recBulkMove('JB', 'interview');
+      await new Promise((x) => setTimeout(x, 10));
+      out.u1 = window._recApps.JB[0].stage; out.u2 = window._recApps.JB[1].stage; out.u3 = window._recApps.JB[2].stage;
+      out.wrote = wrote.sort();
+      out.exitsSelMode = _recSelState('JB').mode;
+      return out;
+    });
+    expect(r.noBulkBarByDefault, 'no bulk UI until Select is on').toBe(true);
+    expect(r.selectHint, 'select mode shows its hint').toBe(true);
+    expect(r.barShowsCount, 'the bulk bar reflects the selection count').toBe(true);
+    expect(r.u1, 'selected u1 moved').toBe('interview');
+    expect(r.u3, 'selected u3 moved').toBe('interview');
+    expect(r.u2, 'unselected u2 untouched').toBeUndefined();
+    expect(r.wrote).toEqual(['u1/interview', 'u3/interview']);
+    expect(r.exitsSelMode, 'a bulk move clears selection and exits select mode').toBe(false);
+  });
+});
