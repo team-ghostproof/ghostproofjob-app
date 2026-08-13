@@ -3053,7 +3053,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v205</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v206</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -4570,8 +4570,83 @@ async function _recMoveStage(jobId,uid,stage){
     if(window.fb&&fb.setApplicationStage) fb.setApplicationStage(jobId,uid,stage).catch(function(){});
     _recRenderKanban(jobId);
     try{ showToast('Moved to '+_recStageLabel(stage)); }catch(e){}
+    /* v206: reaching ✓ Hired is a pipeline state, NOT an automatic hire count.
+       The authoritative, deduped hire proof-point lives at role-close (confirmFill →
+       logHire). Moving a candidate to Hired NUDGES the recruiter into that one path,
+       so a real hire is logged exactly once — and only if they confirm. Never auto. */
+    if(stage==='hired') _recHiredNudge(jobId);
   }catch(e){}
 }
+/* v206: honest hire feed — route the ✓ Hired stage through the SAME close-role flow
+   that records the anonymous aggregate proof-point (no drag-time double counting). */
+function _recHiredNudge(jobId){
+  try{
+    var title=(window._recJobTitle&&window._recJobTitle[jobId])||'this role';
+    if(typeof openFillModal!=='function') return;
+    if(window.confirm('Great news! Mark “'+title+'” as filled and close it?\n\nThis is the only way GhostProofJob can count a real hire — it stays anonymous and aggregate.')){
+      openFillModal(jobId,title);
+    }
+  }catch(e){}
+}
+window._recHiredNudge=_recHiredNudge;
+/* v206 (employer wow #5): ⌘K / Ctrl-K command palette — a desktop power-user
+   accelerator for the employer side. The 6-tab bar stays the universal nav on every
+   platform; this only ADDS a fast keyboard jump. Role-gated: candidates never see it
+   (their palette lands with the deck-wow pass). Reskin-only, no candidate view touched. */
+function _gpjGotoView(id){
+  try{
+    var match=null;
+    [].forEach.call(document.querySelectorAll('.nav-tab'),function(t){ var oc=t.getAttribute('onclick')||''; if(oc.indexOf("'"+id+"'")>=0) match=t; });
+    switchView(id,match);
+  }catch(e){ try{ switchView(id); }catch(_){} }
+}
+function gpjCmdKCommands(){
+  if(!_gpjRecruiterMode()) return [];
+  return [
+    {icon:'🎯',label:'Candidates (matches)',run:function(){ _gpjGotoView('swipe'); }},
+    {icon:'📥',label:'Applicants pipeline',run:function(){ _gpjGotoView('browse'); }},
+    {icon:'📋',label:'Listings',run:function(){ _gpjGotoView('resume'); }},
+    {icon:'➕',label:'Post a new role',run:function(){ _gpjGotoView('resume'); setTimeout(function(){ try{ var t=document.getElementById('rl-title'); if(t){ t.focus(); t.scrollIntoView({block:'center'}); } }catch(e){} },90); }},
+    {icon:'⭐',label:'Reviews',run:function(){ _gpjGotoView('ghost'); }},
+    {icon:'🏢',label:'Company profile',run:function(){ _gpjGotoView('profile'); }},
+    {icon:'⚙️',label:'Settings',run:function(){ _gpjGotoView('account'); }},
+    {icon:'🌓',label:'Toggle light / dark theme',run:function(){ try{ var cur=document.documentElement.getAttribute('data-theme')||localStorage.getItem('gpj_theme')||'dark'; var nx=(cur==='light')?'dark':'light'; if(typeof gpjApplyTheme==='function') gpjApplyTheme(nx); try{ localStorage.setItem('gpj_theme',nx); }catch(_){}} catch(e){} }}
+  ];
+}
+function gpjOpenCmdK(){
+  if(!_gpjRecruiterMode()) return;
+  if(document.getElementById('gpj-cmdk')) return;
+  var cmds=gpjCmdKCommands(); if(!cmds.length) return;
+  var s=document.createElement('div'); s.id='gpj-cmdk';
+  s.style.cssText='position:fixed;inset:0;z-index:9800;background:rgba(8,6,16,.55);display:flex;align-items:flex-start;justify-content:center;padding:12vh 16px;';
+  s.innerHTML='<div style="width:100%;max-width:520px;background:var(--plum2);border:1px solid var(--plum3);border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.45);">'
+    +'<input id="gpj-cmdk-in" placeholder="Jump to…  (type to filter)" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box;border:0;border-bottom:1px solid var(--plum3);background:transparent;color:var(--off);font-size:15px;padding:14px 16px;outline:none;">'
+    +'<div id="gpj-cmdk-list" style="max-height:46vh;overflow:auto;"></div>'
+    +'<div style="padding:8px 14px;border-top:1px solid var(--plum3);font-size:10.5px;color:var(--faint);">↑↓ to move · ⏎ to open · esc to close</div>'
+    +'</div>';
+  s.addEventListener('click',function(e){ if(e.target===s) s.remove(); });
+  document.body.appendChild(s);
+  var sel=0, filtered=cmds.slice();
+  function close(){ var el=document.getElementById('gpj-cmdk'); if(el) el.remove(); }
+  function paint(){
+    var list=document.getElementById('gpj-cmdk-list'); if(!list) return;
+    if(!filtered.length){ list.innerHTML='<div style="padding:14px 16px;font-size:12px;color:var(--muted);">No matches</div>'; return; }
+    list.innerHTML=filtered.map(function(c,i){ return '<div class="cmdk-row" data-i="'+i+'" style="display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;font-size:13.5px;color:var(--off);'+(i===sel?'background:rgba(181,95,230,.16);':'')+'"><span style="font-size:16px;">'+c.icon+'</span><span>'+_esc(c.label)+'</span></div>'; }).join('');
+    [].forEach.call(list.querySelectorAll('.cmdk-row'),function(row){ row.addEventListener('mouseenter',function(){ sel=+row.getAttribute('data-i'); paint(); }); row.addEventListener('click',function(){ run(); }); });
+  }
+  function run(){ var c=filtered[sel]; close(); if(c){ try{ c.run(); }catch(e){} } }
+  var inp=document.getElementById('gpj-cmdk-in');
+  inp.addEventListener('input',function(){ var q=inp.value.toLowerCase().trim(); filtered=cmds.filter(function(c){ return !q||c.label.toLowerCase().indexOf(q)>=0; }); sel=0; paint(); });
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='ArrowDown'){ e.preventDefault(); sel=Math.min(sel+1,filtered.length-1); paint(); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); sel=Math.max(sel-1,0); paint(); }
+    else if(e.key==='Enter'){ e.preventDefault(); run(); }
+    else if(e.key==='Escape'){ e.preventDefault(); close(); }
+  });
+  paint(); setTimeout(function(){ try{ inp.focus(); }catch(e){} },20);
+}
+window.gpjOpenCmdK=gpjOpenCmdK; window.gpjCmdKCommands=gpjCmdKCommands;
+try{ document.addEventListener('keydown',function(e){ if((e.metaKey||e.ctrlKey)&&(e.key==='k'||e.key==='K')&&_gpjRecruiterMode()){ e.preventDefault(); gpjOpenCmdK(); } }); }catch(e){}
 function _recDragStart(e,jobId,uid){ try{ e.dataTransfer.setData('text/plain',jobId+'|'+uid); e.dataTransfer.effectAllowed='move'; }catch(_){} }
 function _recDrop(e,jobId,stage){ try{ e.preventDefault(); const d=(e.dataTransfer.getData('text/plain')||'').split('|'); if(d[0]===jobId && d[1]) _recMoveStage(jobId,d[1],stage); }catch(_){} }
 /* rollback [WRITE]: reset every candidate's stage to 'applied' across the recruiter's roles */
@@ -14300,8 +14375,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v205';
+const APP_VERSION = 'v206';
 const CHANGELOG = {
+  'v206':['employer wow #5-6: honest Hired->hire-feed nudge + role-aware Cmd-K palette'],
   'v205':['employer wow #4: hiring pipeline kanban (drag + stage select), reach-out/decline preserved on Applicant Card'],
   'v204':['employer wow #3: metrics strip on Applicants view (applicants/replies/interviews/active roles)'],
   'v203':['employer wow #2: surface earned Anti-Ghosting badge as a shield on the company chip'],

@@ -7982,3 +7982,49 @@ test.describe('[STATE-COVERAGE] v205 pipeline kanban', () => {
     expect(r.wrote).toContain('J1/u1/offer');
   });
 });
+
+test.describe('[STATE-COVERAGE] v206 employer wow — honest Hired feed + role-gated Cmd-K', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._recMoveStage === 'function' && typeof window.gpjCmdKCommands === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('moving to ✓ Hired nudges the close-role flow but NEVER auto-logs a hire (no drag-time double count)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window._gpjRecruiterAuthApply = () => {};
+      document.body.insertAdjacentHTML('beforeend', '<div id="ra-JX" style="display:block"></div>');
+      window._recApps = { JX: [{ uid: 'u1', resume: { name: 'A One' }, match: 90 }] };
+      window._recJobTitle = { JX: 'Ops Manager' };
+      window.fb = window.fb || {};
+      let hires = 0, staged = null;
+      window.fb.logHire = async () => { hires++; return true; };
+      window.fb.setApplicationStage = async (j, u, s) => { staged = s; return true; };
+      let fillOpened = null;
+      window.openFillModal = (id, title) => { fillOpened = { id, title }; };   // stub the authoritative close flow
+      window.confirm = () => true;   // recruiter accepts the nudge
+      _recRenderKanban('JX');
+      await _recMoveStage('JX', 'u1', 'hired');
+      await new Promise((x) => setTimeout(x, 20));
+      return { staged, hiresLoggedOnDrag: hires, fillOpened };
+    });
+    expect(r.staged, 'the pipeline stage still persists').toBe('hired');
+    expect(r.hiresLoggedOnDrag, 'dragging to Hired must NOT log a hire by itself').toBe(0);
+    expect(r.fillOpened, 'it routes through the one authoritative close-role flow').toEqual({ id: 'JX', title: 'Ops Manager' });
+  });
+
+  test('Cmd-K command list is role-gated: empty for candidates, populated for recruiters', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window._recruiter = null;
+      const asCandidate = gpjCmdKCommands().length;
+      window._recruiter = { uid: 'r1', company: 'Acme' };
+      const cmds = gpjCmdKCommands();
+      return { asCandidate, recCount: cmds.length, labels: cmds.map((c) => c.label) };
+    });
+    expect(r.asCandidate, 'candidates never get the employer palette').toBe(0);
+    expect(r.recCount, 'recruiters get the full command set').toBeGreaterThanOrEqual(7);
+    expect(r.labels.join(' | ')).toContain('Applicants pipeline');
+    expect(r.labels.join(' | ')).toContain('Post a new role');
+  });
+});
