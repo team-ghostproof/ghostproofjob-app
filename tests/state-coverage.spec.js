@@ -8072,3 +8072,60 @@ test.describe('[STATE-COVERAGE] v207 employer wow — kanban bulk stage-move', (
     expect(r.exitsSelMode, 'a bulk move clears selection and exits select mode').toBe(false);
   });
 });
+
+test.describe('[STATE-COVERAGE] v208 deck wow — gamify bar + celebrations', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._gpjRenderGamifyBar === 'function' && typeof window._gpjCelebrateApply === 'function' && typeof window._gpjStreakRead === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('guest/empty: bar renders an encouraging zero-state, never a scold', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.removeItem('gpj_streak');
+      window.lists = window.lists || {}; lists.applied = []; lists.skipped = lists.skipped || [];
+      _gpjRenderGamifyBar();
+      const html = document.getElementById('gpj-gamify-bar').innerHTML;
+      return { rendered: html.length > 0, startStreak: /Start a streak/.test(html), zeroWeek: /0 \/ 20/.test(html), noScold: !/behind|failed|missed|only/i.test(html) };
+    });
+    expect(r.rendered).toBe(true);
+    expect(r.startStreak, 'zero streak invites, not punishes').toBe(true);
+    expect(r.zeroWeek).toBe(true);
+    expect(r.noScold, 'copy is never punitive').toBe(true);
+  });
+
+  test('rendering the bar is READ-ONLY — it must never advance the streak', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.removeItem('gpj_streak');
+      window.lists = window.lists || {}; lists.applied = []; lists.skipped = lists.skipped || [];
+      const before = _gpjStreakRead();               // 0, nothing stored
+      _gpjRenderGamifyBar(); _gpjRenderGamifyBar();   // pure display
+      const afterRenders = _gpjStreakRead();          // still 0 — no mutation
+      _gpjStreak();                                   // a real activity marks today
+      const afterActivity = _gpjStreakRead();         // 1
+      return { before, afterRenders, afterActivity };
+    });
+    expect(r.before, 'no streak yet').toBe(0);
+    expect(r.afterRenders, 'merely viewing the deck never starts a streak').toBe(0);
+    expect(r.afterActivity, 'a real apply/activity advances it').toBe(1);
+  });
+
+  test('a genuine new apply celebrates once, advances the streak, and updates the weekly bar', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.removeItem('gpj_streak');
+      const now = Date.now();
+      window.lists = window.lists || {}; lists.applied = [{ when: now }, { when: now }]; lists.skipped = lists.skipped || [];
+      const streakBefore = _gpjStreakRead();
+      _gpjCelebrateApply('Marketing Manager', 'Acme Co');
+      const burst = document.getElementById('gpj-burst');
+      const streakAfter = _gpjStreakRead();
+      const bar = document.getElementById('gpj-gamify-bar').innerHTML;
+      return { streakBefore, hasBurst: !!burst, applauds: /Applied|Weekly goal/.test(burst ? burst.innerHTML : ''), streakAfter, weekShows: /2 \/ 20/.test(bar) };
+    });
+    expect(r.streakBefore).toBe(0);
+    expect(r.hasBurst, 'a celebration overlay appears').toBe(true);
+    expect(r.streakAfter, 'the apply advances the streak to 1').toBe(1);
+    expect(r.weekShows, 'the weekly bar reflects the applied count').toBe(true);
+  });
+});

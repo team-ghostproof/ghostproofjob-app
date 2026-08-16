@@ -1973,6 +1973,9 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
         <div class="mini-stat clickable" onclick="openStatModal('responses')"><div class="mini-stat-val" style="color:var(--cyber);" id="stat-responses">0</div><div class="mini-stat-lbl">Responses</div></div>
         <div class="mini-stat clickable" onclick="openStatModal('skipped')"><div class="mini-stat-val" style="color:var(--warn);" id="stat-skipped">0</div><div class="mini-stat-lbl">Skipped</div></div>
       </div>
+      <!-- v208 (deck wow): encouraging gamify bar — streak + weekly goal. Never punitive.
+           Populated by _gpjRenderGamifyBar(); auto-hidden in recruiter mode by .rec-mode. -->
+      <div id="gpj-gamify-bar" style="margin:8px 16px 0;background:var(--plum2);border:1px solid var(--plum3);border-radius:14px;padding:9px 12px;display:flex;align-items:center;gap:12px;"></div>
       <div id="resume-nudge" style="margin:8px 16px 0;background:rgba(181,95,230,.1);border:1px solid rgba(181,95,230,.3);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="switchView('resume',document.querySelector('[data-view=resume]'))">
         <div style="font-size:18px;">📄</div>
         <div style="flex:1;font-size:12px;color:var(--cyber);">Upload your resume to unlock real Match % on every card</div>
@@ -3053,7 +3056,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v207</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v208</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3224,6 +3227,7 @@ function switchView(id,el){
   if(el) el.classList.add('active');
   document.querySelector('.view-content').scrollTop=0;
   try{ updateJettCounts(); }catch(e){}
+  if(id==='swipe'){ try{ _gpjRenderGamifyBar(); }catch(e){} }   /* v208: refresh the gamify bar on deck show */
   if(id==='browse'){
     try{ refreshBrowse(); }catch(e){}
     /* v146: restore the saved accordion state (default collapsed) + fill the summary */
@@ -7954,6 +7958,7 @@ function submitHired(){
   document.getElementById('hired-step2').style.display='block';
   document.querySelectorAll('.grace-pill').forEach(p=>{ p.textContent='🎉 Hired — your hunt cost $0'; });
   showToast('🏆 '+co+' logged as a verified hirer. Congrats!');
+  try{ _gpjCelebrateHired(co); }catch(e){}   /* v208: the big celebration — they got hired */
   try{ const r=(document.getElementById('hired-role')||{}).value||''; logHireFromResume(r); }catch(e){}
   try{ const c=document.getElementById('card-rating'); if(c&&c.style.display!=='none') rateResume(); }catch(e){}
 }
@@ -12203,6 +12208,7 @@ function updateStatCounters(){
      switch while the candidate cards (repainted here) showed the truth. Every
      counter update now repaints it from the SAME lists object. */
   try{ const a=document.getElementById('admin-device-stats'); if(a) a.innerHTML=_gpjAdminDeviceLine(); }catch(e){}
+  try{ _gpjRenderGamifyBar(); }catch(e){}   /* v208: keep the gamify bar in sync with the applied count */
 }
 /* v126: verified-hire + signup-attribution insights for the admin panel.
    ADMIN-ONLY by founder honesty rule: no public "N hires" claim until the
@@ -12411,6 +12417,7 @@ function recordSwipe(dir,job){
     lists.applied.push(rec);
     try{ gpjAddSeen(k); }catch(e){}   /* v186: durable de-recycle memory (survives past the 60-row cap) */
     window._lastSwipeRec={rec:rec,list:'applied'};   /* v199: remember the last swipe so rewindLastSwipe() can undo it */
+    try{ _gpjCelebrateApply(rec.t,rec.co); }catch(e){}   /* v208: celebrate a genuine new apply */
   }
   else {
     /* FIX (v41): de-dupe skipped. Swiping left on the same listing twice (or on a
@@ -12663,6 +12670,83 @@ function _gpjStreak(){
   return n;
 }
 window._gpjWeeklyApplyCount=_gpjWeeklyApplyCount; window._gpjStreak=_gpjStreak; window._gpjWeeklyGoal=_gpjWeeklyGoal;
+/* v208 (deck wow): READ-ONLY streak for display — must NOT mutate. Rendering the bar
+   should never advance a streak; only a real apply (_gpjCelebrateApply) does that.
+   Returns the stored count if the last active day was today or yesterday, else 0. */
+function _gpjStreakRead(){
+  try{ var r=JSON.parse(localStorage.getItem('gpj_streak')||'{}'); var t=new Date(); t.setHours(0,0,0,0); var today=t.getTime(); var last=+r.d||0,n=+r.n||0; return (last===today||last===today-86400000)?n:0; }catch(e){ return 0; }
+}
+window._gpjStreakRead=_gpjStreakRead;
+/* v208: the visible gamify bar. Encouraging, never punitive — a zero week reads as an
+   invitation, not a scold. Bound to the same v201 data the tests already cover. */
+function _gpjRenderGamifyBar(){
+  var bar=document.getElementById('gpj-gamify-bar'); if(!bar) return;
+  try{ if(typeof _gpjRecruiterMode==='function' && _gpjRecruiterMode()){ bar.innerHTML=''; return; } }catch(e){}
+  var streak=0, wk=0, goal=20;
+  try{ streak=_gpjStreakRead(); }catch(e){}
+  try{ wk=_gpjWeeklyApplyCount(); }catch(e){}
+  try{ goal=_gpjWeeklyGoal(); }catch(e){}
+  var pct=Math.max(0,Math.min(100, goal?Math.round(wk/goal*100):0));
+  var hitGoal=wk>=goal;
+  var streakTxt=streak>0?('🔥 '+streak+'-day streak'):'🔥 Start a streak';
+  bar.innerHTML=''
+    +'<div style="flex:0 0 auto;font-size:12px;font-weight:800;color:'+(streak>0?'var(--mint)':'var(--muted)')+';">'+streakTxt+'</div>'
+    +'<div style="flex:1;min-width:0;">'
+      +'<div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-bottom:4px;"><span>This week</span><span style="font-weight:800;color:'+(hitGoal?'var(--mint)':'var(--off)')+';">'+wk+' / '+goal+(hitGoal?' 🎉':'')+'</span></div>'
+      +'<div style="height:7px;border-radius:4px;background:var(--plum3);overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,var(--cyber),var(--mint));border-radius:4px;transition:width .5s cubic-bezier(.2,.8,.2,1);"></div></div>'
+    +'</div>';
+}
+window._gpjRenderGamifyBar=_gpjRenderGamifyBar;
+/* v208: one-time keyframes for the celebration burst (self-contained, no external libs). */
+function _gpjEnsureWowStyle(){
+  if(document.getElementById('gpj-wow-style')) return;
+  var s=document.createElement('style'); s.id='gpj-wow-style';
+  s.textContent='@keyframes gpjPop{0%{transform:scale(.6);opacity:0}40%{transform:scale(1.06);opacity:1}100%{transform:scale(1);opacity:1}}'
+    +'@keyframes gpjFade{0%,78%{opacity:1}100%{opacity:0}}'
+    +'@keyframes gpjConfetti{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(130px) rotate(320deg);opacity:0}}';
+  document.head.appendChild(s);
+}
+/* v208: a brief, non-blocking celebration overlay (pointer-events:none, auto-removes). */
+function _gpjBurst(headline,sub,big){
+  try{ _gpjEnsureWowStyle(); }catch(e){}
+  var old=document.getElementById('gpj-burst'); if(old) old.remove();
+  var o=document.createElement('div'); o.id='gpj-burst';
+  o.style.cssText='position:fixed;inset:0;z-index:9900;pointer-events:none;display:flex;align-items:center;justify-content:center;';
+  var colors=['#00F5A0','#B55FE6','#FFC857','#5FD0E6']; var n=big?20:11; var conf='';
+  for(var i=0;i<n;i++){ var left=(10+Math.random()*80).toFixed(1); var delay=(Math.random()*0.15).toFixed(2); var c=colors[i%colors.length]; var sz=6+Math.floor(Math.random()*6);
+    conf+='<div style="position:absolute;top:40%;left:'+left+'%;width:'+sz+'px;height:'+sz+'px;background:'+c+';border-radius:2px;animation:gpjConfetti '+(0.9+Math.random()*0.5).toFixed(2)+'s cubic-bezier(.2,.7,.3,1) '+delay+'s forwards;"></div>'; }
+  o.innerHTML=conf+'<div style="animation:gpjPop .35s cubic-bezier(.2,.9,.3,1.2),gpjFade '+(big?'1.9':'1.45')+'s ease forwards;background:var(--plum2);border:1px solid var(--mint);border-radius:16px;padding:'+(big?'18px 22px':'14px 18px')+';text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.4);max-width:80%;">'
+    +'<div style="font-size:'+(big?'20px':'17px')+';font-weight:900;color:var(--mint);">'+headline+'</div>'
+    +(sub?'<div style="font-size:12px;color:var(--muted);margin-top:4px;">'+sub+'</div>':'')
+    +'</div>';
+  document.body.appendChild(o);
+  setTimeout(function(){ try{ o.remove(); }catch(e){} }, big?1950:1550);
+}
+window._gpjBurst=_gpjBurst;
+/* v208: fire on a genuine NEW apply — advance the streak, buzz, celebrate, refresh the bar.
+   Called only inside the deduped new-apply branches, so exactly once per application. */
+function _gpjCelebrateApply(title,co){
+  try{ _gpjStreak(); }catch(e){}   /* advance the streak (idempotent per day) */
+  try{ if(navigator.vibrate) navigator.vibrate([8,40,12]); }catch(e){}
+  var wk=0,goal=20,streak=0;
+  try{ wk=_gpjWeeklyApplyCount(); }catch(e){}
+  try{ goal=_gpjWeeklyGoal(); }catch(e){}
+  try{ streak=_gpjStreakRead(); }catch(e){}
+  try{ _gpjRenderGamifyBar(); }catch(e){}
+  var hitGoal=(wk===goal);   /* the apply that TIPS them to the goal — celebrate bigger */
+  var coStr=co?(' at '+_esc(String(co))):'';
+  var headline=hitGoal?('🎉 Weekly goal — '+goal+' this week!'):'✅ Applied!';
+  var sub=hitGoal?'Incredible momentum. Keep it rolling.':(streak>1?('🔥 '+streak+'-day streak going'):('Good luck'+coStr+' 🍀'));
+  _gpjBurst(headline,sub,hitGoal);
+}
+window._gpjCelebrateApply=_gpjCelebrateApply;
+/* v208: the big one — the candidate confirmed they were hired. */
+function _gpjCelebrateHired(co){
+  try{ if(navigator.vibrate) navigator.vibrate([10,50,10,50,16]); }catch(e){}
+  var coStr=co?(' at '+_esc(String(co))):'';
+  _gpjBurst('🏆 Hired'+coStr+'!','Your job hunt cost you $0. Congratulations. 💚',true);
+}
+window._gpjCelebrateHired=_gpjCelebrateHired;
 
 /* ---------- JOB FRESHNESS PILLS ---------- */
 let swFreshDays=0;
@@ -14416,8 +14500,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v207';
+const APP_VERSION = 'v208';
 const CHANGELOG = {
+  'v208':['deck wow #1: gamify bar (streak+weekly goal) + Apply/Hired celebrations + haptics'],
   'v207':['employer wow #7: kanban bulk stage-move (select mode); declines stay individual by design'],
   'v206':['employer wow #5-6: honest Hired->hire-feed nudge + role-aware Cmd-K palette'],
   'v205':['employer wow #4: hiring pipeline kanban (drag + stage select), reach-out/decline preserved on Applicant Card'],
@@ -15589,6 +15674,7 @@ function applyTabDone(){
         try{ updateStatCounters(); }catch(e){}
         try{ updateEnergyMeter(); }catch(e){}
         try{ cloudSync(); }catch(e){}
+        try{ _gpjCelebrateApply(jt,jc); }catch(e){}   /* v208: celebrate a genuine new apply */
       }
     }
   }catch(e){}
@@ -15695,7 +15781,7 @@ function sandboxDone(){
     if(jt||jc){
       const key=(jt+'|'+jc).toLowerCase().replace(/\s+/g,' ').trim();
       const already=lists.applied.some(r=>(((r.t||'')+'|'+(r.co||'')).toLowerCase().replace(/\s+/g,' ').trim())===key);
-      if(!already){ lists.applied.push({t:jt,co:jc,ghost:(typeof ghostRiskFor==='function'?ghostRiskFor(jc):0),when:Date.now(),status:null}); try{saveLists();}catch(e){} try{updateStatCounters();}catch(e){} try{cloudSync();}catch(e){} }
+      if(!already){ lists.applied.push({t:jt,co:jc,ghost:(typeof ghostRiskFor==='function'?ghostRiskFor(jc):0),when:Date.now(),status:null}); try{saveLists();}catch(e){} try{updateStatCounters();}catch(e){} try{cloudSync();}catch(e){} try{ _gpjCelebrateApply(jt,jc); }catch(e){} }   /* v208 */
       /* v134: the sandbox "Done — I Applied" is a CONFIRMED apply too — it must
          fire the post-apply email like applyTabDone/internal apply did (this path
          was missed, so external applies confirmed here sent nothing). */
