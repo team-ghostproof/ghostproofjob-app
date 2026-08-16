@@ -8129,3 +8129,34 @@ test.describe('[STATE-COVERAGE] v208 deck wow — gamify bar + celebrations', ()
     expect(r.weekShows, 'the weekly bar reflects the applied count').toBe(true);
   });
 });
+
+test.describe('[STATE-COVERAGE] v209 deck wow — visible undo pill', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._gpjUpdateUndoBtn === 'function' && typeof window.rewindLastSwipe === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('undo pill: hidden with nothing to undo; appears (labeled) after a swipe; hides after undo', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const row = document.getElementById('undo-swipe-row');
+      const out = { exists: !!row };
+      window._lastSwipeRec = null; _gpjUpdateUndoBtn();
+      out.hiddenAtStart = row.style.display === 'none';
+      window._lastSwipeRec = { rec: { t: 'Marketing Manager', co: 'Acme Co' }, list: 'applied' }; _gpjUpdateUndoBtn();
+      out.shownApply = row.style.display === 'block'; out.applyLabel = document.getElementById('undo-swipe-what').textContent;
+      window._lastSwipeRec = { rec: { t: 'X', co: 'Y' }, list: 'skipped' }; _gpjUpdateUndoBtn();
+      out.skipLabel = document.getElementById('undo-swipe-what').textContent;
+      window._lastSwipeRec = null; _gpjUpdateUndoBtn();
+      out.hiddenAfterClear = row.style.display === 'none';
+      return out;
+    });
+    expect(r.exists, 'the undo pill exists on the deck').toBe(true);
+    expect(r.hiddenAtStart, 'nothing to undo → hidden').toBe(true);
+    expect(r.shownApply, 'a recorded swipe reveals the pill').toBe(true);
+    expect(r.applyLabel).toBe('(apply)');
+    expect(r.skipLabel).toBe('(skip)');
+    expect(r.hiddenAfterClear, 'after undo it hides again').toBe(true);
+  });
+});

@@ -2126,6 +2126,11 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
         <div style="text-align:center;"><div style="font-size:11px;color:var(--mint);font-weight:700;" id="swipe-status-top">Free until you're hired 💚</div><div style="font-size:10px;color:var(--muted);" id="swipe-limit-text">(unlimited applies · <span onclick="openLegal('faq')" style="color:var(--cyber);cursor:pointer;text-decoration:underline;">how it works</span>)</div></div>
         <button class="ctrl-btn apply-btn" id="apply-btn" onclick="swipeCard('right')" aria-label="Auto-apply">❤️</button>
       </div>
+      <!-- v209 (deck wow): visible centered UNDO — surfaces the v199 rewind on mobile AND
+           desktop (the Z key still works). Hidden until there's a swipe to undo. -->
+      <div id="undo-swipe-row" style="text-align:center;padding:8px 16px 0;display:none;">
+        <span onclick="rewindLastSwipe()" id="undo-swipe-btn" style="display:inline-flex;align-items:center;gap:6px;background:var(--plum3);border:1px solid var(--plum4);color:var(--off);font-size:12px;font-weight:800;padding:8px 18px;border-radius:999px;cursor:pointer;">↩️ Undo last <span id="undo-swipe-what" style="color:var(--muted);font-weight:600;"></span></span>
+      </div>
       <div style="text-align:center;padding:10px 16px 0;">
         <span onclick="saveCurrentJob()" id="save-job-btn" style="display:inline-block;background:var(--plum3);border:1px solid var(--plum4);color:var(--cyber);font-size:12px;font-weight:800;padding:8px 18px;border-radius:999px;cursor:pointer;">🔖 Save this job for later</span>
       </div>
@@ -3056,7 +3061,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v208</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v209</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -5045,6 +5050,7 @@ function swipeCard(dir){
   const topCard=document.getElementById(deckJobs[topIndex%3].id);
   if(!topCard||topCard.dataset.swiping) return;
   topCard.dataset.swiping='1';
+  try{ if(navigator.vibrate) navigator.vibrate(dir==='right'?12:8); }catch(e){}   /* v209: swipe haptic */
   topCard.style.animation=(dir==='right'?'cardFlyRight':'cardFlyLeft')+' .5s ease forwards';
   const ov=document.getElementById('swipe-overlay');
   ov.className=dir==='right'?'like':'skip';
@@ -5087,6 +5093,7 @@ function swipeCard(dir){
       }
     }
     showToast(dir==='right'?(_isInternalApply?('📨 '+topJob.co+' — complete your application to send it…'):('❤️ '+topJob.co+' — opening the listing to apply…')):'🚫 Skipped · Algorithm updated');
+    try{ _gpjUpdateUndoBtn(); }catch(e){}   /* v209: surface the undo pill after a swipe */
   },480);
 }
 let startX=0,startY=0,isDragging=false;
@@ -5109,9 +5116,17 @@ deck.addEventListener('touchmove',e=>{
 deck.addEventListener('touchend',e=>{
   const dx=e.changedTouches[0].clientX-startX;
   const top=document.querySelector('.job-card.top');
-  if(top) top.style.transform='';
   document.getElementById('swipe-overlay').style.opacity='0';
-  if(isDragging&&Math.abs(dx)>80) swipeCard(dx>0?'right':'left');
+  const willSwipe=isDragging&&Math.abs(dx)>80;
+  if(top){
+    if(willSwipe){ top.style.transform=''; }   /* swipeCard plays the fly-off animation */
+    else {                                      /* v209: spring snap-back on an incomplete drag */
+      top.style.transition='transform .3s cubic-bezier(.2,.9,.3,1.35)';
+      top.style.transform='';
+      setTimeout(function(){ try{ top.style.transition=''; }catch(_){} },320);
+    }
+  }
+  if(willSwipe) swipeCard(dx>0?'right':'left');
   isDragging=false;
 },{passive:true});
 function toggleDrawer(e){
@@ -12644,8 +12659,17 @@ function rewindLastSwipe(){
   applySwipeFilters(); saveLists(); cloudSync();
   window._lastSwipeRec=null;
   showToast('↩ '+(rec.co||'that job')+' brought back to your deck');
+  try{ _gpjUpdateUndoBtn(); }catch(e){}
 }
 window.rewindLastSwipe=rewindLastSwipe;
+/* v209: show/hide the visible undo pill based on whether there's a swipe to rewind. */
+function _gpjUpdateUndoBtn(){
+  var row=document.getElementById('undo-swipe-row'); if(!row) return;
+  var ls=window._lastSwipeRec;
+  if(ls&&ls.rec){ row.style.display='block'; var w=document.getElementById('undo-swipe-what'); if(w) w.textContent=(ls.list==='applied'?'(apply)':'(skip)'); }
+  else row.style.display='none';
+}
+window._gpjUpdateUndoBtn=_gpjUpdateUndoBtn;
 
 /* ===== v201: gamify DATA layer — encouraging, honest, never fabricated =====
    The visual streak/weekly-goal bar (shipping with the deck layout pass) renders on
@@ -14500,8 +14524,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v208';
+const APP_VERSION = 'v209';
 const CHANGELOG = {
+  'v209':['deck wow #2: visible centered undo (mobile+desktop) + spring snap-back + swipe haptic'],
   'v208':['deck wow #1: gamify bar (streak+weekly goal) + Apply/Hired celebrations + haptics'],
   'v207':['employer wow #7: kanban bulk stage-move (select mode); declines stay individual by design'],
   'v206':['employer wow #5-6: honest Hired->hire-feed nudge + role-aware Cmd-K palette'],
