@@ -8283,3 +8283,30 @@ test.describe('[STATE-COVERAGE] v211 keyword search — loose fallback actually 
     expect(r.hasCoord).toBe(false);
   });
 });
+
+test.describe('[STATE-COVERAGE] v212 match honesty — a high % never reads as "stretch role"', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.openMatchInsight === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('no skill-keyword overlap: a 98% explains itself (title/experience), a low % still warns "stretch"', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      resumeReady = true;
+      // skills that will NOT appear in the posting → forces the matched.length===0 branch
+      Object.assign(resumeData, { title: 'Marketing', skills: 'Zorbing · Underwater Basketweaving', jobs: [{ t: 'Marketing Specialist', c: 'Acme', b: 'ran campaigns' }], summary: 'marketing' });
+      const job = { t: 'Director of Marketing', desc: 'Lead integrated marketing strategy across digital and paid media channels for a large health system.', req: 'Lead campaigns and budgets across channels.' };
+      openMatchInsight('Director of Marketing', 98, null, job);
+      const highMsg = document.getElementById('mi-have').innerText;
+      openMatchInsight('Director of Marketing', 40, null, job);
+      const lowMsg = document.getElementById('mi-have').innerText;
+      document.getElementById('match-modal').classList.remove('open');
+      return { highMsg, lowMsg };
+    });
+    expect(r.highMsg, 'a 98% is explained via title & experience').toMatch(/title|experience/i);
+    expect(r.highMsg, 'a 98% must NOT contradict itself with "stretch role"').not.toMatch(/stretch/i);
+    expect(r.lowMsg, 'a genuinely low score still honestly warns "stretch role"').toMatch(/stretch/i);
+  });
+});
