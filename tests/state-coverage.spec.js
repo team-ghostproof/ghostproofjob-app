@@ -8160,3 +8160,69 @@ test.describe('[STATE-COVERAGE] v209 deck wow — visible undo pill', () => {
     expect(r.hiddenAfterClear, 'after undo it hides again').toBe(true);
   });
 });
+
+test.describe('[STATE-COVERAGE] v210 D1 truncation fix — drawer lazy-loads the full posting', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.hydrateDrawer === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('a clipped pool job fetches the full doc ONCE on drawer open; merges full text; never refetches; live docs never fetch', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const preview = 'Lead marketing strategy. The Director should possess: a results-driven approach, with a';
+      const full = preview + ' proven omni-channel record and $2M+ budget ownership. THIS IS THE COMPLETE POSTING that was hidden behind the 600-char pool preview.';
+      const job = { t: 'Director of Marketing', co: 'Texas Children’s', id: 'job-abc', _clipped: true, desc: preview, req: '', benefits: '', url: 'https://x.com' };
+      window.jobsQueue = [job];
+      window._currentTopJob = () => job;
+      window.fb = window.fb || {};
+      let calls = 0, lastId = null;
+      window.fb.getJobFull = async (id) => { calls++; lastId = id; return { description: full, requirements: '5+ yrs, omni-channel', benefits: 'Health, PTO' }; };
+      const out = { previewLen: job.desc.length };
+      hydrateDrawer();
+      await new Promise((x) => setTimeout(x, 120));
+      out.calls1 = calls; out.lastId = lastId;
+      out.descGrew = job.desc.length > out.previewLen;
+      out.hasFullTail = job.desc.indexOf('COMPLETE POSTING') >= 0;
+      out.reqFilled = (job.req || '').length > 0;
+      out.clippedCleared = job._clipped === false;
+      // reopen must NOT refetch
+      hydrateDrawer();
+      await new Promise((x) => setTimeout(x, 60));
+      out.callsAfterReopen = calls;
+      // a LIVE (non-clipped) doc must never call getJobFull
+      const live = { t: 'X', co: 'Y', id: 'live-1', desc: 'full live text already', _clipped: false };
+      window.jobsQueue = [live]; window._currentTopJob = () => live;
+      calls = 0; hydrateDrawer(); await new Promise((x) => setTimeout(x, 60));
+      out.liveNeverFetches = calls === 0;
+      return out;
+    });
+    expect(r.calls1, 'exactly one fetch on first open').toBe(1);
+    expect(r.lastId).toBe('job-abc');
+    expect(r.descGrew, 'the preview is replaced by the longer full text').toBe(true);
+    expect(r.hasFullTail, 'the previously-hidden tail is now shown').toBe(true);
+    expect(r.reqFilled, 'requirements hydrate too').toBe(true);
+    expect(r.clippedCleared, '_clipped flips false so it will not refetch').toBe(true);
+    expect(r.callsAfterReopen, 'reopening the same job never refetches').toBe(1);
+    expect(r.liveNeverFetches, 'a full live doc never triggers a detail read').toBe(true);
+  });
+
+  test('failed/empty full-doc fetch is graceful — the preview stays, no crash, no endless retry', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const job = { t: 'Ops Manager', co: 'Acme', id: 'job-x', _clipped: true, desc: 'short preview text', req: '', benefits: '' };
+      window.jobsQueue = [job]; window._currentTopJob = () => job;
+      window.fb = window.fb || {};
+      let calls = 0;
+      window.fb.getJobFull = async () => { calls++; return null; };   // miss / not found
+      hydrateDrawer();
+      await new Promise((x) => setTimeout(x, 100));
+      const descKept = job.desc === 'short preview text';
+      hydrateDrawer(); // second open must not retry after a miss
+      await new Promise((x) => setTimeout(x, 60));
+      return { descKept, calls };
+    });
+    expect(r.descKept, 'the preview is preserved when the full doc is unavailable').toBe(true);
+    expect(r.calls, 'a miss marks it hydrated so it never retries in a loop').toBe(1);
+  });
+});
