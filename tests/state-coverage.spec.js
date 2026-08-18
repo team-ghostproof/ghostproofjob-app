@@ -8226,3 +8226,60 @@ test.describe('[STATE-COVERAGE] v210 D1 truncation fix — drawer lazy-loads the
     expect(r.calls, 'a miss marks it hydrated so it never retries in a loop').toBe(1);
   });
 });
+
+test.describe('[STATE-COVERAGE] v211 keyword search — loose fallback actually renders (67-found-0-shown)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.searchAllJobsForKeyword === 'function' && typeof window.renderBrowse === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('a multi-word search with no all-words title match renders the ANY-word results (not 0)', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      if (typeof switchView === 'function') switchView('browse');
+      document.getElementById('f-keyword').value = 'account retention';
+      window.fb = window.fb || {};
+      window.fb.fetchJobs = async () => ([
+        { title: 'Account Manager', company: 'Acme', location: 'Dallas, TX', description: 'x', url: 'https://a.com' },
+        { title: 'Retention Specialist', company: 'Beta', location: 'Austin, TX', description: 'x', url: 'https://b.com' },
+        { title: 'Project Coordinator', company: 'Gamma', location: 'Houston, TX', description: 'x', url: 'https://g.com' },
+      ]);
+      await searchAllJobsForKeyword(true);
+      await new Promise((x) => setTimeout(x, 150));
+      const txt = (document.getElementById('browse-results') || {}).innerText || '';
+      return {
+        looseActive: window._kwLooseActive,
+        cards: document.querySelectorAll('#browse-results .job-card-browse').length,
+        hasAccountMgr: /Account Manager/.test(txt),
+        hasRetention: /Retention Specialist/.test(txt),
+        hasCoordinator: /Project Coordinator/.test(txt),
+      };
+    });
+    expect(r.looseActive, 'the loose fallback engaged (no title has both words)').toBe(true);
+    expect(r.cards, 'the any-word matches actually render — not blanked to 0').toBe(2);
+    expect(r.hasAccountMgr).toBe(true);
+    expect(r.hasRetention).toBe(true);
+    expect(r.hasCoordinator, 'a zero-score title is still excluded (no false positives)').toBe(false);
+  });
+
+  test('a strict all-words match still wins and does NOT engage loose mode', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      if (typeof switchView === 'function') switchView('browse');
+      document.getElementById('f-keyword').value = 'account retention';
+      window.fb = window.fb || {};
+      window.fb.fetchJobs = async () => ([
+        { title: 'Account Retention Lead', company: 'Delta', location: 'Remote', description: 'x', url: 'https://d.com', is_remote: true },
+        { title: 'Project Coordinator', company: 'Gamma', location: 'Houston, TX', description: 'x', url: 'https://g.com' },
+      ]);
+      await searchAllJobsForKeyword(true);
+      await new Promise((x) => setTimeout(x, 150));
+      const txt = (document.getElementById('browse-results') || {}).innerText || '';
+      return { looseActive: window._kwLooseActive, cards: document.querySelectorAll('#browse-results .job-card-browse').length, hasLead: /Account Retention Lead/.test(txt), hasCoord: /Project Coordinator/.test(txt) };
+    });
+    expect(r.looseActive, 'strict match found results, so loose mode stays off').toBe(false);
+    expect(r.cards).toBe(1);
+    expect(r.hasLead).toBe(true);
+    expect(r.hasCoord).toBe(false);
+  });
+});

@@ -2168,7 +2168,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
           <div id="browse-co-sug" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--plum3);border:1px solid var(--plum4);border-radius:0 0 12px 12px;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.5);"></div>
         </div>
         <div class="field-label">Keyword / Title</div>
-        <input class="field-input" id="f-keyword" placeholder="e.g. Engineer, Designer… — press Enter to search all of your area" oninput="refreshBrowse();queueLiveFetch()" onkeydown="if(event.key==='Enter'){event.preventDefault();try{ livePage=1; searchAllJobsForKeyword(false); }catch(e){}}" style="margin-bottom:10px;"/>
+        <input class="field-input" id="f-keyword" placeholder="e.g. Engineer, Designer… — press Enter to search all of your area" oninput="window._kwLooseActive=false;refreshBrowse();queueLiveFetch()" onkeydown="if(event.key==='Enter'){event.preventDefault();try{ livePage=1; searchAllJobsForKeyword(false); }catch(e){}}" style="margin-bottom:10px;"/>
         <div class="field-label">📡 Region / Location <span style="text-transform:none;font-weight:400;color:var(--mint);">(city, state, or 5-digit ZIP — triggers live feed)</span></div>
         <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
           <img id="f-flag" src="https://flagcdn.com/24x18/us.png" alt="" style="width:24px;height:18px;border-radius:3px;flex-shrink:0;align-self:center;"/>
@@ -3065,7 +3065,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v210</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v211</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -6097,6 +6097,10 @@ async function searchAllJobsForKeyword(nationwide){
       }
     } else { window._kwNoLocal=false; }
     liveJobs=_gpjDedupePool(matches).map(mapFirestoreJob).filter(Boolean);   /* v101 #1: collapse doc-ID twins */
+    /* v211 (founder repro: "67 found → 0 shown"): when the ANY-word fallback found the
+       results, renderBrowse must match them the SAME loose way — otherwise its strict
+       all-words re-filter throws away every loose hit and the screen blanks to 0. */
+    window._kwLooseActive=_kwLoose;
     livePage=1; _browsePoolKey='__nationwide__'; window._browseOwnsLive=true; renderBrowse();
     showToast('✅ '+liveJobs.length+(_kwLoose?' related':' "'+kw+'"')+' opening(s)'+(nationwide?' (nationwide)':' in your area')+(_kwLoose?' — showing roles matching part of "'+kw+'"':''));
   }catch(e){ showToast('Search failed — try again'); }
@@ -6266,7 +6270,10 @@ function renderBrowse(){
       /* v190: keyword filters live cards by TITLE (+ company), not description —
          so "account" no longer surfaces a Project Coordinator that merely mentions
          accounts. Shared with searchAllJobsForKeyword + the browseJobs path. */
-      if(kw && !_gpjKeywordMatch(kw, j.t, j.co)) return false;
+      /* v211: honor the loose fallback — if the search matched ANY word (e.g.
+         "account retention" → Account Manager / Retention Specialist), keep any
+         positive-score title here too instead of demanding the strict all-words match. */
+      if(kw){ if(window._kwLooseActive){ if(typeof _gpjKeywordScore==='function' && _gpjKeywordScore(kw, j.t, j.co)<=0) return false; } else if(!_gpjKeywordMatch(kw, j.t, j.co)) return false; }
       /* work style: use the structured work_setting field first (accurate), then
          fall back to location/desc text for jobs that didn't carry it */
       if(styVal&&styVal!=='Any'){
@@ -14561,8 +14568,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v210';
+const APP_VERSION = 'v211';
 const CHANGELOG = {
+  'v211':['search fix: renderBrowse honors the any-word fallback (67-found-0-shown) so loose keyword results actually render'],
   'v210':['D1 truncation fix: drawer lazy-loads the FULL posting (pool stored a 600-char preview since v198)'],
   'v209':['deck wow #2: visible centered undo (mobile+desktop) + spring snap-back + swipe haptic'],
   'v208':['deck wow #1: gamify bar (streak+weekly goal) + Apply/Hired celebrations + haptics'],
