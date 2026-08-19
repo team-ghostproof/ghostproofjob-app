@@ -143,7 +143,31 @@
     const impFrac = impact / nB; pts += Math.round(Math.min(1, impFrac / 0.35) * 12); items.push([impFrac >= 0.3, impact + ' bullets show a measurable OUTCOME (not just a task)']);
     const vFrac = strongStart / nB; pts += Math.round(Math.min(1, vFrac / 0.5) * 6) + Math.round(Math.min(1, variety / 0.7) * 2); items.push([vFrac >= 0.4 && variety >= 0.6, 'Verbs are strong and varied']);
     const cleanPts = Math.max(0, 8 - cleanIssues * 3); pts += cleanPts; items.push([cleanIssues === 0, cleanIssues === 0 ? 'Tight & clean — no filler or passive phrasing' : ((fillerN + passiveN + bloatN) + ' phrase(s) to tighten (filler / passive / too long)')]);
+    // v214 Q2: soft-skill dilution + near-duplicate bullets. LOCK-STEP with index.html.
+    const weakN = skills.filter(function (s) { return WEAK_SKILL[String(s).toLowerCase()] === 1; }).length;
+    const softOk = weakN <= 2; pts -= Math.min(6, Math.max(0, weakN - 2) * 2);
+    items.push([softOk, softOk ? 'Skills read specific — little soft-skill filler' : (weakN + ' soft/filler skills dilute your list — swap for hard skills')]);
+    const dupN = countDupeBullets(bullets);
+    const dupOk = dupN === 0; pts -= Math.min(6, dupN * 3);
+    items.push([dupOk, dupOk ? 'No repeated bullets across roles' : (dupN + ' near-duplicate bullet(s) across roles — vary them')]);
+    pts = Math.max(0, pts);
     return { pts: Math.min(60, pts), max: 60, items: items, needsMetrics: (bullets.length > 0 && qFrac < 0.3) };
+  }
+  // v214 Q2 shared helpers — LOCK-STEP with index.html _WEAK_SKILL / _countDupeBullets.
+  const WEAK_SKILL = { 'communication': 1, 'communications': 1, 'scheduling': 1, 'documentation': 1, 'teamwork': 1, 'organization': 1, 'organized': 1, 'multitasking': 1, 'time management': 1, 'microsoft word': 1, 'word': 1, 'detail oriented': 1, 'detail-oriented': 1, 'hard working': 1, 'hard-working': 1, 'problem solving': 1, 'problem-solving': 1, 'critical thinking': 1, 'work ethic': 1, 'punctuality': 1, 'flexibility': 1, 'adaptability': 1, 'interpersonal': 1, 'interpersonal skills': 1, 'fast learner': 1, 'self motivated': 1, 'self-motivated': 1, 'team player': 1, 'reliability': 1, 'positive attitude': 1 };
+  function countDupeBullets(bullets) {
+    var words = function (b) { return String(b).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(function (w) { return w.length > 3; }).map(function (w) { return w.length >= 6 ? w.slice(0, 6) : w; }); };
+    var n = 0;
+    for (var i = 0; i < bullets.length; i++) {
+      var aw = words(bullets[i]); if (aw.length < 4) continue; var aset = {}; aw.forEach(function (w) { aset[w] = 1; });
+      for (var j = i + 1; j < bullets.length; j++) {
+        var bw = words(bullets[j]); if (bw.length < 4) continue;
+        var inter = 0, seen = {}; bw.forEach(function (w) { if (aset[w] && !seen[w]) { inter++; seen[w] = 1; } });
+        var uni = Object.keys(aset).length + bw.filter(function (w) { return !aset[w]; }).length;
+        if (uni > 0 && (inter / uni) >= 0.5) { n++; break; }
+      }
+    }
+    return n;
   }
 
   /** Strength score 1–100 (the ring the public checker shows for free). */

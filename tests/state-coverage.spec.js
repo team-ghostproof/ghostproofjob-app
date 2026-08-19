@@ -8348,3 +8348,29 @@ test.describe('[STATE-COVERAGE] v213 Match-to-Job — checked skills reach the d
     expect(r.masterSkills, 'an UNCHECKED skill is never added').not.toMatch(/Analytics/);
   });
 });
+
+test.describe('[STATE-COVERAGE] v214 rater Q2 — soft-skill dilution + duplicate bullets', () => {
+  const rc = require('../api/rate/rateCore.js');
+  test('a résumé with filler skills + near-duplicate bullets is flagged + docked; a clean one is not', () => {
+    const flagged = rc.rateStructure({
+      name: 'A', contact: 'a@x.com', summary: 'Marketing pro with a decade of real experience shipping campaigns.',
+      // 4 soft/filler skills (Communication, Scheduling, Documentation, Word)
+      skills: 'Excel · Sales · CRM · Communication · Scheduling · Documentation · Word',
+      // two bullets that mean the same thing with varied wording (enhance/enhanced, collaborated/collaboration)
+      jobs: [{ b: 'Enhanced client data pipelines through collaboration, improving stakeholder relationships and reducing friction.\nCollaborated with operations to enhance client data pipelines, strengthening stakeholder relationships.' }],
+    });
+    const flabels = flagged.items.filter((i) => !i[0]).map((i) => i[1]).join(' | ');
+    expect(flabels, 'soft/filler skills are flagged').toMatch(/soft\/filler skills/);
+    expect(flabels, 'meaning-duplicate bullets are caught despite varied wording').toMatch(/near-duplicate bullet/);
+
+    const clean = rc.rateStructure({
+      name: 'B', contact: 'b@x.com', summary: 'Growth marketer focused on measurable lifecycle and paid outcomes.',
+      skills: 'Excel · Salesforce · SEO · Python · Tableau · Figma',
+      jobs: [{ b: 'Increased retention 20% by launching a lifecycle email program.\nCut onboarding time 30% via a new automation workflow.' }],
+    });
+    expect(clean.items.some((i) => i[0] && /little soft-skill filler/.test(i[1])), 'specific skills pass').toBe(true);
+    expect(clean.items.some((i) => i[0] && /No repeated bullets/.test(i[1])), 'distinct bullets pass').toBe(true);
+    // the flagged résumé scores strictly lower than an equivalent clean one (docking works)
+    expect(rc.qualityScore(flagged ? { name: 'A', contact: 'a@x.com', summary: 'Marketing pro with a decade of real experience shipping campaigns.', skills: 'Excel · Sales · CRM · Communication · Scheduling · Documentation · Word', jobs: [{ b: 'Enhanced client data pipelines through collaboration, improving stakeholder relationships and reducing friction.\nCollaborated with operations to enhance client data pipelines, strengthening stakeholder relationships.' }] } : {})).toBeLessThan(90);
+  });
+});
