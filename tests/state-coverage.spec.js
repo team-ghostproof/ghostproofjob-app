@@ -8480,3 +8480,23 @@ test.describe('[STATE-COVERAGE] v217 mobile deck — decision-snapshot card', ()
     expect(r.shown, 'the match tile value is visible').toBe(true);
   });
 });
+
+test.describe('[STATE-COVERAGE] v218 desktop expand — fill the screen, card stays card-width', () => {
+  test('at a wide viewport the app fills to 1680px, the deck column widens to 1040px, and the card is capped at 560px', async ({ page }) => {
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.buildDesktopGrid === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      if (typeof buildDesktopGrid === 'function' && !document.body.classList.contains('desk')) buildDesktopGrid();
+      const g = (sel) => { const el = document.querySelector(sel); return el ? getComputedStyle(el).maxWidth : null; };
+      return {
+        app: g('#app'),
+        view: g('#desk-main > .view#view-swipe') || g('#view-swipe'),
+        deck: (function () { const el = document.querySelector('#view-swipe #card-deck'); return el ? getComputedStyle(el).maxWidth : null; })(),
+      };
+    });
+    expect(r.app, 'the app frame fills the screen (no more 1280 dead gutters)').toBe('1680px');
+    expect(r.view, 'the deck column widens so the bars breathe').toBe('1040px');
+    expect(r.deck, 'the card itself stays card-width — never stretched').toBe('560px');
+  });
+});
