@@ -8413,3 +8413,24 @@ test.describe('[STATE-COVERAGE] v215 footer/nav — cleanup + Resources "Employe
     expect(called, 'landing on /#employers opens the Employer view, not Home').toBe(true);
   });
 });
+
+test.describe('[STATE-COVERAGE] v216 match Q1 — seniority-gap cap', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof _gpjScoreMatch === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(300);
+  });
+
+  test('a Director role no longer scores ~98% for a lower-level résumé; same-level is uncapped; a 2-tier jump caps harder', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const cand = { title: 'Marketing Specialist', roles: [{ t: 'Marketing Specialist', b: 'ran tradeshows and budgets' }, { t: 'Regional Account Manager', b: 'managed accounts via salesforce and crm' }], skills: ['marketing', 'salesforce', 'crm'], summary: 'marketing professional' };
+      const director = _gpjScoreMatch(cand, { title: 'Director of Marketing', desc: 'lead integrated marketing strategy demand gen brand digital paid media analytics' });
+      const manager = _gpjScoreMatch(cand, { title: 'Marketing Manager', desc: 'run marketing campaigns and manage the calendar' });
+      const icOnly = _gpjScoreMatch({ title: 'Marketing Coordinator', roles: [{ t: 'Marketing Coordinator', b: 'coordinated marketing logistics' }], skills: ['marketing'], summary: '' }, { title: 'VP of Marketing', desc: 'own the marketing organization and enterprise brand strategy' });
+      return { director, manager, icOnly };
+    });
+    expect(r.director, 'Director for a Manager-level résumé is a reach (≤85), not near-perfect').toBeLessThanOrEqual(85);
+    expect(r.manager, 'a same-level Manager role is NOT capped by seniority').toBeGreaterThan(85);
+    expect(r.icOnly, 'a 2-tier jump (Coordinator → VP) caps harder (≤70)').toBeLessThanOrEqual(70);
+  });
+});

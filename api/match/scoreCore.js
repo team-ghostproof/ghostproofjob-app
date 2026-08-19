@@ -108,6 +108,16 @@ function scoreMatch(candidate, job) {
 
   const anyRelevant = (bestFieldHits > 0) || anySkill || (corpusFieldHits > 0);
   if (jtFieldWords.length && !anyRelevant) score = Math.min(score, 32);
+  // v216 Q1: cap when the job needs clearly HIGHER seniority than the candidate has ever
+  // held (director/vp/etc. are generic words, so the level jump was invisible). 2-tier
+  // jump caps at 70, 1-tier reach at 85. LOCK-STEP with index.html _gpjScoreMatch.
+  const _T3 = /\b(director|vp|vice[\s-]?president|head|chief|principal|partner|c[eiotf]o)\b/;
+  const _T2 = /\b(manager|mgr|lead|supervisor|senior|sr)\b/;
+  const _T1 = /\b(specialist|coordinator|associate|analyst|assistant|representative|clerk|junior|intern|trainee)\b/;
+  const _tier = function (s) { s = ' ' + _lc(s) + ' '; if (_T3.test(s)) return 3; if (_T2.test(s)) return 2; if (_T1.test(s)) return 1; return 0; };
+  let _jobTier = _tier(jt), _candTier = 0;
+  roles.forEach(function (r) { const t = _tier(r); if (t > _candTier) _candTier = t; });
+  if (_jobTier >= 2 && _candTier > 0 && _jobTier > _candTier) { score = Math.min(score, (_jobTier - _candTier >= 2) ? 70 : 85); }
   score = Math.max(18, Math.min(98, score));
 
   // the job field words with NO signal anywhere in the candidate → "missing"
