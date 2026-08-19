@@ -8374,3 +8374,42 @@ test.describe('[STATE-COVERAGE] v214 rater Q2 — soft-skill dilution + duplicat
     expect(rc.qualityScore(flagged ? { name: 'A', contact: 'a@x.com', summary: 'Marketing pro with a decade of real experience shipping campaigns.', skills: 'Excel · Sales · CRM · Communication · Scheduling · Documentation · Word', jobs: [{ b: 'Enhanced client data pipelines through collaboration, improving stakeholder relationships and reducing friction.\nCollaborated with operations to enhance client data pipelines, strengthening stakeholder relationships.' }] } : {})).toBeLessThan(90);
   });
 });
+
+test.describe('[STATE-COVERAGE] v215 footer/nav — cleanup + Resources "Employers" link', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._gpjSyncEmployerNav === 'function' && typeof window.openEmployer === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('footer: no "Home", uniform muted link colours, checker visible for guests but hidden when signed in', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const footer = document.getElementById('gpj-global-footer');
+      const txt = footer.innerText;
+      const links = [].slice.call(footer.querySelectorAll('a[href*="resume-checker"], a[href*="resources"]'));
+      const cl = document.getElementById('footer-checker-link');
+      const guestVisible = cl && cl.style.display !== 'none';
+      window.fb = window.fb || {}; window.fb.current = () => ({ uid: 'u1' });   // signed in
+      _gpjSyncEmployerNav();
+      return { hasHome: /🏠 Home/.test(txt), hasChecker: /Free Résumé Checker/.test(txt), hasResources: /Resources/.test(txt), colors: links.map((a) => a.style.color), guestVisible, hiddenSignedIn: cl && cl.style.display === 'none' };
+    });
+    expect(r.hasHome, '"Home" is dropped (redundant with the tabs)').toBe(false);
+    expect(r.hasChecker).toBe(true);
+    expect(r.hasResources).toBe(true);
+    expect(r.colors.length).toBeGreaterThan(0);
+    expect(r.colors.every((c) => c === 'var(--muted)'), 'footer links share one uniform colour').toBe(true);
+    expect(r.guestVisible, 'guests see the free checker').toBe(true);
+    expect(r.hiddenSignedIn, 'signed-in individuals do not').toBe(true);
+  });
+
+  test('the #employers hash (Resources nav) opens the Employer entry instead of Home', async ({ page }) => {
+    const called = await page.evaluate(async () => {
+      let hit = false; window.openEmployer = () => { hit = true; };   // hoisted global reassign
+      location.hash = '#employers';
+      await new Promise((r) => setTimeout(r, 900));   // past the 500ms handler delay
+      return hit;
+    });
+    expect(called, 'landing on /#employers opens the Employer view, not Home').toBe(true);
+  });
+});
