@@ -3065,7 +3065,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v212</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v213</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -9814,7 +9814,7 @@ function openMatch2Job(title,co,desc){
   if(m2jContext.suggestions.length){
     body.innerHTML=
       '<div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">This role asks for the skills below. <strong style="color:var(--off);">Check only the ones you genuinely have</strong> — we weave those into your résumé and never claim experience you don’t. Nothing is added unless you check it.</div>'+
-      '<div id="m2j-checks">'+m2jContext.suggestions.map((w,i)=>'<label style="display:flex;align-items:center;gap:10px;background:var(--plum3);border-radius:9px;padding:10px 12px;margin-bottom:7px;cursor:pointer;"><input type="checkbox" id="m2j-c'+i+'" style="accent-color:var(--mint);width:16px;height:16px;"/><span style="font-size:13px;font-weight:600;">I have '+w.replace(/</g,'')+'</span></label>').join('')+'</div>'+
+      '<div id="m2j-checks">'+m2jContext.suggestions.map((w,i)=>'<label style="display:flex;align-items:center;gap:10px;background:var(--plum3);border-radius:9px;padding:10px 12px;margin-bottom:7px;cursor:pointer;"><input type="checkbox" id="m2j-c'+i+'" data-skill="'+String(w).replace(/"/g,'&quot;').replace(/</g,'')+'" style="accent-color:var(--mint);width:16px;height:16px;"/><span style="font-size:13px;font-weight:600;">I have '+w.replace(/</g,'')+'</span></label>').join('')+'</div>'+
       '<div id="m2j-market"></div>'+
       '<div id="m2j-quantify"></div>'+
       '<div onclick="applyMatch2Job()" style="margin-top:12px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;text-align:center;">✓ Add selected & download optimized resume</div>'+
@@ -9861,7 +9861,7 @@ async function enrichMatchWithMarket(title, haveText){
     '<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px;">Mined from '+data.matched+' live '+(title||'role')+' postings. These appear often but aren\u2019t on your resume — add any that are genuinely true for you.</div>'+
     missing.map((m,k)=>{
       const i=base+k;
-      return '<label style="display:flex;align-items:center;gap:10px;background:var(--plum3);border-radius:9px;padding:10px 12px;margin-bottom:7px;cursor:pointer;"><input type="checkbox" id="m2j-c'+i+'" style="accent-color:var(--cyber);width:16px;height:16px;"/><span style="flex:1;font-size:13px;font-weight:600;">I have '+_gpjCanonicalSkill(m.term).replace(/</g,'')+'</span><span style="font-size:10px;font-weight:800;color:var(--cyber);">'+m.pct+'% of postings</span></label>';
+      return '<label style="display:flex;align-items:center;gap:10px;background:var(--plum3);border-radius:9px;padding:10px 12px;margin-bottom:7px;cursor:pointer;"><input type="checkbox" id="m2j-c'+i+'" data-skill="'+String(_gpjCanonicalSkill(m.term)).replace(/"/g,'&quot;').replace(/</g,'')+'" style="accent-color:var(--cyber);width:16px;height:16px;"/><span style="flex:1;font-size:13px;font-weight:600;">I have '+_gpjCanonicalSkill(m.term).replace(/</g,'')+'</span><span style="font-size:10px;font-weight:800;color:var(--cyber);">'+m.pct+'% of postings</span></label>';
     }).join('');
 }
 /* v174 P0 (founder repro: recent jobs became "[object Object]"): a résumé bullet
@@ -9936,22 +9936,26 @@ async function applyMatch2Job(){
       if(typeof hydrateResumeFields==='function') hydrateResumeFields();
     }catch(e){}
   };
+  /* v213: function-scoped so the finally block can persist confirmed skills to the master */
+  let added=[];
   try{
-  /* add the checked keywords to skills (only true ones the user confirmed) */
-  const added=[];
-  m2jContext.suggestions.forEach((w,i)=>{
-    const cb=document.getElementById('m2j-c'+i);
-    if(cb&&cb.checked){
-      const cur=(resumeData.skills||'').split(' · ').map(s=>s.trim()).filter(Boolean);
-      const cap=w.charAt(0).toUpperCase()+w.slice(1);
-      /* v192 (founder repro: checked "I have Campaigns" never reached the PDF):
-         the confirmed skill was PUSHED to the end, so on a résumé already at the
-         15-skill cap (_tidySkills keeps the first 15) it was the one trimmed off.
-         UNSHIFT — a skill the user confirmed for THIS role leads the tailored
-         skills line and survives the cap (an older tail skill drops instead). */
-      if(!cur.some(s=>s.toLowerCase()===w.toLowerCase())){ cur.unshift(cap); resumeData.skills=cur.join(' · '); added.push(cap); }
-    }
-  });
+  /* v213 (founder repro: checked "I have X" never reached the downloaded résumé):
+     the old capture read m2j-c{i} by INDEX-aligning with m2jContext.suggestions across
+     three async render sources (single-job list, market-keywords fetch, rater) — a
+     fragile alignment that could silently drop a checked skill. Read every checked box's
+     OWN skill from a data-attribute instead: bulletproof and index-independent. v192
+     unshift kept so a confirmed skill leads the line and survives the 15-skill cap. */
+  (function(){
+    var boxes=document.querySelectorAll('#match2job-modal input[type=checkbox]:checked');
+    var seen={};
+    [].forEach.call(boxes,function(cb){
+      var w=String((cb.getAttribute('data-skill')||'')).trim(); if(!w) return;
+      var key=w.toLowerCase(); if(seen[key]) return; seen[key]=1;
+      var cur=(resumeData.skills||'').split(' · ').map(function(s){return s.trim();}).filter(Boolean);
+      var cap=w.charAt(0).toUpperCase()+w.slice(1);
+      if(!cur.some(function(s){return s.toLowerCase()===key;})){ cur.unshift(cap); resumeData.skills=cur.join(' · '); added.push(cap); }
+    });
+  })();
   /* Phase 2a: apply any numbers the user typed for unquantified bullets BEFORE the AI
      collects them, so the tailor works from the real, quantified fact. The number is the
      user's own; nothing is invented. */
@@ -10092,13 +10096,29 @@ async function applyMatch2Job(){
         liftNote=(newPct>oldPct)?(' · match '+oldPct+'% → '+newPct+'% 📈'):(' · match '+newPct+'%');
       }
     }catch(e){}
-    showToast((added.length?('✓ Added '+added.length+' keyword(s) · tailored resume downloaded'):'📄 Tailored resume downloaded for this role')+aiNote+liftNote+' · your master resume is unchanged');
+    showToast((added.length?('✓ Added '+added.length+' skill'+(added.length>1?'s':'')+' · tailored resume downloaded'):'📄 Tailored resume downloaded for this role')+aiNote+liftNote+(added.length?' · your confirmed skills were saved to your résumé':' · your master resume is unchanged'));
   }
   }finally{
     /* the master comes back even if a rewrite threw part-way — EXCEPT in improveMode,
        where the whole point is that the improvement STICKS to the master (v177). */
     window._m2jInFlight=false;   /* v160: release the double-fire lock on every exit path */
-    if(!_improve) _restoreMaster();
+    if(!_improve){
+      _restoreMaster();
+      /* v213 (founder "combination"): the AI BULLET rewrites are job-specific and are
+         restored above, but the skills you CONFIRMED ("I have X") are real skills you
+         have — persist them to your MASTER (add-only), so they stick going forward and
+         you never re-check them per job. Never deletes anything; _tidySkills caps. */
+      try{
+        if(added && added.length){
+          var _cur=(resumeData.skills||'').split(' · ').map(function(s){return s.trim();}).filter(Boolean);
+          added.forEach(function(sk){ if(!_cur.some(function(s){return s.toLowerCase()===String(sk).toLowerCase();})) _cur.unshift(sk); });
+          resumeData.skills=_cur.join(' · ');
+          if(typeof _tidySkills==='function'){ var _t=_tidySkills(resumeData.skills); if(_t&&_t.skills) resumeData.skills=_t.skills; }
+          try{ var _skEl=document.getElementById('pr-skills'); if(_skEl&&('value' in _skEl)) _skEl.value=resumeData.skills; }catch(e){}
+          try{ if(typeof cloudSync==='function') cloudSync(); }catch(e){}
+        }
+      }catch(e){}
+    }
     try{ if(typeof saveDraft==='function') saveDraft(); }catch(e){}
   }
 }
@@ -10680,7 +10700,7 @@ function fixResumeWithJett(){
   const body=document.getElementById('m2j-body');
   if(body){
     body.innerHTML='<div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">These show up in many live '+safe+' postings but aren’t on your resume yet. <strong style="color:var(--off);">Check only the ones you genuinely have</strong> — Jett weaves them into your real bullets, never invented.</div>'+
-      '<div id="m2j-checks">'+miss.map((w,i)=>'<label style="display:flex;align-items:center;gap:10px;background:var(--plum3);border-radius:9px;padding:10px 12px;margin-bottom:7px;cursor:pointer;"><input type="checkbox" id="m2j-c'+i+'" style="accent-color:var(--mint);width:16px;height:16px;"/><span style="font-size:13px;font-weight:600;text-transform:capitalize;">I have '+String(w).replace(/</g,'&lt;')+'</span></label>').join('')+'</div>'+
+      '<div id="m2j-checks">'+miss.map((w,i)=>'<label style="display:flex;align-items:center;gap:10px;background:var(--plum3);border-radius:9px;padding:10px 12px;margin-bottom:7px;cursor:pointer;"><input type="checkbox" id="m2j-c'+i+'" data-skill="'+String(w).replace(/"/g,'&quot;').replace(/</g,'')+'" style="accent-color:var(--mint);width:16px;height:16px;"/><span style="font-size:13px;font-weight:600;text-transform:capitalize;">I have '+String(w).replace(/</g,'&lt;')+'</span></label>').join('')+'</div>'+
       '<div onclick="applyMatch2Job()" style="margin-top:12px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;text-align:center;">✨ Add with Jett & update my resume</div>'+
       '<div style="font-size:10px;color:var(--muted);text-align:center;margin-top:8px;">Jett rewrites your real bullets; you can edit everything after.</div>';
   }
@@ -14568,8 +14588,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v212';
+const APP_VERSION = 'v213';
 const CHANGELOG = {
+  'v213':['Match-to-Job #4: bulletproof checkbox capture (data-skill, index-independent) + confirmed skills persist to master'],
   'v212':['match honesty: a high % no longer reads as \'stretch role — no skills\'; score-aware insight (title/experience-driven + keyword tailoring)'],
   'v211':['search fix: renderBrowse honors the any-word fallback (67-found-0-shown) so loose keyword results actually render'],
   'v210':['D1 truncation fix: drawer lazy-loads the FULL posting (pool stored a 600-char preview since v198)'],

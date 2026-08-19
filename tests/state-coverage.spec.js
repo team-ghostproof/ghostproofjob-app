@@ -8310,3 +8310,41 @@ test.describe('[STATE-COVERAGE] v212 match honesty — a high % never reads as "
     expect(r.lowMsg, 'a genuinely low score still honestly warns "stretch role"').toMatch(/stretch/i);
   });
 });
+
+test.describe('[STATE-COVERAGE] v213 Match-to-Job — checked skills reach the download AND persist to the master', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.applyMatch2Job === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('data-skill capture: checked skills land in the tailored download + the master; unchecked excluded; master not corrupted', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      resumeReady = true;
+      Object.assign(resumeData, { name: 'Test', title: 'Marketing', skills: 'Excel · Word · Sales', jobs: [{ t: 'Specialist', c: 'Acme', b: 'Ran events.' }], summary: 'x' });
+      const modal = document.getElementById('match2job-modal');
+      const host = document.getElementById('m2j-body') || modal;
+      // two checked (with data-skill), one UNchecked — the capture reads the box's own skill
+      host.innerHTML = '<div id="m2j-checks">'
+        + '<label><input type="checkbox" data-skill="SEO" checked></label>'
+        + '<label><input type="checkbox" data-skill="Campaign Management" checked></label>'
+        + '<label><input type="checkbox" data-skill="Analytics"></label></div>';
+      window.fb = window.fb || {};
+      window.fb.smartMatch = async (b) => ({ finalResume: b, changedCount: 0 });
+      let pdfSkills = null, storedAdded = null;
+      window.generateResumePDF = () => { pdfSkills = resumeData.skills; return 'f.pdf'; };
+      window.storeOptimizedResume = (t, co, added) => { storedAdded = added; };
+      window.closeMatch2Job = () => {}; window.showToast = () => {}; window.rateResume = () => {}; window.cloudSync = () => {}; window.saveDraft = () => {};
+      await applyMatch2Job();
+      await new Promise((x) => setTimeout(x, 160));
+      return { pdfSkills, storedAdded, masterSkills: resumeData.skills };
+    });
+    expect(r.storedAdded, 'exactly the two CHECKED skills are captured — not by fragile index').toEqual(['SEO', 'Campaign Management']);
+    expect(r.pdfSkills, 'the tailored DOWNLOAD now contains the checked skills (the reported bug)').toMatch(/SEO/);
+    expect(r.pdfSkills).toMatch(/Campaign Management/);
+    expect(r.masterSkills, 'confirmed skills PERSIST to the master (the combination)').toMatch(/SEO/);
+    expect(r.masterSkills, "the master's original skills are preserved — no corruption").toMatch(/Excel/);
+    expect(r.masterSkills, 'an UNCHECKED skill is never added').not.toMatch(/Analytics/);
+  });
+});
