@@ -8434,3 +8434,49 @@ test.describe('[STATE-COVERAGE] v216 match Q1 — seniority-gap cap', () => {
     expect(r.icOnly, 'a 2-tier jump (Coordinator → VP) caps harder (≤70)').toBeLessThanOrEqual(70);
   });
 });
+
+test.describe('[STATE-COVERAGE] v217 mobile deck — decision-snapshot card', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.fillSlot === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('snapshot tiles paint from fillSlot; location not duplicated in the subtitle; taps open the popups not the drawer', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const card = document.querySelector('.job-card.top');
+      const job = { t: 'Marketing Manager', co: 'RPM Living', loc: 'Houston, TX', sal: '$85–110K', work_setting: 'Hybrid', posting_age_days: 13, jtype: 'Full-time', desc: 'x', req: '5+ yrs', benefits: 'y', ghost: 26 };
+      fillSlot(card, job);
+      return {
+        salary: card.querySelector('.s-salary').textContent,
+        loc: card.querySelector('.s-loc').textContent,
+        ghost: card.querySelector('.s-ghost').textContent,
+        subDropsLoc: card.querySelector('.s-sub').textContent.indexOf('Houston') < 0,
+        subKeepsCompanyFirst: card.querySelector('.s-sub').textContent.split(' · ')[0] === 'RPM Living',
+        matchTapsInsight: (card.querySelector('[onclick*="cardMatchInsight"]') || {}) !== null && !!card.querySelector('[onclick*="cardMatchInsight"] .match-pct'),
+        gapTapsReq: (card.querySelector('.s-req').getAttribute('onclick') || '').indexOf('reqGapsTop') >= 0,
+        tapHint: card.querySelector('.tap-hint').textContent,
+      };
+    });
+    expect(r.salary).toBe('$85–110K');
+    expect(r.loc).toBe('📍 Houston, TX');
+    expect(r.ghost).toBe('👻 26%');
+    expect(r.subDropsLoc, 'location lives in its tile, not repeated in the subtitle').toBe(true);
+    expect(r.subKeepsCompanyFirst, 'company stays the first subtitle token other code reads').toBe(true);
+    expect(r.matchTapsInsight, 'the Match tile opens the quick-view insight popup').toBe(true);
+    expect(r.gapTapsReq, 'the gaps row opens the quick-view gaps popup').toBe(true);
+    expect(r.tapHint).toContain('full posting');
+  });
+
+  test('empty/missing data: the match tile is never blank — a graceful fit label', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const card = document.querySelector('.job-card.top');
+      fillSlot(card, { t: 'Marketing Manager', co: 'RPM Living', desc: 'marketing seo email' });
+      const mp = card.querySelector('.match-pct');
+      return { text: mp.textContent, shown: mp.style.display !== 'none' };
+    });
+    expect(r.text, 'never blank').toContain('fit');
+    expect(r.shown, 'the match tile value is visible').toBe(true);
+  });
+});
