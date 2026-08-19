@@ -959,7 +959,7 @@ test.describe('[STATE-COVERAGE] v96 match-insight truth', () => {
       document.getElementById('match-modal').classList.remove('open');
 
       return {
-        waterHonest: /None of your listed skills/.test(waterHave),
+        waterHonest: /stretch role/i.test(waterHave),   /* v212 honest copy: "…a genuine stretch role. …not direct skill overlap." */
         waterNoPhotoshop: !/Photoshop/.test(waterHave),
         mktShowsReal: /Photoshop/.test(mktHave) && /Excel/.test(mktHave) && /Sales/.test(mktHave),
       };
@@ -1639,16 +1639,22 @@ test.describe('[STATE-COVERAGE] v101b batch A (forms, overlay gate, safe-area)',
       // reported "header renders at 375px" on chromium (resizing DOWN across the
       // breakpoint) and "at 1280px" on mobile (resizing UP). Same bug, different
       // width. Wait for the header to actually exist instead of guessing.
+      // v219 flake fix: wait for the reload to COMPLETE (readyState) + the header to exist,
+      // then POLL scrollWidth until the rebuild settles. Under parallel CI load the rebuild
+      // takes a variable moment during which scrollWidth transiently exceeds clientWidth;
+      // measuring one racy frame (the old code) failed intermittently. Polling absorbs it.
       await page.waitForFunction(
-        () => { const h = document.getElementById('header'); return !!(h && h.offsetHeight > 0); },
+        () => document.readyState === 'complete' && !!(document.getElementById('header') && document.getElementById('header').offsetHeight > 0),
         null, { timeout: 15000 },
       ).catch(() => {});
-      const m = await page.evaluate(() => ({
-        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        headerVisible: !!(document.getElementById('header') && document.getElementById('header').offsetHeight),
-      }));
-      expect(m.overflow, 'no horizontal scroll at ' + w + 'px').toBeLessThanOrEqual(0);
-      expect(m.headerVisible, 'header renders at ' + w + 'px').toBe(true);
+      await expect.poll(
+        () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        { timeout: 10000, message: 'no horizontal scroll at ' + w + 'px' },
+      ).toBeLessThanOrEqual(0);
+      const headerVisible = await page.evaluate(
+        () => !!(document.getElementById('header') && document.getElementById('header').offsetHeight),
+      );
+      expect(headerVisible, 'header renders at ' + w + 'px').toBe(true);
     }
   });
 });
@@ -3131,7 +3137,11 @@ test.describe('[STATE-COVERAGE] v142 desktop deck height — Save button stays r
 
   test('mobile is unchanged by the desktop fix (no regression)', async ({ page }) => {
     const r = await page.evaluate(`(${measure})(false)`);
-    expect(r.deckH, 'mobile keeps its 300px floor').toBe(300);
+    /* v219: mobile deck floors at 300 and HUGS the card (max(300, real+8)); v217's
+       founder-approved snapshot card is a few px taller, so 300–~303 is correct — the
+       guard is "no desktop dead-space bleed + no controls overlap", not an exact 300. */
+    expect(r.deckH, 'mobile deck floors at 300 and hugs the card — no desktop 440 bleed').toBeGreaterThanOrEqual(300);
+    expect(r.deckH, 'mobile deck never balloons — it hugs the card').toBeLessThan(340);
     expect(r.overlaps).toBe(false);
   });
 
@@ -7020,8 +7030,10 @@ test.describe('[STATE-COVERAGE] v177 Add-with-Jett improveMode commits to master
       if (improve) ctx.improveMode = true; else ctx.co = 'Acme Corp';
       m2jContext = ctx;
       document.querySelectorAll('[id^="m2j-c"]').forEach(n => n.remove());
-      const box = document.createElement('div'); box.innerHTML = '<input type="checkbox" id="m2j-c0">';
-      document.body.appendChild(box);
+      /* v213 capture reads a checked box's OWN data-skill from inside #match2job-modal
+         (index-independent). Mirror real usage: place the box in the modal with data-skill. */
+      const box = document.createElement('div'); box.innerHTML = '<input type="checkbox" id="m2j-c0" data-skill="Social Media">';
+      (document.getElementById('match2job-modal') || document.body).appendChild(box);
       document.getElementById('m2j-c0').checked = true;
       await applyMatch2Job();
       return { before, after: resumeData.skills };
@@ -8311,7 +8323,7 @@ test.describe('[STATE-COVERAGE] v212 match honesty — a high % never reads as "
   });
 });
 
-test.describe('[STATE-COVERAGE] v213 Match-to-Job — checked skills reach the download AND persist to the master', () => {
+test.describe('[STATE-COVERAGE] v213/v219 Match-to-Job — checked skills reach the download; master stays unchanged', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => typeof window.applyMatch2Job === 'function', null, { timeout: 15000 });
@@ -8319,7 +8331,7 @@ test.describe('[STATE-COVERAGE] v213 Match-to-Job — checked skills reach the d
     await page.waitForTimeout(400);
   });
 
-  test('data-skill capture: checked skills land in the tailored download + the master; unchecked excluded; master not corrupted', async ({ page }) => {
+  test('data-skill capture: checked skills land in the tailored download only; master unchanged; unchecked excluded', async ({ page }) => {
     const r = await page.evaluate(async () => {
       resumeReady = true;
       Object.assign(resumeData, { name: 'Test', title: 'Marketing', skills: 'Excel · Word · Sales', jobs: [{ t: 'Specialist', c: 'Acme', b: 'Ran events.' }], summary: 'x' });
@@ -8343,8 +8355,8 @@ test.describe('[STATE-COVERAGE] v213 Match-to-Job — checked skills reach the d
     expect(r.storedAdded, 'exactly the two CHECKED skills are captured — not by fragile index').toEqual(['SEO', 'Campaign Management']);
     expect(r.pdfSkills, 'the tailored DOWNLOAD now contains the checked skills (the reported bug)').toMatch(/SEO/);
     expect(r.pdfSkills).toMatch(/Campaign Management/);
-    expect(r.masterSkills, 'confirmed skills PERSIST to the master (the combination)').toMatch(/SEO/);
-    expect(r.masterSkills, "the master's original skills are preserved — no corruption").toMatch(/Excel/);
+    expect(r.masterSkills, 'v219 (founder decision): a per-job tailor NEVER mutates the master — the confirmed skill goes to the DOWNLOAD only, not the master').not.toMatch(/SEO/);
+    expect(r.masterSkills, "the master's original skills are fully preserved — no corruption").toMatch(/Excel/);
     expect(r.masterSkills, 'an UNCHECKED skill is never added').not.toMatch(/Analytics/);
   });
 });
