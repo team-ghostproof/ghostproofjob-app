@@ -1647,13 +1647,24 @@ test.describe('[STATE-COVERAGE] v101b batch A (forms, overlay gate, safe-area)',
         () => document.readyState === 'complete' && !!(document.getElementById('header') && document.getElementById('header').offsetHeight > 0),
         null, { timeout: 15000 },
       ).catch(() => {});
+      // The breakpoint-cross reload can still be in flight when we poll; a page.evaluate
+      // that lands mid-navigation throws "Execution context was destroyed". Swallow that
+      // inside the poll (return a sentinel > 0 so it keeps polling) until the page settles
+      // and scrollWidth reports a real, stable value ≤ 0.
       await expect.poll(
-        () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
-        { timeout: 10000, message: 'no horizontal scroll at ' + w + 'px' },
+        async () => {
+          try { return await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth); }
+          catch { return 9999; }
+        },
+        { timeout: 12000, message: 'no horizontal scroll at ' + w + 'px' },
       ).toBeLessThanOrEqual(0);
-      const headerVisible = await page.evaluate(
-        () => !!(document.getElementById('header') && document.getElementById('header').offsetHeight),
-      );
+      // The header can be transiently 0-height mid-rebuild after a breakpoint-cross reload
+      // (esp. on the desktop 1280 step); a one-shot read caught that instant intermittently.
+      // Wait for it to settle visible instead.
+      const headerVisible = await page.waitForFunction(
+        () => { const h = document.getElementById('header'); return !!(h && h.offsetHeight > 0); },
+        null, { timeout: 8000 },
+      ).then(() => true).catch(() => false);
       expect(headerVisible, 'header renders at ' + w + 'px').toBe(true);
     }
   });
@@ -8494,21 +8505,29 @@ test.describe('[STATE-COVERAGE] v217 mobile deck — decision-snapshot card', ()
 });
 
 test.describe('[STATE-COVERAGE] v218 desktop expand — fill the screen, card stays card-width', () => {
-  test('at a wide viewport the app fills to 1680px, the deck column widens to 1040px, and the card is capped at 560px', async ({ page }) => {
+  test('v220: at a wide viewport the app fills wider (2000) AND the card is TRUE-CENTERED in the viewport (balanced 3-col grid)', async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 900 });
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => typeof window.buildDesktopGrid === 'function', null, { timeout: 15000 });
     const r = await page.evaluate(() => {
       if (typeof buildDesktopGrid === 'function' && !document.body.classList.contains('desk')) buildDesktopGrid();
-      const g = (sel) => { const el = document.querySelector(sel); return el ? getComputedStyle(el).maxWidth : null; };
+      const mw = (sel) => { const el = document.querySelector(sel); return el ? getComputedStyle(el).maxWidth : null; };
+      const grid = document.querySelector('#desk-grid');
+      const gridCols = grid ? getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).length : 0;
+      const deck = document.querySelector('#view-swipe #card-deck');
+      const dr = deck ? deck.getBoundingClientRect() : null;
       return {
-        app: g('#app'),
-        view: g('#desk-main > .view#view-swipe') || g('#view-swipe'),
-        deck: (function () { const el = document.querySelector('#view-swipe #card-deck'); return el ? getComputedStyle(el).maxWidth : null; })(),
+        app: mw('#app'),
+        deck: mw('#view-swipe #card-deck'),
+        gridCols,
+        deckLaidOut: !!(dr && dr.width > 0),
+        cardOff: dr ? Math.round((dr.left + dr.right) / 2 - window.innerWidth / 2) : null,
       };
     });
-    expect(r.app, 'the app frame fills the screen (no more 1280 dead gutters)').toBe('1680px');
-    expect(r.view, 'the deck column widens so the bars breathe').toBe('1040px');
+    expect(r.app, 'the app frame fills wider monitors (2000, was 1680 → less dead band)').toBe('2000px');
     expect(r.deck, 'the card itself stays card-width — never stretched').toBe('560px');
+    expect(r.gridCols, 'a wide viewport uses the balanced 3-column grid (rail · centered main · gutter)').toBe(3);
+    expect(r.deckLaidOut, 'the card is actually laid out on the swipe view').toBe(true);
+    expect(Math.abs(r.cardOff), 'v220: the card is TRUE-CENTERED in the viewport — not shoved right by the rail').toBeLessThanOrEqual(6);
   });
 });
