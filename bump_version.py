@@ -27,7 +27,7 @@ MIRROR= os.path.join(HERE, 'GhostProofJob.html')
 PAT = {
     'cache':  (re.compile(r"(const CACHE_VERSION\s*=\s*'gpj-v)(\d+)(')"),        'sw.js / CACHE_VERSION'),
     'app':    (re.compile(r"(const APP_VERSION = 'v)(\d+)(')"),                  'APP_VERSION'),
-    'stamp':  (re.compile(r"(id=\"build-stamp\">v)(\d+)(</span>)"),             'build-stamp'),
+    'stamp':  (re.compile(r"(id=\"build-stamp\"[^>]*>v)(\d+)(</span>)"),        'build-stamp'),
 }
 
 def read(p):
@@ -64,6 +64,32 @@ def add_changelog(idx_text, newver, notes):
     if needle not in idx_text:
         return idx_text, False
     return idx_text.replace(needle, needle + f"  'v{newver}':{arr},\n", 1), True
+
+def update_build_history(newver, notes):
+    """[BUILD-DOC] Append the new version to BUILD_HISTORY.md (the master build log) so it
+    stays current automatically on every bump. Inserts one bullet under the newest ## section
+    and refreshes the 'Last updated / Current live build' line. Idempotent per version."""
+    import os, re, datetime
+    p = 'BUILD_HISTORY.md'
+    if not os.path.exists(p):
+        return False
+    txt = read(p)
+    if f'**v{newver}**' in txt:  # already logged this version
+        return False
+    note = '; '.join(notes) if notes else '(no note)'
+    entry = f'- **v{newver}** — {note}'
+    txt = re.sub(r'_Last updated: [^·]*· Current live build: \*\*v\d+\*\*_',
+                 f'_Last updated: {datetime.date.today().isoformat()} · Current live build: **v{newver}**_', txt, count=1)
+    lines, out, inserted = txt.split('\n'), [], False
+    for ln in lines:
+        out.append(ln)
+        if not inserted and ln.startswith('## '):
+            out.append('- ' + entry[2:] if entry.startswith('- ') else entry)
+            inserted = True
+    if not inserted:
+        out.append(entry)
+    write(p, '\n'.join(out))
+    return True
 
 def main():
     args = sys.argv[1:]
@@ -119,6 +145,7 @@ def main():
         mir, _ = add_changelog(mir, target, notes)
 
     write(SW, sw); write(INDEX, idx); write(MIRROR, mir)
+    hist_added = update_build_history(target, notes)   # [BUILD-DOC] keep the master build log current
 
     # verify
     after = current_versions()
