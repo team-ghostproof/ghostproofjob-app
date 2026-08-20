@@ -806,10 +806,14 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
     #header-row{gap:8px!important;}
   }
   @media(max-width:380px){
-    #auth-chip,#upgrade-trigger{font-size:10px;padding:5px 7px;letter-spacing:-.2px;}
-    #auth-chip{max-width:68px;}
+    /* v222 (founder: wordmark still clipped the final "b" — needed 108px, had 97px). Free
+       room from the right chips AND trim the wordmark just enough that "GhostProofJob" fits
+       whole. padding-right guards the -webkit-background-clip:text last-glyph edge. */
+    #auth-chip,#upgrade-trigger{font-size:10px;padding:5px 6px;letter-spacing:-.2px;}
+    #auth-chip{max-width:56px;}
     .grace-pill{font-size:9px;}
-    .brand-text{font-size:15px!important;}
+    .brand-text{font-size:13px!important;letter-spacing:-.4px!important;padding-right:2px;}
+    #header-row{gap:6px!important;}
     #header > div:first-child{gap:6px!important;padding:10px 10px 8px!important;}
   }
   @media(max-width:340px){
@@ -2075,25 +2079,25 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
                  row. Same s-* class hooks fillSlot() writes to — only the layout changed.
                  Tapping Match or the gaps row opens the existing quick-view popups
                  (cardMatchInsight / reqGapsTop), NOT the drawer. -->
-            <div style="display:flex;gap:7px;margin-top:11px;">
-              <div onclick="cardMatchInsight(event)" style="flex:1;min-width:0;background:rgba(0,245,160,.10);border:1px solid rgba(0,245,160,.35);border-radius:12px;padding:9px 5px;text-align:center;cursor:pointer;">
-                <span class="match-pct" style="display:none;font-size:19px;font-weight:900;color:var(--mint);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🎯</span>
-                <span style="display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-top:2px;">Match ›</span>
+            <div style="display:flex;gap:7px;margin-top:11px;align-items:stretch;">
+              <div onclick="cardMatchInsight(event)" style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;">
+                <span class="match-pct" style="display:none;font-size:17px;font-weight:900;color:var(--mint);line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🎯</span>
+                <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;">Match ›</span>
               </div>
-              <div style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:9px 5px;text-align:center;">
-                <span class="s-salary" style="display:none;font-size:12.5px;font-weight:800;color:var(--off);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
-                <span style="display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-top:3px;">Salary</span>
+              <div style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;">
+                <span class="s-salary" style="display:none;font-size:13px;font-weight:800;color:var(--off);line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+                <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;">Salary</span>
               </div>
-              <div style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:9px 5px;text-align:center;">
-                <span class="s-loc" style="display:none;font-size:12.5px;font-weight:800;color:var(--off);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
-                <span style="display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-top:3px;">Location</span>
+              <div style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;">
+                <span class="s-loc" style="display:none;font-size:13px;font-weight:800;color:var(--off);line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+                <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;">Location</span>
               </div>
             </div>
           </div>
           <div class="card-body">
             <div class="green-flag" style="display:none;">🟢 <strong>Green Flag</strong></div>
             <div class="red-flag" style="display:none;">🔴 <strong>Red Flag</strong></div>
-            <div class="risk-gap-row" style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
+            <div class="risk-gap-row" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
               <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
@@ -2113,25 +2117,25 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
                  row. Same s-* class hooks fillSlot() writes to — only the layout changed.
                  Tapping Match or the gaps row opens the existing quick-view popups
                  (cardMatchInsight / reqGapsTop), NOT the drawer. -->
-            <div style="display:flex;gap:7px;margin-top:11px;">
-              <div onclick="cardMatchInsight(event)" style="flex:1;min-width:0;background:rgba(0,245,160,.10);border:1px solid rgba(0,245,160,.35);border-radius:12px;padding:9px 5px;text-align:center;cursor:pointer;">
-                <span class="match-pct" style="display:none;font-size:19px;font-weight:900;color:var(--mint);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🎯</span>
-                <span style="display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-top:2px;">Match ›</span>
+            <div style="display:flex;gap:7px;margin-top:11px;align-items:stretch;">
+              <div onclick="cardMatchInsight(event)" style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;">
+                <span class="match-pct" style="display:none;font-size:17px;font-weight:900;color:var(--mint);line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🎯</span>
+                <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;">Match ›</span>
               </div>
-              <div style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:9px 5px;text-align:center;">
-                <span class="s-salary" style="display:none;font-size:12.5px;font-weight:800;color:var(--off);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
-                <span style="display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-top:3px;">Salary</span>
+              <div style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;">
+                <span class="s-salary" style="display:none;font-size:13px;font-weight:800;color:var(--off);line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+                <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;">Salary</span>
               </div>
-              <div style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:9px 5px;text-align:center;">
-                <span class="s-loc" style="display:none;font-size:12.5px;font-weight:800;color:var(--off);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
-                <span style="display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-top:3px;">Location</span>
+              <div style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;">
+                <span class="s-loc" style="display:none;font-size:13px;font-weight:800;color:var(--off);line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+                <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;">Location</span>
               </div>
             </div>
           </div>
           <div class="card-body">
             <div class="green-flag" style="display:none;">🟢 <strong>Green Flag</strong></div>
             <div class="red-flag" style="display:none;">🔴 <strong>Red Flag</strong></div>
-            <div class="risk-gap-row" style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
+            <div class="risk-gap-row" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
               <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
@@ -2151,25 +2155,25 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
                  row. Same s-* class hooks fillSlot() writes to — only the layout changed.
                  Tapping Match or the gaps row opens the existing quick-view popups
                  (cardMatchInsight / reqGapsTop), NOT the drawer. -->
-            <div style="display:flex;gap:7px;margin-top:11px;">
-              <div onclick="cardMatchInsight(event)" style="flex:1;min-width:0;background:rgba(0,245,160,.10);border:1px solid rgba(0,245,160,.35);border-radius:12px;padding:9px 5px;text-align:center;cursor:pointer;">
-                <span class="match-pct" style="display:none;font-size:19px;font-weight:900;color:var(--mint);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🎯</span>
-                <span style="display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-top:2px;">Match ›</span>
+            <div style="display:flex;gap:7px;margin-top:11px;align-items:stretch;">
+              <div onclick="cardMatchInsight(event)" style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;">
+                <span class="match-pct" style="display:none;font-size:17px;font-weight:900;color:var(--mint);line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🎯</span>
+                <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;">Match ›</span>
               </div>
-              <div style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:9px 5px;text-align:center;">
-                <span class="s-salary" style="display:none;font-size:12.5px;font-weight:800;color:var(--off);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
-                <span style="display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-top:3px;">Salary</span>
+              <div style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;">
+                <span class="s-salary" style="display:none;font-size:13px;font-weight:800;color:var(--off);line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+                <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;">Salary</span>
               </div>
-              <div style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:9px 5px;text-align:center;">
-                <span class="s-loc" style="display:none;font-size:12.5px;font-weight:800;color:var(--off);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
-                <span style="display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-top:3px;">Location</span>
+              <div style="flex:1;min-width:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;">
+                <span class="s-loc" style="display:none;font-size:13px;font-weight:800;color:var(--off);line-height:1.1;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+                <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;">Location</span>
               </div>
             </div>
           </div>
           <div class="card-body">
             <div class="green-flag" style="display:none;">🟢 <strong>Green Flag</strong></div>
             <div class="red-flag" style="display:none;">🔴 <strong>Red Flag</strong></div>
-            <div class="risk-gap-row" style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
+            <div class="risk-gap-row" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
               <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
@@ -3137,7 +3141,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v221</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v222</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -11081,7 +11085,7 @@ function fillSlot(cardEl, job){
     }
     if(gf){ gf.style.display='none'; }
   } else {
-    if(gf){ var _a=job.posting_age_days, _fresh=(_a==null||_a<=14||(job.sal&&job.sal!=='Salary on request')); var _txt=(job.sal&&job.sal!=='Salary on request')?('Verified salary posted'+(_a!=null&&_a>21?(' · posted '+_a+'d ago'):'')):(_fresh?('Actively hiring now · '+String(job.loc||'').split(',')[0]):('Posted '+_a+'d ago · confirm it’s still open')); gf.innerHTML=(_fresh?'🟢 <strong>Green Flag</strong> — ':'⚠️ ')+_txt; gf.style.borderLeftColor=_fresh?'var(--mint)':'var(--warn)'; gf.style.color=_fresh?'var(--mint)':'var(--warn)'; gf.style.display='block'; }
+    if(gf){ var _a=job.posting_age_days, _fresh=(_a==null||_a<=14||(job.sal&&job.sal!=='Salary on request')); var _txt=(job.sal&&job.sal!=='Salary on request')?('Verified salary posted'+(_a!=null&&_a>21?(' · posted '+_a+'d ago'):'')):(_fresh?('Fresh posting'+(_a!=null?(' · '+_a+'d ago'):' · recently listed')):('Posted '+_a+'d ago · confirm it’s still open')); gf.innerHTML=(_fresh?'🟢 <strong>Green Flag</strong> — ':'⚠️ ')+_txt; gf.style.borderLeftColor=_fresh?'var(--mint)':'var(--warn)'; gf.style.color=_fresh?'var(--mint)':'var(--warn)'; gf.style.display='block'; }
     if(rf){ rf.style.display='none'; }
   }
   /* MATCH BADGE — compute real resume-aware match + make it clickable (parity
@@ -14759,8 +14763,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v221';
+const APP_VERSION = 'v222';
 const CHANGELOG = {
+  'v222':['card uniformity + honest signals [UI-REVIEW approved, verified light+dark on the real card]: the 3 snapshot tiles (Match/Salary/Location) are now uniform — one background per mode, text centered + vertically middled, Match emphasized by its green NUMBER not a clashing green tile (was green vs purple); ghost + gap pills centered (were left-orphaned); green flag is honest — \'Fresh posting · Nd ago\' instead of the unverifiable \'Actively hiring now\' + confusing city append; header wordmark no longer clips on phones (fits "GhostProofJob" whole down to 360px by freeing room from the right chips)'],
   'v221':['logged-in card polish [UI-REVIEW approved, verified on the real signed-in card]: salary tile no longer clips ("On request" + ellipsis, was "Salary on reques…"); ghost kept as the clean 👻 N% pill — only the far-right fling was fixed (no bar); ghost + gap now share ONE row as compact pills (👻 26% · ⚠️ 1 gap) — tap the gap pill to see which requirements are missing; expanded drawer stops repeating duties across sections (overlap-aware dedup) and shows more before "tap to expand"; desktop card widened to match the 860px console; #employers stripped from the URL'],
   'v220':['desktop [UI-REVIEW approved]: true-center the swipe card + footer in the viewport (balanced 3-col grid ≥1200px, fills to 2000px); align every swipe-view element to one center (founder: Applied/Responses/Skipped now centered with everything else)'],
   'v219':['process integrity: per-job tailor is DOWNLOAD-ONLY (reverses v213 job-card master-persist per founder decision); test truth-ups (v96 honest copy, v142 deck tolerance, v177 modal capture) + v101b flake poll-fix'],

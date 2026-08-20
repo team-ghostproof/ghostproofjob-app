@@ -8596,3 +8596,37 @@ test.describe('[STATE-COVERAGE] v221 card-face polish + drawer dedup', () => {
     expect(r.after, 'the hash is cleared once the employer view has been handled').toBe('');
   });
 });
+
+test.describe('[STATE-COVERAGE] v222 card uniformity + honest green flag', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.fillSlot === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('green flag is honest — "Fresh posting", not the "Actively hiring now" overclaim, and no confusing city append', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const card = document.querySelector('.job-card.top');
+      fillSlot(card, { t: 'Marketing Coordinator', co: 'Acme', loc: 'Spring, TX', posting_age_days: 10, ghost: 20, desc: 'x' });
+      const gf = card.querySelector('.green-flag');
+      return { text: gf.textContent.trim(), shown: getComputedStyle(gf).display !== 'none' };
+    });
+    expect(r.shown).toBe(true);
+    expect(r.text, 'no unverifiable "actively hiring" claim').not.toMatch(/actively hiring/i);
+    expect(r.text, 'no orphan city appended to the flag').not.toMatch(/·\s*Spring\b/);
+    expect(r.text, 'honest recency signal').toMatch(/Fresh posting/i);
+  });
+
+  test('the three snapshot tiles are uniform — same background in the current mode (Match accents via text only)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const card = document.querySelector('.job-card.top');
+      fillSlot(card, { t: 'Marketing Coordinator', co: 'Acme', loc: 'Spring, TX', sal: 'Salary on request', ghost: 26, desc: 'x' });
+      const tiles = ['.match-pct', '.s-salary', '.s-loc'].map(s => card.querySelector(s).parentElement).map(t => getComputedStyle(t).backgroundColor);
+      const row = card.querySelector('.risk-gap-row');
+      return { uniqueBgs: [...new Set(tiles)], rowJustify: getComputedStyle(row).justifyContent };
+    });
+    expect(r.uniqueBgs.length, 'all three tiles share ONE background (no green-vs-purple clash)').toBe(1);
+    expect(r.rowJustify, 'the ghost/gap pills are centered, not left-orphaned').toBe('center');
+  });
+});
