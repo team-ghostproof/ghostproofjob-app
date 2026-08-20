@@ -8484,7 +8484,7 @@ test.describe('[STATE-COVERAGE] v217 mobile deck — decision-snapshot card', ()
     });
     expect(r.salary).toBe('$85–110K');
     expect(r.loc).toBe('📍 Houston, TX');
-    expect(r.ghost).toBe('👻 26%');
+    expect(r.ghost, 'the ghost risk pill shows 👻 N% (kept the clean pill; only the far-right fling was fixed)').toBe('👻 26%');
     expect(r.subDropsLoc, 'location lives in its tile, not repeated in the subtitle').toBe(true);
     expect(r.subKeepsCompanyFirst, 'company stays the first subtitle token other code reads').toBe(true);
     expect(r.matchTapsInsight, 'the Match tile opens the quick-view insight popup').toBe(true);
@@ -8525,9 +8525,74 @@ test.describe('[STATE-COVERAGE] v218 desktop expand — fill the screen, card st
       };
     });
     expect(r.app, 'the app frame fills wider monitors (2000, was 1680 → less dead band)').toBe('2000px');
-    expect(r.deck, 'the card itself stays card-width — never stretched').toBe('560px');
+    expect(r.deck, 'v221: the card matches the 860px console width (was 560, read too narrow)').toBe('860px');
     expect(r.gridCols, 'a wide viewport uses the balanced 3-column grid (rail · centered main · gutter)').toBe(3);
     expect(r.deckLaidOut, 'the card is actually laid out on the swipe view').toBe(true);
     expect(Math.abs(r.cardOff), 'v220: the card is TRUE-CENTERED in the viewport — not shoved right by the rail').toBeLessThanOrEqual(6);
+  });
+});
+
+test.describe('[STATE-COVERAGE] v221 card-face polish + drawer dedup', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.fillSlot === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  });
+
+  test('ghost + gap share one row as compact pills — clean "👻 N%" pill, no margin-left:auto, no bar', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const card = document.querySelector('.job-card.top');
+      fillSlot(card, { t: 'Marketing Manager', co: 'Acme', ghost: 26, desc: 'x' });
+      const gb = card.querySelector('.s-ghost');
+      return { pct: gb.textContent.trim(), marginLeft: getComputedStyle(gb).marginLeft, noBar: !card.querySelector('.s-ghost-bar'), hasRow: !!card.querySelector('.risk-gap-row'), gapInRow: !!card.querySelector('.risk-gap-row .s-req') };
+    });
+    expect(r.pct, 'the clean pill kept — single 👻 with the %').toBe('👻 26%');
+    expect(r.marginLeft, 'no margin-left:auto flinging the pill to the far right (the only real bug)').toBe('0px');
+    expect(r.noBar, 'the bar redesign was reverted — the pill is kept').toBe(true);
+    expect(r.hasRow, 'ghost + gap live on one shared row').toBe(true);
+    expect(r.gapInRow, 'the gap pill sits in the same row as the ghost pill').toBe(true);
+  });
+
+  test('gap is a compact PILL (inline-block, icon+count), never blank when a resume is on file', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      resumeReady = true;
+      Object.assign(resumeData, { title: 'Marketing', skills: 'SEO · Email · Analytics', jobs: [{ t: 'Marketing', c: 'x', b: 'ran campaigns' }], summary: 'marketing' });
+      const card = document.querySelector('.job-card.top');
+      fillSlot(card, { t: 'Marketing Coordinator', co: 'Acme', desc: 'marketing seo email analytics', req: 'seo email analytics', ghost: 20 });
+      const req = card.querySelector('.s-req');
+      return { display: getComputedStyle(req).display, text: req.textContent.trim(), opensGaps: (req.getAttribute('onclick') || '').indexOf('reqGapsTop') >= 0 };
+    });
+    expect(r.display, 'the gap pill is shown when a resume is on file (a flex item in the shared row → computed block)').not.toBe('none');
+    expect(r.text.length, 'never blank when a resume is on file (⚠ N gaps or ✓ No gaps)').toBeGreaterThan(0);
+    expect(r.text.length, 'compact — a count pill, not the old full-sentence row').toBeLessThan(20);
+    expect(r.opensGaps, 'tapping the pill opens the requirements-gap detail').toBe(true);
+  });
+
+  test('_sameJobText catches overlapping req/desc so the drawer never repeats duties', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const A = 'Coordinate marketing campaigns across digital and social channels. Develop content and manage brand assets end to end.';
+      return {
+        identical: _sameJobText(A, A),
+        contained: _sameJobText(A + ' Plus one extra sentence about the benefits package.', A),
+        distinct: _sameJobText('Requires five years of hands-on experience with Salesforce administration and SQL reporting.', A),
+        empty: _sameJobText('', A),
+      };
+    });
+    expect(r.identical, 'identical text is a dup').toBe(true);
+    expect(r.contained, 'one fully containing the other is a dup').toBe(true);
+    expect(r.distinct, 'genuinely different sections are NOT a dup — both are shown').toBe(false);
+    expect(r.empty, 'empty is never a dup').toBe(false);
+  });
+
+  test('openEmployer strips the #employers hash from the URL', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      history.replaceState(null, '', location.pathname + '#employers');
+      const before = location.hash;
+      try { await openEmployer(); } catch (e) {}
+      return { before, after: location.hash };
+    });
+    expect(r.before).toBe('#employers');
+    expect(r.after, 'the hash is cleared once the employer view has been handled').toBe('');
   });
 });

@@ -780,7 +780,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
   @media(max-width:600px){ .grace-full{display:none;} .grace-short{display:inline;} }
   .pm-item:hover{background:var(--plum3);}
   .pm-item:active{background:var(--plum4);}
-  .desc-clamp{max-height:76px;overflow:hidden;position:relative;font-size:12px;color:var(--off);line-height:1.6;cursor:pointer;transition:max-height .3s ease;}
+  .desc-clamp{max-height:150px;overflow:hidden;position:relative;font-size:12px;color:var(--off);line-height:1.6;cursor:pointer;transition:max-height .3s ease;}   /* v221 (founder: drawer "dropping text" — 76px cut mid-first-bullet); show more before the "tap to expand" fade */
   .desc-clamp::after{content:'▾ tap to expand';position:absolute;bottom:0;left:0;right:0;height:26px;padding-top:12px;text-align:center;font-size:10px;font-weight:700;color:var(--cyber);background:linear-gradient(transparent,var(--plum2) 60%);pointer-events:none;}
   .desc-clamp.expanded{max-height:360px;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--plum4) transparent;}
   .desc-clamp.expanded::after{display:none;}
@@ -1072,7 +1072,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
     /* v218: widen the deck column so the stats/streak/filter bars breathe across the
        screen; the card itself is held to card-width below so it never stretches. */
     body.desk #desk-main>.view#view-swipe{max-width:1040px;margin:0 auto;}
-    body.desk #desk-main>.view#view-swipe #card-deck{max-width:560px;margin-left:auto;margin-right:auto;}
+    body.desk #desk-main>.view#view-swipe #card-deck{max-width:860px;margin-left:auto;margin-right:auto;}   /* v221 (founder: "card isn't as wide as the rest of the middle console"): match the 860px bars so the column reads as one consistent width */
     body.desk #desk-main>div>*{max-width:860px;margin-left:auto;margin-right:auto;}   /* v220: center non-swipe content in the now-centered main (was left-stuck) */
     /* v220 (founder caught: "Applied/Responses/Skipped not centered with everything else"):
        the streak bar, resume-nudge, filter + energy-meter carry an inline `margin:8px 16px 0`
@@ -1136,12 +1136,13 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
     html[data-theme="light"] body.desk .gpj-light .red-flag{color:var(--danger)!important;}
     html[data-theme="light"] body.desk .gpj-light .s-ghost{color:var(--danger);}
   }
-  /* v220 [UI-REVIEW approved]: on wide-enough monitors (≥1200px, where main stays wider
-     than the 560px card even after the gutter), add the phantom right gutter so the rail
-     is balanced and the content column is TRUE-CENTERED in the viewport — card + footer
-     dead-center, equal whitespace both sides. Below 1200 the base 2-col rule keeps the
-     card full-width (a slight offset there, but never a starved card). */
-  @media(min-width:1200px){
+  /* v220/v221 [UI-REVIEW approved]: balanced phantom right gutter so the rail is offset and
+     the content column (card, bars, swipe controls, footer) is TRUE-CENTERED in the viewport
+     with equal whitespace both sides. v221 (founder, real-site window = 1182px): the old
+     ≥1200 threshold left every window in 1024–1199 shoved +119px right — apply the balanced
+     grid across the WHOLE desktop range so it's always centered, never a dead zone. The card
+     narrows a little on a small desktop, but it stays centered + matches the bars. */
+  @media(min-width:1024px){
     body.desk #desk-grid{grid-template-columns:248px minmax(0,1fr) 248px;}
   }
   @keyframes gpjViewIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
@@ -2088,12 +2089,11 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
                 <span style="display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-top:3px;">Location</span>
               </div>
             </div>
-            <span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;margin-top:9px;padding:8px 11px;border-radius:10px;background:rgba(255,179,71,.12);border:1px solid rgba(255,179,71,.45);color:var(--warn);font-size:11.5px;font-weight:700;"></span>
           </div>
           <div class="card-body">
             <div class="green-flag" style="display:none;">🟢 <strong>Green Flag</strong></div>
             <div class="red-flag" style="display:none;">🔴 <strong>Red Flag</strong></div>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:9px;font-size:11px;color:var(--muted);">👻 Ghost Risk<span class="s-ghost" style="display:none;margin-left:auto;font-weight:800;">👻</span></div>
+            <div class="risk-gap-row" style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
               <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
@@ -2127,12 +2127,11 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
                 <span style="display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-top:3px;">Location</span>
               </div>
             </div>
-            <span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;margin-top:9px;padding:8px 11px;border-radius:10px;background:rgba(255,179,71,.12);border:1px solid rgba(255,179,71,.45);color:var(--warn);font-size:11.5px;font-weight:700;"></span>
           </div>
           <div class="card-body">
             <div class="green-flag" style="display:none;">🟢 <strong>Green Flag</strong></div>
             <div class="red-flag" style="display:none;">🔴 <strong>Red Flag</strong></div>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:9px;font-size:11px;color:var(--muted);">👻 Ghost Risk<span class="s-ghost" style="display:none;margin-left:auto;font-weight:800;">👻</span></div>
+            <div class="risk-gap-row" style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
               <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
@@ -2166,12 +2165,11 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
                 <span style="display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-top:3px;">Location</span>
               </div>
             </div>
-            <span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;margin-top:9px;padding:8px 11px;border-radius:10px;background:rgba(255,179,71,.12);border:1px solid rgba(255,179,71,.45);color:var(--warn);font-size:11.5px;font-weight:700;"></span>
           </div>
           <div class="card-body">
             <div class="green-flag" style="display:none;">🟢 <strong>Green Flag</strong></div>
             <div class="red-flag" style="display:none;">🔴 <strong>Red Flag</strong></div>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:9px;font-size:11px;color:var(--muted);">👻 Ghost Risk<span class="s-ghost" style="display:none;margin-left:auto;font-weight:800;">👻</span></div>
+            <div class="risk-gap-row" style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
               <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
@@ -3139,7 +3137,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v220</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob <span id="build-stamp">v221</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3415,6 +3413,9 @@ try{
   else window.addEventListener('load', _openEmpFromHash);                  /* full page load with #employers */
 }catch(e){}
 async function openEmployer(el){
+  /* v221 (founder: "why is '#employers' next to the url?"): the /#employers deep-link opened
+     the view but left the hash sitting in the address bar. Strip it once we've handled it. */
+  try{ if((location.hash||'').toLowerCase()==='#employers'){ history.replaceState(null,'',location.pathname+location.search); } }catch(e){}
   if(window._recruiter){ switchView('employer', el||document.getElementById('nav-employer')); renderEmployerView(); return; }
   /* v101b C (11, founder-approved): ADMIN "View as Employer" — before this, an
      admin tapping "For Employers" fell through to loadRecruiter(adminUid) → null
@@ -11002,18 +11003,41 @@ function fillSlot(cardEl, job){
   if(job.jtype) subBits.push(job.jtype);
   set('s-sub',subBits.join(' · '));
   cardEl.dataset.jobAge=(job.posting_age_days!=null?job.posting_age_days:'');
-  set('s-salary',job.sal);
+  /* v221 (founder: "Salary on request" clips — the final letter was cut). The tile is narrow,
+     and the span rendered display:inline so its nowrap+ellipsis never engaged (an inline box
+     ignores text-overflow). Compact the low-signal values ("on request/negotiable/DOE") and
+     render the value BLOCK so any still-long range truncates cleanly instead of spilling. */
+  (function(){
+    var s=String(job.sal||'').trim();
+    var shortSal=!s?'—':(/(on\s+)?request|not\s*(listed|specified|disclosed|provided)|competitive|negotiab|\bdoe\b|inquire|commensurate/i.test(s)?'On request':s);
+    set('s-salary',shortSal);
+    var se=cardEl.querySelector('.s-salary'); if(se) se.style.display='block';
+  })();
   /* v80: a REMOTE role's badge says Remote — showing only the HQ city
      ("📍 Temecula, CA" on a remote job) read like an out-of-market leak.
      v84 (B-TEXT-CLIP): long locations show the CITY whole, never a mid-word cut. */
   set('s-loc',_locBadge(job.loc,job.work_setting));
+  var _le=cardEl.querySelector('.s-loc'); if(_le) _le.style.display='block';   /* v221: block so a long city ellipsizes, never spills */
   /* F-REQMATCH (v90): flag missing posting requirements next to the match % */
   try{
     const rq=cardEl.querySelector('.s-req');
     if(rq){
       const g=(typeof _reqGaps==='function')?_reqGaps(job):{gaps:[]};
-      if(g.gaps.length){ rq.textContent='⚠️ '+g.gaps.length+' gap'+(g.gaps.length>1?'s':'')+' vs your résumé · see what’s missing ›'; rq.style.display=''; }
-      else rq.style.display='none';
+      const _ready=(typeof resumeReady!=='undefined'&&resumeReady);
+      /* v221 (founder-directed): the gap is a compact PILL that shares one row with the ghost
+         pill (below) — icon + count at a glance; tap it to see WHICH requirements are missing.
+         A small pill (not a big block) so ghost + gap read as one intuitive, optimized row. */
+      if(g.gaps.length){
+        rq.textContent='⚠️ '+g.gaps.length+' gap'+(g.gaps.length>1?'s':'');
+        rq.style.display='inline-block'; rq.style.color='var(--warn)';
+        rq.style.background='rgba(255,179,71,.12)'; rq.style.borderColor='rgba(255,179,71,.45)'; rq.style.cursor='pointer';
+      } else if(_ready){
+        rq.textContent='✓ No gaps';
+        rq.style.display='inline-block'; rq.style.color='var(--mint)';
+        rq.style.background='rgba(0,245,160,.10)'; rq.style.borderColor='rgba(0,245,160,.4)'; rq.style.cursor='pointer';
+      } else {
+        rq.style.display='none';
+      }
     }
   }catch(e){}
   /* reveal vibe stars now that this is a real job */
@@ -11026,10 +11050,13 @@ function fillSlot(cardEl, job){
   const gb=cardEl.querySelector('.s-ghost');
   if(gb){
     const g=job._verifiedCo?0:(job.ghost!=null?job.ghost:ghostRiskFor(job.co));
-    gb.textContent=job._verifiedCo?'✅ Verified':(g==null?'👻 —':'👻 '+g+'%');
-    gb.style.display='inline-block';
     const c=(job._verifiedCo||(g!=null&&g<=15))?'var(--mint)':(g==null?'var(--muted)':(g<=35?'var(--warn)':'var(--danger)'));
-    gb.style.color=c; gb.style.borderColor=c.replace(')',',.4)').replace('var(--mint','rgba(0,245,160').replace('var(--warn','rgba(255,179,71').replace('var(--danger','rgba(255,77,106');
+    /* v221 (founder-corrected): keep the clean "👻 N%" risk PILL — the only real bug was the %
+       being flung to the far right by margin-left:auto (the "2 parts" look), now removed in the
+       markup so the pill sits tight beside the "Ghost Risk" label. No bar redesign (it added no
+       value and wasn't asked for). Single 👻; the pill border tints by risk level. */
+    gb.textContent=job._verifiedCo?'✅ Verified':(g==null?'👻 —':'👻 '+g+'%');
+    gb.style.display='inline-block'; gb.style.color=c; gb.style.borderColor=c;
   }
   /* v141: COMMUNITY WARNING on the card face — "N hunters reported this". This is
      the whole point of a community platform: one person's wasted week saves the
@@ -11919,6 +11946,25 @@ function companyLinks(co, j){
     web:ownWeb||('https://www.google.com/search?q='+qc+'+official+site+careers')
   };
 }
+/* v221 (founder: the drawer "repeats the same details in 2 different sections"): the harvester
+   often stores overlapping text in a job's `req` and `desc`, so "Job Expectations" and "More
+   about the role" showed the same duties. The old guard only caught EXACT equality. This
+   returns true when the two sections are substantively the same — identical, one fully inside
+   the other, or ≥80% of the shorter section's words appear in the longer — so we render ONE. */
+function _sameJobText(a,b){
+  if(!a||!b) return false;
+  var na=String(a).toLowerCase().replace(/\s+/g,' ').trim();
+  var nb=String(b).toLowerCase().replace(/\s+/g,' ').trim();
+  if(!na||!nb) return false;
+  if(na===nb) return true;
+  var shorter=na.length<=nb.length?na:nb, longer=na.length<=nb.length?nb:na;
+  if(shorter.length>40 && longer.indexOf(shorter)>=0) return true;
+  var wa={},wb={}; na.split(' ').forEach(function(w){ if(w.length>3) wa[w]=1; }); nb.split(' ').forEach(function(w){ if(w.length>3) wb[w]=1; });
+  var ka=Object.keys(wa), kb=Object.keys(wb); if(!ka.length||!kb.length) return false;
+  var inter=0; ka.forEach(function(w){ if(wb[w]) inter++; });
+  var minlen=Math.min(ka.length,kb.length);
+  return minlen>0 && (inter/minlen)>=0.8;
+}
 function hydrateDrawer(){
   const topCard=document.querySelector('.job-card.top');
   const _tj=(typeof _currentTopJob==='function'?_currentTopJob():null);
@@ -11959,7 +12005,10 @@ function hydrateDrawer(){
   const sumBox=document.getElementById('drawer-summary');
   if(sumBox){
     const d=(_tj&&_tj.desc)||(topCard&&topCard.dataset.jobdesc)||'', u=(_tj&&_tj.url)||(topCard&&topCard.dataset.joburl)||'', rq=(_tj&&_tj.req)||(topCard&&topCard.dataset.jobreq)||'', bn=(_tj&&_tj.benefits)||(topCard&&topCard.dataset.jobbenefits)||'';
-    const lead=rq||d;
+    /* v221: when req & desc overlap, show only the RICHER one (no repeated duties); when they
+       genuinely differ, keep both sections. */
+    const _dupRD=_sameJobText(d,rq);
+    const lead=_dupRD?((d&&String(d).length>String(rq||'').length)?d:(rq||d)):(rq||d);
     /* v146 (founder): a HOSTED (internal) job has no third-party posting, so the
        "View Full Posting ↗" button is wrong for it. Show an explicit in-app apply
        AND say why there's no external link — the Verified badge now means "hosted
@@ -11970,7 +12019,7 @@ function hydrateDrawer(){
       sumBox.innerHTML=
         '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📋 Job Expectations & Summary</div>'+
         (lead?('<div class="desc-clamp">'+_fmtJobText(lead)+'</div>'):(_int?'':'<div style="font-size:11px;color:var(--muted);">Full details live on the original posting.</div>'))+
-        ((rq&&d&&d!==rq)?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px;">ℹ️ More about the role</div><div class="desc-clamp">'+_fmtJobText(d)+'</div>'):'')+
+        ((rq&&d&&!_dupRD)?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px;">ℹ️ More about the role</div><div class="desc-clamp">'+_fmtJobText(d)+'</div>'):'')+
         (bn?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px;">🎁 Benefits</div><div class="desc-clamp">'+_fmtJobText(bn)+'</div>'):'')+
         (_int
           ?('<div style="font-size:11px;color:var(--mint);margin-top:10px;display:flex;align-items:center;gap:6px;">✅ Hosted &amp; verified on GhostProofJob — apply in-app, no third-party site.</div>'
@@ -14710,8 +14759,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v220';
+const APP_VERSION = 'v221';
 const CHANGELOG = {
+  'v221':['logged-in card polish [UI-REVIEW approved, verified on the real signed-in card]: salary tile no longer clips ("On request" + ellipsis, was "Salary on reques…"); ghost kept as the clean 👻 N% pill — only the far-right fling was fixed (no bar); ghost + gap now share ONE row as compact pills (👻 26% · ⚠️ 1 gap) — tap the gap pill to see which requirements are missing; expanded drawer stops repeating duties across sections (overlap-aware dedup) and shows more before "tap to expand"; desktop card widened to match the 860px console; #employers stripped from the URL'],
   'v220':['desktop [UI-REVIEW approved]: true-center the swipe card + footer in the viewport (balanced 3-col grid ≥1200px, fills to 2000px); align every swipe-view element to one center (founder: Applied/Responses/Skipped now centered with everything else)'],
   'v219':['process integrity: per-job tailor is DOWNLOAD-ONLY (reverses v213 job-card master-persist per founder decision); test truth-ups (v96 honest copy, v142 deck tolerance, v177 modal capture) + v101b flake poll-fix'],
   'v218':['deck wow: desktop expand — fill the screen (raise 1280 cap), widen deck column, card stays card-width'],
