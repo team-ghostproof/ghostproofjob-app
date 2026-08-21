@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-21 · Current live build: **v225**_
+_Last updated: 2026-08-21 · Current live build: **v226**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v226** — account chip icon-only on tight phones (≤380px): name wrapped in .chip-name span + hidden via CSS so it reads as a clean emoji, not the dangling '🙂 Aa…' the 56px ellipsis produced; name still shows on every wider screen; XSS-safe (textContent, not innerHTML); recruiter 🛡️ badge appends a node so the span survives
 - **v225** — scroll + pill placement [UI-REVIEW approved]: desktop scrollbar now at the FAR-RIGHT window edge (2-col + app fills width; inner-scroll model KEPT so the header stays fixed + all bottom-anchored popups keep working — no regression); content centered BETWEEN the rail and the scrollbar with equal gaps; toast centered in the content column; ghost+gap pills moved directly UNDER the Match/Salary/Location tiles (grouped, not floating after the Green Flag). Verified logged-in AND logged-out, desktop + mobile
 - **v224** — transparent header logo (founder-provided): removed the baked navy square — the ghost now reads clean on both the light and dark header (dark outline + mint drop-shadow glow keep the white body visible); onboarding mascot matches; Jett avatar unchanged
 - **v223** — housekeeping + docs: master BUILD_HISTORY.md now auto-maintained by bump_version ([BUILD-DOC] rule); public footer version hidden (internal APP_VERSION/CACHE_VERSION markers kept for SW cache-busting + What's-New); verified the approved logo design = the gradient wordmark, already live (the squareless ghost still needs a transparent asset)

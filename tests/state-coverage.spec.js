@@ -8651,3 +8651,67 @@ test.describe('[STATE-COVERAGE] v222 card uniformity + honest green flag', () =>
     expect(r.rowJustify, 'the ghost/gap pills are centered, not left-orphaned').toBe('center');
   });
 });
+
+test.describe('[STATE-COVERAGE] v226 account chip — icon-only on tight phones', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._gpjSetAuthChip === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(300);
+  });
+
+  test('≤380px: chip is emoji-only — the name span is hidden (no dangling "🙂 Aa…"); full name returns on wider screens', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 780 });
+    // desktop→mobile breakpoint cross can trigger the app's self-reload (deskMQ); let it settle + re-establish context
+    await page.waitForTimeout(400);
+    await page.waitForFunction(() => typeof window._gpjSetAuthChip === 'function', null, { timeout: 15000 });
+    const narrow = await page.evaluate(() => {
+      _gpjSetAuthChip('🙂', 'Aaliyah');
+      const chip = document.getElementById('auth-chip');
+      const name = chip.querySelector('.chip-name');
+      return {
+        nameDisplay: getComputedStyle(name).display,
+        textContent: chip.textContent,                                  // still concatenates for any reader (badge /^🏢/ test etc.)
+        visibleText: (chip.innerText || '').replace(/\s+/g, ' ').trim(),
+        overflow: chip.scrollWidth - chip.clientWidth,
+      };
+    });
+    expect(narrow.nameDisplay, 'name span hidden at 375px').toBe('none');
+    expect(narrow.textContent, 'textContent still reads the full name for any code that inspects it').toContain('Aaliyah');
+    expect(narrow.visibleText, 'no dangling name fragment is visible — icon only').not.toMatch(/Aa/);
+    expect(narrow.overflow, 'emoji-only chip does not overflow/clip (no ellipsis)').toBeLessThanOrEqual(1);
+
+    await page.setViewportSize({ width: 500, height: 780 });
+    const wide = await page.evaluate(() => {
+      const name = document.querySelector('#auth-chip .chip-name');
+      return { nameDisplay: getComputedStyle(name).display, visibleText: (document.getElementById('auth-chip').innerText || '').trim() };
+    });
+    expect(wide.nameDisplay, 'name span shows on wider screens (>480px)').not.toBe('none');
+    expect(wide.visibleText, 'full name visible on wider phones').toContain('Aaliyah');
+  });
+
+  test('recruiter chip: 🛡️ badge append preserves the .chip-name span (icon-only survives)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      _gpjSetAuthChip('🏢', 'Acme Corp');
+      const chip = document.getElementById('auth-chip');
+      chip.appendChild(document.createTextNode(' 🛡️'));               // mimic _gpjMarkRespBadge's append
+      return { hasSpan: !!chip.querySelector('.chip-name'), badgeMatch: /^🏢/.test(chip.textContent), hasShield: chip.textContent.indexOf('🛡️') >= 0 };
+    });
+    expect(r.hasSpan, 'the name span survives the badge append (not flattened by a textContent reassign)').toBe(true);
+    expect(r.badgeMatch, 'the /^🏢/ badge guard still reads correctly').toBe(true);
+    expect(r.hasShield, 'the earned shield is present').toBe(true);
+  });
+
+  test('guest chip ("Sign In") still shows in full at 375px — no clip', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 780 });
+    // desktop→mobile breakpoint cross can trigger the app's self-reload (deskMQ); let it settle + re-establish context
+    await page.waitForTimeout(400);
+    await page.waitForFunction(() => !!document.getElementById('auth-chip'), null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      const chip = document.getElementById('auth-chip');
+      return { text: (chip.innerText || '').trim(), overflow: chip.scrollWidth - chip.clientWidth };
+    });
+    expect(r.text, 'guest still reads "Sign In"').toMatch(/Sign In/i);
+    expect(r.overflow, 'guest chip not clipped at 375px').toBeLessThanOrEqual(1);
+  });
+});
