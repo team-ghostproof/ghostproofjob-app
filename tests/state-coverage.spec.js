@@ -8505,30 +8505,51 @@ test.describe('[STATE-COVERAGE] v217 mobile deck — decision-snapshot card', ()
 });
 
 test.describe('[STATE-COVERAGE] v218 desktop expand — fill the screen, card stays card-width', () => {
-  test('v220: at a wide viewport the app fills wider (2000) AND the card is TRUE-CENTERED in the viewport (balanced 3-col grid)', async ({ page }) => {
-    await page.setViewportSize({ width: 1600, height: 900 });
+  test('v225: wide viewport — 2-col grid, inner-scroll pane reaches the far right, card centered BETWEEN rail and scrollbar', async ({ page }) => {
+    await page.setViewportSize({ width: 1600, height: 560 });
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => typeof window.buildDesktopGrid === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(600);
     const r = await page.evaluate(() => {
       if (typeof buildDesktopGrid === 'function' && !document.body.classList.contains('desk')) buildDesktopGrid();
       const mw = (sel) => { const el = document.querySelector(sel); return el ? getComputedStyle(el).maxWidth : null; };
       const grid = document.querySelector('#desk-grid');
       const gridCols = grid ? getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).length : 0;
+      const main = document.querySelector('#desk-main');
+      const rail = document.querySelector('#desk-rail');
       const deck = document.querySelector('#view-swipe #card-deck');
       const dr = deck ? deck.getBoundingClientRect() : null;
+      const mainRight = main ? Math.round(main.getBoundingClientRect().right) : null;
+      const railRight = rail ? Math.round(rail.getBoundingClientRect().right) : null;
       return {
-        app: mw('#app'),
-        deck: mw('#view-swipe #card-deck'),
-        gridCols,
+        app: mw('#app'), deck: mw('#view-swipe #card-deck'), gridCols,
         deckLaidOut: !!(dr && dr.width > 0),
-        cardOff: dr ? Math.round((dr.left + dr.right) / 2 - window.innerWidth / 2) : null,
+        mainScrolls: main ? ['auto', 'scroll'].includes(getComputedStyle(main).overflowY) : false,
+        mainReachesEdge: mainRight != null ? (window.innerWidth - mainRight) : null,
+        gapLeft: (dr && railRight != null) ? Math.round(dr.left) - railRight : null,
+        gapRight: (dr && mainRight != null) ? mainRight - Math.round(dr.right) : null,
       };
     });
-    expect(r.app, 'the app frame fills wider monitors (2000, was 1680 → less dead band)').toBe('2000px');
-    expect(r.deck, 'v221: the card matches the 860px console width (was 560, read too narrow)').toBe('860px');
-    expect(r.gridCols, 'a wide viewport uses the balanced 3-column grid (rail · centered main · gutter)').toBe(3);
-    expect(r.deckLaidOut, 'the card is actually laid out on the swipe view').toBe(true);
-    expect(Math.abs(r.cardOff), 'v220: the card is TRUE-CENTERED in the viewport — not shoved right by the rail').toBeLessThanOrEqual(6);
+    expect(r.app, 'the app fills wider monitors (2000)').toBe('2000px');
+    expect(r.deck, 'the card matches the 860px console width').toBe('860px');
+    expect(r.gridCols, 'v225: 2-column grid (rail + main) — no phantom gutter').toBe(2);
+    expect(r.deckLaidOut, 'the card is laid out on the swipe view').toBe(true);
+    expect(r.mainScrolls, 'the inner scroll pane is kept (header stays fixed, popups anchored — no regression)').toBe(true);
+    expect(r.mainReachesEdge, 'v225: the scroll pane reaches the far-right window edge (scrollbar far-right)').toBeLessThanOrEqual(2);
+    expect(Math.abs(r.gapLeft - r.gapRight), 'v225: card centered BETWEEN the rail and the scrollbar — equal gaps').toBeLessThanOrEqual(14);
+  });
+
+  test('v225: the ghost + gap pills sit directly under the tiles (before the Green Flag), not floating after it', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.fillSlot === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(400);
+    const r = await page.evaluate(() => {
+      const card = document.querySelector('.job-card.top');
+      const rg = card.querySelector('.risk-gap-row');
+      const gf = card.querySelector('.green-flag');
+      return { pillsBeforeFlag: (rg && gf) ? (rg.compareDocumentPosition(gf) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 : 'na' };
+    });
+    expect(r.pillsBeforeFlag, 'the ghost/gap pills come BEFORE the Green Flag — grouped under the tiles, not two islands after it').toBe(true);
   });
 });
 

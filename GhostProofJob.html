@@ -1055,7 +1055,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
     /* v218→v220 (founder: "nothing is properly centered… the page is still not full"):
        fill wider monitors (2000 cap, was 1680 → less dead band) AND true-center the content
        via a BALANCED grid below (the left rail no longer shoves everything right). */
-    body.desk #app{max-width:2000px;width:96vw;height:100dvh;margin:0 auto;border-radius:0;box-shadow:none;}
+    body.desk #app{max-width:2000px;width:100%;height:100dvh;margin:0 auto;border-radius:0;box-shadow:none;}   /* v225: width 100% (was 96vw) so main reaches the content edge → the inner #desk-main scrollbar lands at the far-right */
     body.desk #footer-nav{display:none;}            /* mobile bottom nav hidden on desktop */
     body.desk .view-content{overflow:hidden;padding:0;}   /* desktop: only #desk-main scrolls (kills scroll-past-bottom) */
     body.desk .modal-scrim{position:fixed;}   /* center modals over the full viewport, not just the content column */
@@ -1072,6 +1072,11 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
     body.desk .desk-rail-btn:hover{background:var(--plum3);}
     body.desk .desk-rail-btn.active{background:rgba(181,95,230,.16);color:#fff;box-shadow:inset 3px 0 0 var(--cyber);}
     body.desk #desk-main{overflow-y:auto;padding:22px 28px 24px;scrollbar-width:thin;}
+    /* v225 (founder): the toast is absolute-centered in #app (viewport center). With the content
+       now centered in the 2-col main (right of viewport center by half the 248px rail), shift the
+       toast right to sit under the content column. Vertical anchoring (absolute bottom, viewport
+       fixed-height #app) is unchanged — no regression. */
+    body.desk #toast{left:calc(50% + 124px);}
     body.desk #desk-main>.view{display:none;}
     /* v218: widen the deck column so the stats/streak/filter bars breathe across the
        screen; the card itself is held to card-width below so it never stretches. */
@@ -1140,14 +1145,14 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
     html[data-theme="light"] body.desk .gpj-light .red-flag{color:var(--danger)!important;}
     html[data-theme="light"] body.desk .gpj-light .s-ghost{color:var(--danger);}
   }
-  /* v220/v221 [UI-REVIEW approved]: balanced phantom right gutter so the rail is offset and
-     the content column (card, bars, swipe controls, footer) is TRUE-CENTERED in the viewport
-     with equal whitespace both sides. v221 (founder, real-site window = 1182px): the old
-     ≥1200 threshold left every window in 1024–1199 shoved +119px right — apply the balanced
-     grid across the WHOLE desktop range so it's always centered, never a dead zone. The card
-     narrows a little on a small desktop, but it stays centered + matches the bars. */
+  /* v225 [UI-REVIEW approved] — supersedes the v220/v221 phantom-gutter approach. The gutter
+     centered content in the VIEWPORT, which (with the far-right scrollbar) left it jammed against
+     the rail with a big empty gap on the right. Now: 2-col (rail + main), the app fills the width,
+     and the inner #desk-main scrollbar sits at the far-right window edge — so the content centers
+     BETWEEN the rail and the scrollbar with equal gaps. INSERT-ONLY: the inner-scroll model is
+     unchanged, so the header stays fixed and all bottom-anchored popups keep working. */
   @media(min-width:1024px){
-    body.desk #desk-grid{grid-template-columns:248px minmax(0,1fr) 248px;}
+    body.desk #desk-grid{grid-template-columns:248px minmax(0,1fr);}   /* v225: 2-col (dropped the phantom gutter) — #desk-main now reaches the window edge so its scrollbar sits far-right, and content centers BETWEEN the rail and that scrollbar */
   }
   @keyframes gpjViewIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
   .gpj-empty-logo{animation:gpjFadeIn .4s ease-out;}
@@ -2093,11 +2098,13 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
                 <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;">Location</span>
               </div>
             </div>
+            <!-- v225 (founder): the ghost + gap pills sit directly under the Match/Salary/Location
+                 tiles (part of that group), not floating in their own row after the Green Flag. -->
+            <div class="risk-gap-row" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:9px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
           </div>
           <div class="card-body">
             <div class="green-flag" style="display:none;">🟢 <strong>Green Flag</strong></div>
             <div class="red-flag" style="display:none;">🔴 <strong>Red Flag</strong></div>
-            <div class="risk-gap-row" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
               <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
@@ -2131,11 +2138,13 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
                 <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;">Location</span>
               </div>
             </div>
+            <!-- v225 (founder): the ghost + gap pills sit directly under the Match/Salary/Location
+                 tiles (part of that group), not floating in their own row after the Green Flag. -->
+            <div class="risk-gap-row" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:9px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
           </div>
           <div class="card-body">
             <div class="green-flag" style="display:none;">🟢 <strong>Green Flag</strong></div>
             <div class="red-flag" style="display:none;">🔴 <strong>Red Flag</strong></div>
-            <div class="risk-gap-row" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
               <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
@@ -2169,11 +2178,13 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
                 <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;">Location</span>
               </div>
             </div>
+            <!-- v225 (founder): the ghost + gap pills sit directly under the Match/Salary/Location
+                 tiles (part of that group), not floating in their own row after the Green Flag. -->
+            <div class="risk-gap-row" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:9px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
           </div>
           <div class="card-body">
             <div class="green-flag" style="display:none;">🟢 <strong>Green Flag</strong></div>
             <div class="red-flag" style="display:none;">🔴 <strong>Red Flag</strong></div>
-            <div class="risk-gap-row" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;font-size:11px;flex-wrap:wrap;"><span class="s-ghost" title="Ghost Risk" style="display:none;font-weight:800;padding:3px 11px;border-radius:999px;border:1px solid var(--plum4);"></span><span class="s-req" onclick="reqGapsTop(event)" style="display:none;cursor:pointer;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
               <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
@@ -3141,7 +3152,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v224</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v225</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -14763,8 +14774,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v224';
+const APP_VERSION = 'v225';
 const CHANGELOG = {
+  'v225':['scroll + pill placement [UI-REVIEW approved]: desktop scrollbar now at the FAR-RIGHT window edge (2-col + app fills width; inner-scroll model KEPT so the header stays fixed + all bottom-anchored popups keep working — no regression); content centered BETWEEN the rail and the scrollbar with equal gaps; toast centered in the content column; ghost+gap pills moved directly UNDER the Match/Salary/Location tiles (grouped, not floating after the Green Flag). Verified logged-in AND logged-out, desktop + mobile'],
   'v224':['transparent header logo (founder-provided): removed the baked navy square — the ghost now reads clean on both the light and dark header (dark outline + mint drop-shadow glow keep the white body visible); onboarding mascot matches; Jett avatar unchanged'],
   'v223':['housekeeping + docs: master BUILD_HISTORY.md now auto-maintained by bump_version ([BUILD-DOC] rule); public footer version hidden (internal APP_VERSION/CACHE_VERSION markers kept for SW cache-busting + What\'s-New); verified the approved logo design = the gradient wordmark, already live (the squareless ghost still needs a transparent asset)'],
   'v222':['card uniformity + honest signals [UI-REVIEW approved, verified light+dark on the real card]: the 3 snapshot tiles (Match/Salary/Location) are now uniform — one background per mode, text centered + vertically middled, Match emphasized by its green NUMBER not a clashing green tile (was green vs purple); ghost + gap pills centered (were left-orphaned); green flag is honest — \'Fresh posting · Nd ago\' instead of the unverifiable \'Actively hiring now\' + confusing city append; header wordmark no longer clips on phones (fits "GhostProofJob" whole down to 360px by freeing room from the right chips)'],
