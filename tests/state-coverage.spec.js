@@ -8839,3 +8839,44 @@ test.describe('[STATE-COVERAGE] v229 Browse summary (full desc) + gaps-only requ
     expect(r.haveDefault, 'the shared strengths section is visible by default').not.toBe('none');
   });
 });
+
+test.describe('[STATE-COVERAGE] v230 company-card cleanup (company-only)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.openCompanyView === 'function' && typeof window.openCmFeaturedRole === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(300);
+  });
+
+  test('opened from a role: a slim "tap to open the role" line replaces the job-action bleed', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      openCompanyView('Acme Corp', { title: 'Marketing Manager', t: 'Marketing Manager', co: 'Acme Corp', desc: 'Do marketing things across channels.', url: 'https://example.com/job' });
+      const js = document.getElementById('cm-jobsummary').innerHTML;
+      const links = document.getElementById('cm-links').innerHTML;
+      return {
+        slimLine: /tap to open the role/.test(js),
+        noJobActions: !/Match to Job/.test(js) && !/Cover Letter/.test(js) && !/⚡ Apply/.test(js),
+        noStrayApply: !/Apply\s*↗/.test(links) && !/class="buzz-add"/.test(links),
+        cmJob: !!(window._cmJob && window._cmJob.t === 'Marketing Manager'),
+      };
+    });
+    expect(r.slimLine, 'slim "tap to open the role" line present').toBe(true);
+    expect(r.noJobActions, 'no Match/Cover/Apply bleed on the company card').toBe(true);
+    expect(r.noStrayApply, 'no stray Apply in the Connect social row').toBe(true);
+    expect(r.cmJob, 'the AI-context job object is still captured').toBe(true);
+  });
+
+  test('exactly one reviews control + a Glassdoor link; no duplicate green chip', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      openCompanyView('Acme Corp', { title: 'X', t: 'X', co: 'Acme Corp', desc: 'y' });
+      return {
+        revChips: document.querySelectorAll('.cm-rev-btn').length,
+        oneReviewsBtn: /Reviews &amp; rating|Reviews & rating/.test(document.getElementById('company-modal').innerHTML),
+        glassdoorWired: (document.getElementById('cm-glassdoor-link') || {}).href && /glassdoor/i.test((document.getElementById('cm-glassdoor-link') || {}).href),
+      };
+    });
+    expect(r.revChips, 'the duplicate green Reviews chip is gone').toBe(0);
+    expect(r.oneReviewsBtn, 'the single "Reviews & rating" button is present').toBe(true);
+    expect(!!r.glassdoorWired, 'the Glassdoor reviews link is wired').toBe(true);
+  });
+});
