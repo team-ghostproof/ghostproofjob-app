@@ -4048,8 +4048,8 @@ test.describe('[STATE-COVERAGE] v120 street-safe City/State + listings upgrades 
       let savedCompany = null;
       fb.saveCompany = async (cid, d) => { savedCompany = d; return true; };
       fb.createRecruiter = async () => true;
-      fb.loadCompany = async () => ({ name: 'GPJ', logo: 'data:image/png;base64,iVBORw0KGgo=' });
-      window._recruiter = { uid: 'r1', company: 'GPJ', companyId: 'gpj.com', role: 'owner', isValidated: true, logo: 'data:image/png;base64,iVBORw0KGgo=' };
+      fb.loadCompany = async () => ({ name: 'GPJ', logo: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' });
+      window._recruiter = { uid: 'r1', company: 'GPJ', companyId: 'gpj.com', role: 'owner', isValidated: true, logo: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' };
       _gpjApplyRecruiterSkin(); await new Promise((x) => setTimeout(x, 400));
       await renderRecCompany(); await new Promise((x) => setTimeout(x, 300));
       const hasUpload = !!document.getElementById('rc-logo-file');
@@ -8878,5 +8878,29 @@ test.describe('[STATE-COVERAGE] v230 company-card cleanup (company-only)', () =>
     expect(r.revChips, 'the duplicate green Reviews chip is gone').toBe(0);
     expect(r.oneReviewsBtn, 'the single "Reviews & rating" button is present').toBe(true);
     expect(!!r.glassdoorWired, 'the Glassdoor reviews link is wired').toBe(true);
+  });
+});
+
+test.describe('[STATE-COVERAGE] v231 company logos (honest fallback chain)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._gpjLogoHtml === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(200);
+  });
+
+  test('fallback chain: uploaded → online-by-real-domain → emoji (never a guessed domain)', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      uploaded: _gpjLogoHtml({ logo: 'data:image/png;base64,AAAA', size: 46 }).includes('data:image/png'),
+      onlineByDomain: _gpjLogoHtml({ website: 'https://acme.com', size: 46 }).includes('icons.duckduckgo.com/ip3/acme.com.ico'),
+      emojiOnly: (function () { const h = _gpjLogoHtml({ size: 46, emoji: '💼' }); return h.includes('💼') && !h.includes('duckduckgo') && !h.includes('<img'); })(),
+      onerrorSafe: _gpjLogoHtml({ website: 'acme.com' }).includes('onerror="this.remove()"'),
+      // the domain is extracted ONLY from a real URL — a bare company name never yields a domain
+      domainRealOnly: _gpjLogoDomain('https://www.acme.com/careers') === 'acme.com' && _gpjLogoDomain('Acme Corp Inc') === '' && _gpjLogoDomain('') === '',
+    }));
+    expect(r.uploaded, 'an uploaded data-URL logo is used directly').toBe(true);
+    expect(r.onlineByDomain, 'a real website domain → online logo').toBe(true);
+    expect(r.emojiOnly, 'no upload + no domain → emoji only (no guessed online call)').toBe(true);
+    expect(r.onerrorSafe, 'a broken online logo falls back to the emoji (onerror removes the img)').toBe(true);
+    expect(r.domainRealOnly, 'domain comes only from a real URL, never guessed from a company name').toBe(true);
   });
 });

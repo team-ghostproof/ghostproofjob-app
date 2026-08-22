@@ -65,7 +65,7 @@ Legend: **[UI]** = needs [UI-REVIEW] mockup+approval · **Effort** S/M/L · **Im
 - **Honest constraint:** we do NOT scrape Glassdoor/Indeed reviews (ToS). "Online reviews" = our community reviews + an outbound Glassdoor link. "Overview" = employer-provided (accounts only).
 - **[STATE-COVERAGE]:** opened-from-role (slim role line) · opened-standalone (no role line) · verified employer (✅) · no reports (honest "good sign"). Playwright: assert the company modal has no Match/Cover/Apply job buttons and exactly one reviews control.
 
-### A6 · Company logos — surface + employer upload + online fallback  **[UI][FREE-TIER]** · Impact MED-HIGH · Effort M · _(planned 2026-08-22; mockup pending approval)_
+### A6 · Company logos — surface + employer upload + online fallback  **[UI][FREE-TIER]** · Impact MED-HIGH · Effort M · ✅ SHIPPED v231 _(online source = DuckDuckGo icons; Clearbit was sunset)_
 - **Why:** the 💼 briefcase placeholder is generic; real logos make cards trustworthy and scannable. Employer upload already exists (v120 data-URL at `openCompanyView` ~14751) but isn't surfaced broadly and has no fallback.
 - **How (insert-only):** (1) render the company logo where the 💼 is — company-card header + the job-card company icon — using the uploaded data-URL when present. (2) **Online fallback** when no upload: derive it from the company's website domain via a logo/favicon service (e.g. `https://logo.clearbit.com/<domain>` or Google favicon) with the 💼 as the final fallback if that 404s (`onerror`). **[FREE-TIER]:** this is a client-side `<img>` load (no backend call, no quota) — confirm no CSP issue for the image host. (3) Employer company-profile form: add the note "If you don't upload a logo, we'll show the one we find online" + keep the manual upload.
 - **Honesty:** never claim an online-fetched logo is employer-verified; the ✅ verified badge stays tied to account verification, not the logo.
@@ -166,7 +166,12 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 - [ ] Opened from a role → a slim "📋 You were viewing: [Role] · tap to open the role →" line (tapping opens the full job card); **no** Match/Cover/Apply/View buttons bleeding onto the company card.
 - [ ] "Connect with hiring team" = social icons only (**no** stray Apply).
 - [ ] **One** reviews button ("⭐ Reviews & rating") + a "🏢 See Glassdoor reviews →" link — the duplicate green "Reviews" chip is gone.
-- [ ] Both **dark + light**.
+- [ ] Save Company + Reviews are two equal side-by-side buttons (no shared island). Both **dark + light**.
+
+**v231 — company logos** _(open a job/company with a known website; employer profile)_
+- [ ] A job/company with a real website domain shows the **company logo** where the 💼 was (Browse job card + company-card header); a job with no domain still shows 💼 (no wrong logos).
+- [ ] **Employer profile** (recruiter account) → the Company-logo field has a note that an un-uploaded logo falls back to the online one; uploading still overrides it.
+- [ ] A broken/missing online logo quietly falls back to 💼 (no broken-image box). Both **dark + light**.
 
 ## Change log for this tracker
 - 2026-08-22 — created; consolidated the two v226 review PDFs + prior tracker + CLAUDE.md §7/§8 into Sprints A–E.
