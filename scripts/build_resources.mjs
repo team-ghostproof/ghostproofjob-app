@@ -60,7 +60,7 @@ const CSS = `
 *{box-sizing:border-box}body{margin:0;background:var(--plum);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
 a{color:inherit}.wrap{max-width:720px;margin:0 auto;padding:0 22px 90px}
 .sitehdr{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;max-width:960px;margin:0 auto;padding:20px 22px}
-.brand{font-weight:800;letter-spacing:-.01em;font-size:16px;text-decoration:none}.brand .g{color:var(--mint)}
+.brand{display:inline-flex;align-items:center;gap:8px;font-weight:800;letter-spacing:-.01em;font-size:16px;text-decoration:none}.brandmark{width:26px;height:26px;object-fit:contain;flex:0 0 auto}.brandtext{background:linear-gradient(90deg,var(--mint),var(--cyber));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:var(--mint)}.brand .g{color:var(--mint)}
 .snav{display:flex;gap:18px;font-size:13px;color:var(--muted)}.snav a{text-decoration:none}.snav a.on{color:var(--cyber);font-weight:700}
 .pill{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--plum);padding:3px 9px;border-radius:6px}
 .pill.market{background:var(--cyan)}.pill.tips{background:var(--mint)}.pill.ghost{background:var(--danger);color:#fff}
@@ -105,7 +105,7 @@ function pageShell({ title, desc, canonical, body }) {
 <body>
 <div class="themetoggle" onclick="__gpjTheme()">◐ theme</div>
 <header class="sitehdr">
-  <a class="brand" href="/">👻 <span class="g">GhostProof</span>Job</a>
+  <a class="brand" href="/"><img class="brandmark" src="/assets/logo-mark.png" alt="GhostProofJob"/><span class="brandtext">GhostProofJob</span></a>
   <nav class="snav"><a href="/">Home</a><a href="/resume-checker.html">Résumé Checker</a><a class="on" href="/resources/">Resources</a><a href="/#employers">Employers</a></nav>
 </header>
 ${body}

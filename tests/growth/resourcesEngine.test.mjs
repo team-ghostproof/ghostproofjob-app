@@ -88,6 +88,13 @@ test('rendered pages carry canonical + index robots + escaped output', () => {
   assert.ok(/publish here soon/.test(hub), 'empty hub shows honest coming-soon state');
 });
 
+test('A2: the shell header uses the transparent brand mark + gradient wordmark, not the emoji', () => {
+  const hub = renderHub([]);
+  assert.ok(/\/assets\/logo-mark\.png/.test(hub), 'header references the transparent brand mark');
+  assert.ok(/class="brandtext"/.test(hub), 'header uses the gradient wordmark span');
+  assert.ok(!/>👻 <span class="g">GhostProof/.test(hub), 'the old boxed emoji header is gone');
+});
+
 test('decodeVal parses Firestore REST typed values (incl. nested map)', () => {
   assert.equal(decodeVal({ integerValue: '42' }), 42);
   assert.equal(decodeVal({ stringValue: 'hi' }), 'hi');

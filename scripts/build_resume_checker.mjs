@@ -99,7 +99,7 @@ const html =
 '  *{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(0,245,160,.10),transparent 60%),radial-gradient(800px 460px at 10% 0,rgba(181,95,230,.12),transparent 55%),var(--plum);color:var(--off);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6;padding:0 20px 80px}\n' +
 '  .wrap{max-width:760px;margin:0 auto}\n' +
 '  header{text-align:center;padding:56px 0 20px}\n' +
-'  .gm{font-size:46px}\n' +
+'  .gm{font-size:46px}.gm img{width:58px;height:58px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(0,245,160,.35))}\n' +
 '  h1{font-size:clamp(28px,5vw,40px);line-height:1.05;margin:12px 0 6px;letter-spacing:-.02em}\n' +
 '  h1 .g{color:var(--mint)}h1 .p{color:var(--cyber)}\n' +
 '  .lede{color:#D7D2EA;max-width:560px;margin:14px auto 0;font-size:16.5px}\n' +
@@ -113,9 +113,10 @@ const html =
 '  .how p{color:#C6C0DD;font-size:14px}\n' +
 '  footer{text-align:center;color:var(--muted);font-size:12.5px;padding-top:36px}\n' +
 '  a.brand{color:var(--cyber);text-decoration:none;font-weight:800}\n' +
+'  .brandwm{display:inline-flex;align-items:center;gap:7px;text-decoration:none;font-weight:800;vertical-align:middle}.brandwm .bm{width:22px;height:22px;object-fit:contain}.brandwm .bt{background:linear-gradient(90deg,var(--mint),var(--cyber));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:var(--mint)}\n' +
 '</style>\n</head>\n<body>\n<div class="wrap">\n' +
 '  <header>\n' +
-'    <div class="gm">👻</div>\n' +
+'    <div class="gm"><img src="/assets/logo-mark.png" alt="GhostProofJob"/></div>\n' +
 '    <h1>Free <span class="g">Résumé</span> <span class="p">Strength</span> Checker</h1>\n' +
 '    <p class="lede">Upload your résumé (PDF, DOCX or TXT) or paste it — or your LinkedIn profile — for an instant, honest strength score: outcomes, metrics, strong verbs, and concision, with the exact fixes named. It all runs in your browser; your file never leaves your device.</p>\n' +
 '  </header>\n' +
@@ -136,7 +137,7 @@ const html =
 '    <p>The same structural rubric our signed-in rater uses: whether your bullets show <b>measurable outcomes</b> (not just tasks), how many are <b>quantified</b>, whether your <b>verbs are strong and varied</b>, and whether the writing is <b>tight and clean</b>. It scores how your résumé is <em>written</em> — not any one job. For a role-specific match score and AI tailoring to a posting, <a class="brand" href="https://ghostproofjob.com/">join GhostProofJob free</a>.</p>\n' +
 '  </div>\n' +
 '  <footer>\n' +
-'    <div><a class="brand" href="https://ghostproofjob.com/">👻 GhostProofJob</a> — the ethical, free-until-hired job search.</div>\n' +
+'    <div><a class="brandwm" href="https://ghostproofjob.com/"><img class="bm" src="/assets/logo-mark.png" alt=""/><span class="bt">GhostProofJob</span></a> — the ethical, free-until-hired job search.</div>\n' +
 '    <div style="margin-top:6px">No ads · no data selling · your résumé never leaves your device on this page.</div>\n' +
 '  </footer>\n' +
 '</div>\n' +

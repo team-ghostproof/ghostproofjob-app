@@ -34,7 +34,7 @@ Legend: **[UI]** = needs [UI-REVIEW] mockup+approval · **Effort** S/M/L · **Im
 - **Test:** extend the v100/v210 state-coverage tests to assert the Browse modal renders Requirements + Benefits and never ends mid-word; a fetch-fail fallback test.
 - **Rollback:** the lazy-load is additive; on any failure the modal shows exactly what it shows today.
 
-### A2 · Static-page logo sweep (brand consistency)  **[UI, low-risk asset swap]** · Impact MED-HIGH · Effort S
+### A2 · Static-page logo sweep (brand consistency)  **[UI, low-risk asset swap]** · Impact MED-HIGH · Effort S · ✅ SHIPPED 2026-08-22 (static, no app version)
 - **Why:** Resources + public Résumé Checker still use the 👻 emoji, not the transparent brand mark (v224). These are top-of-funnel, indexed pages — a stranger's first impression is off-brand.
 - **How (insert-only):** embed the transparent `logo-mark.png` (or an inlined SVG of it) into the `pageShell` header in `scripts/build_resources.mjs` and into `resume-checker.html`; re-run the generators. No layout change beyond the mark.
 - **[STATE-COVERAGE]:** static pages have no auth states; verify light+dark of each static page + mobile.
@@ -113,6 +113,12 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 
 ---
 
+**A2 — static-page logo + gradient wordmark** _(no login needed — check on ghostproofjob.com)_
+- [ ] **/resources/** (hub + both articles) → header shows the **transparent ghost mark + gradient "GhostProofJob" wordmark**, matching the app. No boxed emoji. Check **dark + light** (theme toggle top-right) + **mobile**.
+- [ ] **/resume-checker.html** → the top mascot is the **transparent mark** (not a flat 👻); the footer "GhostProofJob" is the gradient wordmark.
+- [ ] Note: the article **byline avatar** (small ghost in a gradient circle) is intentionally left as-is — tell me if you want it swapped too.
+
 ## Change log for this tracker
 - 2026-08-22 — created; consolidated the two v226 review PDFs + prior tracker + CLAUDE.md §7/§8 into Sprints A–E.
 - 2026-08-22 — **A1 shipped (v227)**: Browse modal lazy-loads the full posting + renders Summary + Requirements + Benefits as **tap-to-expand accordions** (same `.desc-clamp` as the swipe drawer → "one universal card"); full card-surface scan (Saved + company-live reuse the same modal). 4 new state-coverage tests.
+- 2026-08-22 — **A2 shipped (static, no app version)**: Resources + Résumé Checker now use the transparent brand mark + gradient wordmark (both build scripts + the 3 existing committed pages). +1 resourcesEngine assertion. Byline avatar left as-is (founder call).
