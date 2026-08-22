@@ -41,7 +41,7 @@ Legend: **[UI]** = needs [UI-REVIEW] mockup+approval · **Effort** S/M/L · **Im
 - **Test:** `tests/growth/resourcesEngine.test.mjs` assertion that the shell references the brand asset, not the emoji.
 - **Rollback:** revert the shell string.
 
-### A3 · Tailored-résumé / cover-letter sections read as buttons  **[UI]** · Impact MED · Effort S
+### A3 · Tailored-résumé / cover-letter sections read as buttons  **[UI]** · Impact MED · Effort S · ✅ SHIPPED v228
 - **Why:** In Account, "Your Tailored Résumés / Cover Letters" look like plain text with a faint "–"; users don't know they're interactive, so generated assets feel lost. (Full Site Analysis, P2.)
 - **How (insert-only):** restyle the two collapsible headers as pills/list-buttons — chevron, hover state, count badge — aligned to the same gutter/width as the cards above. Behavior unchanged (still toggles the same content).
 - **[STATE-COVERAGE]:** empty (0 tailored → pill shows "None yet" state, still looks like a control) · populated (count badge) · both themes.
@@ -55,7 +55,11 @@ Legend: **[UI]** = needs [UI-REVIEW] mockup+approval · **Effort** S/M/L · **Im
 - **Test:** state-coverage: simulate a denied callback → toggle reads OFF.
 - **Rollback:** revert the callback lines.
 
-### A5 · Company-card cleanup — company-only content, one reviews button, no job bleed  **[UI]** · Impact HIGH · Effort M · _(planned 2026-08-22; mockup pending approval)_
+### A4.5 · Job-card + requirements bug fixes (founder-reported, verified)  · Impact HIGH · Effort S · _(planned 2026-08-22 → v229)_
+- **B-BROWSE-SUMMARY (the real truncation):** `buildBrowseExpanded` renders the summary as `j.summary||j.desc` (index.html ~6294). `j.summary` is a short ~600-char preview (`mapFirestoreJob` ~5799) that ALWAYS shadows `j.desc`, so even after A1's lazy-load fills the full `j.desc`, the summary section shows the preview (ends mid-word "HubS", no scroll). The swipe drawer reads `j.desc` directly → shows full. **A1 was incomplete here** — it fixed the lazy-load + added Requirements/Benefits, but not the summary source. **Fix:** render the Browse summary from `j.desc` (full), matching the drawer; verify the post-lazy-load re-render. Also set `j.summary=j.desc` in the hydrate so nothing stale lingers. **[STATE-COVERAGE]:** clipped-then-hydrated (full) · hydrate-fails (preview fallback) · internal job · both themes. Test: assert Browse summary renders from the full desc, not the short preview.
+- **B-GAPS-ONLY:** `openReqGaps` (index.html ~6015) shows BOTH "Requirements you already meet" (`mi-have`) and "Requirements to address" (`mi-miss`). Founder: gaps must show ONLY the missing requirements (degree/experience/named skills) — the match % already covers strengths + how to raise it. **Fix:** hide the `mi-have` section in the gaps modal; `liveMatchInsight` (shared `match-modal` DOM) restores it so the Match modal still shows "your matching strengths." **[STATE-COVERAGE]:** gaps modal (only gaps) · match modal (strengths kept) · no-gaps state · both themes. Test: assert the gaps modal hides mi-have and the match modal shows it.
+
+### A5 · Company-card cleanup — company-only content, one reviews button, no job bleed  **[UI]** · Impact HIGH · Effort M · ✅ MOCKUP APPROVED 2026-08-22 (build next; light+dark, full gate)
 - **Why (founder-reported, verified):** the company card (`#company-modal` / `openCompanyView`) mixes JOB content into a COMPANY view: `cm-jobsummary` injects a role's Match/Cover/Apply/View at the top; a stray "Apply ↗" sits in the social row; and there are TWO reviews controls (the green `.cm-rev-btn` in the social row + "⭐ Rate / see reviews"). Confusing and off-design.
 - **How (insert-only):** (1) remove the per-role action block from the company card — when opened from a role, show at most a slim "You were viewing: **[Role]** → tap to open" line that opens the JOB card (which already has all actions); the role also appears under "Open Roles". (2) Remove the stray Apply from the social row (14778). (3) Delete the green `.cm-rev-btn` (17844); keep ONE nicely-styled "⭐ Reviews & rating" button. (4) Company card = header + logo + ghost-risk/reports + community vibe + **one** reviews button + a "See Glassdoor reviews →" link + Open Roles + Recent News + Connect (social icons only). No job actions.
 - **Honest constraint:** we do NOT scrape Glassdoor/Indeed reviews (ToS). "Online reviews" = our community reviews + an outbound Glassdoor link. "Overview" = employer-provided (accounts only).
@@ -67,8 +71,24 @@ Legend: **[UI]** = needs [UI-REVIEW] mockup+approval · **Effort** S/M/L · **Im
 - **Honesty:** never claim an online-fetched logo is employer-verified; the ✅ verified badge stays tied to account verification, not the logo.
 - **[STATE-COVERAGE]:** uploaded logo · no upload but known domain (online) · no upload no domain (💼) · broken image URL (onerror → 💼).
 
+### A7 · Card-face ghost/gap pills → a 2-up tile row (match the tile system)  **[UI]** · Impact MED · Effort S · _(planned 2026-08-22 → FOLDED INTO C3 per founder)_
+- **Why (founder):** the 👻-risk + gaps pills under the Match/Salary/Location tiles still read as two small "random" floating chips.
+- **How (insert-only):** render them as **two equal-width tiles in one row**, using the SAME `--plum3` background / border / radius / centered-content as the 3 tiles above → the card face becomes a tidy grid (3-up + 2-up). Recommended over merely widening the pills. Keep the honest content (ghost % tinted by risk; "✓ No gaps" / "⚠️ N gaps"). Applies to all 3 card slots + the Browse list card for consistency.
+- **[STATE-COVERAGE]:** has-gaps · no-gaps · ghost "—" (no data) · both themes · mobile. Playwright: assert the two tiles share the tile background + equal widths.
+- **Recommendation:** small + card-face — either do it right after the company-card work, or fold it into the Wow-pass hero card (C3) which re-treats the tiles anyway. My pick: **fold into C3** so the tile system is designed once, unless you want it sooner.
+
+### A8 · Align the "random" misaligned sections to the shared gutter  **[UI]** · Impact MED · Effort M · _(diagnosed 2026-08-22 by per-section measurement)_
+- **Why (founder, refined):** NOT a global-width problem — each view is symmetrically centered overall. The real issue: a few sections within a page don't share the same left/right edges as their siblings, so they look "off" while the rest line up. **We deliberately do NOT force one uniform width** (sections have different designs) — each keeps its own width but must sit on the **same center axis / same gutter**.
+- **Measured outliers (left-edge):** Résumé — a `section-card` at 312px vs the rest at 432px. Account — `set-profile` at 312px vs 416px. Settings/Ghosts — saved-job cards at 431/448px vs 416px (true sibling drift). (Some 312-vs-432 cases are parent-card-vs-indented-children nesting, to confirm per section.)
+- **How (insert-only):** per-view pass — normalize each top-level section's horizontal container (padding/margin/max-width auto) so every sibling section shares ONE gutter, without changing any section's internal design/width. Fix the saved-job-card drift + the 312-outlier sections.
+- **[STATE-COVERAGE]:** all 6 views · both themes · 1024→1920 · logged in/out. Playwright: assert sibling top-level sections in a view share the same left edge (within a small tolerance).
+- **Recommendation:** dedicated focused pass (needs per-section CSS inspection); **[UI-REVIEW]**. Can pair with C1.
+
+### Job-card data completeness — investigation conclusion (2026-08-22)
+Founder saw "incomplete data on Browse job cards." **Verified:** v227/A1 IS live (build stamp v227; the `getJobFull` lazy-load is deployed), Firestore rules allow the single-doc read (`match /jobs/{jobId} allow read: if true`), the pool builder preserves `_docId` + sets `_clipped` correctly, and the founder's own screenshot shows Browse fully populated. **Most likely cause of the stale view:** the PWA service worker served a cached pre-v227 shell (hard-refresh / close-all-tabs forces the update). **One honest edge case:** a job pruned from the `jobs` collection (8-day cleanup) but still in the pool → `getJobFull` returns null → Browse falls back to the trimmed preview for that one job (rare; self-heals as the pool rebuilds). No code change required; monitoring only.
+
 ### Recommended slotting
-Do **A5 then A6 back-to-back right after A4** — both touch the company card, so doing them together is efficient and avoids two separate regressions of the same view. Both are **[UI-REVIEW]** — I'll get your nod on the mockup before writing code.
+Do **A5 then A6 back-to-back right after A4** — both touch the company card, so doing them together is efficient and avoids two separate regressions of the same view. Both are **[UI-REVIEW]** — I'll get your nod on the mockup before writing code. **A7** is tiny; fold into C3 (or pull earlier if it bugs you).
 
 ---
 
@@ -132,9 +152,14 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 **A2 — static-page logo + gradient wordmark** _(no login needed — check on ghostproofjob.com)_
 - [ ] **/resources/** (hub + both articles) → header shows the **transparent ghost mark + gradient "GhostProofJob" wordmark**, matching the app. No boxed emoji. Check **dark + light** (theme toggle top-right) + **mobile**.
 - [ ] **/resume-checker.html** → the top mascot is the **transparent mark** (not a flat 👻); the footer "GhostProofJob" is the gradient wordmark.
-- [ ] Note: the article **byline avatar** (small ghost in a gradient circle) is intentionally left as-is — tell me if you want it swapped too.
+- [ ] Note: the article **byline avatar** is now the brand mark (A2b).
+
+**v228 — A3 account pills** _(logged-in → Account/Profile)_
+- [ ] "Your Tailored Résumés" and "Your Tailored Cover Letters" now look like **clickable pill-buttons** with a **count badge** + chevron; tapping still expands/collapses the list. The other sections (Job Titles, Minimum Salary, Industries) are unchanged. Both **dark + light**.
 
 ## Change log for this tracker
 - 2026-08-22 — created; consolidated the two v226 review PDFs + prior tracker + CLAUDE.md §7/§8 into Sprints A–E.
 - 2026-08-22 — **A1 shipped (v227)**: Browse modal lazy-loads the full posting + renders Summary + Requirements + Benefits as **tap-to-expand accordions** (same `.desc-clamp` as the swipe drawer → "one universal card"); full card-surface scan (Saved + company-live reuse the same modal). 4 new state-coverage tests.
-- 2026-08-22 — **A2 shipped (static, no app version)**: Resources + Résumé Checker now use the transparent brand mark + gradient wordmark (both build scripts + the 3 existing committed pages). +1 resourcesEngine assertion. Byline avatar left as-is (founder call).
+- 2026-08-22 — **A2 shipped (static, no app version)**: Resources + Résumé Checker now use the transparent brand mark + gradient wordmark (both build scripts + the 3 existing committed pages). +1 resourcesEngine assertion.
+- 2026-08-22 — **A2b shipped**: resources byline avatar → brand mark (Jett keeps ✍️).
+- 2026-08-22 — **A3 shipped (v228)**: account "Your Tailored Résumés / Cover Letters" → pill-buttons w/ count badge (scoped `.pref-pill`; 2 new tests). Planned A5/A6 (company card cleanup + logos) + A7 (card-face pills) + A8 (uniform content width); recorded the job-card data investigation conclusion.

@@ -8761,3 +8761,38 @@ test.describe('[STATE-COVERAGE] v227 Browse modal — full job data (Requirement
     expect(wired, 'openBrowseExpanded lazy-loads the full posting for a clipped pool row').toBe(true);
   });
 });
+
+test.describe('[STATE-COVERAGE] v228 account tailored sections → pill-buttons', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.renderOptimizedList === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(300);
+  });
+
+  test('the two tailored sections render as pill-buttons with a count badge (scoped — no other section restyled)', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      optPill: !!document.querySelector('#prof-optimized .pref-pill'),
+      clPill: !!document.querySelector('#prof-coverletters .pref-pill'),
+      optCount: !!document.getElementById('optimized-count'),
+      clCount: !!document.getElementById('coverletters-count'),
+      // the OTHER pref sections must NOT have become pills
+      otherPills: document.querySelectorAll('.pref-pill').length,
+    }));
+    expect(r.optPill, 'Tailored Résumés is a pill-button').toBe(true);
+    expect(r.clPill, 'Tailored Cover Letters is a pill-button').toBe(true);
+    expect(r.optCount && r.clCount, 'both have a count badge').toBe(true);
+    expect(r.otherPills, 'exactly the two tailored sections are pills, nothing else').toBe(2);
+  });
+
+  test('the count badge reflects the stored list length (empty → 0, populated → n)', async ({ page }) => {
+    const empty = await page.evaluate(() => { localStorage.setItem('gpj_optimized', '[]'); renderOptimizedList(); return document.getElementById('optimized-count').textContent; });
+    expect(empty, 'empty list → 0').toBe('0');
+    const two = await page.evaluate(() => {
+      localStorage.setItem('gpj_optimized', JSON.stringify([{ title: 'A', co: 'B', when: Date.now() }, { title: 'C', co: 'D', when: Date.now() }]));
+      renderOptimizedList();
+      return document.getElementById('optimized-count').textContent;
+    });
+    expect(two, 'two saved → 2').toBe('2');
+  });
+});

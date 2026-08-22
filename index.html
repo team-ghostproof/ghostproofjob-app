@@ -992,6 +992,14 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
   /* Settings */
   .pref-section{margin:0 16px 20px;}
   .pref-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px;}
+  /* A3 (v228): the two "Your Tailored…" sections were plain muted labels that didn't
+     read as interactive. Render them as clear pill-buttons with a count badge + chevron,
+     matching the app's control language. Scoped class — does NOT touch the other
+     .pref-section-title sections. */
+  .pref-pill{display:flex;align-items:center;gap:10px;background:var(--plum3);border:1px solid var(--plum4);border-radius:12px;padding:13px 15px;cursor:pointer;font-size:14px;font-weight:700;color:var(--off);transition:border-color .15s ease,transform .1s ease;margin-bottom:10px;}
+  .pref-pill:hover{border-color:var(--cyber);transform:translateY(-1px);}
+  .pref-pill .pref-pill-count{font-size:11px;font-weight:800;background:rgba(0,245,160,.15);color:var(--mint);border:1px solid rgba(0,245,160,.35);border-radius:999px;padding:2px 9px;margin-left:auto;}
+  .pref-pill .sec-caret{color:var(--cyber);font-size:13px;}
   .pref-row{background:var(--plum2);border:1px solid var(--plum3);border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;margin-bottom:8px;}
   .pref-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
 
@@ -2955,7 +2963,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
 
       <!-- Tailored/optimized resumes saved per job -->
       <div class="pref-section" id="prof-optimized">
-        <div class="pref-section-title" onclick="(function(s,c){var o=s.style.display==='none';s.style.display=o?'block':'none';c.textContent=o?'▴':'▾';})(document.getElementById('optimized-body'),this.querySelector('.sec-caret'))" style="cursor:pointer;display:flex;align-items:center;">📄 Your Tailored Resumes<span class="sec-caret" style="margin-left:auto;color:var(--muted);">▾</span></div>
+        <div class="pref-pill" onclick="(function(s,c){var o=s.style.display==='none';s.style.display=o?'block':'none';c.textContent=o?'▴':'▾';})(document.getElementById('optimized-body'),this.querySelector('.sec-caret'))"><span>📄 Your Tailored Resumes</span><span class="pref-pill-count" id="optimized-count">0</span><span class="sec-caret">▾</span></div>
         <div id="optimized-body" style="display:none;">
           <div style="font-size:11px;color:var(--muted);margin:8px 0 10px;line-height:1.5;">Resumes you've optimized for specific jobs, labeled by company &amp; role.</div>
           <div id="optimized-list"></div>
@@ -2964,7 +2972,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
 
       <!-- Tailored cover letters saved per job -->
       <div class="pref-section" id="prof-coverletters">
-        <div class="pref-section-title" onclick="(function(s,c){var o=s.style.display==='none';s.style.display=o?'block':'none';c.textContent=o?'▴':'▾';})(document.getElementById('coverletters-body'),this.querySelector('.sec-caret'))" style="cursor:pointer;display:flex;align-items:center;">✨ Your Tailored Cover Letters<span class="sec-caret" style="margin-left:auto;color:var(--muted);">▾</span></div>
+        <div class="pref-pill" onclick="(function(s,c){var o=s.style.display==='none';s.style.display=o?'block':'none';c.textContent=o?'▴':'▾';})(document.getElementById('coverletters-body'),this.querySelector('.sec-caret'))"><span>✨ Your Tailored Cover Letters</span><span class="pref-pill-count" id="coverletters-count">0</span><span class="sec-caret">▾</span></div>
         <div id="coverletters-body" style="display:none;">
           <div style="font-size:11px;color:var(--muted);margin:8px 0 10px;line-height:1.5;">Cover letters you've generated for specific jobs, labeled by company &amp; role.</div>
           <div id="coverletters-list"></div>
@@ -3156,7 +3164,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v227</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v228</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3337,7 +3345,7 @@ function switchView(id,el){
       _browseFilterSummary();
     }catch(e){}
   }
-  if(id==='account'){ try{ _renderHiddenCosList(); }catch(e){} }   /* v146: hidden-companies manager */
+  if(id==='account'){ try{ _renderHiddenCosList(); }catch(e){} try{ renderOptimizedList(); }catch(e){} try{ renderCoverLettersList(); }catch(e){} }   /* v146: hidden-companies manager · A3: refresh tailored-pill counts */
   try{ if(typeof _gpjRecruiterMode==='function' && _gpjRecruiterMode()) _gpjRenderRecPanel(id); }catch(e){}   /* v110 R9 */
 }
 
@@ -8926,6 +8934,7 @@ function renderCoverLettersList(){
   const box=document.getElementById('coverletters-list');
   if(!box) return;
   let list=[]; try{ list=JSON.parse(localStorage.getItem('gpj_coverletters')||'[]'); }catch(e){}
+  try{ const _c=document.getElementById('coverletters-count'); if(_c) _c.textContent=String(list.length); }catch(e){}   /* A3: pill count badge */
   if(!list.length){ box.innerHTML='<div style="font-size:12px;color:var(--muted);">Nothing here yet — generate one from any job card.</div>'; return; }
   box.innerHTML=list.map((r,i)=>{
     const d=new Date(r.when); const ds=(d.getMonth()+1)+'/'+d.getDate();
@@ -11047,6 +11056,7 @@ function renderOptimizedList(){
   const box=document.getElementById('optimized-list');
   if(!box) return;
   let list=[]; try{ list=JSON.parse(localStorage.getItem('gpj_optimized')||'[]'); }catch(e){}
+  try{ const _c=document.getElementById('optimized-count'); if(_c) _c.textContent=String(list.length); }catch(e){}   /* A3: pill count badge */
   if(!list.length){ box.innerHTML='<div style="font-size:12px;color:var(--muted);">Nothing here yet — tailor one from any job card.</div>'; return; }
   box.innerHTML=list.map((r,i)=>{
     const d=new Date(r.when); const ds=(d.getMonth()+1)+'/'+d.getDate();
@@ -14830,8 +14840,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v227';
+const APP_VERSION = 'v228';
 const CHANGELOG = {
+  'v228':['A3: account \'Your Tailored Resumes / Cover Letters\' sections now read as pill-buttons with a count badge + chevron (scoped .pref-pill class — the other pref-section-title sections are untouched); counts fed by the existing render functions + refreshed on account open'],
   'v227':['A1 job-card full data: the Browse detail modal now lazy-loads the full posting (mirrors the swipe drawer\'s v210 fix via fb.getJobFull) and renders Summary + Requirements + Benefits — no more mid-word clip (\'Review p\') and no missing sections; Saved-jobs + company-live \'Full Job Card\' reuse the same modal so every job surface shows complete data'],
   'v226':['account chip icon-only on tight phones (≤380px): name wrapped in .chip-name span + hidden via CSS so it reads as a clean emoji, not the dangling \'🙂 Aa…\' the 56px ellipsis produced; name still shows on every wider screen; XSS-safe (textContent, not innerHTML); recruiter 🛡️ badge appends a node so the span survives'],
   'v225':['scroll + pill placement [UI-REVIEW approved]: desktop scrollbar now at the FAR-RIGHT window edge (2-col + app fills width; inner-scroll model KEPT so the header stays fixed + all bottom-anchored popups keep working — no regression); content centered BETWEEN the rail and the scrollbar with equal gaps; toast centered in the content column; ghost+gap pills moved directly UNDER the Match/Salary/Location tiles (grouped, not floating after the Green Flag). Verified logged-in AND logged-out, desktop + mobile'],
