@@ -131,7 +131,9 @@ function barChart(pairs, { hotFirst = true } = {}) {
 }
 
 function renderArticle(a) {
-  const bylineAvatar = a.byline === 'Jett' ? '✍️' : '👻';
+  // Team byline = the brand → transparent brand mark inside the gradient circle (brand uniformity);
+  // Jett keeps ✍️ (a distinct persona, not the GhostProofJob ghost).
+  const bylineAvatar = a.byline === 'Jett' ? '✍️' : '<img src="/assets/logo-mark.png" alt="" style="width:22px;height:22px;object-fit:contain"/>';
   let body = `<div class="wrap"><article class="art">
 <span class="pill ${a.pillClass || (a.cat === 'tips' ? 'tips' : 'market')}">${esc(a.category)}</span>
 <h1 class="at">${esc(a.title)}</h1>
