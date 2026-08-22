@@ -3156,7 +3156,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v226</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v227</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -6292,6 +6292,16 @@ function buildBrowseExpanded(j,i){
   const flagFresh=(j.posting_age_days==null||j.posting_age_days<=14||(j.sal&&j.sal!=='Salary on request'));
   const flag='<div style="border-left:3px solid '+(flagFresh?'var(--mint)':'var(--warn)')+';background:'+(flagFresh?'rgba(0,245,160,.08)':'rgba(255,176,32,.08)')+';padding:9px 11px;border-radius:0 8px 8px 0;font-size:12px;color:'+(flagFresh?'var(--mint)':'var(--warn)')+';margin:12px 0 0;">'+(flagFresh?'\ud83d\udfe2 <strong>Green Flag</strong> \u2014 ':'\u26a0\ufe0f ')+_browseActiveFlag(j)+'</div>';
   const summary=(j.summary||j.desc||'').replace(/[#`>]/g,'').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim();   /* v81: keep newlines + bullet chars for _fmtJobText */
+  /* A1 (v227): the Browse modal previously rendered ONLY the summary — no Requirements,
+     no Benefits — and read the ~600-char pool preview (clipped at "Review p"). The full
+     doc lazy-loads in openBrowseExpanded (mirrors the drawer's v210 fix). Render the same
+     three sections the swipe drawer shows, with the same ceilings + word-boundary dressing. */
+  const _cln=function(s){ s=String(s==null?'':s); if(typeof cleanMd==='function'){ try{ s=cleanMd(s); }catch(e){} } return s.replace(/[#`>]/g,'').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim(); };
+  const reqT=_cln(j.req||j.requirements||'');
+  const benT=_cln(j.benefits||'');
+  /* v221 dedup: when requirements just repeats the summary/duties, show only the richer one */
+  const _reqDup=(typeof _sameJobText==='function')&&reqT&&summary&&_sameJobText(summary,reqT);
+  const _fmt=function(s,cap){ return (typeof _fmtJobText==='function'?_fmtJobText(typeof cutWords==='function'?cutWords(s,cap):s):dt(s)); };
   return '<div style="display:flex;gap:11px;align-items:flex-start;padding-top:4px;">'+
       '<div style="width:46px;height:46px;border-radius:12px;background:var(--plum3);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">\ud83d\udcbc</div>'+
       '<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:17px;line-height:1.25;overflow-wrap:anywhere;">'+dt(j.t)+'</div>'+
@@ -6321,7 +6331,13 @@ function buildBrowseExpanded(j,i){
     /* B-DESC-CUT (v77): this render had its OWN hard 2400 slice \u2014 the last clip
        site (found by the [STATE-COVERAGE] Q1 test). Word-boundary cut at 4000,
        above the harvester's 3500 max, so the job card never clips real data. */
-    (summary?('<div style="margin-top:14px;"><div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-bottom:5px;">\ud83d\udcc4 JOB EXPECTATIONS &amp; SUMMARY</div><div class="desc-scroll" style="font-size:12px;color:var(--off);line-height:1.55;max-height:280px;overflow-y:auto;">'+(typeof _fmtJobText==='function'?_fmtJobText(typeof cutWords==='function'?cutWords(summary,11000):summary):dt(summary))+'</div></div>'):'')+
+    /* A1 (v227): each section is a tap-to-expand accordion \u2014 same .desc-clamp the swipe
+       drawer uses (global handler ~17885), so the Browse modal and the deck behave
+       identically ("one universal card"). Header stays visible; content previews then
+       expands/collapses on tap. */
+    (summary?('<div style="margin-top:14px;"><div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-bottom:5px;">\ud83d\udcc4 JOB EXPECTATIONS &amp; SUMMARY</div><div class="desc-clamp">'+_fmt(summary,11000)+'</div></div>'):'')+
+    ((reqT&&!_reqDup)?('<div style="margin-top:14px;"><div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-bottom:5px;">\u2705 REQUIREMENTS</div><div class="desc-clamp">'+_fmt(reqT,4000)+'</div></div>'):'')+
+    (benT?('<div style="margin-top:14px;"><div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-bottom:5px;">\ud83c\udf81 BENEFITS</div><div class="desc-clamp">'+_fmt(benT,2500)+'</div></div>'):'')+
     /* F-CARD (v91): the job card carries the SAME company sections as the swipe
        drawer \u2014 Recent Company News + Connect with Hiring Team \u2014 one card design. */
     (function(){
@@ -6362,6 +6378,30 @@ function openBrowseExpanded(i){
   if(body) body.innerHTML=buildBrowseExpanded(j,i);
   document.getElementById('browse-expand-modal').classList.add('open');
   try{ if(typeof markViewed==='function') markViewed(j); }catch(e){}
+  /* A1 (v227): the Browse modal used to show only the ~600-char pool PREVIEW and no
+     Requirements/Benefits. Mirror the swipe drawer's v210 lazy-load — fetch the FULL
+     doc ONCE for a job the user actually opened, merge the full text into the SAME
+     object, and re-render so the card shows the complete posting. One read per open. */
+  try{
+    if(j._clipped && j.id && !j._hydrated && !j._hydrating && window.fb && fb.getJobFull){
+      j._hydrating=true;
+      fb.getJobFull(j.id).then(function(full){
+        j._hydrating=false; j._hydrated=true;                 /* never retry endlessly, even on a miss */
+        if(!full) return;
+        const clean=function(s){ s=String(s==null?'':s); if(typeof cleanMd==='function'){ try{ s=cleanMd(s); }catch(e){} } return s.replace(/<[^>]+>/g,' ').replace(/[ \t]{2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim(); };
+        const cw=(typeof cutWords==='function')?cutWords:(function(s){return s;});
+        const fd=clean(full.description||full.desc||''), fr=clean(full.requirements||full.req||''), fbn=clean(full.benefits||''), fs=clean(full.summary||'');
+        if(fd.length>String(j.desc||'').length) j.desc=cw(fd,11000);
+        if(fr.length>String(j.req||'').length) j.req=cw(fr,4000);
+        if(fbn.length>String(j.benefits||'').length) j.benefits=cw(fbn,2500);
+        if(fs.length>String(j.summary||'').length) j.summary=cw(fs,11000);
+        j._clipped=false;
+        /* re-render ONLY if the modal is still open on THIS same job (no stale clobber) */
+        const m=document.getElementById('browse-expand-modal'), b2=document.getElementById('browse-expand-body');
+        if(m && m.classList.contains('open') && b2 && liveJobs[i]===j){ b2.innerHTML=buildBrowseExpanded(j,i); }
+      }).catch(function(){ j._hydrating=false; j._hydrated=true; });
+    }
+  }catch(e){}
 }
 function closeBrowseExpanded(){ const m=document.getElementById('browse-expand-modal'); if(m) m.classList.remove('open'); }
 
@@ -14790,8 +14830,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v226';
+const APP_VERSION = 'v227';
 const CHANGELOG = {
+  'v227':['A1 job-card full data: the Browse detail modal now lazy-loads the full posting (mirrors the swipe drawer\'s v210 fix via fb.getJobFull) and renders Summary + Requirements + Benefits — no more mid-word clip (\'Review p\') and no missing sections; Saved-jobs + company-live \'Full Job Card\' reuse the same modal so every job surface shows complete data'],
   'v226':['account chip icon-only on tight phones (≤380px): name wrapped in .chip-name span + hidden via CSS so it reads as a clean emoji, not the dangling \'🙂 Aa…\' the 56px ellipsis produced; name still shows on every wider screen; XSS-safe (textContent, not innerHTML); recruiter 🛡️ badge appends a node so the span survives'],
   'v225':['scroll + pill placement [UI-REVIEW approved]: desktop scrollbar now at the FAR-RIGHT window edge (2-col + app fills width; inner-scroll model KEPT so the header stays fixed + all bottom-anchored popups keep working — no regression); content centered BETWEEN the rail and the scrollbar with equal gaps; toast centered in the content column; ghost+gap pills moved directly UNDER the Match/Salary/Location tiles (grouped, not floating after the Green Flag). Verified logged-in AND logged-out, desktop + mobile'],
   'v224':['transparent header logo (founder-provided): removed the baked navy square — the ghost now reads clean on both the light and dark header (dark outline + mint drop-shadow glow keep the white body visible); onboarding mascot matches; Jett avatar unchanged'],

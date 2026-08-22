@@ -26,7 +26,7 @@ Legend: **[UI]** = needs [UI-REVIEW] mockup+approval · **Effort** S/M/L · **Im
 
 ## SPRINT A — Complete & Consistent  _(low risk, high trust; do first)_
 
-### A1 · Job-card full data everywhere + full card-surface scan  **[UI]** · Impact HIGH · Effort M
+### A1 · Job-card full data everywhere + full card-surface scan  **[UI]** · Impact HIGH · Effort M · ✅ SHIPPED v227
 - **Why:** The Browse detail modal clips mid-word ("Review p") and shows no Requirements/Benefits — a stranger reads that as a broken product. (Full Site Analysis, P1.)
 - **Root cause (verified):** `buildBrowseExpanded()` renders `j.summary||j.desc` straight from the byte-trimmed D1 pool object; it never lazy-loads the full `jobs` doc the way the swipe drawer was fixed to in v210, and it renders no Requirements/Benefits block.
 - **How (insert-only):** give the Browse modal the SAME lazy-load path the swipe drawer uses (fetch the full doc on open by id), then render full Summary + Requirements + Benefits with the v97 ceilings. Do NOT change the swipe drawer (already correct). Then scan every card surface — swipe face, swipe drawer, Browse modal, Saved-jobs, Company-view job cards, Skipped tab — and confirm each lazy-loads + shows full allocated text.
@@ -104,11 +104,15 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 ---
 
 ## FOUNDER TEST CHECKLIST  _(I update this after each commit — test each logged-in AND logged-out where it applies)_
-_(nothing to test yet from this planning turn — the first entries land when Sprint A items commit)_
-
-- [ ] _pending Sprint A start_
+**v227 — A1 job-card full data** _(needs live jobs → test logged-in)_
+- [ ] Open a job from **Browse** → the detail modal shows **Job Expectations & Summary + Requirements + Benefits**, all full text, **no mid-word clip** ("Review p" is gone).
+- [ ] Open a job from **Saved Jobs** and from a **company's "Full Job Card"** → same complete sections (they reuse the same modal).
+- [ ] A job with no Requirements/Benefits → those headers are **omitted** (no empty section).
+- [ ] Each section (Summary / Requirements / Benefits) is a **tap-to-expand accordion** — shows a preview with "▾ tap to expand" and a "▴ collapse" bar, exactly like the swipe drawer. The card/modal itself still opens + closes.
+- [ ] Both **dark + light**, **desktop + mobile**. On a slow connection the modal shows the preview instantly, then fills in the full posting a moment later (never blank).
 
 ---
 
 ## Change log for this tracker
 - 2026-08-22 — created; consolidated the two v226 review PDFs + prior tracker + CLAUDE.md §7/§8 into Sprints A–E.
+- 2026-08-22 — **A1 shipped (v227)**: Browse modal lazy-loads the full posting + renders Summary + Requirements + Benefits as **tap-to-expand accordions** (same `.desc-clamp` as the swipe drawer → "one universal card"); full card-surface scan (Saved + company-live reuse the same modal). 4 new state-coverage tests.

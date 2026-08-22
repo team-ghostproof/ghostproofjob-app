@@ -8715,3 +8715,49 @@ test.describe('[STATE-COVERAGE] v226 account chip — icon-only on tight phones'
     expect(r.overflow, 'guest chip not clipped at 375px').toBeLessThanOrEqual(1);
   });
 });
+
+test.describe('[STATE-COVERAGE] v227 Browse modal — full job data (Requirements + Benefits, no mid-word clip)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.buildBrowseExpanded === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(300);
+  });
+
+  test('authed/populated: renders Summary + Requirements + Benefits with full text', async ({ page }) => {
+    const html = await page.evaluate(() => buildBrowseExpanded({
+      t: 'Retention Marketing Manager', co: '360training', loc: 'Remote, US',
+      summary: 'Manage retention across the customer lifecycle including engagement, renewal, and win-back. Review performance weekly and reallocate spend to what converts.',
+      req: '5+ years lifecycle marketing. Owned an email or CRM platform such as Braze or Iterable. Comfort with cohort and funnel analytics.',
+      benefits: 'Remote-first with a home-office stipend. Medical, dental, and vision. 401(k) match. Unlimited PTO.',
+      ghost: 26, match: 81, url: 'https://example.com/job'
+    }, 0));
+    expect(html, 'summary section present').toContain('JOB EXPECTATIONS');
+    expect(html, 'requirements section present').toContain('REQUIREMENTS');
+    expect(html, 'benefits section present').toContain('BENEFITS');
+    expect(html, 'full requirement text (not clipped)').toContain('Braze');
+    expect(html, 'full benefit text (not clipped)').toContain('Unlimited PTO');
+    // each section is a tap-to-expand accordion (same .desc-clamp as the swipe drawer), not an always-open scroll box
+    expect((html.match(/class="desc-clamp"/g) || []).length, 'Summary + Requirements + Benefits are all .desc-clamp accordions').toBe(3);
+  });
+
+  test('empty-data: missing req + benefits → those sections are omitted (no empty headers)', async ({ page }) => {
+    const html = await page.evaluate(() => buildBrowseExpanded({
+      t: 'Analyst', co: 'Acme', loc: 'Houston, TX', summary: 'Do the analysis and report findings.', req: '', benefits: '', ghost: 10
+    }, 0));
+    expect(html, 'no empty Requirements header').not.toContain('REQUIREMENTS');
+    expect(html, 'no empty Benefits header').not.toContain('BENEFITS');
+    expect(html, 'summary still shown').toContain('JOB EXPECTATIONS');
+  });
+
+  test('dedup: requirements that merely repeat the summary are not shown twice', async ({ page }) => {
+    const same = 'Manage retention across the customer lifecycle including engagement renewal and win back and review performance weekly and reallocate spend to what converts';
+    const html = await page.evaluate((s) => buildBrowseExpanded({ t: 'X', co: 'Y', loc: 'Z', summary: s, req: s, benefits: '', ghost: 10 }, 0), same);
+    expect((html.match(/REQUIREMENTS/g) || []).length, 'duplicate requirements folded into the summary').toBe(0);
+  });
+
+  test('interrupted/clipped: the lazy-load path is wired (openBrowseExpanded fetches the full doc)', async ({ page }) => {
+    const wired = await page.evaluate(() => String(openBrowseExpanded).includes('getJobFull'));
+    expect(wired, 'openBrowseExpanded lazy-loads the full posting for a clipped pool row').toBe(true);
+  });
+});
