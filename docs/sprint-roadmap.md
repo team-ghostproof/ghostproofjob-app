@@ -55,6 +55,21 @@ Legend: **[UI]** = needs [UI-REVIEW] mockup+approval · **Effort** S/M/L · **Im
 - **Test:** state-coverage: simulate a denied callback → toggle reads OFF.
 - **Rollback:** revert the callback lines.
 
+### A5 · Company-card cleanup — company-only content, one reviews button, no job bleed  **[UI]** · Impact HIGH · Effort M · _(planned 2026-08-22; mockup pending approval)_
+- **Why (founder-reported, verified):** the company card (`#company-modal` / `openCompanyView`) mixes JOB content into a COMPANY view: `cm-jobsummary` injects a role's Match/Cover/Apply/View at the top; a stray "Apply ↗" sits in the social row; and there are TWO reviews controls (the green `.cm-rev-btn` in the social row + "⭐ Rate / see reviews"). Confusing and off-design.
+- **How (insert-only):** (1) remove the per-role action block from the company card — when opened from a role, show at most a slim "You were viewing: **[Role]** → tap to open" line that opens the JOB card (which already has all actions); the role also appears under "Open Roles". (2) Remove the stray Apply from the social row (14778). (3) Delete the green `.cm-rev-btn` (17844); keep ONE nicely-styled "⭐ Reviews & rating" button. (4) Company card = header + logo + ghost-risk/reports + community vibe + **one** reviews button + a "See Glassdoor reviews →" link + Open Roles + Recent News + Connect (social icons only). No job actions.
+- **Honest constraint:** we do NOT scrape Glassdoor/Indeed reviews (ToS). "Online reviews" = our community reviews + an outbound Glassdoor link. "Overview" = employer-provided (accounts only).
+- **[STATE-COVERAGE]:** opened-from-role (slim role line) · opened-standalone (no role line) · verified employer (✅) · no reports (honest "good sign"). Playwright: assert the company modal has no Match/Cover/Apply job buttons and exactly one reviews control.
+
+### A6 · Company logos — surface + employer upload + online fallback  **[UI][FREE-TIER]** · Impact MED-HIGH · Effort M · _(planned 2026-08-22; mockup pending approval)_
+- **Why:** the 💼 briefcase placeholder is generic; real logos make cards trustworthy and scannable. Employer upload already exists (v120 data-URL at `openCompanyView` ~14751) but isn't surfaced broadly and has no fallback.
+- **How (insert-only):** (1) render the company logo where the 💼 is — company-card header + the job-card company icon — using the uploaded data-URL when present. (2) **Online fallback** when no upload: derive it from the company's website domain via a logo/favicon service (e.g. `https://logo.clearbit.com/<domain>` or Google favicon) with the 💼 as the final fallback if that 404s (`onerror`). **[FREE-TIER]:** this is a client-side `<img>` load (no backend call, no quota) — confirm no CSP issue for the image host. (3) Employer company-profile form: add the note "If you don't upload a logo, we'll show the one we find online" + keep the manual upload.
+- **Honesty:** never claim an online-fetched logo is employer-verified; the ✅ verified badge stays tied to account verification, not the logo.
+- **[STATE-COVERAGE]:** uploaded logo · no upload but known domain (online) · no upload no domain (💼) · broken image URL (onerror → 💼).
+
+### Recommended slotting
+Do **A5 then A6 back-to-back right after A4** — both touch the company card, so doing them together is efficient and avoids two separate regressions of the same view. Both are **[UI-REVIEW]** — I'll get your nod on the mockup before writing code.
+
 ---
 
 ## SPRINT B — Trust the Intelligence  _(verify + harden the core value)_
@@ -110,6 +125,7 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 - [ ] A job with no Requirements/Benefits → those headers are **omitted** (no empty section).
 - [ ] Each section (Summary / Requirements / Benefits) is a **tap-to-expand accordion** — shows a preview with "▾ tap to expand" and a "▴ collapse" bar, exactly like the swipe drawer. The card/modal itself still opens + closes.
 - [ ] Both **dark + light**, **desktop + mobile**. On a slow connection the modal shows the preview instantly, then fills in the full posting a moment later (never blank).
+- [ ] **Job-card uniformity (Browse == Swipe):** open the SAME role from Browse and from Swipe → both now show the full posting with expandable/collapsible Summary/Requirements/Benefits (A1 unified them). If Browse still looks clipped, you're on a cached build — hard-refresh to v227. _(If it's still clipped on v227, that's a new bug — tell me and I'll investigate.)_
 
 ---
 
