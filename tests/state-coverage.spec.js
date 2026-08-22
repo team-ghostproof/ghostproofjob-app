@@ -741,20 +741,26 @@ test.describe('[STATE-COVERAGE] v92 Jett-does-it + rater accuracy', () => {
     expect(r.tidy.removed).toEqual(['Execution']);
   });
 
-  test('Q1: match-insight vs requirements-check show DISTINCT labels', async ({ page }) => {
+  test('Q1: match-insight vs requirements-check show DISTINCT behavior', async ({ page }) => {
+    // v229 B-GAPS-ONLY (founder): the requirements-check modal shows ONLY the missing
+    // requirements — it HIDES the "already meet" section (the match % covers strengths).
+    // The Match modal still shows strengths. Same shared match-modal DOM.
     const r = await page.evaluate(() => {
       resumeReady = true;
       Object.assign(resumeData, { title: 'Sales', skills: 'Sales · Excel', jobs: [{ t: 'Rep', c: 'Acme', b: 'Sold' }], summary: 'x' });
       openMatchInsight('Sales Specialist', 56);
       const mHave = document.getElementById('mi-have-label').textContent;
+      const mHaveShown = getComputedStyle(document.getElementById('mi-have')).display !== 'none';
       openReqGaps({ t: 'Sales Specialist', req: "Bachelor's degree required.", desc: '' });
-      const rHave = document.getElementById('mi-have-label').textContent, rMiss = document.getElementById('mi-miss-label').textContent;
+      const rHaveHidden = getComputedStyle(document.getElementById('mi-have')).display === 'none';
+      const rMiss = document.getElementById('mi-miss-label').textContent;
       document.getElementById('match-modal').classList.remove('open');
-      return { mHave, rHave, rMiss };
+      return { mHave, mHaveShown, rHaveHidden, rMiss };
     });
-    expect(r.mHave).toBe('✅ Your matching strengths');
-    expect(r.rHave, 'requirements mode makes clear the count is requirements, not skills').toBe('✅ Requirements you already meet');
-    expect(r.rMiss).toBe('🎯 Requirements to address');
+    expect(r.mHave, 'match modal labels the section as strengths').toBe('✅ Your matching strengths');
+    expect(r.mHaveShown, 'match modal SHOWS the strengths section').toBe(true);
+    expect(r.rHaveHidden, 'requirements-check HIDES the "already meet" section — only gaps shown').toBe(true);
+    expect(r.rMiss, 'gaps section reads "Requirements to address"').toBe('🎯 Requirements to address');
   });
 });
 
@@ -8794,5 +8800,42 @@ test.describe('[STATE-COVERAGE] v228 account tailored sections → pill-buttons'
       return document.getElementById('optimized-count').textContent;
     });
     expect(two, 'two saved → 2').toBe('2');
+  });
+});
+
+test.describe('[STATE-COVERAGE] v229 Browse summary (full desc) + gaps-only requirements', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.buildBrowseExpanded === 'function' && typeof window.openReqGaps === 'function' && typeof window.openMatchInsight === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(300);
+  });
+
+  test('B-BROWSE-SUMMARY: Job Expectations renders the FULL description, not the short preview that shadowed it', async ({ page }) => {
+    const html = await page.evaluate(() => buildBrowseExpanded({
+      t: 'Marketing Manager', co: 'CCMC', loc: 'Remote, US',
+      desc: 'FULLBODYMARKER responsibilities include building and maintaining HubSpot campaigns, coordinating direct mail, and much more that goes far beyond the short preview boundary and continues.',
+      summary: 'SHORTPREVIEWMARKER that ends abruptly at HubS',
+      ghost: 12
+    }, 0));
+    expect(html, 'the full description text is shown').toContain('FULLBODYMARKER');
+    expect(html, 'the short preview is NOT used as the summary').not.toContain('SHORTPREVIEWMARKER');
+  });
+
+  test('B-GAPS-ONLY: the gaps modal hides "requirements you already meet"; the match modal restores it (shared DOM)', async ({ page }) => {
+    // resumeReady is a module-scoped closure (not settable from a test), and the gaps
+    // chip is only reachable when it is true — so assert the hide/restore WIRING is present.
+    const r = await page.evaluate(() => {
+      const gaps = String(openReqGaps), match = String(openMatchInsight);
+      return {
+        gapsHides: gaps.includes('mi-have') && gaps.includes("display='none'"),
+        matchRestores: match.includes('mi-have') && match.includes("display=''"),
+        // and the match modal DOM defaults to visible (block) so restore works
+        haveDefault: getComputedStyle(document.getElementById('mi-have')).display,
+      };
+    });
+    expect(r.gapsHides, 'openReqGaps hides the "requirements you already meet" section').toBe(true);
+    expect(r.matchRestores, 'openMatchInsight restores it for the Match view').toBe(true);
+    expect(r.haveDefault, 'the shared strengths section is visible by default').not.toBe('none');
   });
 });

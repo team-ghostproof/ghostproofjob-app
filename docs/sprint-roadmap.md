@@ -55,7 +55,7 @@ Legend: **[UI]** = needs [UI-REVIEW] mockup+approval · **Effort** S/M/L · **Im
 - **Test:** state-coverage: simulate a denied callback → toggle reads OFF.
 - **Rollback:** revert the callback lines.
 
-### A4.5 · Job-card + requirements bug fixes (founder-reported, verified)  · Impact HIGH · Effort S · _(planned 2026-08-22 → v229)_
+### A4.5 · Job-card + requirements bug fixes (founder-reported, verified)  · Impact HIGH · Effort S · ✅ SHIPPED v229
 - **B-BROWSE-SUMMARY (the real truncation):** `buildBrowseExpanded` renders the summary as `j.summary||j.desc` (index.html ~6294). `j.summary` is a short ~600-char preview (`mapFirestoreJob` ~5799) that ALWAYS shadows `j.desc`, so even after A1's lazy-load fills the full `j.desc`, the summary section shows the preview (ends mid-word "HubS", no scroll). The swipe drawer reads `j.desc` directly → shows full. **A1 was incomplete here** — it fixed the lazy-load + added Requirements/Benefits, but not the summary source. **Fix:** render the Browse summary from `j.desc` (full), matching the drawer; verify the post-lazy-load re-render. Also set `j.summary=j.desc` in the hydrate so nothing stale lingers. **[STATE-COVERAGE]:** clipped-then-hydrated (full) · hydrate-fails (preview fallback) · internal job · both themes. Test: assert Browse summary renders from the full desc, not the short preview.
 - **B-GAPS-ONLY:** `openReqGaps` (index.html ~6015) shows BOTH "Requirements you already meet" (`mi-have`) and "Requirements to address" (`mi-miss`). Founder: gaps must show ONLY the missing requirements (degree/experience/named skills) — the match % already covers strengths + how to raise it. **Fix:** hide the `mi-have` section in the gaps modal; `liveMatchInsight` (shared `match-modal` DOM) restores it so the Match modal still shows "your matching strengths." **[STATE-COVERAGE]:** gaps modal (only gaps) · match modal (strengths kept) · no-gaps state · both themes. Test: assert the gaps modal hides mi-have and the match modal shows it.
 
@@ -156,6 +156,11 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 
 **v228 — A3 account pills** _(logged-in → Account/Profile)_
 - [ ] "Your Tailored Résumés" and "Your Tailored Cover Letters" now look like **clickable pill-buttons** with a **count badge** + chevron; tapping still expands/collapses the list. The other sections (Job Titles, Minimum Salary, Industries) are unchanged. Both **dark + light**.
+
+**v229 — job-card summary + gaps-only** _(logged-in; hard-refresh to v229)_
+- [ ] **Browse** a job → "Job Expectations & Summary" now shows the **full posting** (not the "…HubS" clip); matches the swipe drawer.
+- [ ] Tap the **"N requirement gaps"** chip → the Requirements-check modal shows **only the missing requirements** (degree, experience, named skills) — the "requirements you already meet" list is gone.
+- [ ] Tap the **Match %** chip → the Match modal **still** shows "Your matching strengths" + "Add these to raise it" (unchanged). Both **dark + light**.
 
 ## Change log for this tracker
 - 2026-08-22 — created; consolidated the two v226 review PDFs + prior tracker + CLAUDE.md §7/§8 into Sprints A–E.
