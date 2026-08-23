@@ -825,8 +825,10 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
   }
   #upgrade-menu{position:absolute;top:58px;right:8px;background:var(--plum3);border:1px solid var(--plum4);border-radius:14px;padding:12px;width:220px;z-index:200;display:none;}
   #upgrade-menu.open{display:block;}
-  .upgrade-btn{background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:700;border-radius:10px;padding:10px;text-align:center;font-size:13px;cursor:pointer;margin-bottom:8px;}
-  .coffee-btn{background:rgba(255,179,71,.15);border:1px solid rgba(255,179,71,.4);color:var(--warn);border-radius:10px;padding:8px;text-align:center;font-size:13px;cursor:pointer;}
+  /* v232: flex-center button labels so the emoji+text group sits true-center (H+V) and
+     stays centered even if it wraps — text-align+padding alone drifts with emojis. */
+  .upgrade-btn{background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:700;border-radius:10px;padding:10px;text-align:center;font-size:13px;cursor:pointer;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:5px;}
+  .coffee-btn{background:rgba(255,179,71,.15);border:1px solid rgba(255,179,71,.4);color:var(--warn);border-radius:10px;padding:8px;text-align:center;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;}
 
   /* Tutorial */
   #tutorial{position:absolute;inset:0;z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(18,15,29,.92);backdrop-filter:blur(4px);}
@@ -1031,14 +1033,14 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
   .opt-after{font-size:12px;color:var(--mint);background:rgba(0,245,160,.07);border-left:3px solid var(--mint);padding:8px 10px;border-radius:0 8px 8px 0;margin:8px 0;}
   .opt-why{font-size:11px;color:var(--cyber);background:rgba(181,95,230,.08);border-radius:8px;padding:8px 10px;line-height:1.6;margin-top:8px;}
   .opt-actions{display:flex;gap:8px;margin-top:10px;}
-  .opt-btn-go{flex:1;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:9px;font-size:12px;text-align:center;cursor:pointer;}
-  .opt-btn-skip{background:transparent;border:1px solid var(--plum4);color:var(--muted);border-radius:10px;padding:9px 14px;font-size:12px;text-align:center;cursor:pointer;}
+  .opt-btn-go{flex:1;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:9px;font-size:12px;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;}
+  .opt-btn-skip{background:transparent;border:1px solid var(--plum4);color:var(--muted);border-radius:10px;padding:9px 14px;font-size:12px;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;}
   .quick-chip{display:inline-block;background:var(--plum2);border:1px solid var(--plum4);color:var(--off);font-size:12px;padding:6px 12px;border-radius:999px;margin:0 6px 6px 0;cursor:pointer;transition:all .15s;}
   .quick-chip:active{border-color:var(--mint);color:var(--mint);}
   .quick-chip.on{border-color:var(--mint);color:var(--mint);background:rgba(0,245,160,.1);}
   .buzz-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--plum3);}
   .buzz-row:last-child{border:none;}
-  .buzz-add{background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.35);color:var(--mint);font-size:11px;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer;flex-shrink:0;}
+  .buzz-add{background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.35);color:var(--mint);font-size:11px;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;gap:4px;}
   .buzz-add.added{background:var(--mint);color:var(--plum);}
   .cred-bar{height:4px;background:var(--plum3);border-radius:999px;overflow:hidden;margin-top:3px;}
 
@@ -1798,8 +1800,8 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            old shared island with a text-link vs a pill; + an explicit Glassdoor link.
            The duplicate green "Reviews" chip in the social row is gone. -->
       <div style="display:flex;gap:8px;margin-bottom:8px;">
-        <div id="cm-save" onclick="toggleSaveCompany()" style="flex:1;background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">🔖 Save Company</div>
-        <div onclick="openCmReviews()" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">⭐ Reviews &amp; rating</div>
+        <div id="cm-save" onclick="toggleSaveCompany()" style="flex:1;background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:10px;padding:10px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">🔖 Save Company</div>
+        <div onclick="openCmReviews()" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:10px;padding:10px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">⭐ Reviews &amp; rating</div>
       </div>
       <div id="cm-glassdoor" style="display:none;margin-bottom:10px;"><a id="cm-glassdoor-link" href="#" target="_blank" rel="noopener" style="color:var(--cyber);font-size:12px;text-decoration:none;font-weight:700;">🏢 See Glassdoor reviews →</a></div>
       <!-- v146 P2-6 (founder): mute an entire company (staffing-agency flooding). -->
@@ -2121,10 +2123,10 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
             <div class="green-flag" style="display:none;">🟢 <strong>Green Flag</strong></div>
             <div class="red-flag" style="display:none;">🔴 <strong>Red Flag</strong></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
-              <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
-              <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
+              <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
+              <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
             </div>
-            <div onclick="fullCompanyFromCard(event)" style="margin-top:6px;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">⭐ Full company profile, vibe &amp; reviews →</div><div onclick="reportExpiredFromCard(event)" style="margin-top:6px;color:var(--muted);font-size:10px;text-align:center;cursor:pointer;text-decoration:underline;">🚩 No longer accepting applications? Report &amp; hide</div>
+            <div onclick="fullCompanyFromCard(event)" style="margin-top:6px;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;cursor:pointer;">⭐ Full company profile, vibe &amp; reviews →</div><div onclick="reportExpiredFromCard(event)" style="margin-top:6px;color:var(--muted);font-size:10px;text-align:center;cursor:pointer;text-decoration:underline;">🚩 No longer accepting applications? Report &amp; hide</div>
             <div class="tap-hint" style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;padding-bottom:4px;">👆 Tap for the full posting</div>
           </div>
         </div>
@@ -2161,10 +2163,10 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
             <div class="green-flag" style="display:none;">🟢 <strong>Green Flag</strong></div>
             <div class="red-flag" style="display:none;">🔴 <strong>Red Flag</strong></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
-              <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
-              <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
+              <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
+              <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
             </div>
-            <div onclick="fullCompanyFromCard(event)" style="margin-top:6px;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">⭐ Full company profile, vibe &amp; reviews →</div><div onclick="reportExpiredFromCard(event)" style="margin-top:6px;color:var(--muted);font-size:10px;text-align:center;cursor:pointer;text-decoration:underline;">🚩 No longer accepting applications? Report &amp; hide</div>
+            <div onclick="fullCompanyFromCard(event)" style="margin-top:6px;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;cursor:pointer;">⭐ Full company profile, vibe &amp; reviews →</div><div onclick="reportExpiredFromCard(event)" style="margin-top:6px;color:var(--muted);font-size:10px;text-align:center;cursor:pointer;text-decoration:underline;">🚩 No longer accepting applications? Report &amp; hide</div>
             <div class="tap-hint" style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;padding-bottom:4px;">👆 Tap for the full posting</div>
           </div>
         </div>
@@ -2201,10 +2203,10 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
             <div class="green-flag" style="display:none;">🟢 <strong>Green Flag</strong></div>
             <div class="red-flag" style="display:none;">🔴 <strong>Red Flag</strong></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
-              <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
-              <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
+              <div onclick="matchToJobFromCard(event)" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;cursor:pointer;">🎯 Match to Job</div>
+              <div onclick="copyOptCard(event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:8px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;cursor:pointer;">✨ Cover Letter</div>
             </div>
-            <div onclick="fullCompanyFromCard(event)" style="margin-top:6px;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;text-align:center;font-size:11px;font-weight:800;cursor:pointer;">⭐ Full company profile, vibe &amp; reviews →</div><div onclick="reportExpiredFromCard(event)" style="margin-top:6px;color:var(--muted);font-size:10px;text-align:center;cursor:pointer;text-decoration:underline;">🚩 No longer accepting applications? Report &amp; hide</div>
+            <div onclick="fullCompanyFromCard(event)" style="margin-top:6px;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:8px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;cursor:pointer;">⭐ Full company profile, vibe &amp; reviews →</div><div onclick="reportExpiredFromCard(event)" style="margin-top:6px;color:var(--muted);font-size:10px;text-align:center;cursor:pointer;text-decoration:underline;">🚩 No longer accepting applications? Report &amp; hide</div>
             <div class="tap-hint" style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;padding-bottom:4px;">👆 Tap for the full posting</div>
           </div>
           <div class="card-drawer" id="card-drawer">
@@ -2505,7 +2507,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
           <div class="field-label">Graduation Year</div><input class="field-input pf-gradyr" placeholder="2019" type="number" oninput="updateProgress();syncEduStruct()"/>
           <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px;">Additional Schools / Programs</div>
           <div id="edu-extra"></div>
-          <div onclick="addEduRow()" style="margin-top:8px;background:rgba(181,95,230,.12);border:1px dashed rgba(181,95,230,.4);color:var(--cyber);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">＋ Add another school / program</div>
+          <div onclick="addEduRow()" style="margin-top:8px;background:rgba(181,95,230,.12);border:1px dashed rgba(181,95,230,.4);color:var(--cyber);border-radius:9px;padding:9px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">＋ Add another school / program</div>
         </div></div>
       </div>
 
@@ -2518,7 +2520,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
         <div class="accordion-body"><div class="acc-inner">
           <div style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5;">List any professional licenses or certifications — these matter a lot for healthcare, trades, and licensed roles.</div>
           <div id="cert-list"></div>
-          <div onclick="addCertRow()" style="margin-top:8px;background:rgba(0,245,160,.1);border:1px dashed rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">＋ Add a license / certification</div>
+          <div onclick="addCertRow()" style="margin-top:8px;background:rgba(0,245,160,.1);border:1px dashed rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:9px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">＋ Add a license / certification</div>
         </div></div>
       </div>
 
@@ -2589,7 +2591,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
           <div style="margin-top:10px;">
             <div class="field-label">Or type your own</div>
             <input class="field-input" id="title-opt-custom" placeholder="Your preferred title" style="font-size:13px;" oninput="titleOptCustomTyping(this.value)"/>
-            <div onclick="titleOptCustomSave()" style="margin-top:8px;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">💾 Use This Title</div>
+            <div onclick="titleOptCustomSave()" style="margin-top:8px;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:9px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">💾 Use This Title</div>
           </div>
           <div style="font-size:10px;color:var(--muted);margin-top:8px;">We never invent seniority you don't have — these rephrase your real title using current market language.</div>
         </div>
@@ -3167,7 +3169,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v231</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v232</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -4891,12 +4893,12 @@ function openCandidateCard(jobId,idx){
     +'<div style="display:flex;align-items:center;gap:12px;padding:16px;background:linear-gradient(135deg,rgba(181,95,230,.18),rgba(0,245,160,.08));border-bottom:1px solid var(--plum3);"><div style="width:44px;height:44px;border-radius:50%;background:var(--plum3);display:grid;place-items:center;font-size:22px;">🧑</div><div style="flex:1;min-width:0;"><div style="font-size:16px;font-weight:800;color:var(--off);">'+_esc(r.name||'Applicant')+'</div><div style="font-size:12px;color:var(--muted);">'+_esc(r.title||'')+(typeof a.match==='number'?(' · <span style="color:var(--mint);font-weight:700;">'+a.match+'% match</span>'):'')+'</div></div><div onclick="document.getElementById(\'candcard-scrim\').remove()" style="color:var(--muted);cursor:pointer;font-size:18px;">✕</div></div>'
     +'<div style="padding:16px;">'
     +('<div style="display:flex;gap:8px;margin-bottom:6px;">'
-      +'<div onclick="_recDownloadApplicant(\''+_esc(jobId)+'\','+idx+',\'resume\')" style="flex:1;background:var(--cyber);color:#fff;border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">⬇ Download résumé</div>'
-      +(a.coverLetter?('<div onclick="_recDownloadApplicant(\''+_esc(jobId)+'\','+idx+',\'cover\')" style="flex:1;background:var(--plum3);color:var(--off);border:1px solid var(--plum4);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">⬇ Cover letter</div>'):'')
+      +'<div onclick="_recDownloadApplicant(\''+_esc(jobId)+'\','+idx+',\'resume\')" style="flex:1;background:var(--cyber);color:#fff;border-radius:9px;padding:9px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">⬇ Download résumé</div>'
+      +(a.coverLetter?('<div onclick="_recDownloadApplicant(\''+_esc(jobId)+'\','+idx+',\'cover\')" style="flex:1;background:var(--plum3);color:var(--off);border:1px solid var(--plum4);border-radius:9px;padding:9px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">⬇ Cover letter</div>'):'')
       +'</div><div style="font-size:10.5px;color:var(--faint);margin-bottom:12px;">Résumé they applied with'+(a.coverLetter?' · cover letter attached':'')+'</div>')
     +(a.uid?('<div style="display:flex;gap:8px;margin-bottom:14px;">'
-      +'<div onclick="reachOutTo(\''+_esc(a.uid)+'\',\''+_esc(jobId)+'\',\''+_rJt+'\',\''+_rNm+'\',\'reachout\');var s=document.getElementById(\'candcard-scrim\');if(s)s.remove();" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">💬 Reach out</div>'
-      +'<div onclick="reachOutTo(\''+_esc(a.uid)+'\',\''+_esc(jobId)+'\',\''+_rJt+'\',\''+_rNm+'\',\'rejection\');var s=document.getElementById(\'candcard-scrim\');if(s)s.remove();" style="flex:1;background:rgba(255,77,106,.10);border:1px solid rgba(255,77,106,.35);color:var(--danger);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">💌 Kind decline</div>'
+      +'<div onclick="reachOutTo(\''+_esc(a.uid)+'\',\''+_esc(jobId)+'\',\''+_rJt+'\',\''+_rNm+'\',\'reachout\');var s=document.getElementById(\'candcard-scrim\');if(s)s.remove();" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:9px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">💬 Reach out</div>'
+      +'<div onclick="reachOutTo(\''+_esc(a.uid)+'\',\''+_esc(jobId)+'\',\''+_rJt+'\',\''+_rNm+'\',\'rejection\');var s=document.getElementById(\'candcard-scrim\');if(s)s.remove();" style="flex:1;background:rgba(255,77,106,.10);border:1px solid rgba(255,77,106,.35);color:var(--danger);border-radius:9px;padding:9px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">💌 Kind decline</div>'
       +'</div>'):'')
     +(r.summary?('<div class="rec-sec-title">Summary</div><div style="font-size:12.5px;color:var(--off);line-height:1.6;margin-bottom:12px;">'+_esc(r.summary)+'</div>'):'')
     +(skills?('<div class="rec-sec-title">Skills</div><div style="margin-bottom:12px;">'+skills+'</div>'):'')
@@ -6280,7 +6282,7 @@ function browseJobCard(j,i){
       _ghostChipHtml(j)+
       matchBadge+
     '</div>'+
-    '<div onclick="event.stopPropagation();notInterestedLive('+i+',event)" style="margin-top:10px;background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.3);color:var(--danger);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">\ud83d\udeab Not Interested</div>'+
+    '<div onclick="event.stopPropagation();notInterestedLive('+i+',event)" style="margin-top:10px;background:rgba(255,77,106,.1);border:1px solid rgba(255,77,106,.3);color:var(--danger);border-radius:9px;padding:9px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">\ud83d\udeab Not Interested</div>'+
     '<div style="margin-top:7px;text-align:center;font-size:10px;color:var(--muted);">Tap card for details, company vibe &amp; apply \u2192</div>'+
   '</div>';
 }
@@ -6339,16 +6341,16 @@ function buildBrowseExpanded(j,i){
       ((typeof _reqGaps==='function'&&resumeReady)?(function(){ const g=_reqGaps(j); return g.gaps.length?('<div onclick="openReqGapsLive('+i+',event)" style="background:rgba(255,179,71,.12);border:1px solid rgba(255,179,71,.45);color:var(--warn);font-size:11px;font-weight:800;padding:3px 9px;border-radius:8px;cursor:pointer;">\u26a0\ufe0f '+g.gaps.length+' requirement gap'+(g.gaps.length>1?'s':'')+'</div>'):''; })():'')+
     '</div>'+flag+
     '<div style="display:flex;gap:8px;margin-top:12px;">'+
-      '<div onclick="matchToJobForRole(\''+t+'\',\''+co+'\',\''+d+'\')" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">\ud83c\udfaf Match to Job</div>'+
-      '<div onclick="copyOptLive('+i+',event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">\u2728 Cover Letter</div>'+
+      '<div onclick="matchToJobForRole(\''+t+'\',\''+co+'\',\''+d+'\')" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:10px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">\ud83c\udfaf Match to Job</div>'+
+      '<div onclick="copyOptLive('+i+',event)" style="flex:1;background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.45);color:var(--cyber);border-radius:9px;padding:10px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">\u2728 Cover Letter</div>'+
     '</div>'+
-    '<div onclick="fullCompanyLive('+i+')" style="margin-top:8px;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:10px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">\u2b50 Full company profile, vibe &amp; reviews \u2192</div>'+
+    '<div onclick="fullCompanyLive('+i+')" style="margin-top:8px;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:9px;padding:10px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">\u2b50 Full company profile, vibe &amp; reviews \u2192</div>'+
     ((j._internal&&j.id)
       ?('<div onclick="applyInternalById(\''+j.id+'\',\''+t+'\',\''+co+'\')" style="margin-top:8px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:12px;text-align:center;font-size:13px;cursor:pointer;">\ud83d\udce8 Apply to this role</div>')   /* R2-C: in-app apply for employer jobs */
       :(url?('<div onclick="applyVia(\''+url+'\',\''+t+'\',\''+co+'\')" style="margin-top:8px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:12px;text-align:center;font-size:13px;cursor:pointer;">View Full Posting \u2197</div>'):''))+
     '<div style="display:flex;gap:8px;margin-top:8px;">'+
-      '<div onclick="saveLive('+i+',event)" style="flex:1;background:rgba(0,245,160,.08);border:1px solid rgba(0,245,160,.3);color:var(--mint);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">\ud83d\udd16 Save</div>'+
-      '<div onclick="notInterestedLive('+i+',event);closeBrowseExpanded()" style="flex:1;background:rgba(255,77,106,.12);border:1px solid rgba(255,77,106,.35);color:var(--danger);border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:800;cursor:pointer;">\ud83d\udeab Not Interested</div>'+
+      '<div onclick="saveLive('+i+',event)" style="flex:1;background:rgba(0,245,160,.08);border:1px solid rgba(0,245,160,.3);color:var(--mint);border-radius:9px;padding:9px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">\ud83d\udd16 Save</div>'+
+      '<div onclick="notInterestedLive('+i+',event);closeBrowseExpanded()" style="flex:1;background:rgba(255,77,106,.12);border:1px solid rgba(255,77,106,.35);color:var(--danger);border-radius:9px;padding:9px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">\ud83d\udeab Not Interested</div>'+
     '</div>'+
     /* B-DESC-CUT (v77): this render had its OWN hard 2400 slice \u2014 the last clip
        site (found by the [STATE-COVERAGE] Q1 test). Word-boundary cut at 4000,
@@ -14899,8 +14901,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v231';
+const APP_VERSION = 'v232';
 const CHANGELOG = {
+  'v232':['v232 button text centering: flex-center the labels in the shared button classes (.upgrade-btn/.coffee-btn/.opt-btn-go/.opt-btn-skip/.buzz-add) and the card + company-card action buttons (Match/Cover/Apply/Save/Not Interested/Save Company/Reviews) so the emoji+text group sits true-center horizontally AND vertically and stays centered if it wraps — text-align+padding alone drifted with emojis'],
   'v231':['A6 company logos: show the company logo where the briefcase was (company-card header + Browse job card) with an HONEST fallback chain — employer uploaded logo → the logo found online from their REAL website domain (DuckDuckGo icons; never a guessed domain, so never the wrong company) → the default emoji (onerror-safe). Employer profile form gains a note that an unuploaded logo falls back to the online one. Client-side img only (no backend/quota); CSP already allows https images'],
   'v230':['A5 company-card cleanup: the company view is now company-only — the per-role Match/Cover/Apply/View bleed is replaced by one slim \'tap to open the role\' line (opens the full job card via openCmFeaturedRole); the stray Apply is removed from the Connect-with-hiring-team social row; the duplicate green \'Reviews\' chip is gone, leaving ONE clean \'Reviews & rating\' button + an explicit \'See Glassdoor reviews\' link (we link out, never scrape reviews)'],
   'v229':['v229 job-card + requirements bug fixes: (B-BROWSE-SUMMARY) the Browse job modal now renders Job Expectations from the FULL description (j.desc) instead of the short j.summary preview that shadowed it — fixes the mid-word \'HubS\' truncation so Browse matches the swipe drawer; (B-GAPS-ONLY) the Requirements-check modal shows ONLY the missing requirements (the \'requirements you already meet\' list is hidden; the Match modal still shows matching strengths)'],

@@ -77,7 +77,11 @@ Legend: **[UI]** = needs [UI-REVIEW] mockup+approval · **Effort** S/M/L · **Im
 - **[STATE-COVERAGE]:** has-gaps · no-gaps · ghost "—" (no data) · both themes · mobile. Playwright: assert the two tiles share the tile background + equal widths.
 - **Recommendation:** small + card-face — either do it right after the company-card work, or fold it into the Wow-pass hero card (C3) which re-treats the tiles anyway. My pick: **fold into C3** so the tile system is designed once, unless you want it sooner.
 
-### A8 · Align the "random" misaligned sections to the shared gutter  **[UI]** · Impact MED · Effort M · _(diagnosed 2026-08-22 by per-section measurement)_
+### A9 · Button/pill label centering (site-wide)  **[UI]** · Impact MED · Effort S · ✅ SHIPPED v232
+- **Why (founder):** button labels ("Save", "Not Interested", "Save Company", "Reviews & rating", card actions) looked off-center — `text-align:center` + padding drifts when an emoji weights the line or the label wraps (measured ~1px vertical + emoji optical offset).
+- **How (insert-only):** flex-center the labels (`display:flex;align-items:center;justify-content:center;gap`) in the shared button classes (.upgrade-btn/.coffee-btn/.opt-btn-go/.opt-btn-skip/.buzz-add→inline-flex) + the card/company action-button style fragments (Match/Cover/Apply/Save/Not Interested/Save Company/Reviews). The emoji+text group now sits true-center H+V and survives wrapping. 2 new tests.
+
+### A8 · Align the "random" misaligned sections to the shared gutter  **[UI]** · Impact MED · Effort M · _(diagnosed 2026-08-22; building next as v233)_
 - **Why (founder, refined):** NOT a global-width problem — each view is symmetrically centered overall. The real issue: a few sections within a page don't share the same left/right edges as their siblings, so they look "off" while the rest line up. **We deliberately do NOT force one uniform width** (sections have different designs) — each keeps its own width but must sit on the **same center axis / same gutter**.
 - **Measured outliers (left-edge):** Résumé — a `section-card` at 312px vs the rest at 432px. Account — `set-profile` at 312px vs 416px. Settings/Ghosts — saved-job cards at 431/448px vs 416px (true sibling drift). (Some 312-vs-432 cases are parent-card-vs-indented-children nesting, to confirm per section.)
 - **How (insert-only):** per-view pass — normalize each top-level section's horizontal container (padding/margin/max-width auto) so every sibling section shares ONE gutter, without changing any section's internal design/width. Fix the saved-job-card drift + the 312-outlier sections.
@@ -172,6 +176,9 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 - [ ] A job/company with a real website domain shows the **company logo** where the 💼 was (Browse job card + company-card header); a job with no domain still shows 💼 (no wrong logos).
 - [ ] **Employer profile** (recruiter account) → the Company-logo field has a note that an un-uploaded logo falls back to the online one; uploading still overrides it.
 - [ ] A broken/missing online logo quietly falls back to 💼 (no broken-image box). Both **dark + light**.
+
+**v232 — button label centering** _(look at any buttons across the app)_
+- [ ] Button/pill labels (Save, Not Interested, Match to Job, Cover Letter, Save Company, Reviews & rating, etc.) sit **centered — middle both ways**; the emoji no longer pushes the text off-center; nothing looks lopsided. Both **dark + light**, desktop + mobile.
 
 ## Change log for this tracker
 - 2026-08-22 — created; consolidated the two v226 review PDFs + prior tracker + CLAUDE.md §7/§8 into Sprints A–E.

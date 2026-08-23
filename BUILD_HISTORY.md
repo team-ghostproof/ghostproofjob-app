@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-22 · Current live build: **v231**_
+_Last updated: 2026-08-22 · Current live build: **v232**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v232** — v232 button text centering: flex-center the labels in the shared button classes (.upgrade-btn/.coffee-btn/.opt-btn-go/.opt-btn-skip/.buzz-add) and the card + company-card action buttons (Match/Cover/Apply/Save/Not Interested/Save Company/Reviews) so the emoji+text group sits true-center horizontally AND vertically and stays centered if it wraps — text-align+padding alone drifted with emojis
 - **v231** — A6 company logos: show the company logo where the briefcase was (company-card header + Browse job card) with an HONEST fallback chain — employer uploaded logo → the logo found online from their REAL website domain (DuckDuckGo icons; never a guessed domain, so never the wrong company) → the default emoji (onerror-safe). Employer profile form gains a note that an unuploaded logo falls back to the online one. Client-side img only (no backend/quota); CSP already allows https images
 - **v230** — A5 company-card cleanup: the company view is now company-only — the per-role Match/Cover/Apply/View bleed is replaced by one slim 'tap to open the role' line (opens the full job card via openCmFeaturedRole); the stray Apply is removed from the Connect-with-hiring-team social row; the duplicate green 'Reviews' chip is gone, leaving ONE clean 'Reviews & rating' button + an explicit 'See Glassdoor reviews' link (we link out, never scrape reviews)
 - **v229** — v229 job-card + requirements bug fixes: (B-BROWSE-SUMMARY) the Browse job modal now renders Job Expectations from the FULL description (j.desc) instead of the short j.summary preview that shadowed it — fixes the mid-word 'HubS' truncation so Browse matches the swipe drawer; (B-GAPS-ONLY) the Requirements-check modal shows ONLY the missing requirements (the 'requirements you already meet' list is hidden; the Match modal still shows matching strengths)

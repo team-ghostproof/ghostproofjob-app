@@ -8904,3 +8904,34 @@ test.describe('[STATE-COVERAGE] v231 company logos (honest fallback chain)', () 
     expect(r.domainRealOnly, 'domain comes only from a real URL, never guessed from a company name').toBe(true);
   });
 });
+
+test.describe('[STATE-COVERAGE] v232 button label centering (H + V)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.openCompanyView === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(200);
+  });
+
+  test('shared button classes flex-center their labels', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const mk = (cls) => { const d = document.createElement('div'); d.className = cls; d.textContent = '🔖 Test'; document.body.appendChild(d); const s = getComputedStyle(d); const o = { display: s.display, ai: s.alignItems, jc: s.justifyContent }; d.remove(); return o; };
+      return { buzz: mk('buzz-add'), optgo: mk('opt-btn-go'), upgrade: mk('upgrade-btn'), coffee: mk('coffee-btn') };
+    });
+    for (const k of ['buzz', 'optgo', 'upgrade', 'coffee']) {
+      expect(r[k].display, k + ' is a flex container').toMatch(/flex/);
+      expect(r[k].ai, k + ' is vertically centered').toBe('center');
+      expect(r[k].jc, k + ' is horizontally centered').toBe('center');
+    }
+  });
+
+  test('company-card action buttons flex-center their labels', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      openCompanyView('Acme', { title: 'X', t: 'X', co: 'Acme', desc: 'd' });
+      const s = getComputedStyle(document.getElementById('cm-save'));
+      return { display: s.display, ai: s.alignItems, jc: s.justifyContent };
+    });
+    expect(r.display, 'Save Company is a flex container').toMatch(/flex/);
+    expect(r.ai, 'vertically centered').toBe('center');
+    expect(r.jc, 'horizontally centered').toBe('center');
+  });
+});
