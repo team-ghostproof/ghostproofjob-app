@@ -8935,3 +8935,23 @@ test.describe('[STATE-COVERAGE] v232 button label centering (H + V)', () => {
     expect(r.jc, 'horizontally centered').toBe('center');
   });
 });
+
+test.describe('[STATE-COVERAGE] v233 page-section alignment (shared gutter on desktop)', () => {
+  test('desktop: all top-level sections in Account/Résumé share one left edge', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => !!document.getElementById('desk-main') && typeof window.switchView === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(1500); // let the desktop grid settle (deskMQ)
+    for (const v of ['account', 'resume']) {
+      await page.evaluate((vw) => { try { switchView(vw); } catch (e) {} }, v);
+      await page.waitForTimeout(500);
+      const lefts = await page.evaluate((vw) => {
+        const view = document.getElementById('view-' + vw); if (!view) return [-1];
+        return [...new Set([...view.children]
+          .filter(c => { const r = c.getBoundingClientRect(); return r.height > 20 && r.width > 100 && getComputedStyle(c).display !== 'none'; })
+          .map(c => Math.round(c.getBoundingClientRect().left)))];
+      }, v);
+      expect(lefts.length, v + ' sections all share ONE left edge on desktop (got ' + JSON.stringify(lefts) + ')').toBe(1);
+    }
+  });
+});
