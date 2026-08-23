@@ -8955,3 +8955,26 @@ test.describe('[STATE-COVERAGE] v233 page-section alignment (shared gutter on de
     }
   });
 });
+
+test.describe('[STATE-COVERAGE] v234 geolocation toggle polish (A4)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.toggleGeo === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(200);
+  });
+
+  test('denied geolocation keeps the toggle OFF and gives an honest enable-it hint', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      // stub the browser API to always deny
+      navigator.geolocation.getCurrentPosition = (ok, err) => err({ code: 1, message: 'denied' });
+      const el = document.createElement('div'); el.className = 'toggle-switch'; document.body.appendChild(el);
+      toggleGeo(el);
+      const stayedOff = !el.classList.contains('on');
+      el.remove();
+      const src = String(toggleGeo);
+      return { stayedOff, honestHint: /blocked/i.test(src) && /browser/i.test(src) && /type your city/i.test(src) };
+    });
+    expect(r.stayedOff, 'toggle stays OFF when the browser denies geolocation').toBe(true);
+    expect(r.honestHint, 'the message explains how to enable it + the type-a-city fallback').toBe(true);
+  });
+});

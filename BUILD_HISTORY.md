@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-22 · Current live build: **v233**_
+_Last updated: 2026-08-23 · Current live build: **v234**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v234** — A4 (last Sprint A item): geolocation toggle polish — when the BROWSER blocks location, keep the toggle visibly OFF and give an honest, actionable message (enable it in your browser's site settings, or type your city) + a matching loc-status hint, instead of a dead-end 'permission denied'. Location stays opt-in
 - **v233** — v233 (A8): page-section alignment — sections with an inline mobile margin (.section-card on Resume, #set-profile on Account) were left-shifting ~100px on desktop because their inline margin:0 16px overrode the desktop centering rule; added !important to the desktop #desk-main>div>* auto-margins so every section shares ONE centered gutter (all now at the same left edge). Desktop-only; mobile keeps its 16px margin
 - **v232** — v232 button text centering: flex-center the labels in the shared button classes (.upgrade-btn/.coffee-btn/.opt-btn-go/.opt-btn-skip/.buzz-add) and the card + company-card action buttons (Match/Cover/Apply/Save/Not Interested/Save Company/Reviews) so the emoji+text group sits true-center horizontally AND vertically and stays centered if it wraps — text-align+padding alone drifted with emojis
 - **v231** — A6 company logos: show the company logo where the briefcase was (company-card header + Browse job card) with an HONEST fallback chain — employer uploaded logo → the logo found online from their REAL website domain (DuckDuckGo icons; never a guessed domain, so never the wrong company) → the default emoji (onerror-safe). Employer profile form gains a note that an unuploaded logo falls back to the online one. Client-side img only (no backend/quota); CSP already allows https images

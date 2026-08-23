@@ -48,7 +48,7 @@ Legend: **[UI]** = needs [UI-REVIEW] mockup+approval · **Effort** S/M/L · **Im
 - **Test:** a state-coverage assertion the sections are focusable/role=button and show a count.
 - **Rollback:** CSS/markup only; revert the block.
 
-### A4 · Geolocation toggle polish  · Impact LOW · Effort S
+### A4 · Geolocation toggle polish  · Impact LOW · Effort S · ✅ SHIPPED v234 _(completes Sprint A build items; A7 folded into C3)_
 - **Why:** Not a bug — the browser denies location and the app honestly falls back — but the toggle can look "on but dead," and there's no hint on how to enable it. (Full Site Analysis, P3.)
 - **How (insert-only):** on the permission-denied callback, snap the toggle visibly back to OFF; append one honest line ("Location is blocked for this site — enable it in your browser's settings") to the existing toast/status.
 - **[STATE-COVERAGE]:** denied · granted · unsupported (`!navigator.geolocation`) · already-off.
@@ -182,6 +182,14 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 
 **v233 — page-section alignment** _(desktop; Résumé + Account pages)_
 - [ ] On desktop, every section on a page lines up on the **same left/right edge** — the résumé "section-card" and the account profile card no longer stick out ~100px wider than the rest. Resize 1024→1920. (Mobile margins unchanged.)
+
+**v234 — geolocation toggle (A4)** _(Account → "Use device location", with location blocked in the browser)_
+- [ ] Tapping it when the browser blocks location keeps the toggle **OFF** and shows an honest message: enable it in your browser's site settings, or type your city. No dead-end "permission denied".
+
+---
+
+### ✅ SPRINT A COMPLETE (build items) — v226–v234
+A1 job-card full data · A2/A2b logo+wordmark · A3 tailored pills · A4 geo toggle · A4.5 Browse-summary + gaps-only bugs · A5 company-card cleanup · A6 company logos · A8 section alignment · A9 button centering. **A7 (card-face tiles) folded into Sprint C (Wow pass).** Open follow-up: button *word* vs *icon* centering (10px, site-wide) — awaiting founder A/B direction.
 
 ## Change log for this tracker
 - 2026-08-22 — created; consolidated the two v226 review PDFs + prior tracker + CLAUDE.md §7/§8 into Sprints A–E.
