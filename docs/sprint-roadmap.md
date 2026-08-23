@@ -91,6 +91,14 @@ Legend: **[UI]** = needs [UI-REVIEW] mockup+approval · **Effort** S/M/L · **Im
 ### Job-card data completeness — investigation conclusion (2026-08-22)
 Founder saw "incomplete data on Browse job cards." **Verified:** v227/A1 IS live (build stamp v227; the `getJobFull` lazy-load is deployed), Firestore rules allow the single-doc read (`match /jobs/{jobId} allow read: if true`), the pool builder preserves `_docId` + sets `_clipped` correctly, and the founder's own screenshot shows Browse fully populated. **Most likely cause of the stale view:** the PWA service worker served a cached pre-v227 shell (hard-refresh / close-all-tabs forces the update). **One honest edge case:** a job pruned from the `jobs` collection (8-day cleanup) but still in the pool → `getJobFull` returns null → Browse falls back to the trimmed preview for that one job (rare; self-heals as the pool rebuilds). No code change required; monitoring only.
 
+### A6b · Company logo on the COMPANY card too  · ✅ SHIPPED v235
+Founder: A6 put the logo on job cards but the company card still had none (opened from Ghosts, no domain → nothing). Added a persistent logo BOX to the company-card header (upload → online-by-real-domain → 🏢 placeholder), matching the job card.
+
+### Findings parked for a decision (from 2026-08-23 review)
+- **Candidate card icon** = anonymous 🧑 (no photo/logo — candidates stay anonymous until they apply/engage). Mockup delivered. Options if changing: keep 🧑 (rec) · initial-monogram on the Applicant Card only · GPJ mark.
+- **Saved Jobs placement** — currently on the Ghosts tab (above companies), which is unintuitive (Ghosts = ghost-risk/company intel). Move options: (A) Browse "★ Saved (N)" filter/section [rec — jobs live in Browse] · (B) consolidate into Settings → Saved Jobs (exists) · (C) a Saved quick-link on Swipe/home. [UI-REVIEW] — mock before moving.
+- **Button *word* centering** (10px, site-wide) — ON HOLD per founder; remind after Sprint C (options A keep-icon-pin-left / B drop-icon).
+
 ### Recommended slotting
 Do **A5 then A6 back-to-back right after A4** — both touch the company card, so doing them together is efficient and avoids two separate regressions of the same view. Both are **[UI-REVIEW]** — I'll get your nod on the mockup before writing code. **A7** is tiny; fold into C3 (or pull earlier if it bugs you).
 

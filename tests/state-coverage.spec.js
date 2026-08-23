@@ -4057,9 +4057,10 @@ test.describe('[STATE-COVERAGE] v120 street-safe City/State + listings upgrades 
       await saveRecCompany();
       openCompanyView('GPJ', { _internal: true, companyId: 'gpj.com', title: 'Marketing Manager' });
       await new Promise((x) => setTimeout(x, 300));
-      const nameHtml = (document.getElementById('cm-name') || {}).innerHTML || '';
+      // v235: the company-card logo moved from inline-in-cm-name to the dedicated #cm-logo box
+      const logoHtml = (document.getElementById('cm-logo') || {}).innerHTML || '';
       try { document.getElementById('company-modal').classList.remove('open'); } catch (e) {}
-      return { hasUpload, previewHasImg: /<img/.test(preview), savedLogo: savedCompany && savedCompany.logo, modalHasLogo: /<img/.test(nameHtml) };
+      return { hasUpload, previewHasImg: /<img/.test(preview), savedLogo: savedCompany && savedCompany.logo, modalHasLogo: /<img/.test(logoHtml) };
     });
     expect(r.hasUpload).toBe(true);
     expect(r.previewHasImg).toBe(true);
@@ -8976,5 +8977,28 @@ test.describe('[STATE-COVERAGE] v234 geolocation toggle polish (A4)', () => {
     });
     expect(r.stayedOff, 'toggle stays OFF when the browser denies geolocation').toBe(true);
     expect(r.honestHint, 'the message explains how to enable it + the type-a-city fallback').toBe(true);
+  });
+});
+
+test.describe('[STATE-COVERAGE] v235 company-card logo box', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.openCompanyView === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(200);
+  });
+
+  test('the company card has a logo box: 🏢 placeholder without a domain, online logo with one', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      openCompanyView('CCMC', { title: 'X', t: 'X', co: 'CCMC', desc: 'd' }); // no domain
+      const noDom = document.getElementById('cm-logo').innerHTML;
+      openCompanyView('Acme', { title: 'X', t: 'X', co: 'Acme', companyWebsite: 'https://acme.com', desc: 'd' }); // real domain
+      const withDom = document.getElementById('cm-logo').innerHTML;
+      return {
+        placeholder: noDom.includes('🏢') && !noDom.includes('<img'),
+        online: withDom.includes('icons.duckduckgo.com/ip3/acme.com'),
+      };
+    });
+    expect(r.placeholder, 'no domain → 🏢 placeholder box (no wrong logo)').toBe(true);
+    expect(r.online, 'real domain → online logo in the box').toBe(true);
   });
 });
