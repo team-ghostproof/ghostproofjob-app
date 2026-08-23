@@ -8783,13 +8783,17 @@ test.describe('[STATE-COVERAGE] v228 account tailored sections → pill-buttons'
       clPill: !!document.querySelector('#prof-coverletters .pref-pill'),
       optCount: !!document.getElementById('optimized-count'),
       clCount: !!document.getElementById('coverletters-count'),
-      // the OTHER pref sections must NOT have become pills
-      otherPills: document.querySelectorAll('.pref-pill').length,
+      // scoped: exactly the two tailored sections became pills; other sections still use
+      // the plain .pref-section-title (not restyled). v236 added a legit 3rd .pref-pill in
+      // Browse (Saved Jobs), so we no longer assert a global .pref-pill count.
+      tailoredPills: document.querySelectorAll('#prof-optimized .pref-pill, #prof-coverletters .pref-pill').length,
+      plainTitlesRemain: document.querySelectorAll('.pref-section-title').length,
     }));
     expect(r.optPill, 'Tailored Résumés is a pill-button').toBe(true);
     expect(r.clPill, 'Tailored Cover Letters is a pill-button').toBe(true);
     expect(r.optCount && r.clCount, 'both have a count badge').toBe(true);
-    expect(r.otherPills, 'exactly the two tailored sections are pills, nothing else').toBe(2);
+    expect(r.tailoredPills, 'exactly the two tailored sections are pills').toBe(2);
+    expect(r.plainTitlesRemain, 'other sections keep the plain section-title (not restyled)').toBeGreaterThan(0);
   });
 
   test('the count badge reflects the stored list length (empty → 0, populated → n)', async ({ page }) => {
@@ -9000,5 +9004,43 @@ test.describe('[STATE-COVERAGE] v235 company-card logo box', () => {
     });
     expect(r.placeholder, 'no domain → 🏢 placeholder box (no wrong logo)').toBe(true);
     expect(r.online, 'real domain → online logo in the box').toBe(true);
+  });
+});
+
+test.describe('[STATE-COVERAGE] v236 saved-jobs → Browse (collapsible) + trending logos', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.renderSavedJobs === 'function' && typeof window.renderGhostCompanies === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(200);
+  });
+
+  test('saved jobs render into the Browse collapsible section (not Ghosts); collapsed by default; count; empty hides', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      localStorage.setItem('gpj_saved_jobs', JSON.stringify([{ t: 'Marketing Manager', co: 'CCMC', when: Date.now(), url: 'https://x.com' }, { t: 'Analyst', co: 'Acme', when: Date.now() }]));
+      renderSavedJobs();
+      const out = {
+        inBrowse: document.getElementById('browse-saved').innerHTML.includes('Marketing Manager'),
+        count: document.getElementById('browse-saved-count').textContent,
+        wrapShown: getComputedStyle(document.getElementById('browse-saved-wrap')).display !== 'none',
+        listCollapsed: getComputedStyle(document.getElementById('browse-saved')).display === 'none',
+        notOnGhosts: !((document.getElementById('ghost-list') || {}).innerHTML || '').includes('Marketing Manager'),
+      };
+      localStorage.setItem('gpj_saved_jobs', '[]'); renderSavedJobs();
+      out.emptyHides = getComputedStyle(document.getElementById('browse-saved-wrap')).display === 'none';
+      return out;
+    });
+    expect(r.inBrowse, 'saved jobs render in the Browse section').toBe(true);
+    expect(r.count, 'count badge = 2').toBe('2');
+    expect(r.wrapShown, 'section shows when there are saved jobs').toBe(true);
+    expect(r.listCollapsed, 'the list is collapsed by default').toBe(true);
+    expect(r.notOnGhosts, 'saved jobs are no longer prepended to the Ghosts list').toBe(true);
+    expect(r.emptyHides, 'empty → the whole section hides').toBe(true);
+  });
+
+  test('trending/hunt company rows use the logo helper (real domain → logo → 🏢)', async ({ page }) => {
+    // the active renderGhostCompanies is a wrapper that calls _v8RenderGhostCos (the inner
+    // renderer that draws the company rows) — that's where the logo helper lives.
+    const wired = await page.evaluate(() => String(_v8RenderGhostCos).includes('_gpjLogoHtml'));
+    expect(wired, 'the company-row renderer draws logos via _gpjLogoHtml').toBe(true);
   });
 });

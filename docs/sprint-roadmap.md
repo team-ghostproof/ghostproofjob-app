@@ -94,6 +94,11 @@ Founder saw "incomplete data on Browse job cards." **Verified:** v227/A1 IS live
 ### A6b · Company logo on the COMPANY card too  · ✅ SHIPPED v235
 Founder: A6 put the logo on job cards but the company card still had none (opened from Ghosts, no domain → nothing). Added a persistent logo BOX to the company-card header (upload → online-by-real-domain → 🏢 placeholder), matching the job card.
 
+### A6c/A10 · Saved-Jobs → Browse + trending logos  · ✅ SHIPPED v236
+- Saved Jobs moved off the Ghosts tab into a **collapsible "🔖 Your Saved Jobs" section in Browse** (collapsed by default, count badge, hides when empty). Ghosts is now companies-only.
+- Trending/hunt company rows (`_v8RenderGhostCos`) now render the company **logo box** (real domain → DuckDuckGo → 🏢). Amazon/Meta/Stripe trending fallback carries real domains; hunt companies show 🏢 when their job data has no domain (no guessing).
+- Note: my first edit hit a DEAD duplicate `renderGhostCompanies` (16611, captured as `_v8RenderGhostCos` at 17488 and wrapped at 17489) — the edit was live via `_v8RenderGhostCos`; test now checks the inner fn. **Also learned: the Ghosts view id is `view-ghost` (singular), Settings lives under Account — worth a follow-up to make the v233 alignment test cover ghost/settings too.**
+
 ### Findings parked for a decision (from 2026-08-23 review)
 - **Candidate card icon** = anonymous 🧑 (no photo/logo — candidates stay anonymous until they apply/engage). Mockup delivered. Options if changing: keep 🧑 (rec) · initial-monogram on the Applicant Card only · GPJ mark.
 - **Saved Jobs placement** — currently on the Ghosts tab (above companies), which is unintuitive (Ghosts = ghost-risk/company intel). Move options: (A) Browse "★ Saved (N)" filter/section [rec — jobs live in Browse] · (B) consolidate into Settings → Saved Jobs (exists) · (C) a Saved quick-link on Swipe/home. [UI-REVIEW] — mock before moving.
@@ -193,6 +198,13 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 
 **v234 — geolocation toggle (A4)** _(Account → "Use device location", with location blocked in the browser)_
 - [ ] Tapping it when the browser blocks location keeps the toggle **OFF** and shows an honest message: enable it in your browser's site settings, or type your city. No dead-end "permission denied".
+
+**v235 — company logo on the company card** _(open any company card)_
+- [ ] The company-card header shows a logo box: real logo when the company has a domain, else 🏢. Both dark + light.
+
+**v236 — Saved Jobs in Browse + trending logos**
+- [ ] **Browse** has a collapsible "🔖 Your Saved Jobs" section (collapsed by default; count badge). **Ghosts no longer shows saved jobs** (companies only).
+- [ ] Ghosts company rows show a logo box (real logo when the company has a domain, else 🏢).
 
 ---
 
