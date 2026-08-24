@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-23 · Current live build: **v236**_
+_Last updated: 2026-08-23 · Current live build: **v237**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v237** — v237: (C1) subtle ambient background — a faint dotted grid + two low-opacity brand glows behind the app content (desktop #desk-main fills the empty margins; mobile #app) so it reads with depth, not flat/empty; behind opaque content so contrast is untouched, static (no motion), light+dark. (#2 honesty) removed the fabricated 'trending nationally' Amazon/Meta/Stripe report counts — the Ghosts company section now shows only REAL hunt companies + an honest onboarding empty state
 - **v236** — v236: (1) Saved Jobs moved from the Ghosts tab to a collapsible '🔖 Your Saved Jobs' section in Browse (collapsed by default, count badge, hides when empty) — more intuitive, jobs live in Browse. (2) Trending/hunt company rows now show the company LOGO (real domain → DuckDuckGo → 🏢) instead of a hardcoded building icon
 - **v235** — A6 completion (founder): company logo now on the COMPANY card too — a persistent logo BOX in the company-card header (employer upload → online logo by the company's REAL domain → 🏢 placeholder), matching the job card. Before this, A6 only showed an inline logo on the company card when a domain was present, so companies without one (e.g. opened from Ghosts) showed no logo at all
 - **v234** — A4 (last Sprint A item): geolocation toggle polish — when the BROWSER blocks location, keep the toggle visibly OFF and give an honest, actionable message (enable it in your browser's site settings, or type your city) + a matching loc-status hint, instead of a dead-end 'permission denied'. Location stays opt-in

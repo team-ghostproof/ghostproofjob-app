@@ -9044,3 +9044,28 @@ test.describe('[STATE-COVERAGE] v236 saved-jobs → Browse (collapsible) + trend
     expect(wired, 'the company-row renderer draws logos via _gpjLogoHtml').toBe(true);
   });
 });
+
+test.describe('[STATE-COVERAGE] v237 real-only ghost list + ambient background', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.renderGhostCompanies === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(200);
+  });
+
+  test('#2 honesty: no fabricated "trending nationally" Amazon/Meta/Stripe counts; honest empty state instead', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const s = String(_v8RenderGhostCos);
+      return {
+        noFakeCounts: !s.includes('43 reports') && !s.includes("co:'Amazon'") && !s.includes('Trending nationally'),
+        honestEmpty: s.includes('will show here') && s.includes('ghost-risk'),
+      };
+    });
+    expect(r.noFakeCounts, 'the invented Amazon/Meta/Stripe report counts are gone').toBe(true);
+    expect(r.honestEmpty, 'an honest onboarding empty state replaces them').toBe(true);
+  });
+
+  test('C1: the app content has an ambient (radial-gradient) background behind content', async ({ page }) => {
+    const has = await page.evaluate(() => /radial-gradient/.test(getComputedStyle(document.getElementById('app')).backgroundImage));
+    expect(has, '#app carries the ambient radial-gradient background').toBe(true);
+  });
+});

@@ -129,8 +129,8 @@ Do **A5 then A6 back-to-back right after A4** — both touch the company card, s
 ## SPRINT C — The Wow Pass  _(design maturity; all [UI], one cohesive sprint)_
 _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber Purple / ghost. Mockups required + approved before ANY code._
 
-- **C1 · Ambient background + column rhythm/typography** **[UI]** · HIGH · M — subtle plum→purple radial glow behind the deck + ~3% dotted grid; cap the primary column, confident headings, 8px scale. Kills the flat/empty feel. Guardrail: never reduce light-mode contrast; honor `prefers-reduced-motion`.
-- **C2 · Contextual right rail (applicant side)** **[UI]** · HIGH · M — fill the width with USEFUL info: streak/weekly-goal ring, market pulse (reuse `resources/_market_stats`, ~1 read), a Jett tip, recent activity. Stacks/collapses on mobile.
+- **C1 · Ambient background** **[UI]** · HIGH · M — ✅ SHIPPED v237: faint dotted grid + two low-opacity brand glows on #desk-main (fills the empty desktop margins) + #app (mobile); behind opaque content (contrast untouched), static, light+dark. (Column-rhythm/type polish can follow.)
+- **C2 · Contextual right rail (applicant side)** **[UI]** · HIGH · M — _next as v238_ — fill the width with USEFUL info: streak/weekly-goal ring, market pulse (compute from the loaded pool client-side = no extra reads), a Jett tip, recent activity. Desktop 2-col; stacks on mobile. Isolated build to protect the v225 centering.
 - **C3 · Hero job card + animated match ring** **[UI]** · HIGH · M — circular animated match ring, subtle gradient border on the top card, company avatar, one tile system, crisp ghost-risk meter. Your signature "wow"/shareable.
 - **C4 · Motion & delight (applicant only)** **[UI]** · HIGH · M — finish swipe spring physics, count-up stats, streak flame, extend Apply/Hired celebrations. Employer side stays calm. Respect reduced-motion; never block the core action.
 - **C5 · Skeleton loaders + mascot empty states** **[UI]** · MED · S — cheapest "feels fast/finished" upgrade; ghost-led empty/first-run states.
