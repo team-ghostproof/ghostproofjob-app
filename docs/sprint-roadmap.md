@@ -224,12 +224,20 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 - [ ] Check **dark + light**. The rail cards should match the theme (dark panels in dark, off-white in light).
 - [ ] Recruiter accounts: the Swipe/Employer view is unaffected (no rail, single column).
 
+**v240 — brand logos + honesty fixes** _(the batch from your live test)_
+- [ ] **Big-company logos:** search **Amazon** (Ghosts) / open **Microsoft**'s company card → their **real logo** now shows (was the building icon). Same on job cards + trending rows. A company we don't recognize still shows 🏢 (we never show a *wrong* logo).
+- [ ] **Company Website button** (globe in "Connect with hiring team"): for a known brand it now opens their **real site** (e.g. microsoft.com) instead of a Google search.
+- [ ] **null% is gone:** type in the **Ghosts** search (and Browse company search) → companies with no ghost data show **"👻 —"**, never "👻 null%".
+- [ ] **Swipe footer:** on desktop the footer (Free Résumé Checker · Resources · …) now sits **under the card column**, lined up with the deck — not shifted right beside the rail. Mobile unchanged.
+- [ ] **Long tail (over ~8 days):** the harvester now grabs each employer's website when the source provides it, so more companies (not just the big brands) will get logos + a real Website link as the pool refreshes. _Nothing to test day-one; just know it's coming._ **Heads-up:** I can't verify the harvester live from here — it'll show on the next real harvest.
+
 ---
 
 ### ✅ SPRINT A COMPLETE (build items) — v226–v234
 A1 job-card full data · A2/A2b logo+wordmark · A3 tailored pills · A4 geo toggle · A4.5 Browse-summary + gaps-only bugs · A5 company-card cleanup · A6 company logos · A8 section alignment · A9 button centering. **A7 (card-face tiles) folded into Sprint C (Wow pass).** Open follow-up: button *word* vs *icon* centering (10px, site-wide) — awaiting founder A/B direction.
 
 ## Change log for this tracker
+- 2026-08-24 — **v240 shipped (founder live-test fixes)**: (1) curated verified brand→domain map so big-name logos (Amazon/Microsoft/etc.) resolve everywhere immediately (never a *guessed* domain); (2) harvester captures `company_url`→`companyWebsite` + pool carries it → long-tail logos + Website button populate over ~8 days; (3) company Website button links the real domain when known; (4) null% → honest "👻 —" in Ghost + Browse search dropdowns; (5) swipe footer aligns under the deck column beside the C2 rail. 4 new state tests + harvester selftest. Full no-skip gate. **Next: C3 hero card (v241) — mockup approved.**
 - 2026-08-23 — **v239 shipped (Sprint C · C2 right rail)**: desktop-only sticky rail (streak/goal/market-pulse/Jett/recent) that replaces the on-deck gamify bar on desktop; mobile unchanged. Zero-read market pulse (`_gpjMarketPulse` from the in-memory pool). 2 new state tests. Browser-verified dark+light+narrow+mobile. Full no-skip gate. **Next: C3 hero card + animated match ring (needs its own mockup).**
 - 2026-08-23 — **v238 shipped (Sprint C · candidate avatar)**: `_gpjPersonAvatar` hybrid — initial monogram for named people (applicant card, team rows), anonymous 🧑 for matched candidates. 1 new state test. Full no-skip gate green (benchmark + 8 backend + Playwright 836/836). **Next: C2 right rail (v239).**
 - 2026-08-23 — **v237 shipped (Sprint C · C1)**: ambient background (#app + #desk-main) + real-only Ghosts list (removed fabricated trending companies). 2 new state tests. Full gate green (834/834).

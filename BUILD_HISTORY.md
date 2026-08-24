@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-23 · Current live build: **v239**_
+_Last updated: 2026-08-24 · Current live build: **v240**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v240** — v240 (founder live-test fixes): (1) company LOGOS for big brands everywhere — a curated, verified name->domain map (_gpjBrandDomain) feeds the existing logo helper, so Amazon/Microsoft/etc. show their real logo on job cards, company cards/modals, Ghosts + trending, without a stored domain (we still never GUESS one). (2) harvester now captures company_url->companyWebsite (JobSpy) + pool carries it, so the long tail of employers resolve logos + the Website button over ~8 days as the pool self-heals. (3) company 'Website' button links the real domain (curated map) instead of a Google search when known. (4) null% bug fixed — Ghost + Browse search dropdowns show honest '— ' not '👻 null%'. (5) swipe footer aligns under the deck column on desktop (was centered under the full main, looked shifted right beside the C2 rail).
 - **v239** — v239 (Sprint C · C2): desktop contextual right rail — DESKTOP-ONLY (>=1180px) sticky rail beside the swipe deck (streak · weekly-goal ring · market pulse · Jett tip · recent). Fills the empty desktop width with USEFUL, honest info. Founder-approved: replaces the on-deck gamify bar on desktop (no repetition); mobile/tablet unchanged. Market pulse computed from the in-memory jobsQueue = ZERO extra reads; grounded empty states; recruiter mode reverts to single column. Insert-only: one appended #gpj-deck-rail + one render fn + a wide-desktop-gated CSS grid; the 860px deck cap + v220/v225/v233 centering are untouched
 - **v238** — v238 (founder-approved): hybrid candidate avatar — a colored initial monogram (brand gradient) for people we have a name for (applicant card, teammates), and the anonymous 🧑 for still-anonymous matched candidates. New _gpjPersonAvatar(name,size) helper; applied to the applicant card, matched-candidate card, and company team rows. No fabricated photos; identity only surfaces once someone applies
 - **v237** — v237: (C1) subtle ambient background — a faint dotted grid + two low-opacity brand glows behind the app content (desktop #desk-main fills the empty margins; mobile #app) so it reads with depth, not flat/empty; behind opaque content so contrast is untouched, static (no motion), light+dark. (#2 honesty) removed the fabricated 'trending nationally' Amazon/Meta/Stripe report counts — the Ghosts company section now shows only REAL hunt companies + an honest onboarding empty state

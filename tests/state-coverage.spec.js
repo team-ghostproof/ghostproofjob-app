@@ -9166,3 +9166,55 @@ test.describe('[STATE-COVERAGE] v239 desktop right rail (C2)', () => {
     }
   });
 });
+
+test.describe('[STATE-COVERAGE] v240 brand logos + honest ghost dropdown', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._gpjBrandDomain === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(200);
+  });
+
+  test('curated brand map → real logo + website for big names; unknown → honest fallback (never a guessed domain)', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      amazon: _gpjBrandDomain('Amazon'),
+      msft: _gpjBrandDomain('Microsoft Corporation'),         // legal suffix stripped
+      jnj: _gpjBrandDomain('Johnson & Johnson'),
+      unknown: _gpjBrandDomain("Bob's Local Widgets LLC"),
+      logoHasImg: /icons\.duckduckgo\.com\/ip3\/amazon\.com\.ico/.test(_gpjLogoHtml({ company: 'Amazon' })),
+      logoUnknownNoImg: !/duckduckgo/.test(_gpjLogoHtml({ company: 'Zzq Nonexistent Co' })),
+      brandWeb: (typeof companyLinks === 'function') ? companyLinks('Microsoft', {}).web : '',
+      unknownWeb: (typeof companyLinks === 'function') ? companyLinks('Zzq Nonexistent Co', {}).web : '',
+    }));
+    expect(r.amazon, 'Amazon → amazon.com').toBe('amazon.com');
+    expect(r.msft, 'Microsoft Corporation → microsoft.com (suffix stripped)').toBe('microsoft.com');
+    expect(r.jnj, 'Johnson & Johnson → jnj.com').toBe('jnj.com');
+    expect(r.unknown, 'unknown company → NO guessed domain (honest)').toBe('');
+    expect(r.logoHasImg, 'big brand → real logo resolved by domain').toBe(true);
+    expect(r.logoUnknownNoImg, 'unknown company → emoji only, no wrong logo').toBe(true);
+    expect(r.brandWeb, 'known brand Website button → real domain (not a Google search)').toBe('https://microsoft.com');
+    expect(/google\.com\/search/.test(r.unknownWeb), 'unknown company → honest search fallback').toBe(true);
+  });
+
+  test('Ghost search dropdown never renders "null%" — honest "👻 —" for no-data companies', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const out = { rendered: false, hasNull: false, hasHonest: false };
+      try {
+        if (typeof switchView === 'function') switchView('ghost');
+        for (const q of ['a', 'e', 'o', 'in', 'co']) {
+          ghostSuggest(q);
+          const box = document.getElementById('ghost-sug');
+          const html = box ? box.innerHTML : '';
+          if (/pickGhostCo/.test(html)) {
+            out.rendered = true;
+            if (/null%/.test(html)) out.hasNull = true;
+            if (/👻 —/.test(html)) out.hasHonest = true;
+          }
+        }
+      } catch (e) { out.err = String(e); }
+      return out;
+    });
+    expect(r.rendered, 'the dropdown rendered company rows for a broad query').toBe(true);
+    expect(r.hasNull, 'NO company row shows "null%" (the bug)').toBe(false);
+    expect(r.hasHonest, 'no-data companies show the honest "👻 —"').toBe(true);
+  });
+});

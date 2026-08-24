@@ -456,6 +456,12 @@ def normalize_row(row, region, source_hint):
     source = safe_str(row.get("site")) or source_hint or "jobspy"
     if not title or not url:
         return None
+    # v240: capture the company's own website when the source provides it (JobSpy exposes
+    # company_url on LinkedIn/Indeed). Stored as companyWebsite so the app's logo helper
+    # (DuckDuckGo icon by domain) + the company "Website" button resolve for the long tail
+    # of employers automatically. Empty when the source didn't give one (kept out of the
+    # doc below so it costs no bytes) — the app then falls back to the curated brand map / 🏢.
+    company_url = safe_str(row.get("company_url")) or safe_str(row.get("company_url_direct"))
 
     smin, smax, is_hourly, hr_lo, hr_hi = parse_salary(row)
     raw_desc = safe_str(row.get("description"))
@@ -549,7 +555,7 @@ def normalize_row(row, region, source_hint):
     else:
         salary_display = ""
 
-    return {
+    doc = {
         "title": title,
         "company": company,
         "location": location,
@@ -570,6 +576,9 @@ def normalize_row(row, region, source_hint):
         "work_setting": work_setting,
         "job_level": job_level,
     }
+    if company_url:
+        doc["companyWebsite"] = company_url   # v240: only when present (no empty-key byte cost)
+    return doc
 
 
 # ─────────────────────────────────────────────────────────────────────────────

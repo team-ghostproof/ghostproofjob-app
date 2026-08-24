@@ -123,6 +123,9 @@ function toPoolRow(id, v) {
   if (v.is_remote) row.is_remote = true;
   if (v.job_type) row.job_type = cut(v.job_type, 40);
   if (v.work_setting) row.work_setting = cut(v.work_setting, 40);
+  /* v240: carry the company's website (harvester captures company_url) so the deck/Browse
+     logo helper + "Website" button resolve the real company domain. Small, only-when-present. */
+  if (v.companyWebsite) row.companyWebsite = cut(v.companyWebsite, 200);
   if (v.ingestedAt) row.ingestedAt = v.ingestedAt;
   if (v.date_posted) row.date_posted = cut(v.date_posted, 40);
   /* whole-document term coverage for stable match scoring (see MATCH_TERMS) —

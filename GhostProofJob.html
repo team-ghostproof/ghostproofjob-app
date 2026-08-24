@@ -1139,6 +1139,14 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
       body.desk #view-swipe.gpj-rail-on.active>#gpj-deck-rail{display:flex!important;flex-direction:column;gap:12px;grid-column:2;grid-row:1 / span 50;position:sticky;top:4px;align-self:start;max-width:300px!important;margin:0!important;}
       body.desk #view-swipe.gpj-rail-on.active #gpj-gamify-bar{display:none!important;}   /* rail carries streak+goal on desktop — no repetition (founder); beats the inline display:flex */
       body.desk #desk-main>.view#view-swipe.gpj-rail-on.active.rec-mode{display:block!important;max-width:1040px;}   /* candidate-first: recruiter reskin reverts to single column (rail child already hidden by line 874) */
+      /* v240 (founder: "the footer looks off on swipe now with the 3 panes"): the shared
+         global footer is centered in the FULL main, but with the C2 rail the card sits in
+         the left column — so the footer read as shifted right. When the swipe rail is
+         active, cap the footer to the same box as #view-swipe and reserve the rail column
+         so its centered content aligns under the DECK column. Other views (no rail) and
+         narrow widths keep full-width centering. :has() is progressive — unsupported
+         browsers just keep the centered footer (no breakage). */
+      body.desk #desk-main:has(> #view-swipe.gpj-rail-on.active) > #gpj-global-footer{max-width:1240px;margin-left:auto;margin-right:auto;padding-right:324px!important;}   /* !important beats the footer's inline padding */
     }
     body.desk .ctrl-btn:hover{transform:scale(1.08);}
     body.desk .browse-row:hover,body.desk .pref-row:hover{border-color:var(--cyber);}
@@ -3216,7 +3224,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v239</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v240</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -6375,7 +6383,7 @@ function buildBrowseExpanded(j,i){
   return '<div style="display:flex;gap:11px;align-items:flex-start;padding-top:4px;">'+
       /* A6 (v231): company logo where the \ud83d\udcbc was \u2014 employer upload \u2192 online logo by the
          job's real website domain \u2192 \ud83d\udcbc. Never a guessed domain. */
-      _gpjLogoHtml({logo:j.companyLogo||j.logo, website:j.companyWebsite||j.website||j.domain, size:46, radius:12, emoji:'\ud83d\udcbc'})+
+      _gpjLogoHtml({logo:j.companyLogo||j.logo, website:j.companyWebsite||j.website||j.domain, company:(j.co||j.company||''), size:46, radius:12, emoji:'\ud83d\udcbc'})+
       '<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:17px;line-height:1.25;overflow-wrap:anywhere;">'+dt(j.t)+'</div>'+
       '<div style="font-size:12px;color:var(--muted);margin-top:3px;">'+dt(j.co)+' \u00b7 '+dt(j.loc)+age+'</div></div>'+
       '<div onclick="fullCompanyLive('+i+')" style="text-align:right;cursor:pointer;flex-shrink:0;"><div class="vibe-stars">\u2605\u2605\u2605\u2605\u2606</div><div style="font-size:10px;color:var(--muted);">Vibe \u00b7 tap</div></div>'+
@@ -12091,13 +12099,17 @@ function companyLinks(co, j){
      fill falls back to the existing search process. */
   const _own=function(u){ u=String(u||'').trim(); if(!u) return ''; if(!/^https?:[\/][\/]/i.test(u)) u='https://'+u; return /^https:[\/][\/][^\s"'<>]+$/i.test(u)?u:''; };
   const ownWeb=_own(j&&j.companyWebsite), ownLi=_own(j&&j.companyLinkedIn), ownX=_own(j&&j.companyX);
+  /* v240: when we don't have the employer's own website, link a KNOWN mega-brand's real
+     site directly (curated map) instead of a Google search; unknown companies keep the
+     honest search fallback. */
+  const _brandWeb=(typeof _gpjBrandDomain==='function')?_gpjBrandDomain(co):'';
   return {
     news:'https://news.google.com/search?q='+q,
     newsHiring:'https://news.google.com/search?q='+encodeURIComponent(co+' hiring layoffs'),
     linkedin:ownLi||('https://www.linkedin.com/search/results/companies/?keywords='+qc),
     x:ownX||('https://x.com/search?q='+qc),
     glassdoor:'https://www.glassdoor.com/Search/results.htm?keyword='+qc,
-    web:ownWeb||('https://www.google.com/search?q='+qc+'+official+site+careers')
+    web:ownWeb||(_brandWeb?('https://'+_brandWeb):('https://www.google.com/search?q='+qc+'+official+site+careers'))
   };
 }
 /* v221 (founder: the drawer "repeats the same details in 2 different sections"): the harvester
@@ -14867,10 +14879,45 @@ function _gpjLogoDomain(w){
   try{ w=w.replace(/^https?:\/\//i,'').replace(/^www\./i,'').split(/[\/?#]/)[0].trim(); }catch(e){ return ''; }
   return /^([a-z0-9-]+\.)+[a-z]{2,}$/i.test(w) ? w : '';
 }
+/* v240 (founder: "I can't imagine we can't find Amazon's logo"): a small, VERIFIED
+   name→domain table for mega-brands. Scraped jobs carry a company NAME but no domain,
+   and we deliberately never GUESS a domain (v231 — a guessed domain shows the WRONG
+   company's logo). These are KNOWN, hand-verified, so the big names resolve their real
+   logo immediately, everywhere the logo helper runs. The long tail is covered by the
+   harvester capturing company_url going forward (populates as the pool self-heals). */
+const _GPJ_BRAND_DOMAINS={
+  'amazon':'amazon.com','amazon web services':'amazon.com','aws':'amazon.com','microsoft':'microsoft.com',
+  'google':'google.com','alphabet':'abc.xyz','meta':'meta.com','facebook':'meta.com','apple':'apple.com',
+  'netflix':'netflix.com','tesla':'tesla.com','nvidia':'nvidia.com','intel':'intel.com','ibm':'ibm.com',
+  'oracle':'oracle.com','salesforce':'salesforce.com','adobe':'adobe.com','sap':'sap.com','cisco':'cisco.com',
+  'dell':'dell.com','hewlett packard':'hp.com','uber':'uber.com','lyft':'lyft.com','airbnb':'airbnb.com',
+  'spotify':'spotify.com','paypal':'paypal.com','stripe':'stripe.com','walmart':'walmart.com','target':'target.com',
+  'costco':'costco.com','home depot':'homedepot.com','cvs':'cvs.com','cvs health':'cvs.com','walgreens':'walgreens.com',
+  'kroger':'kroger.com','fedex':'fedex.com','ups':'ups.com','jpmorgan chase':'jpmorganchase.com','jpmorgan':'jpmorganchase.com',
+  'chase':'chase.com','bank of america':'bankofamerica.com','wells fargo':'wellsfargo.com','citigroup':'citi.com',
+  'goldman sachs':'goldmansachs.com','morgan stanley':'morganstanley.com','american express':'americanexpress.com',
+  'visa':'visa.com','mastercard':'mastercard.com','coca cola':'coca-cola.com','coca-cola':'coca-cola.com','pepsico':'pepsico.com',
+  'nike':'nike.com','adidas':'adidas.com','starbucks':'starbucks.com',"mcdonald's":'mcdonalds.com','mcdonalds':'mcdonalds.com',
+  'walt disney':'disney.com','disney':'disney.com','comcast':'comcast.com','verizon':'verizon.com','at&t':'att.com',
+  't-mobile':'t-mobile.com','boeing':'boeing.com','lockheed martin':'lockheedmartin.com','ford':'ford.com',
+  'general motors':'gm.com','general electric':'ge.com','johnson & johnson':'jnj.com','pfizer':'pfizer.com','merck':'merck.com',
+  'unitedhealth':'unitedhealthgroup.com','unitedhealth group':'unitedhealthgroup.com','deloitte':'deloitte.com',
+  'accenture':'accenture.com','pwc':'pwc.com','kpmg':'kpmg.com','ernst & young':'ey.com','mckinsey':'mckinsey.com',
+  'linkedin':'linkedin.com','snap':'snap.com','snapchat':'snap.com','pinterest':'pinterest.com','reddit':'reddit.com',
+  'dropbox':'dropbox.com','zoom':'zoom.us','shopify':'shopify.com','twilio':'twilio.com','atlassian':'atlassian.com',
+  'servicenow':'servicenow.com','workday':'workday.com','snowflake':'snowflake.com','databricks':'databricks.com','palantir':'palantir.com'
+};
+function _gpjBrandDomain(name){
+  var s=String(name||'').toLowerCase().replace(/[.,]/g,' ')
+    .replace(/\b(inc|incorporated|corp|corporation|company|llc|llp|lp|ltd|limited|plc|group|holdings|technologies|solutions|labs|systems)\b/g,' ')
+    .replace(/\s+/g,' ').trim();
+  return _GPJ_BRAND_DOMAINS[s]||'';
+}
+window._gpjBrandDomain=_gpjBrandDomain;
 function _gpjLogoHtml(o){
   o=o||{}; const s=o.size||46, r=(o.radius!=null?o.radius:12), em=o.emoji||'💼';
   const up=(o.logo&&/^data:image\//.test(o.logo))?o.logo:'';
-  const dom=up?'':_gpjLogoDomain(o.website||o.domain||o.companyWebsite||'');
+  const dom=up?'':(_gpjLogoDomain(o.website||o.domain||o.companyWebsite||'')||_gpjBrandDomain(o.company||o.name||o.co||''));
   const src=up||(dom?('https://icons.duckduckgo.com/ip3/'+dom+'.ico'):'');
   const wrap='position:relative;width:'+s+'px;height:'+s+'px;border-radius:'+r+'px;background:var(--plum3);display:flex;align-items:center;justify-content:center;font-size:'+Math.round(s*0.5)+'px;flex-shrink:0;overflow:hidden;';
   const img=src?('<img src="'+src+'" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:var(--plum3);" onerror="this.remove()"/>'):'';
@@ -14918,11 +14965,11 @@ function openCompanyView(co,job){
        online from the company's REAL website domain → 🏢 placeholder (never a guessed
        domain). Render immediately from any domain on the job; the lazy loadCompany
        (internal employers) upgrades to their uploaded logo / website domain. */
-    lb.innerHTML=_gpjLogoHtml({logo:(job&&(job.companyLogo||job.logo)), website:(job&&(job.companyWebsite||job.website||job.domain)), size:44, radius:12, emoji:'🏢'});
+    lb.innerHTML=_gpjLogoHtml({logo:(job&&(job.companyLogo||job.logo)), website:(job&&(job.companyWebsite||job.website||job.domain)), company:co, size:44, radius:12, emoji:'🏢'});
     try{
       if(job&&(job._internal||job.source==='internal')&&job.companyId&&window.fb&&fb.loadCompany){
         fb.loadCompany(job.companyId).then(function(c){
-          if(c) lb.innerHTML=_gpjLogoHtml({logo:c.logo, website:(c.website||c.domain), size:44, radius:12, emoji:'🏢'});
+          if(c) lb.innerHTML=_gpjLogoHtml({logo:c.logo, website:(c.website||c.domain), company:(c.name||co), size:44, radius:12, emoji:'🏢'});
         });
       }
     }catch(e){}
@@ -15030,8 +15077,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v239';
+const APP_VERSION = 'v240';
 const CHANGELOG = {
+  'v240':['v240 (founder live-test fixes): (1) company LOGOS for big brands everywhere — a curated, verified name->domain map (_gpjBrandDomain) feeds the existing logo helper, so Amazon/Microsoft/etc. show their real logo on job cards, company cards/modals, Ghosts + trending, without a stored domain (we still never GUESS one). (2) harvester now captures company_url->companyWebsite (JobSpy) + pool carries it, so the long tail of employers resolve logos + the Website button over ~8 days as the pool self-heals. (3) company \'Website\' button links the real domain (curated map) instead of a Google search when known. (4) null% bug fixed — Ghost + Browse search dropdowns show honest \'— \' not \'👻 null%\'. (5) swipe footer aligns under the deck column on desktop (was centered under the full main, looked shifted right beside the C2 rail).'],
   'v239':['v239 (Sprint C · C2): desktop contextual right rail — DESKTOP-ONLY (>=1180px) sticky rail beside the swipe deck (streak · weekly-goal ring · market pulse · Jett tip · recent). Fills the empty desktop width with USEFUL, honest info. Founder-approved: replaces the on-deck gamify bar on desktop (no repetition); mobile/tablet unchanged. Market pulse computed from the in-memory jobsQueue = ZERO extra reads; grounded empty states; recruiter mode reverts to single column. Insert-only: one appended #gpj-deck-rail + one render fn + a wide-desktop-gated CSS grid; the 860px deck cap + v220/v225/v233 centering are untouched'],
   'v238':['v238 (founder-approved): hybrid candidate avatar — a colored initial monogram (brand gradient) for people we have a name for (applicant card, teammates), and the anonymous 🧑 for still-anonymous matched candidates. New _gpjPersonAvatar(name,size) helper; applied to the applicant card, matched-candidate card, and company team rows. No fabricated photos; identity only surfaces once someone applies'],
   'v237':['v237: (C1) subtle ambient background — a faint dotted grid + two low-opacity brand glows behind the app content (desktop #desk-main fills the empty margins; mobile #app) so it reads with depth, not flat/empty; behind opaque content so contrast is untouched, static (no motion), light+dark. (#2 honesty) removed the fabricated \'trending nationally\' Amazon/Meta/Stripe report counts — the Ghosts company section now shows only REAL hunt companies + an honest onboarding empty state'],
@@ -16768,7 +16816,7 @@ function renderGhostCompanies(){
       const safeCo=p.co.replace(/'/g,"\\'").replace(/"/g,'&quot;');
       return '<div class="report-card" onclick="openCompanyView(\''+safeCo+'\')" style="cursor:pointer;">'+
         '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'+
-        _gpjLogoHtml({website:p.dom,size:34,radius:9,emoji:'🏢'})+   /* v236: real logo by domain → 🏢 */
+        _gpjLogoHtml({website:p.dom,company:p.co,size:34,radius:9,emoji:'🏢'})+   /* v236: real logo by domain → 🏢 · v240: + brand-name fallback (big brands resolve without a stored domain) */
         '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;">'+p.co+'</div><div style="font-size:11px;color:var(--muted);">'+p.label+'</div></div>'+
         '<div class="ghost-score" style="color:'+c+';"'+(g==null?' title="No ghost reports yet"':'')+'>'+(g==null?'—':g+'%')+'</div></div>'+
         '<div class="report-bar-bg"><div class="report-bar-fill" style="width:'+(g==null?0:g)+'%;background:'+c+';"></div></div>'+
@@ -17129,8 +17177,9 @@ function browseCoSuggest(q){
   if(hits.length){
     html+=hits.map(c=>{
       const g=ghostRiskFor(c);
-      const col=g<=15?'var(--mint)':(g<=35?'var(--warn)':'var(--danger)');
-      return '<div onclick="browseCoPick(this)" data-co="'+c.replace(/"/g,'&quot;')+'" style="padding:10px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;border-bottom:1px solid var(--plum4);"><span>'+c+'</span><span style="font-weight:800;color:'+col+';">👻 '+g+'%</span></div>';
+      const col=(g==null)?'var(--muted)':(g<=15?'var(--mint)':(g<=35?'var(--warn)':'var(--danger)'));   /* v240: null (no data) → honest — , not "null%" */
+      const badge=(g==null)?'👻 —':('👻 '+g+'%');
+      return '<div onclick="browseCoPick(this)" data-co="'+c.replace(/"/g,'&quot;')+'" style="padding:10px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;border-bottom:1px solid var(--plum4);"><span>'+c+'</span><span style="font-weight:800;color:'+col+';">'+badge+'</span></div>';
     }).join('');
     html+='<div onclick="browseCoExact()" style="padding:10px 12px;font-size:12px;cursor:pointer;color:var(--cyber);font-weight:700;border-top:1px solid var(--plum4);">🔎 Open \u201c'+_browseCoQ.replace(/</g,'&lt;')+'\u201d profile + live roles →</div>';
   } else {
@@ -17210,8 +17259,9 @@ function ghostSuggest(q){
   if(hits.length){
     html+=hits.map(c=>{
       const g=ghostRiskFor(c);
-      const col=g<=15?'var(--mint)':(g<=35?'var(--warn)':'var(--danger)');
-      return '<div onclick="pickGhostCo(this)" data-co="'+c.replace(/"/g,'&quot;')+'" style="padding:10px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;border-bottom:1px solid var(--plum4);"><span>'+c+'</span><span style="font-weight:800;color:'+col+';">👻 '+g+'%</span></div>';
+      const col=(g==null)?'var(--muted)':(g<=15?'var(--mint)':(g<=35?'var(--warn)':'var(--danger)'));   /* v240: null (no data) → honest — , not "null%" */
+      const badge=(g==null)?'👻 —':('👻 '+g+'%');
+      return '<div onclick="pickGhostCo(this)" data-co="'+c.replace(/"/g,'&quot;')+'" style="padding:10px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;border-bottom:1px solid var(--plum4);"><span>'+c+'</span><span style="font-weight:800;color:'+col+';">'+badge+'</span></div>';
     }).join('');
     /* did-you-mean footer: search the exact typed text live */
     html+='<div onclick="ghostSearchExact()" style="padding:10px 12px;font-size:12px;cursor:pointer;color:var(--cyber);font-weight:700;border-top:1px solid var(--plum4);">🔎 Search \u201c'+_ghostQ.replace(/</g,'&lt;')+'\u201d for live openings →</div>';
