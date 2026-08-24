@@ -3179,7 +3179,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v237</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v238</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -4192,7 +4192,7 @@ async function renderRecTeam(){
   const roleChip=r=>{ const t=(r==='owner')?'Owner':(r==='admin'?'Company admin':'Standard');
     const c=(r==='standard')?'var(--muted)':'var(--cyber)';
     return '<span style="background:rgba(181,95,230,.13);color:'+c+';border-radius:6px;padding:2px 7px;font-size:10px;font-weight:800;">'+t+'</span>'; };
-  const row=(name,sub,r,extra)=>'<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--plum3);"><div style="width:30px;height:30px;border-radius:50%;background:var(--plum3);display:grid;place-items:center;font-size:14px;">🧑</div><div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:var(--off);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_esc(name)+'</div><div style="font-size:11px;color:var(--muted);">'+_esc(sub)+'</div></div>'+roleChip(r)+(extra||'')+'</div>';
+  const row=(name,sub,r,extra)=>'<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--plum3);">'+_gpjPersonAvatar(name,30)+'<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:var(--off);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_esc(name)+'</div><div style="font-size:11px;color:var(--muted);">'+_esc(sub)+'</div></div>'+roleChip(r)+(extra||'')+'</div>';
   let h='<div style="font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:8px;">'+seatTxt+'. Company admins can edit company info, list roles and hire. Standard members can list roles and hire.</div>';
   h+=members.map(m=>row(([m.contactFirst,m.contactLast].filter(Boolean).join(' ')||m.email||'Teammate'), m.email||'', String(m.role||'owner').toLowerCase(),'')).join('');
   h+=invites.map(i=>row(i.email,'Invite sent · awaiting sign-up',String(i.role||'standard'),
@@ -4617,7 +4617,7 @@ async function renderRecCandidates(){
       } else {
         actionHtml='<div onclick="recSendRole(\''+_esc(uid)+'\',\''+_esc(j.id)+'\',\''+_esc(j.title||'')+'\')" style="margin-top:9px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:9px;padding:9px;text-align:center;font-size:12px;cursor:pointer;">🔥 Send them this role</div>';
       }
-      html+='<div class="rec-card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="display:flex;align-items:center;gap:10px;"><div style="width:34px;height:34px;border-radius:50%;background:var(--plum3);display:grid;place-items:center;font-size:16px;">🧑</div><div><div style="font-size:13px;font-weight:800;color:var(--off);">Candidate · '+(c.applied?'<span style="color:var(--mint);">Applied</span>':'Open to offers')+'</div><div style="font-size:11px;color:var(--muted);">'+_esc(c.market||c.region||'Local')+'</div></div></div><div onclick="_showMatchWhy(\'rt:'+_esc(k)+'\')" title="Why this match?" style="text-align:right;cursor:pointer;"><div style="font-size:17px;font-weight:800;color:'+(pct>=80?'var(--mint)':(pct>=60?'var(--warn)':'var(--muted)'))+';">'+pct+'% <span style="font-size:11px;">ⓘ</span></div><div style="font-size:9px;color:var(--muted);">match</div></div></div>'
+      html+='<div class="rec-card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="display:flex;align-items:center;gap:10px;">'+_gpjPersonAvatar('',34)+'<div><div style="font-size:13px;font-weight:800;color:var(--off);">Candidate · '+(c.applied?'<span style="color:var(--mint);">Applied</span>':'Open to offers')+'</div><div style="font-size:11px;color:var(--muted);">'+_esc(c.market||c.region||'Local')+'</div></div></div><div onclick="_showMatchWhy(\'rt:'+_esc(k)+'\')" title="Why this match?" style="text-align:right;cursor:pointer;"><div style="font-size:17px;font-weight:800;color:'+(pct>=80?'var(--mint)':(pct>=60?'var(--warn)':'var(--muted)'))+';">'+pct+'% <span style="font-size:11px;">ⓘ</span></div><div style="font-size:9px;color:var(--muted);">match</div></div></div>'
         +(skills?'<div style="margin-top:8px;">'+skills+'</div>':'')
         +actionHtml+'</div>';
     });
@@ -4901,7 +4901,7 @@ function openCandidateCard(jobId,idx){
   const scrim=document.createElement('div'); scrim.id='candcard-scrim';
   scrim.style.cssText='position:fixed;inset:0;z-index:9700;background:rgba(8,6,16,.72);display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px;overflow:auto;';
   scrim.innerHTML='<div style="width:100%;max-width:520px;background:var(--plum2);border:1px solid var(--plum3);border-radius:18px;overflow:hidden;">'
-    +'<div style="display:flex;align-items:center;gap:12px;padding:16px;background:linear-gradient(135deg,rgba(181,95,230,.18),rgba(0,245,160,.08));border-bottom:1px solid var(--plum3);"><div style="width:44px;height:44px;border-radius:50%;background:var(--plum3);display:grid;place-items:center;font-size:22px;">🧑</div><div style="flex:1;min-width:0;"><div style="font-size:16px;font-weight:800;color:var(--off);">'+_esc(r.name||'Applicant')+'</div><div style="font-size:12px;color:var(--muted);">'+_esc(r.title||'')+(typeof a.match==='number'?(' · <span style="color:var(--mint);font-weight:700;">'+a.match+'% match</span>'):'')+'</div></div><div onclick="document.getElementById(\'candcard-scrim\').remove()" style="color:var(--muted);cursor:pointer;font-size:18px;">✕</div></div>'
+    +'<div style="display:flex;align-items:center;gap:12px;padding:16px;background:linear-gradient(135deg,rgba(181,95,230,.18),rgba(0,245,160,.08));border-bottom:1px solid var(--plum3);">'+_gpjPersonAvatar(r.name||'',44)+'<div style="flex:1;min-width:0;"><div style="font-size:16px;font-weight:800;color:var(--off);">'+_esc(r.name||'Applicant')+'</div><div style="font-size:12px;color:var(--muted);">'+_esc(r.title||'')+(typeof a.match==='number'?(' · <span style="color:var(--mint);font-weight:700;">'+a.match+'% match</span>'):'')+'</div></div><div onclick="document.getElementById(\'candcard-scrim\').remove()" style="color:var(--muted);cursor:pointer;font-size:18px;">✕</div></div>'
     +'<div style="padding:16px;">'
     +('<div style="display:flex;gap:8px;margin-bottom:6px;">'
       +'<div onclick="_recDownloadApplicant(\''+_esc(jobId)+'\','+idx+',\'resume\')" style="flex:1;background:var(--cyber);color:#fff;border-radius:9px;padding:9px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">⬇ Download résumé</div>'
@@ -14774,6 +14774,19 @@ function _gpjLogoHtml(o){
   return '<div style="'+wrap+'">'+em+img+'</div>';
 }
 window._gpjLogoHtml=_gpjLogoHtml;
+/* v238 (founder-approved hybrid): person avatar — a colored initial monogram (brand
+   gradient) when we have a name (applied/engaged candidates, teammates), else the
+   anonymous 🧑 (matches not yet engaged). No fabricated photos; identity only ever
+   surfaces once someone has applied/shared it. */
+function _gpjPersonAvatar(name,size){
+  size=size||40; const s=String(name||'').trim();
+  const box='width:'+size+'px;height:'+size+'px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;';
+  const parts=s.split(/\s+/).filter(Boolean);
+  const ini=parts.length?((parts[0][0]||'')+(parts.length>1?(parts[parts.length-1][0]||''):'')).toUpperCase().replace(/[^A-Z0-9]/g,''):'';
+  if(ini) return '<div style="'+box+'background:linear-gradient(135deg,var(--cyber),var(--mint));color:#0E0B16;font-weight:800;font-size:'+Math.round(size*0.38)+'px;">'+ini+'</div>';
+  return '<div style="'+box+'background:var(--plum3);font-size:'+Math.round(size*0.5)+'px;">🧑</div>';
+}
+window._gpjPersonAvatar=_gpjPersonAvatar;
 function openCompanyView(co,job){
   /* track as a viewed job (recall later) when opened against a specific role */
   if(job&&job.title){ try{ recordView({t:job.title,co:co,url:job.url||'',ghost:ghostRiskFor(co),desc:job.desc||''}); }catch(e){} }
@@ -14914,8 +14927,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v237';
+const APP_VERSION = 'v238';
 const CHANGELOG = {
+  'v238':['v238 (founder-approved): hybrid candidate avatar — a colored initial monogram (brand gradient) for people we have a name for (applicant card, teammates), and the anonymous 🧑 for still-anonymous matched candidates. New _gpjPersonAvatar(name,size) helper; applied to the applicant card, matched-candidate card, and company team rows. No fabricated photos; identity only surfaces once someone applies'],
   'v237':['v237: (C1) subtle ambient background — a faint dotted grid + two low-opacity brand glows behind the app content (desktop #desk-main fills the empty margins; mobile #app) so it reads with depth, not flat/empty; behind opaque content so contrast is untouched, static (no motion), light+dark. (#2 honesty) removed the fabricated \'trending nationally\' Amazon/Meta/Stripe report counts — the Ghosts company section now shows only REAL hunt companies + an honest onboarding empty state'],
   'v236':['v236: (1) Saved Jobs moved from the Ghosts tab to a collapsible \'🔖 Your Saved Jobs\' section in Browse (collapsed by default, count badge, hides when empty) — more intuitive, jobs live in Browse. (2) Trending/hunt company rows now show the company LOGO (real domain → DuckDuckGo → 🏢) instead of a hardcoded building icon'],
   'v235':['A6 completion (founder): company logo now on the COMPANY card too — a persistent logo BOX in the company-card header (employer upload → online logo by the company\'s REAL domain → 🏢 placeholder), matching the job card. Before this, A6 only showed an inline logo on the company card when a domain was present, so companies without one (e.g. opened from Ghosts) showed no logo at all'],

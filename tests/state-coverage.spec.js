@@ -9069,3 +9069,23 @@ test.describe('[STATE-COVERAGE] v237 real-only ghost list + ambient background',
     expect(has, '#app carries the ambient radial-gradient background').toBe(true);
   });
 });
+
+test.describe('[STATE-COVERAGE] v238 hybrid candidate avatar', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._gpjPersonAvatar === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(150);
+  });
+
+  test('name → initial monogram (no 🧑); no name → anonymous 🧑', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      mono: _gpjPersonAvatar('Jordan Avery', 44),
+      anon: _gpjPersonAvatar('', 34),
+      single: _gpjPersonAvatar('Taylor', 40),
+    }));
+    expect(r.mono.includes('>JA</div>'), 'two-word name → JA monogram').toBe(true);
+    expect(r.mono.includes('🧑'), 'a monogram has no anonymous 🧑').toBe(false);
+    expect(r.anon.includes('🧑'), 'no name → anonymous 🧑 fallback').toBe(true);
+    expect(r.single.includes('>T</div>'), 'single name → first initial').toBe(true);
+  });
+});
