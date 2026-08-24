@@ -130,7 +130,8 @@ Do **A5 then A6 back-to-back right after A4** — both touch the company card, s
 _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber Purple / ghost. Mockups required + approved before ANY code._
 
 - **C1 · Ambient background** **[UI]** · HIGH · M — ✅ SHIPPED v237: faint dotted grid + two low-opacity brand glows on #desk-main (fills the empty desktop margins) + #app (mobile); behind opaque content (contrast untouched), static, light+dark. (Column-rhythm/type polish can follow.)
-- **C2 · Contextual right rail (applicant side)** **[UI]** · HIGH · M — _next as v238_ — fill the width with USEFUL info: streak/weekly-goal ring, market pulse (compute from the loaded pool client-side = no extra reads), a Jett tip, recent activity. Desktop 2-col; stacks on mobile. Isolated build to protect the v225 centering.
+- **Candidate avatar (hybrid A+B)** **[UI]** · MED · S — ✅ SHIPPED v238: `_gpjPersonAvatar(name,size)` — brand-gradient initial monogram when we have a real name (applicant card, company team rows), anonymous 🧑 for still-anonymous matches. No fabricated photos; light+dark.
+- **C2 · Contextual right rail (applicant side)** **[UI]** · HIGH · M — _NEXT (v239); mockup approved (GPJ-sprintC-mockup.html)_ — fill the width with USEFUL info: streak/weekly-goal ring, market pulse (compute from the loaded pool client-side = no extra reads), a Jett tip, recent activity. Desktop 2-col; stacks on mobile. Isolated build to protect the v225 centering.
 - **C3 · Hero job card + animated match ring** **[UI]** · HIGH · M — circular animated match ring, subtle gradient border on the top card, company avatar, one tile system, crisp ghost-risk meter. Your signature "wow"/shareable.
 - **C4 · Motion & delight (applicant only)** **[UI]** · HIGH · M — finish swipe spring physics, count-up stats, streak flame, extend Apply/Hired celebrations. Employer side stays calm. Respect reduced-motion; never block the core action.
 - **C5 · Skeleton loaders + mascot empty states** **[UI]** · MED · S — cheapest "feels fast/finished" upgrade; ghost-led empty/first-run states.
@@ -206,12 +207,23 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 - [ ] **Browse** has a collapsible "🔖 Your Saved Jobs" section (collapsed by default; count badge). **Ghosts no longer shows saved jobs** (companies only).
 - [ ] Ghosts company rows show a logo box (real logo when the company has a domain, else 🏢).
 
+**v237 — real-only ghost list + ambient background (Sprint C · C1)**
+- [ ] **Ghosts** tab no longer shows fabricated "trending nationally" companies (the old Amazon/Meta/Stripe counts are gone); with no community data it shows an honest empty state ("Companies you apply to or browse will show here…").
+- [ ] The app has a **subtle ambient background** (faint dotted grid + two soft brand glows) behind the content on **desktop** (the empty side margins) and **mobile** — text contrast is unchanged. Check **dark + light**.
+
+**v238 — hybrid candidate avatar (Sprint C · avatar)**
+- [ ] **Recruiter side — Applicants:** open a role's applicant list → each applicant shows a **colored initial monogram** (their initials in the brand gradient), not a generic 🧑.
+- [ ] **Company team** rows (Employer → team/contacts) show the same initial monogram per teammate.
+- [ ] **Matched candidates** (still anonymous, not yet applied) keep the **anonymous 🧑** — we never invent a name or photo. Check **dark + light**, desktop + mobile.
+
 ---
 
 ### ✅ SPRINT A COMPLETE (build items) — v226–v234
 A1 job-card full data · A2/A2b logo+wordmark · A3 tailored pills · A4 geo toggle · A4.5 Browse-summary + gaps-only bugs · A5 company-card cleanup · A6 company logos · A8 section alignment · A9 button centering. **A7 (card-face tiles) folded into Sprint C (Wow pass).** Open follow-up: button *word* vs *icon* centering (10px, site-wide) — awaiting founder A/B direction.
 
 ## Change log for this tracker
+- 2026-08-23 — **v238 shipped (Sprint C · candidate avatar)**: `_gpjPersonAvatar` hybrid — initial monogram for named people (applicant card, team rows), anonymous 🧑 for matched candidates. 1 new state test. Full no-skip gate green (benchmark + 8 backend + Playwright 836/836). **Next: C2 right rail (v239).**
+- 2026-08-23 — **v237 shipped (Sprint C · C1)**: ambient background (#app + #desk-main) + real-only Ghosts list (removed fabricated trending companies). 2 new state tests. Full gate green (834/834).
 - 2026-08-22 — created; consolidated the two v226 review PDFs + prior tracker + CLAUDE.md §7/§8 into Sprints A–E.
 - 2026-08-22 — **A1 shipped (v227)**: Browse modal lazy-loads the full posting + renders Summary + Requirements + Benefits as **tap-to-expand accordions** (same `.desc-clamp` as the swipe drawer → "one universal card"); full card-surface scan (Saved + company-live reuse the same modal). 4 new state-coverage tests.
 - 2026-08-22 — **A2 shipped (static, no app version)**: Resources + Résumé Checker now use the transparent brand mark + gradient wordmark (both build scripts + the 3 existing committed pages). +1 resourcesEngine assertion.
