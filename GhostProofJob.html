@@ -1066,6 +1066,16 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
   .stat-row:last-child{border:none;}
   .desk-only{display:none;}
 
+  /* v239 (Sprint C · C2): GLOBAL base for the desktop right rail — hidden everywhere by
+     default (only the ≥1180px desktop block re-shows it), and the card styling lives here in
+     global scope so it's correct wherever the rail renders. Must NOT sit inside a desktop
+     @media, or the rail div would show unstyled on mobile. */
+  #gpj-deck-rail{display:none;}
+  .rail-card{background:var(--plum2);border:1px solid var(--plum4);border-radius:14px;padding:13px 14px;}
+  .rail-card .rc-h{font-size:10.5px;font-weight:800;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;text-transform:uppercase;}
+  .rail-ring{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;}
+  .rail-ring i{width:40px;height:40px;border-radius:50%;background:var(--plum2);display:grid;place-items:center;font-style:normal;font-weight:800;font-size:12px;color:var(--cyber);}
+
   /* ===== FULL DESKTOP GRID OPTIMIZATION (≥1024px) ===== */
   @media(min-width:1024px){
     body.desk{display:block;background:var(--plum);}
@@ -1106,6 +1116,30 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
        cx=886 while the stats strip + card sat at cx=960. Force every swipe-view child to
        center on desktop (beats the inline margin); mobile keeps its 16px gutters (body.desk). */
     body.desk #view-swipe>*{margin-left:auto!important;margin-right:auto!important;}
+    /* ===== v239 (Sprint C · C2): contextual right rail — DESKTOP-ONLY (≥1180px) =====
+       Insert-only: appends one #gpj-deck-rail child + turns #view-swipe into a 2-col grid
+       ONLY at ≥1180px. The deck column keeps its exact 860px cap + centering (rules above,
+       unchanged); the rail is explicitly exempted from the 860/auto rules so it can't fight
+       them. Rail is sticky (works because #desk-main is the scroll container). Mobile/tablet
+       (<1180px) never see the grid or the rail — the existing single-column stack + gamify
+       bar are byte-for-byte unchanged. Recruiter mode reverts to single column (candidate-first).
+       (Base hide + .rail-card styling live in GLOBAL scope above the ≥1024 block so the rail is
+       hidden on mobile too — a rule trapped in the desktop @media would leave a raw div showing.) */
+    @media (min-width:1180px){
+      /* deskShowOnly() sets an inline display:block on the ACTIVE view, so the grid needs
+         !important to win — scoped to .active so an INACTIVE swipe (inline display:none, no
+         .active) is never force-shown. The media query re-evaluates on resize, so crossing
+         1180px swaps grid⇄block automatically with no JS. */
+      body.desk #desk-main>.view#view-swipe.gpj-rail-on.active{max-width:1240px;display:grid!important;grid-template-columns:minmax(0,1fr) 300px;column-gap:24px;align-items:start;}
+      /* column-1 items: size explicitly (capped 860, centered) instead of margin:auto — an
+         auto margin on a GRID item shrinks it to content, which zero-widths #card-deck (its
+         cards are position:absolute). width/margin are !important to beat the 3-id rule at
+         line ~1101 (#desk-main #view-swipe #card-deck). Vertical margins are left untouched. */
+      body.desk #view-swipe.gpj-rail-on.active>:not(#gpj-deck-rail){grid-column:1;justify-self:center;width:100%!important;max-width:860px!important;margin-left:0!important;margin-right:0!important;}
+      body.desk #view-swipe.gpj-rail-on.active>#gpj-deck-rail{display:flex!important;flex-direction:column;gap:12px;grid-column:2;grid-row:1 / span 50;position:sticky;top:4px;align-self:start;max-width:300px!important;margin:0!important;}
+      body.desk #view-swipe.gpj-rail-on.active #gpj-gamify-bar{display:none!important;}   /* rail carries streak+goal on desktop — no repetition (founder); beats the inline display:flex */
+      body.desk #desk-main>.view#view-swipe.gpj-rail-on.active.rec-mode{display:block!important;max-width:1040px;}   /* candidate-first: recruiter reskin reverts to single column (rail child already hidden by line 874) */
+    }
     body.desk .ctrl-btn:hover{transform:scale(1.08);}
     body.desk .browse-row:hover,body.desk .pref-row:hover{border-color:var(--cyber);}
     body.desk .nav-pill{font-size:12px;font-weight:700;color:var(--muted);background:var(--plum3);border:1px solid var(--plum4);border-radius:999px;padding:7px 14px;cursor:pointer;transition:all .2s;}
@@ -2029,7 +2063,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
   <div class="view-content">
 
     <!-- VIEW: SWIPE -->
-    <div class="view active" id="view-swipe">
+    <div class="view active gpj-rail-on" id="view-swipe">
       <div class="rec-panel" id="rec-swipe" style="padding:16px;"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px 16px 4px;">
         <div class="mini-stat clickable" onclick="openStatModal('applied')"><div class="mini-stat-val" style="color:var(--mint);" id="stat-applied">0</div><div class="mini-stat-lbl">Applied</div></div>
@@ -2082,6 +2116,9 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
         <div id="energy-label" style="font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;">⚡ Daily Energy Meter: <span id="energy-count" style="color:var(--mint);">0</span> / <span id="energy-cap">30</span> Applications Sent Today</div>
         <div style="flex:1;height:4px;background:var(--plum3);border-radius:999px;overflow:hidden;"><div id="energy-fill" style="width:0%;height:100%;background:linear-gradient(90deg,var(--mint),var(--cyber));border-radius:999px;transition:width .4s ease;"></div></div>
       </div>
+
+      <!-- v239 (Sprint C · C2): the desktop contextual right rail. Desktop-only (shown by the ≥1180px .gpj-rail-on media block below); hidden on mobile/tablet and auto-hidden in recruiter mode (line 874: .view.rec-mode > *:not(.rec-panel)). Filled by _gpjRenderDeckRail() with REAL data only — streak/goal reuse the v201 layer, market pulse is computed from the in-memory jobsQueue (ZERO extra reads), recent = the newest Applied row. Placed here so its grid area (col 2, row-spanning) sits alongside the deck; DOM order is irrelevant under explicit grid placement. -->
+      <div id="gpj-deck-rail" aria-label="Your hunt at a glance"></div>
 
       <div id="card-deck">
         <div id="deck-empty" style="display:none;text-align:center;padding:48px 24px;">
@@ -3179,7 +3216,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v238</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v239</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3350,7 +3387,7 @@ function switchView(id,el){
   if(el) el.classList.add('active');
   document.querySelector('.view-content').scrollTop=0;
   try{ updateJettCounts(); }catch(e){}
-  if(id==='swipe'){ try{ _gpjRenderGamifyBar(); }catch(e){} }   /* v208: refresh the gamify bar on deck show */
+  if(id==='swipe'){ try{ _gpjRenderGamifyBar(); }catch(e){} try{ _gpjRenderDeckRail(); }catch(e){} }   /* v208: refresh the gamify bar on deck show · v239: + the desktop rail */
   if(id==='browse'){
     try{ refreshBrowse(); }catch(e){}
     try{ renderSavedJobs(); }catch(e){}   /* v236: Saved Jobs now live in Browse (collapsible) */
@@ -12034,6 +12071,7 @@ function applySwipeFilters(){
   const cnt=document.getElementById('sw-filter-count');
   if(cnt) cnt.textContent=list.length?('Showing '+list.length+' jobs'+(hide?' · ghosters hidden 👻🚫':'')+(sort==='ghost'?' · safest first':'')) : 'No jobs match — loosen filters';
   if(list.length) reloadDeckFromQueue();
+  try{ _gpjRenderDeckRail(); }catch(e){}   /* v239: market pulse reflects the freshly-loaded/filtered pool */
 }
 
 /* ---------- CLICKABLE COMPANY INTEL (drawer) ---------- */
@@ -12575,6 +12613,7 @@ function updateStatCounters(){
      counter update now repaints it from the SAME lists object. */
   try{ const a=document.getElementById('admin-device-stats'); if(a) a.innerHTML=_gpjAdminDeviceLine(); }catch(e){}
   try{ _gpjRenderGamifyBar(); }catch(e){}   /* v208: keep the gamify bar in sync with the applied count */
+  try{ _gpjRenderDeckRail(); }catch(e){}    /* v239: keep the desktop rail (streak/goal/recent) in sync too */
 }
 /* v126: verified-hire + signup-attribution insights for the admin panel.
    ADMIN-ONLY by founder honesty rule: no public "N hires" claim until the
@@ -13072,6 +13111,69 @@ function _gpjRenderGamifyBar(){
     +'</div>';
 }
 window._gpjRenderGamifyBar=_gpjRenderGamifyBar;
+/* ===== v239 (Sprint C · C2): the desktop contextual right rail =====
+   Fills #gpj-deck-rail (CSS-shown only ≥1180px desktop) with REAL data only:
+   • streak + weekly goal reuse the same v201 layer the gamify bar + tests already cover,
+   • market pulse is computed from the in-memory jobsQueue (the pool already loaded for the
+     deck) → ZERO extra Firestore reads [FREE-TIER],
+   • recent = the newest Applied row.
+   Honest empty states throughout — a thin/absent pool never invents a number, and a zero
+   week reads as an invitation, not a scold (matches the gamify-bar tone). No-op off-desktop
+   (the element is display:none there) and in recruiter mode (cleared + hidden by line 874). */
+/* v239: pure market-pulse math over a job pool — extracted so it's unit-testable without
+   the lexical jobsQueue. Returns {n, remotePct, med}; grounded, never fabricated. */
+function _gpjMarketPulse(pool){
+  pool=Array.isArray(pool)?pool:[];
+  var n=pool.length, remote=0, sals=[];
+  for(var i=0;i<pool.length;i++){ var j=pool[i]||{};
+    if(j.is_remote||/remote/i.test(String(j.location||''))) remote++;
+    var s=+(j.salary_min||j.salary_max||0); if(s>0) sals.push(s);
+  }
+  sals.sort(function(a,b){return a-b;});
+  return { n:n, remotePct:n?Math.round(remote/n*100):0, med:sals.length?sals[Math.floor(sals.length/2)]:0 };
+}
+window._gpjMarketPulse=_gpjMarketPulse;
+function _gpjRenderDeckRail(){
+  var rail=document.getElementById('gpj-deck-rail'); if(!rail) return;
+  try{ var v=document.getElementById('view-swipe'); if(v && v.classList.contains('rec-mode')){ rail.innerHTML=''; return; } }catch(e){}
+  var streak=0, wk=0, goal=20;
+  try{ streak=_gpjStreakRead(); }catch(e){}
+  try{ wk=_gpjWeeklyApplyCount(); }catch(e){}
+  try{ goal=_gpjWeeklyGoal(); }catch(e){}
+  var pct=Math.max(0,Math.min(100, goal?Math.round(wk/goal*100):0));
+  var hitGoal=wk>=goal, left=Math.max(0,goal-wk);
+  /* --- market pulse from the loaded deck pool (no reads) --- */
+  var pool=[]; try{ if(typeof jobsQueue!=='undefined'&&Array.isArray(jobsQueue)) pool=jobsQueue; }catch(e){}
+  var mp=_gpjMarketPulse(pool);
+  var n=mp.n, remotePct=mp.remotePct, med=mp.med;
+  var medTxt=med>=1000?('$'+Math.round(med/1000)+'k'):(med>0?('$'+med):'');
+  /* --- recent activity: newest Applied row (max by when, order-agnostic) --- */
+  var rec=null; try{ var ap=(typeof lists!=='undefined'&&lists&&lists.applied)||[]; for(var k=0;k<ap.length;k++){ if(ap[k]&&(!rec||(+ap[k].when||0)>(+rec.when||0))) rec=ap[k]; } }catch(e){}
+  /* --- Jett tip: rotates once per day, deterministic + honest (generic best-practice) --- */
+  var tips=['Quantify one bullet today — add a % or $ to your top result.',
+    'Mirror the job post’s exact keywords in your skills line.',
+    'Lead each bullet with a strong verb: Led, Built, Cut, Grew.',
+    'Keep it to the roles from your last ~10 years — recruiters skim.',
+    'Name the tools by name — “Salesforce,” not “a CRM.”',
+    'Put your strongest, most relevant win in the top third of page one.',
+    'Match the job title’s wording in your summary line.'];
+  var tip=tips[Math.floor(Date.now()/86400000)%tips.length];
+  var streakTxt=streak>0?(streak+'-day streak'):'Start a streak';
+  var streakSub=streak>0?'Keep it going — apply once today':'Apply to a role to begin';
+  var pulseHtml=n
+    ? ('<b style="color:var(--off)">'+n+'</b> roles loaded'+(remotePct?(' · <b style="color:var(--off)">'+remotePct+'%</b> remote'):'')+(medTxt?(' · median <b style="color:var(--off)">'+medTxt+'</b>'):'')+'<div style="font-size:9.5px;color:var(--muted);margin-top:5px;">From the jobs currently in your deck</div>')
+    : '<span style="color:var(--muted)">Set your location or add your résumé to see your market.</span>';
+  var recHtml=rec
+    ? (_esc(rec.t||rec.title||'A role')+(rec.co?(' @ '+_esc(rec.co)):'')+'<div style="font-size:9.5px;color:var(--muted);margin-top:4px;">'+((typeof fmtAgo==='function')?fmtAgo(rec.when):'')+'</div>')
+    : '<span style="color:var(--muted)">No applications yet — your first will show here.</span>';
+  rail.innerHTML=''
+    +'<div class="rail-card"><div class="rc-h">🔥 Your streak</div><div style="display:flex;align-items:center;gap:11px;"><span style="font-size:22px;">🔥</span><div><div style="font-weight:800;font-size:17px;color:'+(streak>0?'var(--mint)':'var(--off)')+';">'+streakTxt+'</div><div style="font-size:11px;color:var(--muted);">'+streakSub+'</div></div></div></div>'
+    +'<div class="rail-card"><div class="rc-h">🎯 Weekly goal</div><div style="display:flex;align-items:center;gap:12px;"><div class="rail-ring" style="background:conic-gradient(var(--cyber) '+pct+'%,var(--plum4) 0);"><i>'+pct+'%</i></div><div style="font-size:12px;color:var(--off);"><b>'+wk+' / '+goal+'</b>'+(hitGoal?' 🎉':'')+'<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+(hitGoal?'Goal reached — nice work':(left+' more this week'))+'</div></div></div></div>'
+    +'<div class="rail-card"><div class="rc-h">📊 Market pulse</div><div style="font-size:12px;line-height:1.6;">'+pulseHtml+'</div></div>'
+    +'<div class="rail-card"><div class="rc-h">💡 Jett’s tip</div><div style="font-size:12px;color:var(--off);line-height:1.55;">'+tip+'</div></div>'
+    +'<div class="rail-card"><div class="rc-h">🕑 Recent</div><div style="font-size:12px;color:var(--off);line-height:1.5;">'+recHtml+'</div></div>';
+}
+window._gpjRenderDeckRail=_gpjRenderDeckRail;
 /* v208: one-time keyframes for the celebration burst (self-contained, no external libs). */
 function _gpjEnsureWowStyle(){
   if(document.getElementById('gpj-wow-style')) return;
@@ -13108,6 +13210,7 @@ function _gpjCelebrateApply(title,co){
   try{ goal=_gpjWeeklyGoal(); }catch(e){}
   try{ streak=_gpjStreakRead(); }catch(e){}
   try{ _gpjRenderGamifyBar(); }catch(e){}
+  try{ _gpjRenderDeckRail(); }catch(e){}   /* v239: refresh the desktop rail after an apply (streak/goal/recent) */
   var hitGoal=(wk===goal);   /* the apply that TIPS them to the goal — celebrate bigger */
   var coStr=co?(' at '+_esc(String(co))):'';
   var headline=hitGoal?('🎉 Weekly goal — '+goal+' this week!'):'✅ Applied!';
@@ -14927,8 +15030,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v238';
+const APP_VERSION = 'v239';
 const CHANGELOG = {
+  'v239':['v239 (Sprint C · C2): desktop contextual right rail — DESKTOP-ONLY (>=1180px) sticky rail beside the swipe deck (streak · weekly-goal ring · market pulse · Jett tip · recent). Fills the empty desktop width with USEFUL, honest info. Founder-approved: replaces the on-deck gamify bar on desktop (no repetition); mobile/tablet unchanged. Market pulse computed from the in-memory jobsQueue = ZERO extra reads; grounded empty states; recruiter mode reverts to single column. Insert-only: one appended #gpj-deck-rail + one render fn + a wide-desktop-gated CSS grid; the 860px deck cap + v220/v225/v233 centering are untouched'],
   'v238':['v238 (founder-approved): hybrid candidate avatar — a colored initial monogram (brand gradient) for people we have a name for (applicant card, teammates), and the anonymous 🧑 for still-anonymous matched candidates. New _gpjPersonAvatar(name,size) helper; applied to the applicant card, matched-candidate card, and company team rows. No fabricated photos; identity only surfaces once someone applies'],
   'v237':['v237: (C1) subtle ambient background — a faint dotted grid + two low-opacity brand glows behind the app content (desktop #desk-main fills the empty margins; mobile #app) so it reads with depth, not flat/empty; behind opaque content so contrast is untouched, static (no motion), light+dark. (#2 honesty) removed the fabricated \'trending nationally\' Amazon/Meta/Stripe report counts — the Ghosts company section now shows only REAL hunt companies + an honest onboarding empty state'],
   'v236':['v236: (1) Saved Jobs moved from the Ghosts tab to a collapsible \'🔖 Your Saved Jobs\' section in Browse (collapsed by default, count badge, hides when empty) — more intuitive, jobs live in Browse. (2) Trending/hunt company rows now show the company LOGO (real domain → DuckDuckGo → 🏢) instead of a hardcoded building icon'],

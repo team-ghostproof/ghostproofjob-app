@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-23 · Current live build: **v238**_
+_Last updated: 2026-08-23 · Current live build: **v239**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v239** — v239 (Sprint C · C2): desktop contextual right rail — DESKTOP-ONLY (>=1180px) sticky rail beside the swipe deck (streak · weekly-goal ring · market pulse · Jett tip · recent). Fills the empty desktop width with USEFUL, honest info. Founder-approved: replaces the on-deck gamify bar on desktop (no repetition); mobile/tablet unchanged. Market pulse computed from the in-memory jobsQueue = ZERO extra reads; grounded empty states; recruiter mode reverts to single column. Insert-only: one appended #gpj-deck-rail + one render fn + a wide-desktop-gated CSS grid; the 860px deck cap + v220/v225/v233 centering are untouched
 - **v238** — v238 (founder-approved): hybrid candidate avatar — a colored initial monogram (brand gradient) for people we have a name for (applicant card, teammates), and the anonymous 🧑 for still-anonymous matched candidates. New _gpjPersonAvatar(name,size) helper; applied to the applicant card, matched-candidate card, and company team rows. No fabricated photos; identity only surfaces once someone applies
 - **v237** — v237: (C1) subtle ambient background — a faint dotted grid + two low-opacity brand glows behind the app content (desktop #desk-main fills the empty margins; mobile #app) so it reads with depth, not flat/empty; behind opaque content so contrast is untouched, static (no motion), light+dark. (#2 honesty) removed the fabricated 'trending nationally' Amazon/Meta/Stripe report counts — the Ghosts company section now shows only REAL hunt companies + an honest onboarding empty state
 - **v236** — v236: (1) Saved Jobs moved from the Ghosts tab to a collapsible '🔖 Your Saved Jobs' section in Browse (collapsed by default, count badge, hides when empty) — more intuitive, jobs live in Browse. (2) Trending/hunt company rows now show the company LOGO (real domain → DuckDuckGo → 🏢) instead of a hardcoded building icon

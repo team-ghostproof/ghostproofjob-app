@@ -8512,7 +8512,7 @@ test.describe('[STATE-COVERAGE] v217 mobile deck — decision-snapshot card', ()
 });
 
 test.describe('[STATE-COVERAGE] v218 desktop expand — fill the screen, card stays card-width', () => {
-  test('v225: wide viewport — 2-col grid, inner-scroll pane reaches the far right, card centered BETWEEN rail and scrollbar', async ({ page }) => {
+  test('v225/v239: wide viewport — 2-col grid, inner-scroll pane reaches the far right; the card+C2-rail group is centered', async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 560 });
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => typeof window.buildDesktopGrid === 'function', null, { timeout: 15000 });
@@ -8525,25 +8525,40 @@ test.describe('[STATE-COVERAGE] v218 desktop expand — fill the screen, card st
       const main = document.querySelector('#desk-main');
       const rail = document.querySelector('#desk-rail');
       const deck = document.querySelector('#view-swipe #card-deck');
+      const c2 = document.getElementById('gpj-deck-rail');
       const dr = deck ? deck.getBoundingClientRect() : null;
+      const cbox = c2 ? c2.getBoundingClientRect() : null;
+      const c2Vis = !!(c2 && getComputedStyle(c2).display !== 'none' && cbox && cbox.width > 0);
       const mainRight = main ? Math.round(main.getBoundingClientRect().right) : null;
       const railRight = rail ? Math.round(rail.getBoundingClientRect().right) : null;
+      // v239: with the C2 rail present, the card sits in the LEFT column and the rail in the
+      // right column; the [card | rail] GROUP should be centered in the space between the
+      // desk nav-rail and the far-right scrollbar (the v225 "not lost in space" guarantee).
+      const groupLeft = dr ? Math.round(dr.left) : null;
+      const groupRight = (c2Vis && cbox) ? Math.round(cbox.right) : (dr ? Math.round(dr.right) : null);
+      const groupCenter = (groupLeft != null && groupRight != null) ? (groupLeft + groupRight) / 2 : null;
+      const availCenter = (railRight != null && mainRight != null) ? (railRight + mainRight) / 2 : null;
       return {
         app: mw('#app'), deck: mw('#view-swipe #card-deck'), gridCols,
         deckLaidOut: !!(dr && dr.width > 0),
         mainScrolls: main ? ['auto', 'scroll'].includes(getComputedStyle(main).overflowY) : false,
         mainReachesEdge: mainRight != null ? (window.innerWidth - mainRight) : null,
-        gapLeft: (dr && railRight != null) ? Math.round(dr.left) - railRight : null,
-        gapRight: (dr && mainRight != null) ? mainRight - Math.round(dr.right) : null,
+        c2Vis,
+        cardRightOfDeskRail: (dr && railRight != null) ? (Math.round(dr.left) - railRight) : null,
+        railRightOfCard: (c2Vis && cbox && dr) ? (Math.round(cbox.left) - Math.round(dr.right)) : null,
+        groupOffset: (groupCenter != null && availCenter != null) ? Math.abs(groupCenter - availCenter) : null,
       };
     });
     expect(r.app, 'the app fills wider monitors (2000)').toBe('2000px');
     expect(r.deck, 'the card matches the 860px console width').toBe('860px');
-    expect(r.gridCols, 'v225: 2-column grid (rail + main) — no phantom gutter').toBe(2);
+    expect(r.gridCols, 'v225: 2-column desk grid (nav rail + main) — no phantom gutter').toBe(2);
     expect(r.deckLaidOut, 'the card is laid out on the swipe view').toBe(true);
     expect(r.mainScrolls, 'the inner scroll pane is kept (header stays fixed, popups anchored — no regression)').toBe(true);
     expect(r.mainReachesEdge, 'v225: the scroll pane reaches the far-right window edge (scrollbar far-right)').toBeLessThanOrEqual(2);
-    expect(Math.abs(r.gapLeft - r.gapRight), 'v225: card centered BETWEEN the rail and the scrollbar — equal gaps').toBeLessThanOrEqual(14);
+    expect(r.c2Vis, 'v239: the C2 contextual rail is present at wide viewport').toBe(true);
+    expect(r.cardRightOfDeskRail, 'the card is right of the desk nav-rail (positive gap)').toBeGreaterThan(0);
+    expect(r.railRightOfCard, 'v239: the C2 rail sits to the RIGHT of the card (card in the left column)').toBeGreaterThan(0);
+    expect(r.groupOffset, 'v225/v239: the card+rail group is centered between the nav-rail and the scrollbar').toBeLessThanOrEqual(16);
   });
 
   test('v225: the ghost + gap pills sit directly under the tiles (before the Green Flag), not floating after it', async ({ page }) => {
@@ -9087,5 +9102,67 @@ test.describe('[STATE-COVERAGE] v238 hybrid candidate avatar', () => {
     expect(r.mono.includes('🧑'), 'a monogram has no anonymous 🧑').toBe(false);
     expect(r.anon.includes('🧑'), 'no name → anonymous 🧑 fallback').toBe(true);
     expect(r.single.includes('>T</div>'), 'single name → first initial').toBe(true);
+  });
+});
+
+test.describe('[STATE-COVERAGE] v239 desktop right rail (C2)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._gpjRenderDeckRail === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(250);
+  });
+
+  test('rail renders 5 cards; honest empty pulse; _gpjMarketPulse computes from a pool (zero reads)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      _gpjRenderDeckRail();                                    // renders against the live (empty, offline) pool
+      const rail = document.getElementById('gpj-deck-rail');
+      const html = rail.innerHTML;
+      // pure pulse math (extracted so it's testable without the lexical jobsQueue)
+      const mp = _gpjMarketPulse([
+        { is_remote: true, salary_min: 90000 },
+        { location: 'Houston, TX', salary_min: 100000 },
+        { is_remote: true, salary_min: 120000 },
+      ]);
+      const empty = _gpjMarketPulse([]);
+      return {
+        cards: rail.querySelectorAll('.rail-card').length,
+        emptyHonest: /Set your location/i.test(html),          // Empty/Missing-data → honest, no fabricated number
+        emptyNoFakeNumber: !/roles loaded/.test(html),
+        n: mp.n, remotePct: mp.remotePct, med: mp.med,
+        emptyN: empty.n, emptyPct: empty.remotePct,
+      };
+    });
+    expect(r.cards, 'rail renders 5 cards').toBe(5);
+    expect(r.emptyHonest, 'empty pool → honest market-pulse message').toBe(true);
+    expect(r.emptyNoFakeNumber, 'empty pool → NO fabricated "roles loaded" number').toBe(true);
+    expect(r.n, 'pulse counts the pool').toBe(3);
+    expect(r.remotePct, 'pulse remote % = 2 of 3 → 67').toBe(67);
+    expect(r.med, 'pulse median salary from posted salaries').toBe(100000);
+    expect(r.emptyN, 'empty pool → n=0').toBe(0);
+    expect(r.emptyPct, 'empty pool → 0% (no divide-by-zero)').toBe(0);
+  });
+
+  test('desktop (≥1180) shows the rail + hides the on-deck gamify bar; mobile/tablet keep the single-column stack', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      _gpjRenderDeckRail();
+      const isDesk = document.body.classList.contains('desk') && window.innerWidth >= 1180;
+      const rail = document.getElementById('gpj-deck-rail');
+      const gam = document.getElementById('gpj-gamify-bar');
+      const view = document.getElementById('view-swipe');
+      return {
+        isDesk,
+        railDisplay: getComputedStyle(rail).display,
+        gamDisplay: getComputedStyle(gam).display,
+        viewDisplay: getComputedStyle(view).display,
+      };
+    });
+    if (r.isDesk) {
+      expect(r.railDisplay, 'desktop: rail is visible').not.toBe('none');
+      expect(r.viewDisplay, 'desktop: swipe view becomes a 2-col grid').toBe('grid');
+      expect(r.gamDisplay, 'desktop: on-deck gamify bar hidden (rail carries streak+goal, no repetition)').toBe('none');
+    } else {
+      expect(r.railDisplay, 'mobile/tablet: no rail (single-column stack unchanged)').toBe('none');
+      expect(r.gamDisplay, 'mobile/tablet: gamify bar stays visible').not.toBe('none');
+    }
   });
 });

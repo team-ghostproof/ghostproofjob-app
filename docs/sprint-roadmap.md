@@ -131,7 +131,7 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 
 - **C1 · Ambient background** **[UI]** · HIGH · M — ✅ SHIPPED v237: faint dotted grid + two low-opacity brand glows on #desk-main (fills the empty desktop margins) + #app (mobile); behind opaque content (contrast untouched), static, light+dark. (Column-rhythm/type polish can follow.)
 - **Candidate avatar (hybrid A+B)** **[UI]** · MED · S — ✅ SHIPPED v238: `_gpjPersonAvatar(name,size)` — brand-gradient initial monogram when we have a real name (applicant card, company team rows), anonymous 🧑 for still-anonymous matches. No fabricated photos; light+dark.
-- **C2 · Contextual right rail (applicant side)** **[UI]** · HIGH · M — _NEXT (v239); mockup approved (GPJ-sprintC-mockup.html)_ — fill the width with USEFUL info: streak/weekly-goal ring, market pulse (compute from the loaded pool client-side = no extra reads), a Jett tip, recent activity. Desktop 2-col; stacks on mobile. Isolated build to protect the v225 centering.
+- **C2 · Contextual right rail (applicant side)** **[UI]** · HIGH · M — ✅ SHIPPED v239: DESKTOP-ONLY (≥1180px) sticky rail beside the deck — 🔥 streak · 🎯 weekly-goal ring · 📊 market pulse · 💡 Jett tip · 🕑 recent. Founder-approved refinement: rail REPLACES the on-deck gamify bar on desktop (no repetition); mobile/tablet unchanged. Market pulse computed from the in-memory `jobsQueue` (extracted as testable `_gpjMarketPulse`) = ZERO reads; grounded empty states. Insert-only: one appended `#gpj-deck-rail` + `_gpjRenderDeckRail()` + a wide-desktop-gated CSS grid (`.active`+`!important` beats the inline display from `deskShowOnly`; column-1 items sized explicitly so `margin:auto` can't zero-width the deck). Recruiter mode reverts to single column. Browser-verified dark+light+narrow+mobile; 2 new tests.
 - **C3 · Hero job card + animated match ring** **[UI]** · HIGH · M — circular animated match ring, subtle gradient border on the top card, company avatar, one tile system, crisp ghost-risk meter. Your signature "wow"/shareable.
 - **C4 · Motion & delight (applicant only)** **[UI]** · HIGH · M — finish swipe spring physics, count-up stats, streak flame, extend Apply/Hired celebrations. Employer side stays calm. Respect reduced-motion; never block the core action.
 - **C5 · Skeleton loaders + mascot empty states** **[UI]** · MED · S — cheapest "feels fast/finished" upgrade; ghost-led empty/first-run states.
@@ -216,12 +216,21 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 - [ ] **Company team** rows (Employer → team/contacts) show the same initial monogram per teammate.
 - [ ] **Matched candidates** (still anonymous, not yet applied) keep the **anonymous 🧑** — we never invent a name or photo. Check **dark + light**, desktop + mobile.
 
+**v239 — desktop right rail (Sprint C · C2)** _(this is the big "fills the empty space" one)_
+- [ ] **On DESKTOP (a wide window, ≥1180px):** the Swipe page now has a **right-hand rail** beside the job card — 🔥 streak, 🎯 weekly-goal ring, 📊 market pulse, 💡 Jett's tip, 🕑 recent activity. The empty right space is gone; the card + stats + filter still line up on the left.
+- [ ] The old streak/weekly-goal bar that used to sit **above** the card is **gone on desktop** (the rail carries it now — no repetition). It should still be there on mobile.
+- [ ] **Market pulse** shows real counts from the jobs currently loaded ("N roles loaded · X% remote · median $Y"). With nothing loaded yet it says "Set your location or add your résumé…" — never a made-up number.
+- [ ] **On MOBILE / a narrow window:** nothing changes — single column, the streak bar is still above the card, **no** rail. (Shrink your browser below ~1180px to confirm it cleanly switches back.)
+- [ ] Check **dark + light**. The rail cards should match the theme (dark panels in dark, off-white in light).
+- [ ] Recruiter accounts: the Swipe/Employer view is unaffected (no rail, single column).
+
 ---
 
 ### ✅ SPRINT A COMPLETE (build items) — v226–v234
 A1 job-card full data · A2/A2b logo+wordmark · A3 tailored pills · A4 geo toggle · A4.5 Browse-summary + gaps-only bugs · A5 company-card cleanup · A6 company logos · A8 section alignment · A9 button centering. **A7 (card-face tiles) folded into Sprint C (Wow pass).** Open follow-up: button *word* vs *icon* centering (10px, site-wide) — awaiting founder A/B direction.
 
 ## Change log for this tracker
+- 2026-08-23 — **v239 shipped (Sprint C · C2 right rail)**: desktop-only sticky rail (streak/goal/market-pulse/Jett/recent) that replaces the on-deck gamify bar on desktop; mobile unchanged. Zero-read market pulse (`_gpjMarketPulse` from the in-memory pool). 2 new state tests. Browser-verified dark+light+narrow+mobile. Full no-skip gate. **Next: C3 hero card + animated match ring (needs its own mockup).**
 - 2026-08-23 — **v238 shipped (Sprint C · candidate avatar)**: `_gpjPersonAvatar` hybrid — initial monogram for named people (applicant card, team rows), anonymous 🧑 for matched candidates. 1 new state test. Full no-skip gate green (benchmark + 8 backend + Playwright 836/836). **Next: C2 right rail (v239).**
 - 2026-08-23 — **v237 shipped (Sprint C · C1)**: ambient background (#app + #desk-main) + real-only Ghosts list (removed fabricated trending companies). 2 new state tests. Full gate green (834/834).
 - 2026-08-22 — created; consolidated the two v226 review PDFs + prior tracker + CLAUDE.md §7/§8 into Sprints A–E.
