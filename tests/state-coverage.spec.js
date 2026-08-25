@@ -5851,6 +5851,14 @@ test.describe('[STATE-COVERAGE] v156 rater: quality vs role-fit', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => typeof window.rateResume === 'function' && typeof window.gpjPrefs === 'function', null, { timeout: 15000 });
+    // v241 (CI flake fix): the firebase MODULE lands AFTER the inline script, reassigns
+    // window.fb, and fires the signed-out auth callback which BLANKS app state incl.
+    // resumeData. If we seed before that fires, a late reset wipes resumeData and
+    // rateResume() bails to its zero-state ("📊 Rate my resume") — the exact CI failure
+    // (green in isolation, flaky under parallel load). Gate on the module + settle FIRST,
+    // then seed, so nothing clobbers resumeData or the fb stub afterwards.
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(500);
     await page.evaluate(() => {
       try { localStorage.removeItem('gpj_prefs'); localStorage.removeItem('gpj_corpus_v1'); } catch (e) {}
       window._roleCorpusCache = null;
