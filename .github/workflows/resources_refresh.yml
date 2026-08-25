@@ -6,14 +6,16 @@ name: Resources Article
 # Harvest's pool builder writes for free — this job does NOT scan the jobs
 # collection, so it costs ~1 Firestore read ([FREE-TIER]).
 #
-# GO-LIVE GATE: manual (workflow_dispatch) is ON so the founder can publish the
-# FIRST real article and review it. The every-other-day schedule below is COMMENTED
-# until that review passes — uncomment the two `cron` lines to turn the cadence on.
+# GO-LIVE (2026-08-24, founder-approved): the founder has manually run + reviewed the
+# publisher, so the every-other-day cadence is now ON. Manual dispatch stays available.
+# Safe to auto-run: the generator is grounded (never fabricates a number, returns null on
+# thin data), costs ~1 Firestore read (reads the tiny resources/_market_stats doc, never
+# the jobs collection), and only commits when there is a genuinely new article.
 
 on:
   workflow_dispatch:
-  # schedule:
-  #   - cron: '0 13 2-30/2 * *'   # 13:00 UTC, every other day — flip on AFTER the seed is approved
+  schedule:
+    - cron: '0 13 2-30/2 * *'   # 13:00 UTC, every other day (GO-LIVE 2026-08-24)
 
 permissions:
   contents: write   # needed to commit the generated article back to the repo
