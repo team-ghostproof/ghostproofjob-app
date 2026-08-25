@@ -9231,3 +9231,49 @@ test.describe('[STATE-COVERAGE] v240 brand logos + honest ghost dropdown', () =>
     expect(r.hasHonest, 'no-data companies show the honest "👻 —"').toBe(true);
   });
 });
+
+test.describe('[STATE-COVERAGE] v241 hero card (C3)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.fillSlot === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(200);
+  });
+
+  test('top card has a gradient-ring border; Match becomes a count-up ring; brand logo resolves on the card', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const top = document.querySelector('.job-card.top');
+      // force a real match % so the ring engages (computeMatch is gated by resumeReady)
+      try { resumeReady = true; } catch (e) {}
+      try { computeMatch = () => 87; } catch (e) {}
+      fillSlot(top, { t: 'Cloud Engineer', co: 'Amazon', desc: 'aws cloud engineer', ghost: 20 });
+      await new Promise((res) => requestAnimationFrame(() => res()));   // let fillSlot's rAF set --pct
+      const mp = top.querySelector('.match-pct');
+      const lg = top.querySelector('.s-logo');
+      const be = getComputedStyle(top, '::before');
+      const mc = (be.maskComposite || be.webkitMaskComposite || '').toString();
+      const img = lg ? lg.querySelector('img') : null;
+      return {
+        borderRing: /exclude|xor/.test(mc),                       // masked gradient outline present
+        ring: mp ? mp.classList.contains('mp-ring') : false,
+        pct: mp ? mp.style.getPropertyValue('--pct').trim() : '',  // the target the ring animates TO
+        logoAmazon: !!(img && /icons\.duckduckgo\.com\/ip3\/amazon\.com\.ico/.test(img.src)),
+      };
+    });
+    expect(r.borderRing, 'top card shows the mint→cyber gradient ring (masked ::before)').toBe(true);
+    expect(r.ring, 'a real match % turns the Match snapshot into a ring').toBe(true);
+    expect(r.pct, 'the ring is driven by the real match %').toBe('87');
+    expect(r.logoAmazon, 'a brand company shows its real logo on the swipe card').toBe(true);
+  });
+
+  test('no real match % → plain "fit", no ring (honest, no fake number)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const top = document.querySelector('.job-card.top');
+      try { resumeReady = false; } catch (e) {}      // no résumé → no computed match
+      fillSlot(top, { t: 'Cloud Engineer', co: 'Acme', desc: 'x', ghost: 20 });
+      const mp = top.querySelector('.match-pct');
+      return { ring: mp ? mp.classList.contains('mp-ring') : true, text: mp ? mp.textContent : '' };
+    });
+    expect(r.ring, 'no match → no ring').toBe(false);
+    expect(r.text, 'shows the honest "fit" fallback').toMatch(/fit/i);
+  });
+});
