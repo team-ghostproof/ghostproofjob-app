@@ -9337,3 +9337,29 @@ test.describe('[STATE-COVERAGE] v242 gap consistency + A7 tiles + honest stats',
     expect(r.honest, 'honest brand fact shown instead').toBe(true);
   });
 });
+
+test.describe('[STATE-COVERAGE] v243 Match-to-Job — no duplicate skill suggestions', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.enrichMatchWithMarket === 'function' && typeof window._gpjCanonicalSkill === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(200);
+  });
+
+  test('the market list never offers the same canonical skill twice ("customer" + "service" → one "Customer Service")', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      try { resumeReady = true; } catch (e) {}
+      resumeData.skills = 'marketing, communications';
+      m2jContext = { title: 'Sales and Marketing Associate', co: 'X', desc: '', suggestions: [] };
+      window.fb = Object.assign(window.fb || {}, { mineRoleKeywords: async () => ({ matched: 208, terms: [
+        { term: 'customer', pct: 62 }, { term: 'service', pct: 48 }, { term: 'project', pct: 43 }, { term: 'communication', pct: 40 },
+      ] }) });
+      let host = document.getElementById('m2j-market');
+      if (!host) { host = document.createElement('div'); host.id = 'm2j-market'; document.body.appendChild(host); }
+      await enrichMatchWithMarket('Sales and Marketing Associate', (resumeData.skills || '').toLowerCase());
+      const html = host.innerHTML;
+      return { csCount: (html.match(/I have Customer Service/g) || []).length, hasProject: /Project Management/.test(html) };
+    });
+    expect(r.csCount, '"Customer Service" is offered at most once (dedup by canonical skill)').toBeLessThanOrEqual(1);
+    expect(r.hasProject, 'other real skills still surface').toBe(true);
+  });
+});
