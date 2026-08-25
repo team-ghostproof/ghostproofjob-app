@@ -899,6 +899,12 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
   .job-card.top::before{content:"";position:absolute;inset:0;border-radius:24px;padding:1.5px;background:linear-gradient(135deg,var(--mint),var(--cyber));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;z-index:3;}
   .job-card .match-pct.mp-ring{--pct:0;width:46px;height:46px;border-radius:50%;max-width:none!important;background:radial-gradient(closest-side,var(--plum3) 71%,transparent 72%),conic-gradient(var(--mint) calc(var(--pct)*1%),var(--plum4) 0);display:flex!important;align-items:center;justify-content:center;font-size:12px!important;font-weight:900;color:var(--mint);transition:--pct .9s cubic-bezier(.2,.8,.2,1);}
   @media (prefers-reduced-motion:reduce){.job-card .match-pct.mp-ring{transition:none;}}
+  /* v242 (Sprint C · A7, founder: "the ghost % + gaps button are too small"): the ghost +
+     gap pills become proper TILES — flex so each fills half the row (a lone one spans full
+     width when the other is hidden), bigger padding + tap target, radius matches the tile
+     system. fillSlot's colour tints stay on the text/border. */
+  .job-card .risk-gap-row{display:flex!important;gap:8px;}
+  .job-card .risk-gap-row>span{flex:1;min-height:42px;padding:9px 12px!important;border-radius:12px!important;font-size:13px!important;display:flex!important;align-items:center;justify-content:center;background:var(--plum3);}
   .salary-badge{background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.3);color:var(--mint);font-size:11px;padding:3px 8px;border-radius:8px;}
   .location-badge{background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.3);color:var(--cyber);font-size:11px;padding:3px 8px;border-radius:8px;}
   .match-badge{background:linear-gradient(90deg,rgba(0,245,160,.18),rgba(181,95,230,.18));border:1px solid rgba(0,245,160,.4);color:var(--mint);font-size:11px;font-weight:800;padding:3px 8px;border-radius:8px;}
@@ -1864,7 +1870,13 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
         <div id="cm-save" onclick="toggleSaveCompany()" style="flex:1;background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:10px;padding:10px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">🔖 Save Company</div>
         <div onclick="openCmReviews()" style="flex:1;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:10px;padding:10px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:800;cursor:pointer;">⭐ Reviews &amp; rating</div>
       </div>
-      <div id="cm-glassdoor" style="display:none;margin-bottom:10px;"><a id="cm-glassdoor-link" href="#" target="_blank" rel="noopener" style="color:var(--cyber);font-size:12px;text-decoration:none;font-weight:700;">🏢 See Glassdoor reviews →</a></div>
+      <!-- v242 (founder: "give them something real" on ratings): we can't legally/free pull
+           Google/Glassdoor STAR ratings (paid API / ToS), so we link OUT to the real reviews,
+           clearly sourced. Two honest one-tap links. -->
+      <div id="cm-glassdoor" style="display:none;margin-bottom:10px;gap:14px;flex-wrap:wrap;">
+        <a id="cm-glassdoor-link" href="#" target="_blank" rel="noopener" style="color:var(--cyber);font-size:12px;text-decoration:none;font-weight:700;">🏢 Glassdoor reviews →</a>
+        <a id="cm-google-link" href="#" target="_blank" rel="noopener" style="color:var(--cyber);font-size:12px;text-decoration:none;font-weight:700;">🔎 Google reviews →</a>
+      </div>
       <!-- v146 P2-6 (founder): mute an entire company (staffing-agency flooding). -->
       <div onclick="hideCompanyRoles((document.getElementById('cm-name')||{}).textContent||'this company')" style="font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;text-align:center;margin-bottom:10px;text-decoration:underline;">🚫 Hide all roles from this company</div>
       <div id="cm-reviews" style="display:none;max-height:170px;overflow-y:auto;margin-bottom:10px;"></div>
@@ -2873,9 +2885,12 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
         <div style="font-size:19px;font-weight:800;">👻 Ghost Reports</div>
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">Community-verified ghosting intelligence</div>
       </div>
+      <!-- v242 (founder honesty rule): the old "2,847 Community Reports / 94% Data Accuracy"
+           were HARDCODED demo numbers — removed. Honest, verifiable brand facts instead (no
+           fabricated metrics). Real community counts surface per-company when they exist. -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px 12px;">
-        <div class="mini-stat"><div class="mini-stat-val" style="color:var(--danger);">2,847</div><div class="mini-stat-lbl">Community Reports</div></div>
-        <div class="mini-stat"><div class="mini-stat-val" style="color:var(--mint);">94%</div><div class="mini-stat-lbl">Data Accuracy</div></div>
+        <div class="mini-stat"><div class="mini-stat-val" style="color:var(--mint);">Free</div><div class="mini-stat-lbl">Until you’re hired</div></div>
+        <div class="mini-stat"><div class="mini-stat-val" style="color:var(--cyber);">0</div><div class="mini-stat-lbl">Ads · no data selling</div></div>
       </div>
       <div style="margin:0 16px 12px;position:relative;">
         <input class="field-input" id="ghost-q" placeholder="🔎 Search any company (Walmart, CVS, local shops…)" oninput="ghostSuggest(this.value)" onkeydown="ghostKey(event)" autocomplete="off"/>
@@ -3240,7 +3255,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v241</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v242</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -6109,6 +6124,29 @@ function openReqGaps(j){
     ? g.gaps.map(function(x){ return '<div style="font-size:12px;color:var(--off);background:rgba(255,179,71,.08);border-left:3px solid var(--warn);border-radius:0 8px 8px 0;padding:8px 10px;margin-bottom:6px;line-height:1.5;"><strong>'+String(x.label).replace(/</g,'&lt;')+'</strong> — '+String(x.note).replace(/</g,'&lt;')+'</div>'; }).join('')
     : '<div style="font-size:12px;color:var(--mint);">✅ Nothing missing that we can detect — strong application.</div>';
   document.getElementById('match-modal').classList.add('open');
+}
+/* v242 (founder: the card showed "✓ No gaps" while the modal found a Bachelor's-degree
+   gap): both are the SAME check, but the card painted on the TRUNCATED pool text at
+   fillSlot time while the modal ran on the full posting (lazy-loaded on drawer open). One
+   shared painter — called by fillSlot AND after hydrateDrawer pulls the full text — keeps
+   the card pill and the modal identical, always. */
+function _paintReqPill(cardEl, job){
+  try{
+    const rq=cardEl&&cardEl.querySelector('.s-req'); if(!rq) return;
+    const g=(typeof _reqGaps==='function')?_reqGaps(job):{gaps:[]};
+    const _ready=(typeof resumeReady!=='undefined'&&resumeReady);
+    if(g.gaps.length){
+      rq.textContent='⚠️ '+g.gaps.length+' gap'+(g.gaps.length>1?'s':'');
+      rq.style.display=''; rq.style.color='var(--warn)';
+      rq.style.background='rgba(255,179,71,.12)'; rq.style.borderColor='rgba(255,179,71,.45)'; rq.style.cursor='pointer';
+    } else if(_ready){
+      rq.textContent='✓ No gaps';
+      rq.style.display=''; rq.style.color='var(--mint)';
+      rq.style.background='rgba(0,245,160,.10)'; rq.style.borderColor='rgba(0,245,160,.4)'; rq.style.cursor='pointer';
+    } else {
+      rq.style.display='none';
+    }
+  }catch(e){}
 }
 function reqGapsTop(ev){ if(ev) ev.stopPropagation(); const j=(typeof _currentTopJob==='function'?_currentTopJob():null); if(j) openReqGaps(j); }
 function openReqGapsLive(i,ev){ if(ev) ev.stopPropagation(); const j=(typeof liveJobs!=='undefined'?liveJobs[i]:null); if(j) openReqGaps(j); }
@@ -11208,28 +11246,10 @@ function fillSlot(cardEl, job){
      v84 (B-TEXT-CLIP): long locations show the CITY whole, never a mid-word cut. */
   set('s-loc',_locBadge(job.loc,job.work_setting));
   var _le=cardEl.querySelector('.s-loc'); if(_le) _le.style.display='block';   /* v221: block so a long city ellipsizes, never spills */
-  /* F-REQMATCH (v90): flag missing posting requirements next to the match % */
-  try{
-    const rq=cardEl.querySelector('.s-req');
-    if(rq){
-      const g=(typeof _reqGaps==='function')?_reqGaps(job):{gaps:[]};
-      const _ready=(typeof resumeReady!=='undefined'&&resumeReady);
-      /* v221 (founder-directed): the gap is a compact PILL that shares one row with the ghost
-         pill (below) — icon + count at a glance; tap it to see WHICH requirements are missing.
-         A small pill (not a big block) so ghost + gap read as one intuitive, optimized row. */
-      if(g.gaps.length){
-        rq.textContent='⚠️ '+g.gaps.length+' gap'+(g.gaps.length>1?'s':'');
-        rq.style.display='inline-block'; rq.style.color='var(--warn)';
-        rq.style.background='rgba(255,179,71,.12)'; rq.style.borderColor='rgba(255,179,71,.45)'; rq.style.cursor='pointer';
-      } else if(_ready){
-        rq.textContent='✓ No gaps';
-        rq.style.display='inline-block'; rq.style.color='var(--mint)';
-        rq.style.background='rgba(0,245,160,.10)'; rq.style.borderColor='rgba(0,245,160,.4)'; rq.style.cursor='pointer';
-      } else {
-        rq.style.display='none';
-      }
-    }
-  }catch(e){}
+  /* F-REQMATCH (v90): flag missing posting requirements next to the match %.
+     v242: shared painter (_paintReqPill) so the card pill == the Requirements-check modal
+     even after the full posting lazy-loads (see hydrateDrawer). */
+  _paintReqPill(cardEl, job);
   /* reveal vibe stars now that this is a real job */
   const vs=cardEl.querySelector('.vibe-stars'); if(vs) vs.style.display='';
   cardEl.dataset.joburl=job.url||'';
@@ -12140,6 +12160,7 @@ function companyLinks(co, j){
     linkedin:ownLi||('https://www.linkedin.com/search/results/companies/?keywords='+qc),
     x:ownX||('https://x.com/search?q='+qc),
     glassdoor:'https://www.glassdoor.com/Search/results.htm?keyword='+qc,
+    googleReviews:'https://www.google.com/search?q='+qc+'+reviews',   /* v242: link out to real Google reviews (we never scrape/display the rating) */
     web:ownWeb||(_brandWeb?('https://'+_brandWeb):('https://www.google.com/search?q='+qc+'+official+site+careers'))
   };
 }
@@ -12186,7 +12207,7 @@ function hydrateDrawer(){
           if(fr.length>String(_tj.req||'').length) _tj.req=cw(fr,4000);
           if(fbn.length>String(_tj.benefits||'').length) _tj.benefits=cw(fbn,2500);
           _tj._clipped=false;
-          try{ const tc=document.querySelector('.job-card.top'); if(tc) tc.dataset.jobdesc=_tj.desc||''; }catch(e){}
+          try{ const tc=document.querySelector('.job-card.top'); if(tc){ tc.dataset.jobdesc=_tj.desc||''; try{ _paintReqPill(tc,_tj); }catch(e){} } }catch(e){}   /* v242: repaint the gap pill on the NOW-FULL text so the card matches the modal (no stale "No gaps") */
           /* re-render only if this is still the open top job */
           const cur=(typeof _currentTopJob==='function'?_currentTopJob():null);
           if(cur===_tj){ try{ hydrateDrawer(); }catch(e){} }
@@ -15033,7 +15054,7 @@ function openCompanyView(co,job){
     '<div class="social-icon" onclick="window.open(\''+L.glassdoor+'\',\'_blank\',\'noopener\')" title="Glassdoor">\ud83c\udfe2</div>'+
     '<div class="social-icon" onclick="window.open(\''+L.web+'\',\'_blank\',\'noopener\')" title="Website">\ud83c\udf10</div>';
   /* A5 (v230): explicit Glassdoor reviews link (we link out \u2014 we do NOT scrape reviews) */
-  try{ const gl=document.getElementById('cm-glassdoor-link'), gw=document.getElementById('cm-glassdoor'); if(gl&&L.glassdoor){ gl.href=L.glassdoor; if(gw) gw.style.display='block'; } else if(gw){ gw.style.display='none'; } }catch(e){}
+  try{ const gl=document.getElementById('cm-glassdoor-link'), gw=document.getElementById('cm-glassdoor'), gg=document.getElementById('cm-google-link'); if(gg&&L.googleReviews) gg.href=L.googleReviews; if(gl&&L.glassdoor){ gl.href=L.glassdoor; if(gw) gw.style.display='flex'; } else if(gw){ gw.style.display='none'; } }catch(e){}   /* v242: + Google reviews link; row shows as flex */
   document.getElementById('company-modal').classList.add('open');
 }
 /* A5 (v230): open the featured role's FULL job card from the company card's slim role
@@ -15108,8 +15129,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v241';
+const APP_VERSION = 'v242';
 const CHANGELOG = {
+  'v242':['v242 (founder live-test fixes): (1) gap card↔modal CONSISTENCY — the card\'s gap pill was painted on the truncated pool text so it showed \'✓ No gaps\' while the Requirements-check modal (full text) found a real gap (e.g. Bachelor\'s vs Associate). One shared painter (_paintReqPill) used by fillSlot AND after hydrateDrawer pulls the full posting → card always matches the modal. (2) A7 — the ghost % + gap pills are now proper flex TILES (bigger, easier to read/tap), not tiny pills. (3) honesty — removed the fabricated \'2,847 Community Reports / 94% Data Accuracy\' Ghosts-page stats (hardcoded demo numbers) → honest brand facts (Free until hired · 0 ads); + a Google-reviews link beside Glassdoor on company cards (we link OUT to real reviews, never scrape/display a rating). Light+dark; insert-only.'],
   'v241':['v241 (Sprint C · C3 hero card + toast fix): the swipe card reads as the focal point — (a) a mint→cyber gradient ring on the active (top) card only (masked outline, pointer-events:none, never covers/blocks content); (b) the Match snapshot is now an animated count-up donut ring; (c) the card header shows the REAL company logo (reuses the v240 brand map/domain chain → 💼 fallback), not a static briefcase. Insert-only via CSS + fillSlot (no card-markup restructure); light+dark; honors prefers-reduced-motion. Also: the deck \'N jobs loaded\' toast now centers under the deck COLUMN beside the C2 rail (was 162px off, centered under the full main) — same :has()-scoped shape as the v240 footer fix.'],
   'v240':['v240 (founder live-test fixes): (1) company LOGOS for big brands everywhere — a curated, verified name->domain map (_gpjBrandDomain) feeds the existing logo helper, so Amazon/Microsoft/etc. show their real logo on job cards, company cards/modals, Ghosts + trending, without a stored domain (we still never GUESS one). (2) harvester now captures company_url->companyWebsite (JobSpy) + pool carries it, so the long tail of employers resolve logos + the Website button over ~8 days as the pool self-heals. (3) company \'Website\' button links the real domain (curated map) instead of a Google search when known. (4) null% bug fixed — Ghost + Browse search dropdowns show honest \'— \' not \'👻 null%\'. (5) swipe footer aligns under the deck column on desktop (was centered under the full main, looked shifted right beside the C2 rail).'],
   'v239':['v239 (Sprint C · C2): desktop contextual right rail — DESKTOP-ONLY (>=1180px) sticky rail beside the swipe deck (streak · weekly-goal ring · market pulse · Jett tip · recent). Fills the empty desktop width with USEFUL, honest info. Founder-approved: replaces the on-deck gamify bar on desktop (no repetition); mobile/tablet unchanged. Market pulse computed from the in-memory jobsQueue = ZERO extra reads; grounded empty states; recruiter mode reverts to single column. Insert-only: one appended #gpj-deck-rail + one render fn + a wide-desktop-gated CSS grid; the 860px deck cap + v220/v225/v233 centering are untouched'],

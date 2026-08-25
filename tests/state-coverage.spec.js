@@ -3154,11 +3154,13 @@ test.describe('[STATE-COVERAGE] v142 desktop deck height — Save button stays r
 
   test('mobile is unchanged by the desktop fix (no regression)', async ({ page }) => {
     const r = await page.evaluate(`(${measure})(false)`);
-    /* v219: mobile deck floors at 300 and HUGS the card (max(300, real+8)); v217's
-       founder-approved snapshot card is a few px taller, so 300–~303 is correct — the
-       guard is "no desktop dead-space bleed + no controls overlap", not an exact 300. */
+    /* v219: mobile deck floors at 300 and HUGS the card (max(300, real+8)). v242 (A7,
+       founder-requested): the ghost/gap pills became bigger TILES, so the snapshot card is
+       intentionally taller (~350) — the deck hugs it. The guard is "no desktop 440
+       dead-space bleed + no controls overlap", not an exact height, so the ceiling is 380
+       (still well below 440 → a real desktop-bleed regression is still caught). */
     expect(r.deckH, 'mobile deck floors at 300 and hugs the card — no desktop 440 bleed').toBeGreaterThanOrEqual(300);
-    expect(r.deckH, 'mobile deck never balloons — it hugs the card').toBeLessThan(340);
+    expect(r.deckH, 'mobile deck hugs the card, never the 440 desktop bleed').toBeLessThan(380);
     expect(r.overlaps).toBe(false);
   });
 
@@ -9275,5 +9277,63 @@ test.describe('[STATE-COVERAGE] v241 hero card (C3)', () => {
     });
     expect(r.ring, 'no match → no ring').toBe(false);
     expect(r.text, 'shows the honest "fit" fallback').toMatch(/fit/i);
+  });
+});
+
+test.describe('[STATE-COVERAGE] v242 gap consistency + A7 tiles + honest stats', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.fillSlot === 'function' && typeof window._paintReqPill === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(200);
+  });
+
+  test('card gap pill uses the SAME check as the modal — a Bachelor’s req vs an Associate shows the gap, not "No gaps"', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      try { resumeReady = true; } catch (e) {}
+      resumeData.title = 'Marketing'; resumeData.skills = 'marketing, communications';
+      resumeData.edu = "Associate of Science · HCC"; resumeData.eduStruct = { degree: "Associate's", major: 'Science', school: 'HCC' };
+      const job = { t: 'Marketing Manager', co: 'X', req: "Bachelor's degree required. Minimum 3 years experience.", desc: '', ghost: 20 };
+      const gaps = (typeof _reqGaps === 'function') ? _reqGaps(job).gaps.map((g) => String(g.label)) : [];
+      const top = document.querySelector('.job-card.top');
+      _paintReqPill(top, job);                                  // the shared painter (card == modal)
+      const rq = top.querySelector('.s-req');
+      return { gaps, pillText: rq ? rq.textContent : '' };
+    });
+    expect(r.gaps.some((l) => /bachelor/i.test(l)), '_reqGaps finds the degree gap').toBe(true);
+    expect(r.pillText, 'the card pill reflects the gap (matches the modal)').toMatch(/gap/i);
+    expect(r.pillText, 'no false "No gaps"').not.toMatch(/No gaps/);
+  });
+
+  test('A7: ghost + gap are proper flex TILES (rounded, real tap height); company card links out to Google reviews', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const top = document.querySelector('.job-card.top');
+      fillSlot(top, { t: 'Analyst', co: 'Acme', desc: 'x', ghost: 22 });
+      const row = top.querySelector('.risk-gap-row');
+      const sp = row ? row.querySelector('.s-ghost') : null;
+      const rcs = row ? getComputedStyle(row) : null;
+      const scs = sp ? getComputedStyle(sp) : null;
+      const links = (typeof companyLinks === 'function') ? companyLinks('Acme', {}) : {};
+      return {
+        flex: rcs ? rcs.display : '',
+        radius: scs ? parseInt(scs.borderRadius) : 0,
+        minH: scs ? parseInt(scs.minHeight) : 0,
+        google: links.googleReviews || '',
+      };
+    });
+    expect(r.flex, 'ghost/gap row is a flex tile row').toBe('flex');
+    expect(r.radius, 'tiles are rounded (~12px), not pills').toBeGreaterThanOrEqual(10);
+    expect(r.minH, 'tiles have a real tap height').toBeGreaterThanOrEqual(40);
+    expect(/google\.com\/search/.test(r.google), 'company card links out to Google reviews').toBe(true);
+  });
+
+  test('no fabricated Ghosts-page stats (2,847 / 94% Data Accuracy) — honest facts instead', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      try { switchView('ghost'); } catch (e) {}
+      const t = document.body.innerText;
+      return { noReports: !/2,?847/.test(t), noAcc: !/94%\s*Data Accuracy/i.test(t), honest: /Until you.{0,3}re hired/i.test(t) };
+    });
+    expect(r.noReports, 'no fabricated "2,847" community reports').toBe(true);
+    expect(r.noAcc, 'no fabricated "94% Data Accuracy"').toBe(true);
+    expect(r.honest, 'honest brand fact shown instead').toBe(true);
   });
 });
