@@ -227,6 +227,16 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 - [ ] Check **dark + light**. The rail cards should match the theme (dark panels in dark, off-white in light).
 - [ ] Recruiter accounts: the Swipe/Employer view is unaffected (no rail, single column).
 
+**v241 — hero job card (C3) + toast fix** _(open the Swipe deck)_
+- [ ] The **top job card** now has a subtle **mint→cyber gradient border** marking it as the focal card; the **Match %** is an **animated donut ring** that counts up; the header shows the **real company logo** for known brands/domained jobs (💼 otherwise). No real match yet → plain "fit", no ring (no fake number). Check **dark + light**, desktop + mobile.
+- [ ] On **desktop** the "N jobs loaded — start swiping" toast is now centered **under the card**, not shifted right beside the rail.
+
+**v242 — gap consistency + bigger tiles + honest stats** _(the batch from your live test)_
+- [ ] **Gap bug fixed:** open a job whose posting needs a degree you don't have (e.g. the Manager role) → the card's gap pill and the Requirements-check modal now **agree** (no more "✓ No gaps" on the card while the modal shows a Bachelor's gap).
+- [ ] **Ghost % + gaps are now bigger TILES** (side-by-side, easy to read/tap), not tiny pills.
+- [ ] **Ghosts page:** the fake "2,847 Community Reports / 94% Data Accuracy" are gone → honest "Free until you're hired · 0 ads."
+- [ ] **Company card:** a **🔎 Google reviews →** link now sits beside 🏢 Glassdoor (we link out to real reviews; we don't fake a star rating). Check **dark + light**.
+
 **v240 — brand logos + honesty fixes** _(the batch from your live test)_
 - [ ] **Big-company logos:** search **Amazon** (Ghosts) / open **Microsoft**'s company card → their **real logo** now shows (was the building icon). Same on job cards + trending rows. A company we don't recognize still shows 🏢 (we never show a *wrong* logo).
 - [ ] **Company Website button** (globe in "Connect with hiring team"): for a known brand it now opens their **real site** (e.g. microsoft.com) instead of a Google search.
@@ -240,6 +250,8 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 A1 job-card full data · A2/A2b logo+wordmark · A3 tailored pills · A4 geo toggle · A4.5 Browse-summary + gaps-only bugs · A5 company-card cleanup · A6 company logos · A8 section alignment · A9 button centering. **A7 (card-face tiles) folded into Sprint C (Wow pass).** Open follow-up: button *word* vs *icon* centering (10px, site-wide) — awaiting founder A/B direction.
 
 ## Change log for this tracker
+- 2026-08-25 — **v242 shipped (Sprint B fixes)**: gap card↔modal consistency (shared `_paintReqPill`), A7 bigger ghost/gap tiles, honest Ghosts stats + Google-reviews link. 3 new tests; v142 deck-height bound updated for the intentionally-taller card. Full gate 854/854. **Next: v243 — the reframe-and-rewrite tailoring engine (core value).**
+- 2026-08-25 — **v241 shipped (Sprint C · C3)**: hero card (gradient border + animated match ring + real logo) + toast-centering fix. 848/848.
 - 2026-08-24 — **v240 shipped (founder live-test fixes)**: (1) curated verified brand→domain map so big-name logos (Amazon/Microsoft/etc.) resolve everywhere immediately (never a *guessed* domain); (2) harvester captures `company_url`→`companyWebsite` + pool carries it → long-tail logos + Website button populate over ~8 days; (3) company Website button links the real domain when known; (4) null% → honest "👻 —" in Ghost + Browse search dropdowns; (5) swipe footer aligns under the deck column beside the C2 rail. 4 new state tests + harvester selftest. Full no-skip gate. **Next: C3 hero card (v241) — mockup approved.**
 - 2026-08-23 — **v239 shipped (Sprint C · C2 right rail)**: desktop-only sticky rail (streak/goal/market-pulse/Jett/recent) that replaces the on-deck gamify bar on desktop; mobile unchanged. Zero-read market pulse (`_gpjMarketPulse` from the in-memory pool). 2 new state tests. Browser-verified dark+light+narrow+mobile. Full no-skip gate. **Next: C3 hero card + animated match ring (needs its own mockup).**
 - 2026-08-23 — **v238 shipped (Sprint C · candidate avatar)**: `_gpjPersonAvatar` hybrid — initial monogram for named people (applicant card, team rows), anonymous 🧑 for matched candidates. 1 new state test. Full no-skip gate green (benchmark + 8 backend + Playwright 836/836). **Next: C2 right rail (v239).**
