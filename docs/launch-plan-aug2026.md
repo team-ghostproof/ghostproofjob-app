@@ -89,17 +89,15 @@ Everything above is **launch-critical**. Big net-new features (5 templates, full
 
 ## 4. Post-launch tail (September) — honest deferral
 
-These are real and planned, but **not** responsibly completable AND fully gated by Aug 31 without rushing the launch bar. Recommend shipping them after go-live:
+**CORRECTION (2026-08-24 audit):** Sprint D is mostly ALREADY BUILT — see the roadmap Sprint D audit. So most of it is VERIFY (folds into the Aug 27–29 Sprint-B verification block), not net-new work. Only **D2 (Inbox)** is a real build.
 
-- **Sprint D — Signature features:**
-  - **Full Inbox tab** — big feature; the interim (v196 per-message dismiss + collapse) covers the anti-ghosting need for launch.
-  - **5 résumé templates (F-TPL)** — large [UI-REVIEW] effort; the current template works for launch.
-  - **F-GHOST aggregated flag counts + "another hunter reported this"** — needs real community volume to be meaningful; better once users exist.
-  - **Broaden-location flow** ("other regions" pill) — approved but not launch-blocking; remote + in-market already work.
-- **Sprint E — Growth & Cost:**
-  - **D1 (Firestore read-cost reduction)** — **explicitly deferred by founder** until the Blaze trial nears expiry (**2026-09-19**); the pool/self-heal already cut deck reads. Do in mid-Sept.
-  - **Resources cron go-live** — gated on founder reviewing the first real article; flip the cron when ready.
-  - **Signed-in CI** — reliability nicety; not user-facing.
+- **Sprint D:**
+  - **D2 — Full Inbox tab** — the ONE net-new Sprint D build. Founder flagged it important (tracks messages both sides). **Candidate to pull into the launch window** (Sprint D verifies freed the time) as a [UI-REVIEW] build, OR ship right after launch. Founder's call.
+  - **D1 F-GHOST** (reports + "N hunters reported" badge), **D3 5 templates** (Export Template Studio), **D4 broaden flow** (Browse widen pill + deck other-cities) — **already built → VERIFY only**, folded into the Sprint-B verification days.
+- **Sprint E:**
+  - **E2 (read-cost)** — biggest sink already cut (the `job_pools` pool: deck reads ~3,800→~6). Finish the lighter caching (Browse/company reads, query caps) **before 2026-09-19** so post-trial we sit inside the free tier (50k reads/20k writes per day). Not heavy to build.
+  - **E1 Resources cron** — founder runs `resources_refresh` once + reviews the first article, then I flip the cron (2-line uncomment). The "Weekly Content Pack" that ran today is a different, already-live social-draft workflow.
+  - **E3 signed-in CI** — reliability nicety; post-launch.
 - **Harvester logo long-tail** — v240 already captures `company_url`; logos/website links populate automatically as the pool self-heals (~8 days), no action needed.
 
 ---

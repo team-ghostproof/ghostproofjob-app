@@ -142,18 +142,20 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 
 ## SPRINT D — Signature Features  _(net-new value)_
 
-- **D1 · F-GHOST aggregated flag popup + real counts** · MED · M — Firestore-aggregated flag count + "Another hunter reported this job." The emotional core of the brand, underused today. Honest — "—" when no data.
-- **D2 · Full Inbox tab** · MED · M — replace the interim per-message dismiss/collapse (v196) with a real inbox: anti-ghosting record + employer messages in one place. **[UI]** for the new tab.
-- **D3 · Five résumé templates (F-TPL)** **[UI]** · MED · M — multiple export layouts; differentiation + a reason to stay. Must not break export/accent/headshot/spacing.
-- **D4 · Location/role broaden flow + "other regions" control (§7)** **[UI]** · MED · M — same-state → statewide → other cities ladder; single pill, never widens on its own; reuses `loadDeckOtherCities`. Also folds in B-SALARY-CYCLE (pure client-side filter) + B-SARATOGA hard-scope live-verify.
+> **AUDIT 2026-08-24 (founder challenged "don't we already have these?"): mostly TRUE.** 3 of 4 are already built — they become VERIFY tasks, not builds. Only D2 (Inbox) is net-new.
+
+- **D1 · F-GHOST aggregated flag popup + real counts** · **✅ LARGELY BUILT → VERIFY** — `fb.fileGhostReport` writes cross-user reports to the `ghost_reports` collection; `_paintJobReportBadge` (v141) paints "N hunters reported this" on the card face via a cached count() aggregation; honest "—" when no data. Remaining: live-verify the count aggregates correctly with real volume + confirm the "another hunter" popup surfaces everywhere intended. **Not a build.**
+- **D2 · Full Inbox tab** · **⬜ NOT BUILT (founder: important — core feature)** — replace the interim per-message dismiss/collapse (v196) with a real inbox: anti-ghosting record + employer messages + candidate-side in one place. **[UI-REVIEW]** new tab. **This is the one real Sprint D build.**
+- **D3 · Five résumé templates (F-TPL)** · **✅ ALREADY BUILT → VERIFY** — the Export Template Studio ships 5 (`Classic ATS / Modern Split / Minimal / Corporate Grid / Creative Accent` via `setTpl`/`renderTplPreview`, index.html ~2692). Roadmap/CLAUDE.md §8 was STALE. Remaining: verify each exports cleanly (accent/headshot/spacing/address toggles intact). **Not a build.**
+- **D4 · Location/role broaden flow + "other regions" control (§7)** · **✅ LARGELY BUILT → VERIFY** — Browse `browseWiden()` + "Show other parts of [state] → / Show all regions →" pill (`_browseScope` market/wide, ~6121); deck `loadDeckOtherCities` + same-state broaden. Remaining: live-verify the full ladder + B-SALARY-CYCLE (client-side filter) + B-SARATOGA hard-scope. **Not a build.**
 
 ---
 
 ## SPRINT E — Growth & Cost  _(last, per founder instruction)_
 
-- **E1 · Resources cron GO-LIVE** · MED-HIGH · S — flip the every-other-day publish on after you review the first real articles; add light monitoring. Near-zero cost SEO growth engine. _(Founder action to enable the schedule + the FIREBASE_SERVICE_ACCOUNT secret path.)_
-- **E2 · D1 read-cost reduction** · HIGH after 2026-09-19 · M-L — cache region pool per session, cap queries, paginate. The Blaze trial credit ends 2026-09-19; today the cost is masked.
-- **E3 · F-TEST hardening** · MED · M — Playwright screenshots, more backend coverage, signed-in CI.
+- **E1 · Resources cron GO-LIVE** · **⬜ GATED ON FOUNDER REVIEW** — the publisher (`resources_refresh.yml`) is `workflow_dispatch`-only; its `cron` is COMMENTED (lines 15–16) until the founder runs it once + approves the first real article, then I uncomment 2 lines. NOTE: the **"Weekly Content Pack"** that ran this morning is a DIFFERENT workflow (`weekly_content.yml`, Mondays) — it drafts SOCIAL posts as an artifact to post manually, never publishes to the site. So the SEO Resources cron is NOT yet live. **Founder action: run resources_refresh → review → tell me to flip the cron.**
+- **E2 · D1 read-cost reduction** · **PARTIALLY DONE — finish before 2026-09-19** — the biggest sink is ALREADY cut: the `job_pools` pool dropped deck reads ~3,800→~6 per load (D1-LIVE). Remaining: session-cache the Browse/company-view reads, cap query sizes, paginate. These REDUCE reads (cheap to build, not heavy). Trial credit ends 2026-09-19; budget: ~$12.28 of $300 used, founder cap ≈ $20 total. Free tier = 50k reads + 20k writes/day. **Do before Sep 19 so post-trial we sit inside free tier.**
+- **E3 · F-TEST hardening (signed-in CI)** · MED · M — signed-in Playwright coverage in CI + screenshots. Separate from the standing NON-NEGOTIABLE: never skip the test protocol, and **red CI is never acceptable (flake or not)** — treat any red run as stop-and-fix at root cause.
 
 ---
 
