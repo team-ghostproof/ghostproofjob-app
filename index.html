@@ -912,6 +912,11 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
      draws the eye. Not shrunk to a small pill. */
   .job-card .risk-gap-row>span{flex:0 1 auto;min-width:min(38%,320px);min-height:42px;padding:9px 16px!important;border-radius:12px!important;font-size:13px!important;display:flex!important;align-items:center;justify-content:center;background:var(--plum3);}
   .job-card .risk-gap-row .s-ghost{display:none!important;}   /* de-dup: ghost % lives below View Full Posting */
+  /* v246 (founder: on mobile "$60K – $150K / yr" clipped to "…"): the GOOD-looking fix is a
+     COMPACT one-line salary ("$60–150K/yr", set by _gpjTileSal in fillSlot) so all three
+     snapshot tiles stay uniform — NOT an ugly wrap. This just lets a still-long value shrink
+     a touch to stay on one line as a safety; the tiles never wrap. */
+  .job-card .s-salary,.job-card .s-loc{font-size:clamp(11.5px,3.3vw,13px)!important;}
   .salary-badge{background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.3);color:var(--mint);font-size:11px;padding:3px 8px;border-radius:8px;}
   .location-badge{background:rgba(181,95,230,.12);border:1px solid rgba(181,95,230,.3);color:var(--cyber);font-size:11px;padding:3px 8px;border-radius:8px;}
   .match-badge{background:linear-gradient(90deg,rgba(0,245,160,.18),rgba(181,95,230,.18));border:1px solid rgba(0,245,160,.4);color:var(--mint);font-size:11px;font-weight:800;padding:3px 8px;border-radius:8px;}
@@ -3262,7 +3267,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v245</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v246</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -11231,6 +11236,24 @@ function renderOptimizedList(){
 }
 const communityGhost={'Stripe':12,'Linear':9,'Figma':15,'Amazon':74,'Meta':41,'Chime':18,'Tenet Health':22,'HEB Digital':11,'Favor':31,'HubSpot':14,'Visit Houston':19,'Houston Methodist':8,'ADP':26,'Houston ISD':7,'Sysco':13,'Deloitte':24,'HEB':10,'Baker Botts':17,'Hilton Americas':20,'Bechtel':9,'Target':11,'Starbucks':9,'Accenture':16,'Kelsey-Seybold':12,'Alorica':23,'MD Anderson':10,'Local Foods':18,'Pappadeaux':8,'John Moore Services':9};
 
+/* v246 (founder: "$60K – $150K / yr" clipped/wrapped ugly in the mobile Salary tile): compact
+   a salary to ONE clean line for the tile — a range collapses to "$60–150K/yr" and "/ year"
+   tightens to "/yr". Display-only; the drawer/company view still show the full string. Safe:
+   only clear numeric patterns are rewritten; anything unrecognized returns unchanged. */
+function _gpjTileSal(s){
+  s=String(s||'').trim(); if(!s) return '—';
+  if(/request|not\s|competit|negotiab|\bdoe\b|inquire|commensurate/i.test(s)) return 'On request';
+  var out=s.replace(/\s*\/\s*(year|yr|annum)\b/i,'/yr').replace(/\s*\/\s*(hour|hr)\b/i,'/hr')
+           .replace(/\s*per\s+year\b/i,'/yr').replace(/\s*per\s+hour\b/i,'/hr');
+  /* {n, K} — K-ify only when the value is thousands or explicitly "K"; hourly rates stay plain */
+  var norm=function(raw,k){ var n=parseFloat(String(raw).replace(/,/g,'')); if(isNaN(n)) return null; if(k) return {n:n,K:true}; if(n>=1000) return {n:Math.round(n/1000),K:true}; return {n:n,K:false}; };
+  var r=out.match(/\$?\s*([\d,\.]+)\s*([kK])?\s*[–—-]\s*\$?\s*([\d,\.]+)\s*([kK])?/);
+  if(r){ var a=norm(r[1],r[2]), b=norm(r[3],r[4]); if(a&&b){ var K=a.K||b.K?'K':''; return (out.slice(0,r.index).replace(/\$\s*$/,'').trim())+'$'+a.n+'–'+b.n+K+out.slice(r.index+r[0].length); } }
+  var one=out.match(/\$?\s*([\d,\.]+)\s*([kK])?/);
+  if(one){ var v=norm(one[1],one[2]); if(v && v.K && !/[kK]/.test(one[0])){ return out.slice(0,one.index)+'$'+v.n+'K'+out.slice(one.index+one[0].length); } }
+  return out;
+}
+window._gpjTileSal=_gpjTileSal;
 function fillSlot(cardEl, job){
   if(!cardEl||!job) return;
   cardEl.style.visibility='';   /* reveal — was hidden when empty */
@@ -11266,7 +11289,7 @@ function fillSlot(cardEl, job){
   (function(){
     var s=String(job.sal||'').trim();
     var shortSal=!s?'—':(/(on\s+)?request|not\s*(listed|specified|disclosed|provided)|competitive|negotiab|\bdoe\b|inquire|commensurate/i.test(s)?'On request':s);
-    set('s-salary',shortSal);
+    set('s-salary', _gpjTileSal(shortSal));   /* v246: compact one-line salary for the tile ("$60–150K/yr") so it never clips/wraps */
     var se=cardEl.querySelector('.s-salary'); if(se) se.style.display='block';
   })();
   /* v80: a REMOTE role's badge says Remote — showing only the HQ city
@@ -15162,8 +15185,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v245';
+const APP_VERSION = 'v246';
 const CHANGELOG = {
+  'v246':['v246 (founder: mobile tile text clipping): the Salary/Location snapshot tiles on the job card used white-space:nowrap + ellipsis, so \'$60K – $150K / yr\' clipped to \'…\' on narrow phones. Now the tile VALUES wrap to 2 lines + shrink via clamp(11px,3.2vw,13px) to fit every width/platform. Also: worker/worker.js tailoring prompt HARD-CAPPED to reframe AT MOST 2–3 bullets (the v244 tune still over-stuffed \'marketing\' onto most bullets) — REQUIRES a Worker redeploy.'],
   'v245':['v245 (founder): the swipe job card showed the ghost-risk % TWICE — the A7 card-face tile AND the drawer block below \'View Full Posting\'. Kept the drawer one (per founder), hid the card-face ghost tile, and CENTER the single gap button. Reversible (2 CSS rules). Green/Red flag on the card face still conveys risk at a glance.'],
   'v244':['v244 (founder live-test fixes): (1) \'Hiring Company\' placeholder — recover the real employer from idealtraits.com ATS URLs (/career/Agency-Coach-AI/ → \'Agency Coach AI\'). (2) truncation regression — the full-posting fetch only fired when the pool set _clipped; some pool rows carry a preview WITHOUT it, leaving a card stuck on a short summary (ended \'…external…\'). Now ALSO fetch when the preview LOOKS clipped (ends with an ellipsis or <650 chars) in BOTH the Browse job-card modal AND the swipe drawer — one guarded read per open. (3) \'null%\' on the Ghosts \'From you & your hunt\' list — ghostRiskFor returns null when there\'s no computed community % yet; now shows the honest \'—\' + empty bar (matches every other ghost display). (4) worker/worker.js tailoring prompt tuned to reframe SELECTIVELY (no keyword-stuffing \'marketing/communication\' onto every bullet) — REQUIRES a Worker redeploy.'],
   'v243':['v243 (core value — tailoring engine reframe): the AI tailoring only PARAPHRASED (synonym swaps) because the Worker system prompts said \'rewrite the bullet / preserve the candidate\'s real meaning\' with NO instruction to reframe toward the target role. Rewrote BOTH worker/worker.js system prompts (bullets + summary) to FOREGROUND the parts of the candidate\'s REAL work most relevant to the TARGET ROLE + mirror the posting\'s language/duties — honesty rules intact (never invent metrics/employers/titles/seniority). REQUIRES a Cloudflare Worker redeploy to take effect. Also fixed the duplicate-skill bug: the Match-to-Job market list offered \'Customer Service\' twice (\'customer\' + \'service\' are different stems but the same canonical skill) — now deduped by canonical skill + against the single-job suggestions. Retitle + before/after match display come in v244 once the live reframe is confirmed.'],

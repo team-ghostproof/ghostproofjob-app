@@ -9400,4 +9400,26 @@ test.describe('[STATE-COVERAGE] v244 employer-from-URL + honest reported list', 
     expect(r.hasDash, 'honest "—" when no computed community %').toBe(true);
     expect(r.hasCo, 'the reported company still renders').toBe(true);
   });
+
+  test('v246: salary compacts to one clean line ("$60–150K/yr") so the tile fits without clipping/wrapping', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const top = document.querySelector('.job-card.top');
+      fillSlot(top, { t: 'X', co: 'Y', sal: '$60K – $150K / yr', loc: 'Houston, TX, US', desc: 'x' });
+      const salText = (top.querySelector('.s-salary') || {}).textContent || '';
+      return {
+        range: _gpjTileSal('$60K – $150K / yr'),
+        commas: _gpjTileSal('$60,000 – $150,000 / year'),
+        single: _gpjTileSal('$120,000 / yr'),
+        hourly: _gpjTileSal('$18 – $22 / hr'),
+        onreq: _gpjTileSal('Compensation is competitive'),
+        tileShows: salText,
+      };
+    });
+    expect(r.range, 'annual range → compact "$60–150K/yr"').toBe('$60–150K/yr');
+    expect(r.commas, 'comma thousands → compact K form').toBe('$60–150K/yr');
+    expect(r.single, 'single annual → "$120K/yr"').toBe('$120K/yr');
+    expect(r.hourly, 'hourly stays PLAIN, never K-ified').toBe('$18–22/hr');
+    expect(r.onreq, 'vague comp → "On request"').toBe('On request');
+    expect(r.tileShows, 'the tile renders the compact salary').toBe('$60–150K/yr');
+  });
 });

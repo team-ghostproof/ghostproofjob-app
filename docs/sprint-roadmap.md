@@ -231,11 +231,20 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 - [ ] The **top job card** now has a subtle **mint→cyber gradient border** marking it as the focal card; the **Match %** is an **animated donut ring** that counts up; the header shows the **real company logo** for known brands/domained jobs (💼 otherwise). No real match yet → plain "fit", no ring (no fake number). Check **dark + light**, desktop + mobile.
 - [ ] On **desktop** the "N jobs loaded — start swiping" toast is now centered **under the card**, not shifted right beside the rail.
 
-> ### ⚠️ BEFORE TESTING (morning): REDEPLOY THE WORKER
-> The résumé-tailoring fix lives in **`worker/worker.js`** (the two `smart-match` system prompts).
-> Cloudflare is the source of truth and does NOT auto-deploy from the repo — **paste `worker/worker.js`
-> into the live Cloudflare Worker and redeploy**, or the reframing tune (v243→v244) won't be live.
-> Everything else (v243–v245 app changes) is already deployed via the normal push.
+> ### ⚠️ BEFORE TESTING: DEPLOY BOTH (app + worker)
+> **1. The APP (`index.html`).** Live-test screenshots (2026-08-25 late) show OLD behavior —
+> the ghost % still doubled on the card, the salary tile still clipping — which means the live
+> site (ghostproofjob.com) is **several builds behind** the repo. The v244–v246 fixes
+> (truncation-fetch, ghost de-dup, mobile tile wrap) are in the repo but **not live** until the
+> **latest `index.html` from the repo is deployed** (drag-upload the CURRENT repo copy — not an
+> older local one). This likely explains "still clipping / still doubled".
+> **2. The WORKER (`worker/worker.js`).** Cloudflare is source-of-truth + not auto-deployed —
+> **paste `worker/worker.js` into the live Worker and redeploy** for the tailoring reframe (now
+> HARD-CAPPED at 2–3 bullets in v246 to stop the "marketing"-on-every-bullet over-stuffing).
+
+**v246 — mobile tile-text clipping + reframe hard-cap**
+- [ ] **Mobile:** the **Salary** tile ("$60K – $150K / yr") and **Location** tile no longer clip to "…" — they wrap + shrink to fit. Check a few jobs with long salary ranges on a phone.
+- [ ] **Résumé tailoring (needs Worker redeploy):** re-run Match-to-Job → the reframe should now touch **only 2–3 bullets**, not stuff "marketing" onto most of them. Send me a PDF.
 
 **v245 — de-duplicated ghost % on the swipe card**
 - [ ] The swipe job card no longer shows the ghost-risk % **twice** — the card-face tile is gone; the **% stays below "View Full Posting"** (in the drawer). The **gap button is centered** and about **one tile wide** (eye-catching). The Green/Red flag still shows risk at a glance. _(If you'd rather keep ghost at-a-glance on the card face and drop the drawer one instead, say so — it's a 2-line flip.)_
@@ -271,6 +280,7 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 A1 job-card full data · A2/A2b logo+wordmark · A3 tailored pills · A4 geo toggle · A4.5 Browse-summary + gaps-only bugs · A5 company-card cleanup · A6 company logos · A8 section alignment · A9 button centering. **A7 (card-face tiles) folded into Sprint C (Wow pass).** Open follow-up: button *word* vs *icon* centering (10px, site-wide) — awaiting founder A/B direction.
 
 ## Change log for this tracker
+- 2026-08-25 — **v246 shipped**: mobile salary/location tile text wraps+shrinks instead of clipping to "…"; worker tailoring prompt HARD-CAPPED to 2–3 reframed bullets (v244 tune still over-stuffed). **DEPLOY GAP FLAGGED:** live site is several builds behind the repo — deploy the latest index.html + worker. Full gate.
 - 2026-08-25 — **v245 shipped**: de-duplicated the ghost-risk % on the swipe card (hid the card-face tile, kept the drawer one, centered + widened the gap button to ~one tile). Full gate.
 - 2026-08-25 — **v244 shipped**: truncation-fetch robustness (fetch full posting when the preview ends in "…", never for short-complete ones — v210 read-cost invariant preserved), idealtraits "Hiring Company" fix, ghost "null%"→"—" on the reported list, tailoring-prompt tune (selective reframe, no keyword-stuffing — needs Worker redeploy). 860/860.
 - 2026-08-25 — **v243 shipped (core value)**: reframe-toward-target-role Worker prompts (turns paraphrase into real tailoring) + duplicate-skill fix. Verdict on the live re-run: reframe WORKS (targets the role's language); v244 tuned it to stop over-stuffing. 856/856. **Worker redeploy required.**
