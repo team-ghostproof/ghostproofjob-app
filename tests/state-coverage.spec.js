@@ -9363,3 +9363,36 @@ test.describe('[STATE-COVERAGE] v243 Match-to-Job — no duplicate skill suggest
     expect(r.hasProject, 'other real skills still surface').toBe(true);
   });
 });
+
+test.describe('[STATE-COVERAGE] v244 employer-from-URL + honest reported list', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._gpjEmployerFromUrl === 'function' && typeof window.renderUserReports === 'function', null, { timeout: 15000 });
+    await page.waitForTimeout(200);
+  });
+
+  test('idealtraits ATS URL recovers the real employer (not "Hiring Company"); existing ATSes still work', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      ideal: _gpjEmployerFromUrl('https://app.idealtraits.com/career/Agency-Coach-AI/365664IND'),
+      greenhouse: _gpjEmployerFromUrl('https://boards.greenhouse.io/acme/jobs/123'),
+      unknown: _gpjEmployerFromUrl('https://www.indeed.com/viewjob?jk=abc'),
+    }));
+    expect(r.ideal, 'idealtraits /career/<Company>/ → real name').toBe('Agency Coach AI');
+    expect(r.greenhouse, 'existing greenhouse extraction unaffected').toBe('Acme');
+    expect(r.unknown, 'a non-employer host returns empty (never a wrong guess)').toBe('');
+  });
+
+  test('the reported-companies list shows the honest "—", never "null%"', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      ghostReports = { 'Bludorn Restaurant': [{ stage: 'No longer accepting applications', when: Date.now() }] };
+      let w = document.getElementById('user-reports');
+      if (!w) { w = document.createElement('div'); w.id = 'user-reports'; document.body.appendChild(w); }
+      renderUserReports();
+      const html = w.innerHTML;
+      return { noNull: !/null%/.test(html), hasDash: /—/.test(html), hasCo: /Bludorn Restaurant/.test(html) };
+    });
+    expect(r.noNull, 'no literal "null%"').toBe(true);
+    expect(r.hasDash, 'honest "—" when no computed community %').toBe(true);
+    expect(r.hasCo, 'the reported company still renders').toBe(true);
+  });
+});
