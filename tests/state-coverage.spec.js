@@ -9304,25 +9304,30 @@ test.describe('[STATE-COVERAGE] v242 gap consistency + A7 tiles + honest stats',
     expect(r.pillText, 'no false "No gaps"').not.toMatch(/No gaps/);
   });
 
-  test('A7: ghost + gap are proper flex TILES (rounded, real tap height); company card links out to Google reviews', async ({ page }) => {
+  test('A7/v245: the gap is a centered rounded tile; the card-face ghost tile is hidden (de-dup); company card links to Google reviews', async ({ page }) => {
     const r = await page.evaluate(() => {
       const top = document.querySelector('.job-card.top');
       fillSlot(top, { t: 'Analyst', co: 'Acme', desc: 'x', ghost: 22 });
       const row = top.querySelector('.risk-gap-row');
-      const sp = row ? row.querySelector('.s-ghost') : null;
+      const gap = row ? row.querySelector('.s-req') : null;
+      const ghost = row ? row.querySelector('.s-ghost') : null;
       const rcs = row ? getComputedStyle(row) : null;
-      const scs = sp ? getComputedStyle(sp) : null;
+      const gcs = gap ? getComputedStyle(gap) : null;
       const links = (typeof companyLinks === 'function') ? companyLinks('Acme', {}) : {};
       return {
         flex: rcs ? rcs.display : '',
-        radius: scs ? parseInt(scs.borderRadius) : 0,
-        minH: scs ? parseInt(scs.minHeight) : 0,
+        justify: rcs ? rcs.justifyContent : '',
+        ghostHidden: ghost ? getComputedStyle(ghost).display === 'none' : true,
+        radius: gcs ? parseInt(gcs.borderRadius) : 0,
+        minH: gcs ? parseInt(gcs.minHeight) : 0,
         google: links.googleReviews || '',
       };
     });
-    expect(r.flex, 'ghost/gap row is a flex tile row').toBe('flex');
-    expect(r.radius, 'tiles are rounded (~12px), not pills').toBeGreaterThanOrEqual(10);
-    expect(r.minH, 'tiles have a real tap height').toBeGreaterThanOrEqual(40);
+    expect(r.flex, 'the ghost/gap row is a flex row').toBe('flex');
+    expect(r.justify, 'v245: the single gap button is centered').toBe('center');
+    expect(r.ghostHidden, 'v245: the card-face ghost % tile is hidden (kept in the drawer, no dup)').toBe(true);
+    expect(r.radius, 'the gap is a rounded tile (~12px), not a pill').toBeGreaterThanOrEqual(10);
+    expect(r.minH, 'the gap tile has a real tap height').toBeGreaterThanOrEqual(40);
     expect(/google\.com\/search/.test(r.google), 'company card links out to Google reviews').toBe(true);
   });
 

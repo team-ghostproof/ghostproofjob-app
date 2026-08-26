@@ -231,6 +231,27 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 - [ ] The **top job card** now has a subtle **mint→cyber gradient border** marking it as the focal card; the **Match %** is an **animated donut ring** that counts up; the header shows the **real company logo** for known brands/domained jobs (💼 otherwise). No real match yet → plain "fit", no ring (no fake number). Check **dark + light**, desktop + mobile.
 - [ ] On **desktop** the "N jobs loaded — start swiping" toast is now centered **under the card**, not shifted right beside the rail.
 
+> ### ⚠️ BEFORE TESTING (morning): REDEPLOY THE WORKER
+> The résumé-tailoring fix lives in **`worker/worker.js`** (the two `smart-match` system prompts).
+> Cloudflare is the source of truth and does NOT auto-deploy from the repo — **paste `worker/worker.js`
+> into the live Cloudflare Worker and redeploy**, or the reframing tune (v243→v244) won't be live.
+> Everything else (v243–v245 app changes) is already deployed via the normal push.
+
+**v245 — de-duplicated ghost % on the swipe card**
+- [ ] The swipe job card no longer shows the ghost-risk % **twice** — the card-face tile is gone; the **% stays below "View Full Posting"** (in the drawer). The **gap button is centered** and about **one tile wide** (eye-catching). The Green/Red flag still shows risk at a glance. _(If you'd rather keep ghost at-a-glance on the card face and drop the drawer one instead, say so — it's a 2-line flip.)_
+
+**v244 — truncation, "Hiring Company", ghost null%** _(the batch from your live test)_
+- [ ] **Truncation:** open a job whose posting was cut mid-sentence (ended "…") → it now **fetches the full posting** and shows the complete text (Browse modal + swipe drawer). _If a specific job is STILL cut, that posting was stored truncated at harvest — tell me which and I'll confirm; a genuinely short posting is not re-fetched (saves reads)._
+- [ ] **"Hiring Company":** the idealtraits job (Agency Coach AI) now shows the **real company name**, not "Hiring Company".
+- [ ] **Ghosts "From you & your hunt":** companies you reported show **"—"** (not "null%") until there's a real community %.
+- [ ] **Résumé tailoring (needs the Worker redeploy above):** re-run **Match-to-Job** on Geisinger / Indeed → bullets should reframe toward the role **naturally**, NOT stuff "marketing/communication" onto every line. Send me the PDFs and we'll tune further if needed.
+
+**v243 — the tailoring engine (core value)**
+- [ ] **This is the big one — after redeploying the Worker.** Match-to-Job should now produce a résumé that genuinely **targets the posting's language** (the v243 verdict: it works, v244 tuned it to stop keyword-stuffing). The **duplicate "Customer Service"** skill suggestion is gone.
+
+**v241 — hero card (C3) + toast fix**
+- [ ] Top card has a **gradient border** + **animated match-ring**; **real company logo** for known brands; the "N jobs loaded" toast centers under the card (desktop). Dark + light.
+
 **v242 — gap consistency + bigger tiles + honest stats** _(the batch from your live test)_
 - [ ] **Gap bug fixed:** open a job whose posting needs a degree you don't have (e.g. the Manager role) → the card's gap pill and the Requirements-check modal now **agree** (no more "✓ No gaps" on the card while the modal shows a Bachelor's gap).
 - [ ] **Ghost % + gaps are now bigger TILES** (side-by-side, easy to read/tap), not tiny pills.
@@ -250,6 +271,9 @@ _Grounded in the Design/Wow PDF. Brand-safe: keeps Midnight Plum / Mint / Cyber 
 A1 job-card full data · A2/A2b logo+wordmark · A3 tailored pills · A4 geo toggle · A4.5 Browse-summary + gaps-only bugs · A5 company-card cleanup · A6 company logos · A8 section alignment · A9 button centering. **A7 (card-face tiles) folded into Sprint C (Wow pass).** Open follow-up: button *word* vs *icon* centering (10px, site-wide) — awaiting founder A/B direction.
 
 ## Change log for this tracker
+- 2026-08-25 — **v245 shipped**: de-duplicated the ghost-risk % on the swipe card (hid the card-face tile, kept the drawer one, centered + widened the gap button to ~one tile). Full gate.
+- 2026-08-25 — **v244 shipped**: truncation-fetch robustness (fetch full posting when the preview ends in "…", never for short-complete ones — v210 read-cost invariant preserved), idealtraits "Hiring Company" fix, ghost "null%"→"—" on the reported list, tailoring-prompt tune (selective reframe, no keyword-stuffing — needs Worker redeploy). 860/860.
+- 2026-08-25 — **v243 shipped (core value)**: reframe-toward-target-role Worker prompts (turns paraphrase into real tailoring) + duplicate-skill fix. Verdict on the live re-run: reframe WORKS (targets the role's language); v244 tuned it to stop over-stuffing. 856/856. **Worker redeploy required.**
 - 2026-08-25 — **v242 shipped (Sprint B fixes)**: gap card↔modal consistency (shared `_paintReqPill`), A7 bigger ghost/gap tiles, honest Ghosts stats + Google-reviews link. 3 new tests; v142 deck-height bound updated for the intentionally-taller card. Full gate 854/854. **Next: v243 — the reframe-and-rewrite tailoring engine (core value).**
 - 2026-08-25 — **v241 shipped (Sprint C · C3)**: hero card (gradient border + animated match ring + real logo) + toast-centering fix. 848/848.
 - 2026-08-24 — **v240 shipped (founder live-test fixes)**: (1) curated verified brand→domain map so big-name logos (Amazon/Microsoft/etc.) resolve everywhere immediately (never a *guessed* domain); (2) harvester captures `company_url`→`companyWebsite` + pool carries it → long-tail logos + Website button populate over ~8 days; (3) company Website button links the real domain when known; (4) null% → honest "👻 —" in Ghost + Browse search dropdowns; (5) swipe footer aligns under the deck column beside the C2 rail. 4 new state tests + harvester selftest. Full no-skip gate. **Next: C3 hero card (v241) — mockup approved.**
