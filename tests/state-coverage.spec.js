@@ -8475,7 +8475,10 @@ test.describe('[STATE-COVERAGE] v216 match Q1 — seniority-gap cap', () => {
       return { director, manager, icOnly };
     });
     expect(r.director, 'Director for a Manager-level résumé is a reach (≤85), not near-perfect').toBeLessThanOrEqual(85);
-    expect(r.manager, 'a same-level Manager role is NOT capped by seniority').toBeGreaterThan(85);
+    /* v250 (N2): scores were de-saturated, so the guarantee is the ORDERING (a same-level
+       match beats the 1-tier reach and is not seniority-capped), not a fixed >85 threshold. */
+    expect(r.manager, 'a same-level Manager role is NOT seniority-capped — scores above the 1-tier reach').toBeGreaterThan(r.director);
+    expect(r.manager, 'a same-level match is still comfortably high on the de-saturated scale (v250 N2)').toBeGreaterThanOrEqual(80);
     expect(r.icOnly, 'a 2-tier jump (Coordinator → VP) caps harder (≤70)').toBeLessThanOrEqual(70);
   });
 });

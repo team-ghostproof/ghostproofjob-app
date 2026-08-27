@@ -84,3 +84,36 @@ describe('v146 P-MATCH — one scorer, same number both directions', () => {
     assert.equal(fwd, rev, 'still agree on a weak pair');
   });
 });
+
+// N2 (v250) — the score must DISCRIMINATE, not clamp at 98 for every in-field job.
+describe('N2: match score is de-saturated (discriminates by depth)', () => {
+  const cand = {
+    title: 'Marketing Specialist',
+    roles: [
+      { t: 'Marketing Specialist', b: 'managed campaigns, email marketing, analytics, content, social media, seo, reporting, stakeholder management' },
+      { t: 'Account Manager', b: 'client relationships, retention' },
+    ],
+    skills: ['marketing', 'campaigns', 'email marketing', 'analytics', 'content', 'seo', 'social media', 'reporting', 'crm', 'stakeholder management'],
+    summary: 'Marketing specialist with campaign and analytics experience.',
+  };
+  const strong = scoreMatch(cand, { title: 'Senior Marketing Manager', desc: 'Lead marketing strategy, campaigns, email marketing, analytics, content, seo, social media, reporting, demand generation, stakeholder management, crm.' }).score;
+  const thin = scoreMatch(cand, { title: 'Marketing Specialist', desc: 'Support marketing efforts.' }).score;
+  const partial = scoreMatch(cand, { title: 'Communications Coordinator', desc: 'Write content, manage social media, some analytics and reporting.' }).score;
+  const outField = scoreMatch(cand, { title: 'Software Engineer', desc: 'Build backend services in Java, Kubernetes, distributed systems, APIs.' }).score;
+
+  test('a strong, deep match scores high (88-98) — not everything does', () => {
+    assert.ok(strong >= 88 && strong <= 98, `strong should be 88-98, got ${strong}`);
+  });
+  test('an in-field but THIN match no longer saturates at ~98', () => {
+    assert.ok(thin < strong && thin <= 90, `thin (${thin}) should be below strong (${strong}) and <=90`);
+  });
+  test('a partial/adjacent match spreads well below strong', () => {
+    assert.ok(partial < 70 && partial < thin, `partial (${partial}) should be <70 and below thin (${thin})`);
+  });
+  test('an out-of-field match stays low (capped)', () => {
+    assert.ok(outField <= 40, `out-of-field (${outField}) should be <=40`);
+  });
+  test('the ordering is monotonic: strong > thin > partial > out', () => {
+    assert.ok(strong > thin && thin > partial && partial > outField, `expected strong>${thin}>${partial}>${outField}`);
+  });
+});

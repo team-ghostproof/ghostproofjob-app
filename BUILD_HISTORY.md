@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-27 · Current live build: **v249**_
+_Last updated: 2026-08-27 · Current live build: **v250**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v250** — N2: de-saturate the match score so it discriminates instead of clamping at 98 for every in-field job — split into capped IN-FIELD (~68) + DEPTH (~28) components so the 90s require real skill/JD depth, not a single field-word match; mirrored lock-step in api/match/scoreCore.js (convergence test green)
 - **v249** — N1: block aggregator/ATS/social hosts (indeed/linkedin/eightfold/workday...) from sourcing a company logo — wrong-brand icons now fall back to the default; N13: circular company/job logos + unified briefcase default (matches the brand refresh)
 - **v248** — E2-1 read-cost: hard-cap the LIVE fallback query budget to 1500 docs (pool-miss path only) so a stale/down pool can't spike reads to 3-8k; N6: remove the duplicate 'Resume Optimizer' title in the optimizer body
 - **v247** — N9+N10: admin Diagnostics report (grouped client errors + user bug reports, admin-only on-demand + Copy button); bug-report reply-to fixed to reporter email/support@ (dead bugs@ removed) + APP_VERSION stamped on each report

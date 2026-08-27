@@ -93,18 +93,28 @@ function scoreMatch(candidate, job) {
 
   let titleSkillHits = 0, descSkillHits = 0;
   skills.forEach((sk) => { if (!sk) return; if (jt.includes(sk)) { titleSkillHits++; if (matched.indexOf(sk) < 0) matched.push(sk); } else if (jd.includes(sk)) { descSkillHits++; if (matched.indexOf(sk) < 0) matched.push(sk); } });
-  let score = best;
-  if (titleSkillHits > 0) { score += 22 + Math.min(12, (titleSkillHits - 1) * 6); }
-  if (skills.length && descSkillHits) score += Math.round((descSkillHits / skills.length) * 18);
   const anySkill = (titleSkillHits + descSkillHits) > 0;
 
   let corpusFieldHits = 0;
   jtFieldWords.forEach((w) => { if (myCorpus.indexOf(w) >= 0) corpusFieldHits++; });
-  if (jtFieldWords.length) { score += Math.round((corpusFieldHits / jtFieldWords.length) * 20); }
 
   const seen = new Set(); let jdHits = 0, jdTot = 0;
   jd.split(/[^a-z]+/).forEach((w) => { if (w.length < 6 || GENERIC_ROLE_WORDS.has(w) || seen.has(w)) return; if (jdTot >= 16) return; seen.add(w); jdTot++; if (myCorpus.indexOf(w) >= 0) jdHits++; });
-  if (jdTot) score += Math.round((jdHits / jdTot) * 6);
+
+  // N2 (v250) — DE-SATURATE the score so it DISCRIMINATES instead of clamping at 98 for
+  // every in-field job. Two CAPPED components: IN-FIELD (role match + corpus field coverage,
+  // caps ~68) + DEPTH (distinct skills + JD-keyword coverage, caps ~28). Reaching the 90s
+  // now requires real depth, not a single field-word match. anyRelevant cap, seniority caps
+  // and the [18,98] clamp are unchanged. LOCK-STEP with index.html _gpjScoreMatch.
+  let inField = best;
+  if (jtFieldWords.length) inField += Math.round((corpusFieldHits / jtFieldWords.length) * 14);
+  inField = Math.min(inField, 68);
+  let depth = 0;
+  if (titleSkillHits > 0) depth += 10 + Math.min(8, (titleSkillHits - 1) * 5);
+  if (skills.length && descSkillHits) depth += Math.round((descSkillHits / skills.length) * 22);
+  if (jdTot) depth += Math.round((jdHits / jdTot) * 10);
+  depth = Math.min(depth, 28);
+  let score = inField + depth;
 
   const anyRelevant = (bestFieldHits > 0) || anySkill || (corpusFieldHits > 0);
   if (jtFieldWords.length && !anyRelevant) score = Math.min(score, 32);
