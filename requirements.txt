@@ -1,3 +1,22 @@
 python-jobspy==1.1.80
 firebase-admin==6.5.0
 pandas==2.2.2
+
+# ── N11 (2026-08-27): PIN the Firestore write stack ────────────────────────────
+# firebase-admin (2024) left google-cloud-firestore / google-api-core / grpcio /
+# protobuf UNPINNED, so the runner pulled "latest" every day. On 2026-08-25 a
+# harvest crashed with `400 Invalid database id (default)` at batch.commit(); a
+# manual re-run on 2026-08-27 succeeded with the versions below (from that run's
+# pip log), so 8/25 was a transient Google-side blip — but the drift risk is real.
+# Pinning the exact working set makes every future run reproducible: it can never
+# silently break on a surprise transitive bump again. (Runner Python = 3.12.)
+# To upgrade deliberately later: bump a pin, run the harvest manually, confirm green.
+google-cloud-firestore==2.29.0
+google-api-core==2.34.0
+grpcio==1.83.0
+grpcio-status==1.83.0
+protobuf==7.36.0
+proto-plus==1.28.4
+googleapis-common-protos==1.75.2
+google-auth==2.57.0
+google-cloud-core==2.7.0
