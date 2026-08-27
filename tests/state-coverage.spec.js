@@ -9021,18 +9021,18 @@ test.describe('[STATE-COVERAGE] v235 company-card logo box', () => {
     await page.waitForTimeout(200);
   });
 
-  test('the company card has a logo box: 🏢 placeholder without a domain, online logo with one', async ({ page }) => {
+  test('the company card has a logo box: 💼 placeholder without a domain, online logo with one', async ({ page }) => {
     const r = await page.evaluate(() => {
       openCompanyView('CCMC', { title: 'X', t: 'X', co: 'CCMC', desc: 'd' }); // no domain
       const noDom = document.getElementById('cm-logo').innerHTML;
       openCompanyView('Acme', { title: 'X', t: 'X', co: 'Acme', companyWebsite: 'https://acme.com', desc: 'd' }); // real domain
       const withDom = document.getElementById('cm-logo').innerHTML;
       return {
-        placeholder: noDom.includes('🏢') && !noDom.includes('<img'),
+        placeholder: noDom.includes('💼') && !noDom.includes('<img'),   /* N13 (v249): unified default is now the circular briefcase */
         online: withDom.includes('icons.duckduckgo.com/ip3/acme.com'),
       };
     });
-    expect(r.placeholder, 'no domain → 🏢 placeholder box (no wrong logo)').toBe(true);
+    expect(r.placeholder, 'no domain → 💼 placeholder box (no wrong logo)').toBe(true);
     expect(r.online, 'real domain → online logo in the box').toBe(true);
   });
 });
@@ -9462,5 +9462,35 @@ test.describe('[STATE-COVERAGE] v247 N9 admin Diagnostics', () => {
     });
     expect(r.threw, 'Diagnostics helpers never throw without a host/report').toBe(false);
     expect(r.toastText, 'copy with nothing loaded prompts to Load first').toMatch(/Load first/i);
+  });
+});
+
+/* v249 (N1 + N13) — company logo: aggregator/ATS hosts must never source a logo (they
+   showed the wrong brand's icon), and the container is now circular with a 💼 default. */
+test.describe('[STATE-COVERAGE] v249 N1 logo host blocklist + N13 circular default', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1200);
+  });
+
+  test('Q1: job-board/ATS/social hosts never become a logo domain; real employers do', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      indeed:    window._gpjLogoDomain('https://www.indeed.com/cmp/gordian'),
+      linkedin:  window._gpjLogoDomain('https://www.linkedin.com/company/murray-resources'),
+      eightfold: window._gpjLogoDomain('https://fortive.eightfold.ai/careers/job/893397024766'),
+      workday:   window._gpjLogoDomain('https://acme.myworkdayjobs.com/en-US/careers'),
+      real:      window._gpjLogoDomain('https://www.geisinger.org/careers'),
+      real2:     window._gpjLogoDomain('microsoft.com'),
+      circle:    !!(window._gpjLogoHtml && /border-radius:50%/.test(window._gpjLogoHtml({ company: 'Nobody Co' }))),
+      def:       !!(window._gpjLogoHtml && window._gpjLogoHtml({ company: 'Nobody Co' }).indexOf('💼') >= 0),
+    }));
+    expect(r.indeed, 'indeed.com blocked').toBe('');
+    expect(r.linkedin, 'linkedin.com blocked').toBe('');
+    expect(r.eightfold, 'eightfold.ai (ATS) blocked').toBe('');
+    expect(r.workday, 'myworkdayjobs.com blocked').toBe('');
+    expect(r.real, 'real employer domain passes through').toBe('geisinger.org');
+    expect(r.real2, 'bare real domain passes through').toBe('microsoft.com');
+    expect(r.circle, 'N13: logo container is circular').toBe(true);
+    expect(r.def, 'N13: default placeholder is the briefcase').toBe(true);
   });
 });
