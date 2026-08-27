@@ -9497,3 +9497,24 @@ test.describe('[STATE-COVERAGE] v249 N1 logo host blocklist + N13 circular defau
     expect(r.def, 'N13: default placeholder is the briefcase').toBe(true);
   });
 });
+
+/* v251 (F-CL-PDF) — cover letter exports as a real PDF (matches the résumé). */
+test.describe('[STATE-COVERAGE] v251 cover-letter PDF export', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1000);
+  });
+  test('downloadCoverLetterPDF exists (jsPDF loaded) and no-ops safely on empty text', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      let threw = false, toast = '';
+      const _t = window.showToast; window.showToast = (m) => { toast = String(m || ''); };
+      try { const ta = document.getElementById('cl-text'); if (ta) ta.value = ''; window.downloadCoverLetterPDF(); } catch (e) { threw = true; }
+      window.showToast = _t;
+      return { exists: typeof window.downloadCoverLetterPDF === 'function', jspdf: !!(window.jspdf && window.jspdf.jsPDF), threw, toast };
+    });
+    expect(r.exists, 'downloadCoverLetterPDF is defined').toBe(true);
+    expect(r.jspdf, 'jsPDF lib is available for the PDF export').toBe(true);
+    expect(r.threw, 'never throws on empty input').toBe(false);
+    expect(r.toast, 'empty input prompts, does not silently download').toMatch(/nothing to export/i);
+  });
+});

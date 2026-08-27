@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-27 · Current live build: **v250**_
+_Last updated: 2026-08-27 · Current live build: **v251**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v251** — E2-4: two-slot session cache (region + nationwide) on roomy devices + 10→30min TTL — fewer redundant pool re-reads when alternating deck/nationwide/company views (low-mem devices keep 1 slot, preserving the v139 iPhone-OOM fix); F-CL-PDF: cover letters now export as a real PDF (matches the résumé) via the loaded jsPDF, with a TXT option kept
 - **v250** — N2: de-saturate the match score so it discriminates instead of clamping at 98 for every in-field job — split into capped IN-FIELD (~68) + DEPTH (~28) components so the 90s require real skill/JD depth, not a single field-word match; mirrored lock-step in api/match/scoreCore.js (convergence test green)
 - **v249** — N1: block aggregator/ATS/social hosts (indeed/linkedin/eightfold/workday...) from sourcing a company logo — wrong-brand icons now fall back to the default; N13: circular company/job logos + unified briefcase default (matches the brand refresh)
 - **v248** — E2-1 read-cost: hard-cap the LIVE fallback query budget to 1500 docs (pool-miss path only) so a stale/down pool can't spike reads to 3-8k; N6: remove the duplicate 'Resume Optimizer' title in the optimizer body

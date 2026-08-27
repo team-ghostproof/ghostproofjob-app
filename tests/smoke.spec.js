@@ -45,6 +45,8 @@ test('core functions still exist (regression guard)', async ({ page }) => {
     'togglePhoneOnResume',
     // v247 N9 admin Diagnostics report
     'adminLoadDiagnostics', 'copyDiagReport',
+    // v251 F-CL-PDF cover-letter PDF export
+    'downloadCoverLetterPDF',
   ];
   const missing = await page.evaluate(
     (names) => names.filter((n) => typeof window[n] !== 'function'),
