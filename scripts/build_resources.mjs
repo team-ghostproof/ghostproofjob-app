@@ -55,8 +55,8 @@ const prettyDate = (iso) => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-
    STANDALONE static pages (real <head>, canonical, OG), not app views. */
 const CSS = `
 :root{--plum:#120F1D;--plum2:#1A1629;--plum3:#241E38;--line:rgba(181,95,230,.20);--mint:#00F5A0;--cyber:#B55FE6;--cyan:#5FD0E6;--danger:#FF4D6A;--warn:#FFB347;--ink:#F1EEF9;--muted:#9E97BA;--faint:#6E6688;--serif:Georgia,"Iowan Old Style","Times New Roman",serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-:root[data-theme=light]{--plum:#FBFAFE;--plum2:#FFFFFF;--plum3:#F3F0FA;--line:rgba(122,60,168,.20);--mint:#0B9E6B;--cyber:#7A3CA8;--cyan:#1E7F97;--ink:#241F33;--muted:#5B5473;--faint:#8A82A3}
-@media(prefers-color-scheme:light){:root:not([data-theme=dark]){--plum:#FBFAFE;--plum2:#FFFFFF;--plum3:#F3F0FA;--line:rgba(122,60,168,.20);--mint:#0B9E6B;--cyber:#7A3CA8;--cyan:#1E7F97;--ink:#241F33;--muted:#5B5473;--faint:#8A82A3}}
+:root[data-theme=light]{--plum:#FBFAFE;--plum2:#FFFFFF;--plum3:#F3F0FA;--line:rgba(122,60,168,.20);--mint:#0B9E6B;--cyber:#7C3AED;--cyan:#1E7F97;--ink:#241F33;--muted:#5B5473;--faint:#8A82A3}
+@media(prefers-color-scheme:light){:root:not([data-theme=dark]){--plum:#FBFAFE;--plum2:#FFFFFF;--plum3:#F3F0FA;--line:rgba(122,60,168,.20);--mint:#0B9E6B;--cyber:#7C3AED;--cyan:#1E7F97;--ink:#241F33;--muted:#5B5473;--faint:#8A82A3}}
 *{box-sizing:border-box}body{margin:0;background:var(--plum);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
 a{color:inherit}.wrap{max-width:720px;margin:0 auto;padding:0 22px 90px}
 .sitehdr{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;max-width:960px;margin:0 auto;padding:20px 22px}
