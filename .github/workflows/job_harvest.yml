@@ -17,6 +17,9 @@ on:
 jobs:
   harvest:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write          # N12: the failure-alert step opens/updates a "harvest-failure" issue
     # 6h cap for a stacking run, 60m for normal. (Public-repo runners allow 360.)
     timeout-minutes: ${{ github.event.inputs.mode == 'stack' && 360 || 60 }}
     steps:
@@ -112,3 +115,25 @@ jobs:
             echo "::error title=D1 pool MISSING::job_pools/_manifest was NOT written this run — the app is on the expensive live-query fallback. Jobs harvested fine; only the D1 optimisation is off. Fix: check the 'Rebuild the D1 job pool' step log + the FIREBASE_SERVICE_ACCOUNT secret."
             exit 1
           fi
+
+      # ── FAILURE ALERT (N12, founder-approved 2026-08-27) ───────────────────
+      # If any step above FAILED (harvest crash like the 8/25 "Invalid database id",
+      # or the D1-pool guardrail), ping the founder immediately: open (or comment on
+      # an existing) "harvest-failure" GitHub issue — GitHub emails you on issue
+      # activity, so no inbox scraping and no secret needed. Note: a step FAILURE
+      # triggers this; a job TIMEOUT/cancel kills the runner before it can run, so
+      # GitHub's own native run-failure email still covers that case (a scheduled
+      # "watchdog" workflow is the fuller fix — proposed, not yet built).
+      - name: Alert on failure (N12)
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `🔴 **Daily Job Harvest failed.**\n\n**Run:** ${url}\n**When:** ${new Date().toISOString()}\n\nJobs may go stale until this is fixed. Open the run log for the failing step + exact error.`;
+            const found = await github.rest.issues.listForRepo({ owner: context.repo.owner, repo: context.repo.repo, state: 'open', labels: 'harvest-failure', per_page: 1 });
+            if (found.data.length) {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: found.data[0].number, body });
+            } else {
+              await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title: '🔴 Daily Job Harvest FAILED', body, labels: ['harvest-failure'] });
+            }
