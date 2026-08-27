@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-26 · Current live build: **v247**_
+_Last updated: 2026-08-27 · Current live build: **v248**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v248** — E2-1 read-cost: hard-cap the LIVE fallback query budget to 1500 docs (pool-miss path only) so a stale/down pool can't spike reads to 3-8k; N6: remove the duplicate 'Resume Optimizer' title in the optimizer body
 - **v247** — N9+N10: admin Diagnostics report (grouped client errors + user bug reports, admin-only on-demand + Copy button); bug-report reply-to fixed to reporter email/support@ (dead bugs@ removed) + APP_VERSION stamped on each report
 - **v246** — v246 (founder: mobile tile text clipping): the Salary/Location snapshot tiles on the job card used white-space:nowrap + ellipsis, so '$60K – $150K / yr' clipped to '…' on narrow phones. Now the tile VALUES wrap to 2 lines + shrink via clamp(11px,3.2vw,13px) to fit every width/platform. Also: worker/worker.js tailoring prompt HARD-CAPPED to reframe AT MOST 2–3 bullets (the v244 tune still over-stuffed 'marketing' onto most bullets) — REQUIRES a Worker redeploy.
 - **v245** — v245 (founder): the swipe job card showed the ghost-risk % TWICE — the A7 card-face tile AND the drawer block below 'View Full Posting'. Kept the drawer one (per founder), hid the card-face ghost tile, and CENTER the single gap button. Reversible (2 CSS rules). Green/Red flag on the card face still conveys risk at a glance.
