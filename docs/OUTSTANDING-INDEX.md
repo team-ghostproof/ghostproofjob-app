@@ -46,7 +46,7 @@
   reverse-match nightly + Ghosts read volume. Founder budget cap ~ $20 total.
   **Read-cost audit DONE 2026-08-27 -> `docs/E2-read-cost-audit.md`.** Ranked fixes (read-path only; no `[UI-REVIEW]`; each ships a state-coverage test):
   - [x] **E2-1 · Live-fallback caps → 1,500 · ✅ SHIPPED v248 (live)** (freshness ADMIN indicator deferred = [UI-REVIEW]) — removes the surprise-bill tail risk (a stale pool makes every fetch a 3,000-8,000-doc live read). **Do first.**
-  - [ ] **E2-2 · Company view reuses the in-memory pool** ⏸ **deferred to v249 (careful data-path build)** — instead of `loadCompanyJobs` (<=800 reads/open) — biggest normal-path saver.
+  - [x] **E2-2 · Company view read cost** ✅ **NO BUILD NEEDED — audit corrected 2026-08-27.** The company view already uses the pool-cached `fetchJobs`; the "≤800 reads" I flagged was actually `fb.mineHires` (rater path, reads the small `hired` collection, self-limiting). Residual cache-thrash on company-view open folds into **E2-4** below.
   - [ ] **E2-3 · Session-memoize ghost counters** (`countJobReports`/`countGhostReports` read <=200 docs each; the job counter fires on every card paint).
   - [ ] **E2-4 · Two-slot session cache + longer TTL** (single slot thrashes on region<->nationwide; 10-min TTL re-reads).
   - [ ] **E2-5 · Cache the per-fetch internal-jobs query** (`limit(300)` on every `fetchJobs`; minor until the employer side grows).

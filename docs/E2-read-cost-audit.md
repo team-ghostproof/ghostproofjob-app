@@ -30,11 +30,14 @@ This is the **most likely cause of an unexpected charge.**
   fallback is survivable; (b) add a pool-freshness guard/console signal (already logs HIT/MISS) surfaced
   to the admin panel; (c) confirm `build_job_pool.mjs` runs reliably right after each daily harvest.
 
-### 🟠 #2 — `loadCompanyJobs(co)` reads up to 800 docs per company-view open  (biggest normal-path sink)
-`index.html:16946` → `getDocs(query(jobs, orderBy ts, limit(maxDocs||800)))`, called on every company card
-open (`openCompanyView` ~17111). The company's roles are almost always **already in the in-memory pool**.
-- **Fix:** filter the cached pool (`_jobsCache` / `liveJobs`/`jobsQueue`) by company first; only fall back to
-  a **capped** live query (e.g. limit 50) if the pool has none. Turns ~800 → ~0 on the common path.
+### ✅ #2 — CORRECTION (2026-08-27): company view is ALREADY pool-cached; the ≤800 sink was mis-attributed
+The original audit claimed `loadCompanyJobs` did an 800-doc query. **That was wrong** — verified by reading the
+code: `loadCompanyJobs` searches via `fb.fetchJobs('', …)` (the **pool-first + 10-min session-cached** path),
+filtering client-side by company. The `limit(maxDocs||800)` I flagged is actually **`fb.mineHires`** — a read of
+the small `hired` collection on the **rater** path (bills only the few docs returned; self-limiting). So **E2-2
+needs no build.** Residual (minor): `loadCompanyJobs` calls `fetchJobs('','3000')` then, if empty, `fetchJobs('','4000')`
+— different cache keys from the deck's `regionKey|3000`, so a company-view open can trigger a ~40-read national-pool
+fetch + thrash the single-slot cache. **The clean fix for that is #4 (two-slot cache), not a company-view rewrite.**
 
 ### 🟠 #3 — Ghost-report counters read matching docs (≤200 each); `countJobReports` fires on every card paint
 `_paintJobReportBadge` (~11326, in `fillSlot`) → `countJobReports(jobKey)` and `countGhostReports(co)`
