@@ -1,0 +1,302 @@
+# GhostProofJob — OUTSTANDING INDEX (single reference sheet)
+
+> **Purpose:** the ONE place to see every open item by its ID, its status, and where the
+> detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
+> (`- [ ]` → `- [x]`) as we complete them.
+> **Current live build: v246** (`CACHE_VERSION = gpj-v246`; live == repo, verified 2026-08-27).
+> **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
+> `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
+> **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
+
+---
+
+## 0. THE RULES WE WORK UNDER (self-contained — never bypass)
+
+- **🔴 CL / CI RED = BLOCKING.** Any red CI/test status is a blocking failure, **never** a "flake."
+  A red run is **stop-and-fix at the root cause** (precedent: v156 rater race made deterministic, not retried).
+- **INSERT-ONLY.** Add narrowly; never rebuild/restructure/redesign working code or layout.
+- **`[UI-REVIEW]` gate.** ANY change to layout / a view / an overlay / z-index / visual behavior / a core
+  flow → STOP, propose the approach + mockup, get explicit approval **before writing code**.
+- **`[STATE-COVERAGE]` before code.** Map the 4 quadrants — Guest · Authenticated · Interrupted-network ·
+  Empty-data — and add a Playwright test for any uncovered state.
+- **Data-write changes are feature-class ALWAYS** (5-part approval + exact rollback), even fixing a bug.
+- **Ask before:** editing the Cloudflare Worker · changing `firestore.rules` · consuming new quota ·
+  deleting/renaming any file.
+- **The Matrix Gate (no skips), every change:** (1) `node scripts/benchmark.mjs` → **BENCHMARK GREEN**
+  (JS syntax · boot harness "RAN TO COMPLETION" · `<div>` delta 0 · mirror byte-identical · no dup DOM ids ·
+  `on*` audit · 3 version markers in sync · ≤12 Vercel functions · case-exact requires · sitemap ≤50k) →
+  (2) 8 backend suites + `pool:check` + rules emulator (Java/CI) → (3) full Playwright chromium+mobile,
+  all pages × light+dark × in/out × desktop/mobile × orientation, **0 failed / 0 flaky** → (4) founder in-app self-test.
+- **Live post-deploy check.** After every deploy, verify the LIVE url (`ghostproofjob.com`) is the new build
+  (`APP_VERSION`/`build-stamp` == repo) — the local gate can't catch a stale deploy (it happened once).
+- **Honesty over optimism.** No fabricated data (`—` when not real); honest "jump to apply" (auto-apply is
+  impossible); no scraping; every AI action says when it fell back to templates AND when live AI returned.
+- **Full drop-in files** for every changed file — never snippets. **`--workers=2`** Playwright (never raise).
+- **Deploy flow:** `main` auto-deploys to Vercel — **get explicit go-ahead before pushing.** Rollback prefers
+  `git revert <sha>`. `index.html` re-uploads are **drag-and-drop only** (pasting truncates the ~1.5MB file).
+
+---
+
+## 1. ⏰ THE ONLY HARD DEADLINE — Firebase credit clock
+
+- [ ] **E2 · D1 read-cost reduction — MUST land before 2026-09-19 (Firebase Blaze trial credit expiry).**
+  Screenshot 2026-08-27: **$274.43 credit left · 23 days.** After it lapses, usage over the **free tier
+  (50K reads + 20K writes/day)** bills the card. Biggest sink already cut (`job_pools` pool: deck reads
+  ~3,800→~6). **Remaining:** session-cache Browse + company-view reads, cap query sizes, paginate; check
+  reverse-match nightly + Ghosts read volume. Founder budget cap ~ $20 total.
+  **Read-cost audit DONE 2026-08-27 -> `docs/E2-read-cost-audit.md`.** Ranked fixes (read-path only; no `[UI-REVIEW]`; each ships a state-coverage test):
+  - [ ] **E2-1 · Lower live-fallback caps + pool-freshness signal** — removes the surprise-bill tail risk (a stale pool makes every fetch a 3,000-8,000-doc live read). **Do first.**
+  - [ ] **E2-2 · Company view reuses the in-memory pool** instead of `loadCompanyJobs` (<=800 reads/open) — biggest normal-path saver.
+  - [ ] **E2-3 · Session-memoize ghost counters** (`countJobReports`/`countGhostReports` read <=200 docs each; the job counter fires on every card paint).
+  - [ ] **E2-4 · Two-slot session cache + longer TTL** (single slot thrashes on region<->nationwide; 10-min TTL re-reads).
+  - [ ] **E2-5 · Cache the per-fetch internal-jobs query** (`limit(300)` on every `fetchJobs`; minor until the employer side grows).
+- [ ] **Founder step:** screenshot **Firebase console -> Firestore -> Usage** (reads/day + trend) — tells us if we're already under 50K.
+- [ ] **Founder safety net:** set a Firebase **budget alert/cap** (Billing -> Budgets & alerts) so nothing surprises you.
+- [ ] **E2-P · Stale-job PRUNE is fragile / likely not firing** `[BUILD][FEATURE-CLASS: data-delete → needs 5-part approval]`.
+  The harvester HAS a prune (`prune_stale_jobs`, STALE_DAYS=8, deletes by `ingestedAt`), but it only runs on a
+  "verify day" (`cycle_day==7`) AND **not** during STACKING mode — and recent stacking runs (pool build #61) plus
+  the Usage screenshot (**Deletes = 0/7 days**) say it hasn't fired. Design risk: the ~205K-job pool may not be
+  re-scraped within 8 days, so a live job could be wrongly pruned. **Proposed fix (needs founder sign-off + rollback):**
+  run the prune every non-stacking harvest; set STALE_DAYS to safely exceed the real coverage-lap time; consider
+  `active:false` marking before hard-delete. **Founder step:** open the latest Daily Job Harvest run → paste the
+  `cycle_day=… verify=… pruned=…` line (or authorize `gh`) to confirm. Detail: `docs/E2-read-cost-audit.md` context.
+
+---
+
+## 2. NEW — found in the 2026-08-27 live audit (not yet in the roadmap)
+
+- [ ] **🔴 N11 · P0 — Daily Job Harvest is FAILING (jobs going stale).** `[BUILD][INFRA][data-write]`
+  Run #76 (8/25) crashed: `google.api_core.exceptions.InvalidArgument: 400 Invalid database id (default)` at
+  `batch.commit()`; today's run was **cancelled at the 60-min timeout**. Root structure confirmed: `init_firestore`
+  is correct, but the **google dependency stack is UNPINNED** — `firebase-admin==6.5.0` (2024) now auto-pulls
+  `google-cloud-firestore 2.29.0` + `google-api-core 2.34.0`, so the runner's deps drift daily. (The routing-header
+  paren-encoding I first suspected is normal/old — a red herring.) **Cannot confirm transient-vs-persistent from the
+  sandbox** (no backend creds; local Python is 3.14, runner is 3.12). **Plan:** (A) **manual re-run now** (free,
+  definitive) → tells us if it recurs; (B) **pin the google stack** in `requirements.txt` regardless (stops silent
+  drift) — verified by the CI run; (C) **timeout hardening** (a hung commit-retry can't eat 60 min); (D) **failure
+  notification** (see N12). Impact: no fresh jobs since ~8/24 → pool content ages; the app may drift to the live-query
+  read-path (explains reads at 32K). **Consequence for E2-P prune:** even on 8/25's verify-day the prune never ran —
+  the harvest crashed before reaching it.
+- [ ] **N12 · No failure alerting on daily actions.** `[BUILD][INFRA]` Nothing tells the founder (or Claude) when a
+  cron workflow fails — it died quietly for days. **Fix:** add an `if: failure()` step to `job_harvest.yml` (+ the
+  other crons) that emails via the existing **Resend** wiring (and/or opens a GitHub issue) with the failing step +
+  error. Native, no inbox scraping. Optionally a daily pool-freshness health check (builtAt < 36h).
+
+- [ ] **N1 · Wrong company logo = LinkedIn "in" glyph (systemic).** `[UI-REVIEW]` · HIGH-visibility, honesty.
+  On the **swipe card** AND the **Ghosts company list** (both themes), companies sourced from LinkedIn show
+  the LinkedIn logo, because `companyWebsite` = a `linkedin.com/company/...` URL and `_gpjLogoDomain`
+  (index.html ~14985) has **no job-board/aggregator host exclusion**. **Fix:** blocklist linkedin/indeed/
+  glassdoor/ziprecruiter/monster/greenhouse/lever/ashbyhq/myworkdayjobs/icims/google/bing → return `''` →
+  falls to the brand-map → existing **💼 / 🏢 placeholder**. Single-point fix; add a state-coverage test.
+- [ ] **N2 · "98% Match" on every Browse card.** Live-confirmed the tracked over-generous score — Murray/Dow/
+  Conroe/Houston Methodist all read 98% while the relevance chips read 12%/26%/8%. Same-field over-generosity
+  was never tightened (v212/v216 fixed cross-level + messaging only). **Fix:** tighten `computeMatch`/`scoreCore`
+  generosity so a weak in-field fit isn't in the 90s. (This IS the Sprint-B "Match %-honesty" item.)
+- [ ] **N3 · Ghost-page empty-state copy.** `[UI][DECISION]` Replace bare "—" with "a report is logged; a
+  community % appears once there's enough signal"; relabel "hiring near your search" companies that have **zero
+  live roles** when tapped. (Same as the roadmap "Ghost-page intuitiveness pass".)
+- [ ] **N4 · Mobile tap targets < 44px.** `[UI-REVIEW]` Sign In (28px), Support Us (28px), Match to Job (30px),
+  Cover Letter (30px), filter chips (29px) are below the 44px iOS / 48dp Android minimum. Padding-only fix;
+  add a mobile Playwright assertion (primary buttons ≥44px tall).
+- [ ] **N5 · Cross-surface brand-purple mismatch.** App light `--cyber` = `#7C3AED` but Resources pages
+  (`resources/index.html`) use `#7A3CA8`. Unify (folds into F-WORDING/B3).
+- [ ] **N6 · "Resume Optimizer" label appears twice** in Résumé Studio (collapsed header + expanded block reuse
+  the same title). Minor copy/polish.
+- [ ] **N7 · Repo cruft** — delete the stray empty `ran` file and `${OUT}v246_salary_tiles.png` (leaked shell
+  var in a filename) at repo root. (Trivial; "ask before deleting" — confirm.)
+- [ ] **N8 · Automate the live-URL post-deploy smoke** (= E3 below) — the local gate can't catch a stale deploy.
+- [ ] **N9 · Admin Diagnostics — readable Bug & Error report** `[UI-REVIEW][BUILD]` · founder-requested.
+  **🔨 BUILT v247 (2026-08-27) — awaiting deploy + founder test T12.** Benchmark GREEN · 8 backend suites PASS ·
+  N9 state-coverage 4/4 · smoke 12/12 · both-theme visual proof captured. Full Playwright running. Not yet pushed (needs go-ahead).
+  Today the admin panel shows only the 🐞 24h client-error COUNT (`adminLoadErrCount`), and the actual data
+  lives where the founder can't easily read it: `client_errors` docs `{msg,src,line,ua,v,ts}` (admin-read;
+  auto-captured from `window.onerror`/`unhandledrejection`) are only viewable in the **Firebase console**, and
+  user `bugReports` (their text + a 10-line `consoleTrail` + context) are delivered to **support@ghostproofjob.com**
+  (Worker `/contact` always sends to support) and stored in Firestore `bugReports` — see N10 re: the reply-to.
+  **Build:** an admin-only "🔬 Diagnostics" report under the existing admin panel that lists BOTH —
+  (a) **client errors grouped/deduped by `msg|src|line`** with occurrence count, latest time, app version, browser;
+  (b) **user bug reports** (description + console trail + timestamp) — each in plain, readable language, plus a
+  **"Copy report" button** so the founder can paste it straight back here to resolve.
+  **No rules change needed** (both collections are already admin-read). **[FREE-TIER]:** admin-only, manual-trigger,
+  **capped** (e.g. last 100 errors + last 50 reports) → a bounded handful of reads only when opened, never on the
+  candidate hot path — consistent with the existing count-only design. **[STATE-COVERAGE]:** admin (renders) ·
+  non-admin (hidden/denied) · empty (honest "no errors/reports in range") · read-fail (message, never blank).
+- [ ] **N10 · Bug-report reply-to is a dead inbox.** `[BUG]` **🔨 BUILT v247 (folded into N9).** The bug-report send (`index.html:15826`) sets the
+  Worker `/contact` payload `email:'bugs@ghostproofjob.com'` — **`bugs@` is not an active mailbox.** The report
+  itself IS delivered (Worker always sends **to `support@`**; it's also written to Firestore `bugReports`), but
+  `email` becomes the **reply-to**, so replying to a bug-report email bounces. **Fix:** set the reply-to to the
+  **signed-in reporter's email when available, else `support@ghostproofjob.com`** — never the dead `bugs@`.
+  One-line, non-visual, no Worker/rules change. Good to fold into the N9 build.
+
+---
+
+## 3. OPEN WORK BY SPRINT (Sprint A is ✅ complete)
+
+### Sprint B — Trust the Intelligence (verify + harden the core value)
+- [ ] **B1 · Cover-letter / AI quality** (F-AI, F-COVERLETTER) — verify end-to-end now the Worker is redeployed;
+  fix any unfilled phrasing ("the this role position") / forced emphasis; confirm honest fallback labels +
+  per-tier caps. Live-quality is a founder gate (Worker prompt is outside the repo).
+- [ ] **B2 · Rater + ATS-preview** (F-RATER, F-ATSPREVIEW) — confirm the rater reads the WHOLE résumé, scores on
+  the stable 7-day corpus, two honest labelled scores; confirm the ATS preview shows the REAL parsed data
+  (never audited — launch-readiness open Q3).
+- [ ] **B2b · Match %-honesty** (= N2) — tighten same-field generosity; cross-field cap holds.
+- [ ] **B3 · Site-wide wording / pricing consistency sweep** (F-WORDING) — one honest story everywhere (app +
+  static + Resources + checker); folds in N5 brand-purple unify.
+- [ ] **B-misc · Spell-check reachability** — `resumeSpellCheck()` runs only at import; "Improve My Whole Resume"
+  doesn't spell-check and there's no button (feature-audit A3). Decide: wire it into Jett / add a button.
+
+### Sprint C — The Wow Pass (all `[UI-REVIEW]`; C1/C2/C3 shipped)
+- [ ] **C4 · Motion & delight (applicant only)** — swipe spring/touch-drag physics, count-up stats, streak flame,
+  extend Apply/Hired celebrations. Employer side stays calm; respect `prefers-reduced-motion`; never block the core action.
+- [ ] **C5 · Skeleton loaders + mascot empty/first-run states** — cheapest "feels fast + finished"; kill blank flashes.
+- [ ] **C6 · Signed-out home hero + honest social-proof bar** — first thing a new user sees; muted looping demo
+  swipe; aggregate numbers ONLY when real (ties to F-GHOST data).
+
+### Sprint D — Signature Features (3 of 4 already built → VERIFY; D2 is the one build)
+- [ ] **D2 · Full Inbox tab** `[UI-REVIEW]` **[BUILD]** — replace the interim per-message dismiss (v196) with a
+  real inbox (anti-ghosting record + employer + candidate in one place). Founder: important, launch-window.
+- [ ] **D1 · F-GHOST aggregated flag counts** — VERIFY the count aggregates with real volume + the "another hunter
+  reported this" popup surfaces everywhere.
+- [ ] **D3 · 5 résumé templates** — VERIFY each exports cleanly (accent/headshot/spacing/address toggles intact).
+- [ ] **D4 · Broaden-location flow + "other regions" control** — VERIFY the same-state→statewide→other-cities
+  ladder + B-SALARY-CYCLE (client-side salary filter) + B-SARATOGA hard-scope.
+
+### Sprint E — Growth & Cost
+- [ ] **E2 · D1 read-cost reduction** — see §1 (the deadline).
+- [ ] **E3 · F-TEST hardening / signed-in CI + live-URL post-deploy smoke** (= N8) — authed Playwright in CI +
+  a Playwright job against the production URL (home loads, deck fetches, `/smart-match` responds, `APP_VERSION`==HEAD).
+- [x] **E1 · Resources cron GO-LIVE** — ✅ LIVE (v243 go-live; every-other-day publisher). Monitor output.
+
+### Company real-data (cross-cutting)
+- [ ] **Company logo/website from the apply-URL domain** `[BUILD]` — derive the employer domain from a
+  direct-employer "View Full Posting" URL (e.g. `jobs.geisinger.org`→`geisinger.org`) for the logo + a real
+  Website button; exclude aggregator/ATS hosts (shares the N1 blocklist). Fixes Geisinger's missing logo.
+- [ ] **Harvester long-tail logos** — `company_url`→`companyWebsite` (v240) populates as the pool self-heals (~8 days). Verify on a live harvest.
+
+---
+
+## 4. CARRIED-OVER P1/P2 (from the v157 launch-readiness study — de-duplicated)
+
+**Resolved since v157 (verify live, then keep checked):**
+- [x] Node 20→24 (P0-1) — `engines:"24"` + all workflows on 24. ✅
+- [x] Hide Ledger 60-cap (P0-2) — v186 (~5,000 keys, cloud-synced). ✅
+- [x] Matching ignores education/certs (P1-4) — v187. ✅
+- [x] Rater benchmarks wrong role (feat-audit A1) — v156 targets the wanted role. ✅
+- [x] Public résumé checker (P2-3) — shipped `/resume-checker.html` (zero-read, static). ✅
+- [x] Message hide-for-me (P1-6/D6) — v196 per-message dismiss. ✅
+
+**Still open:**
+- [ ] **P1-2 · Reverse match returns nothing** — blocked on the `FIREBASE_SERVICE_ACCOUNT` secret / one run-log
+  line (open since v145). **Founder action.**
+- [ ] **P1-3 / G7 · Digest emails ×3** — approved, unbuilt (cheap now the pool is live).
+- [ ] **P1-7 / F7 · Hire data captured but not surfaced** — do NOT publicly claim hire numbers until an aggregate view exists.
+- [ ] **P2-5 · Offline queue** — an action taken offline may never reach the cloud (unknown/unbuilt).
+- [ ] **P2-6 · "My Data" audit view** — let users see what's stored (unbuilt).
+- [ ] **P2-7 · Backup branch auto-update on green** — the deep backup branch is far behind (intentional fallback); automation approved, unbuilt.
+- [ ] **P2-8 · Speed Insights re-add + guard** — was merged then silently lost in a full-file rewrite.
+- [ ] **P2-10 · Dead files** — `manifest.json` (unreferenced; note `manifest.webmanifest` is the live one) +
+  `frontend/Swipecardquery.js`. **Ask before deleting.**
+- [ ] **SEO (P2-1/P2-2 / G1)** — 312 templated pages "discovered, not indexed" (crawl reality, PARKED, not a bug);
+  duplicate company pages — generator doesn't fold name variants like the app's `_coKey`.
+- [ ] **Dead-code / orphan audit** — `openCardCompanyProfile` (CLAUDE.md §6 landmark, zero callers) +
+  ~9 other unreferenced fns; confirm retired vs. lost.
+
+---
+
+## 5. FOUNDER MANUAL ACTIONS (external consoles — I can't do these; confirm status)
+
+- [x] Deploy latest **Cloudflare Worker** — ✅ done (latest deployed 2026-08-26/27, founder-confirmed).
+- [x] Firestore **point-in-time recovery** — ✅ enabled.
+- [ ] **Confirm `firestore.rules` is deployed** — D1 pool reads it live (tracker says LIVE); confirm the console shows current rules.
+- [ ] **DMARC** TXT record for Resend + confirm **SPF/DKIM** green (P2-9). `_dmarc` TXT: `v=DMARC1; p=none; rua=mailto:support@ghostproofjob.com; fo=1`.
+- [ ] Confirm Worker emails use `support@` (not `noreply@`) — if the latest Worker deploy included it, check this off.
+- [ ] **Branch protection** on `main` (require `verify`) + `stable` (CI-only push, no force).
+- [ ] **Set a Firebase budget alert/cap** (the credit-clock safety net — §1).
+- [ ] Resolve the **Cloudflare vs Vercel DNS** confusion (guidance only — I won't change DNS): decide the domain
+  stays on **Vercel DNS** (avoids moving nameservers to Cloudflare / its paid tiers). The Worker runs on
+  `*.workers.dev` and does NOT need the apex domain.
+- [ ] **`FIREBASE_SERVICE_ACCOUNT` GitHub secret** — set it (unblocks reverse-match P1-2).
+- [ ] **Expand the employer test listing past 26 chars** (P1-5) — so it clears the listing-strength pin gate.
+- [ ] **Walk account creation end-to-end** (signup → profile write → first-run) — never exercised by anyone.
+- [ ] **Confirm the recruiter test-account login** (was timing out).
+
+---
+
+## 6. PARKED DECISIONS (need a founder call)
+
+- [ ] **Button *word* vs *icon* centering** (10px, site-wide) — A: keep icon, pin left · B: drop icon. On hold; remind after Sprint C.
+- [ ] **Ghost-% placement** — v245 hid the card-face tile (kept the drawer one). Reversible in 2 CSS lines if you prefer at-a-glance on the card face.
+- [ ] **N3 Ghost-page decisions** — (a) do flagged companies still surface in your hunt? (b) exact "hiring near your search" relabel/hide rule.
+
+---
+
+## 7. 🧪 MANUAL TEST CHECKLIST — step-by-step (founder runs these)
+
+> Run on a **real device**, **logged in** unless noted, and check **both dark + light** (profile menu → theme toggle)
+> and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
+
+### T0 · Confirm you're on the current build (do this first, every deploy)
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v246**
+  (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
+
+### T1 · In-app Self-Test (the fastest health check — 19+ checks)
+- [ ] Profile chip (top-right "Aaliyah") → **Run Self-Test** → wait for it to finish → **every row green**.
+  Any red = tell me the row name; that's a real failure, not a flake.
+
+### T2 · Company logos (the N1 fix — after we ship it)
+- [ ] **Swipe** a few cards + open **Ghosts** → company logos are either the **real company logo** or the
+  **💼/🏢 placeholder** — **never the blue LinkedIn "in" logo** on a non-LinkedIn company. Check dark + light.
+
+### T3 · Match % honesty (the N2 fix — after we ship it)
+- [ ] **Browse** your list → the green **"Match"** badge is **not 98% on every card**; a weak/out-of-field role
+  reads a believable lower number. Open a strong match and a weak one → the numbers differ sensibly.
+
+### T4 · Ghost-page intuitiveness (the N3 fix — after we ship it)
+- [ ] **Ghosts** → companies with no community data show the honest "**a community % appears once there's enough
+  signal**" line, not a bare "—" with no context. Tap a "hiring near your search" company → it either shows real
+  open roles or is honestly relabeled (no dead "none found" surprise).
+
+### T5 · Mobile tap targets (the N4 fix — after we ship it)
+- [ ] On a **phone**: Sign In, Support Us, **🎯 Match to Job**, **✨ Cover Letter**, and the filter chips are
+  **easy to tap** (comfortably thumb-sized, ~44px tall) — none feel like a thin sliver.
+
+### T6 · Résumé tailoring / AI quality (B1 — needs the Worker deployed, which it is)
+- [ ] **Résumé** → open a real job → **🎯 Match to Job** → the reframe touches **only 2–3 bullets**, reads
+  natural (NOT "marketing" stuffed onto every line), and **never invents** a metric/employer/title. **Send me the PDF.**
+- [ ] **✨ Cover Letter** on the same job → no unfilled phrasing ("the this role position"); it names real strengths;
+  if live AI wasn't reachable it **says so** (honest fallback banner).
+
+### T7 · Rater + ATS preview (B2)
+- [ ] **Résumé** → **Rate My Résumé** → two honest labelled scores (writing quality + role fit); the score doesn't
+  swing wildly between visits. **ATS preview** → what it shows matches your real résumé content (name, titles, skills).
+
+### T8 · 5 template exports (D3)
+- [ ] **Export Template Studio** → try each of the **5 templates** (Classic ATS / Modern Split / Minimal /
+  Corporate Grid / Creative Accent) → each downloads a clean PDF; toggling accent / headshot / spacing / address
+  doesn't break the layout. Check one in dark and one in light.
+
+### T9 · Broaden-location ladder (D4)
+- [ ] **Browse** → the "Show other parts of [State] → / Show all regions →" pill widens **only when you tap it**
+  (never on its own). The "Only jobs with posted salary" toggle **filters in place** (doesn't re-pull random regions).
+
+### T10 · Both-theme + device sweep (every build)
+- [ ] Walk **Swipe · Browse · Résumé · Ghosts · Account** in **dark**, then **light** → colors match the brand
+  (Midnight Plum / Mint / Cyber Purple), text is readable, nothing off-center or clipped. Repeat on **mobile**.
+
+### T11 · Deploy proof (after each deploy)
+- [ ] Re-run **T0** on the live site + re-run **T1 Self-Test** → confirms the deploy is live and healthy, not stale.
+
+### T12 · Admin Diagnostics report (the N9 build — after we ship it)
+- [ ] On your admin account: **Settings → admin panel → 🔬 Diagnostics** → you see a **readable list** of recent
+  client errors (grouped, with counts + which browser + which build) AND user bug reports (their words + console
+  trail) — not just the 🐞 count. Tap **Copy report** → paste it here so I can resolve the specific issues.
+  _Until this ships, view client errors in the Firebase console (`client_errors`) and bug reports in your **support@** inbox or Firestore `bugReports`._
+
+---
+
+## 8. How we work each item (the loop)
+`[UI-REVIEW]` mockup + approval (if visual) → `[STATE-COVERAGE]` matrix + test → INSERT-ONLY build (full files) →
+**full Matrix Gate, no skips** → visual proof (before/after, both themes) → you approve → I push (with your go-ahead)
+→ **live-URL post-deploy check** → update this index + `sprint-roadmap.md` + `BUILD_HISTORY.md`.
+
+_Last updated: 2026-08-27 · against live build v246._

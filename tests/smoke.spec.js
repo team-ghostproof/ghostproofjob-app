@@ -43,6 +43,8 @@ test('core functions still exist (regression guard)', async ({ page }) => {
     'buildLetterText', 'tailorCoverLetter', 'openSavedJobCard', 'openSavedJobs',
     'openSavedCompanies', 'openBrowseExpanded', 'notifOn', 'maybeAlertNewMatches',
     'togglePhoneOnResume',
+    // v247 N9 admin Diagnostics report
+    'adminLoadDiagnostics', 'copyDiagReport',
   ];
   const missing = await page.evaluate(
     (names) => names.filter((n) => typeof window[n] !== 'function'),

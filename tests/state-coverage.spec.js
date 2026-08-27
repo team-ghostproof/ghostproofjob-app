@@ -9423,3 +9423,44 @@ test.describe('[STATE-COVERAGE] v244 employer-from-URL + honest reported list', 
     expect(r.tileShows, 'the tile renders the compact salary').toBe('$60–150K/yr');
   });
 });
+
+/* v247 (N9) — admin Diagnostics report: readable client-errors + bug-reports, admin-only.
+   Q1 guest = the panel is admin-gated (never rendered for a signed-out/candidate session);
+   the render + copy helpers exist and no-op safely when their DOM host is absent. */
+test.describe('[STATE-COVERAGE] v247 N9 admin Diagnostics', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+  });
+
+  test('Q1 guest: Diagnostics is admin-gated — no panel, no output box; helpers exist', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      panel: !!document.getElementById('admin-panel'),
+      diagBox: !!document.getElementById('admin-diag-out'),
+      hasLoad: typeof window.adminLoadDiagnostics === 'function',
+      hasCopy: typeof window.copyDiagReport === 'function',
+      hasList: !!(window.fb && typeof fb.adminListClientErrors === 'function' && typeof fb.adminListBugReports === 'function'),
+    }));
+    expect(r.panel, 'admin panel must NOT render for a guest').toBe(false);
+    expect(r.diagBox, 'Diagnostics output must NOT render for a guest').toBe(false);
+    expect(r.hasLoad, 'adminLoadDiagnostics exists').toBe(true);
+    expect(r.hasCopy, 'copyDiagReport exists').toBe(true);
+    expect(r.hasList, 'fb admin list readers exist').toBe(true);
+  });
+
+  test('Q3/empty: render + copy no-op safely with no DOM host / no loaded report', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let threw = false, toastText = '';
+      const _t = window.showToast; window.showToast = (m) => { toastText = String(m || ''); };
+      try {
+        await window.adminLoadDiagnostics();     // no #admin-diag-out present → must return quietly
+        window._gpjDiagText = '';
+        window.copyDiagReport();                  // nothing loaded → honest prompt, no throw
+      } catch (e) { threw = true; }
+      window.showToast = _t;
+      return { threw, toastText };
+    });
+    expect(r.threw, 'Diagnostics helpers never throw without a host/report').toBe(false);
+    expect(r.toastText, 'copy with nothing loaded prompts to Load first').toMatch(/Load first/i);
+  });
+});

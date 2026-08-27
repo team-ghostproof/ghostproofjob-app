@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-25 · Current live build: **v246**_
+_Last updated: 2026-08-26 · Current live build: **v247**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v247** — N9+N10: admin Diagnostics report (grouped client errors + user bug reports, admin-only on-demand + Copy button); bug-report reply-to fixed to reporter email/support@ (dead bugs@ removed) + APP_VERSION stamped on each report
 - **v246** — v246 (founder: mobile tile text clipping): the Salary/Location snapshot tiles on the job card used white-space:nowrap + ellipsis, so '$60K – $150K / yr' clipped to '…' on narrow phones. Now the tile VALUES wrap to 2 lines + shrink via clamp(11px,3.2vw,13px) to fit every width/platform. Also: worker/worker.js tailoring prompt HARD-CAPPED to reframe AT MOST 2–3 bullets (the v244 tune still over-stuffed 'marketing' onto most bullets) — REQUIRES a Worker redeploy.
 - **v245** — v245 (founder): the swipe job card showed the ghost-risk % TWICE — the A7 card-face tile AND the drawer block below 'View Full Posting'. Kept the drawer one (per founder), hid the card-face ghost tile, and CENTER the single gap button. Reversible (2 CSS rules). Green/Red flag on the card face still conveys risk at a glance.
 - **v244** — v244 (founder live-test fixes): (1) 'Hiring Company' placeholder — recover the real employer from idealtraits.com ATS URLs (/career/Agency-Coach-AI/ → 'Agency Coach AI'). (2) truncation regression — the full-posting fetch only fired when the pool set _clipped; some pool rows carry a preview WITHOUT it, leaving a card stuck on a short summary (ended '…external…'). Now ALSO fetch when the preview LOOKS clipped (ends with an ellipsis or <650 chars) in BOTH the Browse job-card modal AND the swipe drawer — one guarded read per open. (3) 'null%' on the Ghosts 'From you & your hunt' list — ghostRiskFor returns null when there's no computed community % yet; now shows the honest '—' + empty bar (matches every other ghost display). (4) worker/worker.js tailoring prompt tuned to reframe SELECTIVELY (no keyword-stuffing 'marketing/communication' onto every bullet) — REQUIRES a Worker redeploy.

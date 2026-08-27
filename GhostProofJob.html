@@ -79,6 +79,10 @@
       /* v125 (ops): client error telemetry — shape-locked create + admin 24h count */
       logClientError: async (rec)=>{ try{ const u=auth.currentUser; if(!u||!rec) return false; const ref=doc(collection(db,'client_errors')); await setDoc(ref,{msg:String(rec.msg||'').slice(0,200),src:String(rec.src||'').slice(0,120),line:Number(rec.line)||0,ua:String(rec.ua||'').slice(0,80),v:String(rec.v||'').slice(0,12),ts:Date.now()}); return true; }catch(e){ return false; } },
       adminClientErrorCount: async (sinceMs)=>{ try{ const s=await getCountFromServer(query(collection(db,'client_errors'), where('ts','>=',Number(sinceMs)||0))); return s.data().count; }catch(e){ return null; } },
+      /* v247 (N9): admin-only, on-demand reads of the actual telemetry (both collections are admin-read).
+         Bounded caps so a "Load" tap costs a handful of reads, never the candidate path. */
+      adminListClientErrors: async (sinceMs,cap)=>{ try{ const L=Math.min(cap||100,200); let s; try{ s=await getDocs(query(collection(db,'client_errors'), where('ts','>=',Number(sinceMs)||0), orderBy('ts','desc'), limit(L))); }catch(_e){ s=await getDocs(query(collection(db,'client_errors'), where('ts','>=',Number(sinceMs)||0), limit(L))); } const out=[]; s.forEach(d=>out.push(d.data())); out.sort((a,b)=>(b.ts||0)-(a.ts||0)); return out; }catch(e){ return null; } },
+      adminListBugReports: async (cap)=>{ try{ const L=Math.min(cap||50,100); let s; try{ s=await getDocs(query(collection(db,'bugReports'), orderBy('when','desc'), limit(L))); }catch(_e){ s=await getDocs(query(collection(db,'bugReports'), limit(L))); } const out=[]; s.forEach(d=>out.push(Object.assign({id:d.id},d.data()))); out.sort((a,b)=>(b.when||0)-(a.when||0)); return out; }catch(e){ return null; } },
       /* v126: admin insights — surface the data we capture but never showed.
          count() aggregations only (one cheap read per number, on demand). */
       adminHireCounts: async ()=>{ try{
@@ -3267,7 +3271,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v246</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v247</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -12765,6 +12769,47 @@ async function adminLoadErrCount(){
     el.style.color=n?'var(--danger)':'var(--mint)';
   }catch(e){}
 }
+/* v247 (N9): admin Diagnostics — a readable, copyable report of client errors (grouped by
+   msg|src|line) + user bug reports. Admin-only + on-demand (both collections are admin-read);
+   bounded reads (≤100 errors + ≤50 reports) only when Load is tapped — never a candidate path. */
+window._gpjDiagText='';
+async function adminLoadDiagnostics(){
+  const box=document.getElementById('admin-diag-out'); if(!box) return;
+  box.style.display='block'; box.textContent='Loading…';
+  const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const ago=ms=>{ const d=Math.max(0,Date.now()-(+ms||0)); const m=Math.floor(d/60000); if(m<60) return m+'m ago'; const h=Math.floor(m/60); if(h<48) return h+'h ago'; return Math.floor(h/24)+'d ago'; };
+  const shortUA=u=>{ u=String(u||''); if(/iphone|ipad/i.test(u)) return /crios/i.test(u)?'Chrome iOS':'Safari iOS'; if(/android/i.test(u)) return 'Android'; if(/edg/i.test(u)) return 'Edge'; if(/chrome/i.test(u)) return 'Chrome'; if(/firefox/i.test(u)) return 'Firefox'; if(/safari/i.test(u)) return 'Safari'; return u.slice(0,24)||'?'; };
+  let errs=null, bugs=null;
+  try{ errs=(window.fb&&fb.adminListClientErrors)?await fb.adminListClientErrors(Date.now()-7*86400000,100):null; }catch(e){}
+  try{ bugs=(window.fb&&fb.adminListBugReports)?await fb.adminListBugReports(50):null; }catch(e){}
+  if(errs==null && bugs==null){ box.textContent='Could not load diagnostics (permission or network). Try again.'; return; }
+  const g={};
+  (errs||[]).forEach(e=>{ const k=(e.msg||'')+'|'+(e.src||'')+'|'+(e.line||0); if(!g[k]) g[k]={msg:e.msg,src:e.src,line:e.line,v:e.v,ua:e.ua,n:0,latest:0}; g[k].n++; if((e.ts||0)>=g[k].latest){ g[k].latest=e.ts; g[k].v=e.v; g[k].ua=e.ua; } });
+  const gArr=Object.values(g).sort((a,b)=>(b.latest||0)-(a.latest||0));
+  let html='', txt='=== GhostProofJob Diagnostics · '+new Date().toISOString()+' ===\n\n';
+  html+='<div style="font-weight:700;color:var(--mint);margin-bottom:4px;">Client errors · last 7d ('+(errs?errs.length:'—')+' events · '+gArr.length+' unique)</div>';
+  txt+='CLIENT ERRORS (last 7d · '+(errs?errs.length:'—')+' events · '+gArr.length+' unique):\n';
+  if(!gArr.length){ html+='<div style="color:var(--muted);">No client errors in range. 🎉</div>'; txt+='  (none)\n'; }
+  gArr.forEach(e=>{
+    html+='<div style="margin:4px 0;padding-bottom:4px;border-bottom:1px solid var(--plum4);"><span style="color:var(--danger);font-weight:600;">'+esc(e.msg||'(no message)')+'</span> <span style="color:var(--muted);">×'+e.n+' · '+ago(e.latest)+'</span><br><span style="color:var(--muted);font-size:10px;">'+esc(e.src||'?')+':'+(e.line||0)+' · '+esc(e.v||'?')+' · '+esc(shortUA(e.ua))+'</span></div>';
+    txt+='  • '+(e.msg||'(no message)')+'  ×'+e.n+' · '+ago(e.latest)+'\n      '+(e.src||'?')+':'+(e.line||0)+' · '+(e.v||'?')+' · '+shortUA(e.ua)+'\n';
+  });
+  html+='<div style="font-weight:700;color:var(--cyber);margin:10px 0 4px;">User bug reports ('+(bugs?bugs.length:'—')+')</div>';
+  txt+='\nUSER BUG REPORTS ('+(bugs?bugs.length:'—')+'):\n';
+  if(!bugs||!bugs.length){ html+='<div style="color:var(--muted);">No bug reports.</div>'; txt+='  (none)\n'; }
+  (bugs||[]).forEach(b=>{
+    const con=(b.console&&b.console.length)?b.console.join(' | '):'';
+    html+='<div style="margin:4px 0;padding-bottom:4px;border-bottom:1px solid var(--plum4);"><span style="color:var(--off);">“'+esc(b.text||'')+'”</span> <span style="color:var(--muted);">'+ago(b.when)+' · '+esc(b.v||'?')+' · '+esc(shortUA(b.ua))+'</span>'+(con?('<br><span style="color:var(--muted);font-size:10px;">console: '+esc(con)+'</span>'):'')+'</div>';
+    txt+='  • "'+(b.text||'')+'"  '+ago(b.when)+' · '+(b.v||'?')+' · '+shortUA(b.ua)+'\n'+(con?('      console: '+con+'\n'):'');
+  });
+  box.innerHTML=html;
+  window._gpjDiagText=txt;
+}
+function copyDiagReport(){
+  const t=window._gpjDiagText||''; if(!t){ showToast('Tap ↻ Load first'); return; }
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(function(){showToast('📋 Diagnostics copied');},function(){_gpjCopyDiagFallback(t);}); } else { _gpjCopyDiagFallback(t); } }catch(e){ _gpjCopyDiagFallback(t); }
+}
+function _gpjCopyDiagFallback(t){ try{ const ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); showToast('📋 Diagnostics copied'); }catch(e){ showToast('Copy failed — select the text manually'); } }
 /* one builder for the admin device-stats line — render + live refresh agree */
 function _gpjAdminDeviceLine(){
   return 'This device — Applied: <strong style="color:var(--mint);">'+lists.applied.length+'</strong> · Skipped: <strong style="color:var(--warn);">'+(lists.skipped||[]).length+'</strong> · Responses: <strong style="color:var(--cyber);">'+(lists.responses||[]).length+'</strong> · Letters today: <strong>'+clUsed()+'</strong> · Tier: <strong>'+userTier()+'</strong>';
@@ -15185,8 +15230,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v246';
+const APP_VERSION = 'v247';
 const CHANGELOG = {
+  'v247':['N9+N10: admin Diagnostics report (grouped client errors + user bug reports, admin-only on-demand + Copy button); bug-report reply-to fixed to reporter email/support@ (dead bugs@ removed) + APP_VERSION stamped on each report'],
   'v246':['v246 (founder: mobile tile text clipping): the Salary/Location snapshot tiles on the job card used white-space:nowrap + ellipsis, so \'$60K – $150K / yr\' clipped to \'…\' on narrow phones. Now the tile VALUES wrap to 2 lines + shrink via clamp(11px,3.2vw,13px) to fit every width/platform. Also: worker/worker.js tailoring prompt HARD-CAPPED to reframe AT MOST 2–3 bullets (the v244 tune still over-stuffed \'marketing\' onto most bullets) — REQUIRES a Worker redeploy.'],
   'v245':['v245 (founder): the swipe job card showed the ghost-risk % TWICE — the A7 card-face tile AND the drawer block below \'View Full Posting\'. Kept the drawer one (per founder), hid the card-face ghost tile, and CENTER the single gap button. Reversible (2 CSS rules). Green/Red flag on the card face still conveys risk at a glance.'],
   'v244':['v244 (founder live-test fixes): (1) \'Hiring Company\' placeholder — recover the real employer from idealtraits.com ATS URLs (/career/Agency-Coach-AI/ → \'Agency Coach AI\'). (2) truncation regression — the full-posting fetch only fired when the pool set _clipped; some pool rows carry a preview WITHOUT it, leaving a card stuck on a short summary (ended \'…external…\'). Now ALSO fetch when the preview LOOKS clipped (ends with an ellipsis or <650 chars) in BOTH the Browse job-card modal AND the swipe drawer — one guarded read per open. (3) \'null%\' on the Ghosts \'From you & your hunt\' list — ghostRiskFor returns null when there\'s no computed community % yet; now shows the honest \'—\' + empty bar (matches every other ghost display). (4) worker/worker.js tailoring prompt tuned to reframe SELECTIVELY (no keyword-stuffing \'marketing/communication\' onto every bullet) — REQUIRES a Worker redeploy.'],
@@ -15814,7 +15860,8 @@ async function submitBug(){
     ua:navigator.userAgent.slice(0,160),
     uid:(window.fb&&fb.current()&&fb.current().uid)||'anonymous',
     console:consoleTrail.slice(-6),
-    when:Date.now()
+    when:Date.now(),
+    v:(typeof APP_VERSION!=='undefined'?APP_VERSION:'')   /* v247 (N9): stamp the build so Diagnostics shows which version the bug hit */
   };
   /* bugReports collection (admin-readable per your rules) + Worker email backup */
   let saved=false;
@@ -15822,8 +15869,11 @@ async function submitBug(){
     try{ const r=await fb.fileBugReport(report); if(r&&r.ok) saved=true; }catch(e){}
   }
   if(WORKER_URL){
+    /* N10 (v247): reply-to must be a LIVE inbox — the reporter's email when signed in, else support@
+       (never the dead bugs@). The Worker /contact always DELIVERS to support@; this only sets reply_to. */
+    const _rEmail=(window.fb&&fb.current&&fb.current()&&fb.current().email)||'support@ghostproofjob.com';
     try{ await fetch(WORKER_URL.replace(/\/$/,'')+'/contact',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name:'Bug Report',email:'bugs@ghostproofjob.com',message:JSON.stringify(report,null,1).slice(0,2500)})}); saved=true; }catch(e){}
+      body:JSON.stringify({name:'Bug Report',email:_rEmail,message:JSON.stringify(report,null,1).slice(0,2500)})}); saved=true; }catch(e){}
   }
   document.getElementById('bug-modal').classList.remove('open');
   document.getElementById('bug-text').value='';
@@ -17815,6 +17865,9 @@ function renderAdminPanel(){
     '<div class="pref-row" style="flex-direction:column;align-items:stretch;gap:8px;">'+
     '<div style="font-size:12px;line-height:1.8;" id="admin-device-stats">'+_gpjAdminDeviceLine()+'</div>'+
     '<div style="font-size:12px;margin-top:4px;">🐞 Client errors (24h): <strong id="admin-err-count" style="color:var(--muted);">—</strong> <span class="buzz-add" onclick="adminLoadErrCount()" style="font-size:10px;padding:2px 8px;">↻ check</span></div>'+
+    /* v247 (N9): readable Diagnostics — grouped client errors + user bug reports, admin-only, on-demand */
+    '<div style="display:flex;align-items:center;gap:8px;font-size:12px;background:var(--plum3);border:1px solid var(--plum4);border-radius:8px;padding:8px 10px;">🔬 Diagnostics <span style="color:var(--muted);font-size:10px;">(errors + bug reports)</span><div class="buzz-add" style="margin-left:auto;" onclick="adminLoadDiagnostics()">↻ Load</div><div class="buzz-add" onclick="copyDiagReport()">📋 Copy</div></div>'+
+    '<div id="admin-diag-out" style="display:none;font-size:11px;line-height:1.5;background:var(--plum2);border:1px solid var(--plum4);border-radius:8px;padding:10px;max-height:340px;overflow:auto;"></div>'+
     '<div style="font-size:12px;margin-top:4px;">💚 Verified hires: <strong id="admin-hire-count" style="color:var(--muted);">—</strong> <span class="buzz-add" onclick="adminLoadInsights()" style="font-size:10px;padding:2px 8px;">↻ check</span></div>'+
     '<div id="admin-heard-line" style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.6;"></div>'+
     '<div style="display:flex;align-items:center;gap:8px;font-size:12px;background:var(--plum3);border:1px solid var(--plum4);border-radius:8px;padding:8px 10px;">📊 Jobs in system: <strong id="admin-job-count" style="color:var(--mint);">tap refresh →</strong><div class="buzz-add" style="margin-left:auto;" onclick="refreshJobCount(this)">↻ Count</div></div>'+
