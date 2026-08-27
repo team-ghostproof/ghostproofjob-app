@@ -69,7 +69,8 @@
   the 2026-08-27 manual re-run **succeeded**, and I **pinned the Firestore write stack** (`requirements.txt`:
   firestore 2.29.0 / api-core 2.34.0 / grpcio 1.83.0 / protobuf 7.36.0 / auth 2.57.0 …) to the exact working set so
   a transitive bump can never silently break writes again. Takes effect next harvest (or trigger a manual run to confirm).
-- [ ] **N13 · Circular company/job logo + one consistent default** `[UI-REVIEW]` (founder-requested; bundle with N1).
+- [x] **N13 · Circular company/job logo + unified 💼 default** ✅ **SHIPPED v249 (live).** All logos circular; one default (💼).
+- [ ] ~~N13 (orig)~~ `[UI-REVIEW]` (founder-requested; bundled with N1).
   Make all company/job logos **circular**; use **one** consistent no-logo default (today it's inconsistent: 💼 job card /
   🏢 company / 🧑 person). Founder to pick the default: **(A)** ghost 👻 in a circle · **(B)** brand-gradient monogram ·
   **(C)** 🏢. Build together with N1 (aggregator-host blocklist) so wrong logos fall back to the chosen circular default.
@@ -95,7 +96,7 @@
   other crons) that emails via the existing **Resend** wiring (and/or opens a GitHub issue) with the failing step +
   error. Native, no inbox scraping. Optionally a daily pool-freshness health check (builtAt < 36h).
 
-- [ ] **N1 · Wrong company logo = LinkedIn "in" glyph (systemic).** `[UI-REVIEW]` · HIGH-visibility, honesty.
+- [x] **N1 · Wrong company logo (LinkedIn/Indeed glyph) — FIXED.** ✅ **SHIPPED v249 (live).** `_gpjLogoDomain` now blocks job-board/aggregator/ATS/social hosts → wrong-brand icons fall back to the default. `[UI-REVIEW]` · HIGH-visibility, honesty.
   On the **swipe card** AND the **Ghosts company list** (both themes), companies sourced from LinkedIn show
   the LinkedIn logo, because `companyWebsite` = a `linkedin.com/company/...` URL and `_gpjLogoDomain`
   (index.html ~14985) has **no job-board/aggregator host exclusion**. **Fix:** blocklist linkedin/indeed/
