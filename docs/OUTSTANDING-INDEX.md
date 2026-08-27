@@ -48,11 +48,18 @@
   - [x] **E2-1 · Live-fallback caps → 1,500 · ✅ SHIPPED v248 (live)** (freshness ADMIN indicator deferred = [UI-REVIEW]) — removes the surprise-bill tail risk (a stale pool makes every fetch a 3,000-8,000-doc live read). **Do first.**
   - [x] **E2-2 · Company view read cost** ✅ **NO BUILD NEEDED — audit corrected 2026-08-27.** The company view already uses the pool-cached `fetchJobs`; the "≤800 reads" I flagged was actually `fb.mineHires` (rater path, reads the small `hired` collection, self-limiting). Residual cache-thrash on company-view open folds into **E2-4** below.
   - [ ] **E2-3 · Session-memoize ghost counters** (`countJobReports`/`countGhostReports` read <=200 docs each; the job counter fires on every card paint).
-  - [ ] **E2-4 · Two-slot session cache + longer TTL** (single slot thrashes on region<->nationwide; 10-min TTL re-reads).
+  - [x] **E2-4 · Two-slot session cache + 30-min TTL** ✅ **SHIPPED v251 (live)** (region + nationwide both cached on roomy devices; low-mem keeps 1 slot per the v139 OOM fix).
   - [ ] **E2-5 · Cache the per-fetch internal-jobs query** (`limit(300)` on every `fetchJobs`; minor until the employer side grows).
 - [ ] **Founder step:** screenshot **Firebase console -> Firestore -> Usage** (reads/day + trend) — tells us if we're already under 50K.
 - [ ] **Founder safety net:** set a Firebase **budget alert/cap** (Billing -> Budgets & alerts) so nothing surprises you.
-- [ ] **E2-P · Stale-job PRUNE is fragile / likely not firing** `[BUILD][FEATURE-CLASS: data-delete → needs 5-part approval]`.
+- [x] **E2-P · Stale-job PRUNE — FIXED (founder-approved).** ✅ **SHIPPED (harvester; effective next 05:00 UTC run).**
+  Now runs on EVERY normal (non-stacking) harvest (was a ~never-hit "verify day"); queries ONLY stale docs
+  (`ingestedAt < cutoff`, fail-safe — any error → 0 deletes, never touches fresh jobs); STALE_DAYS default 8→**14**
+  (wide margin so a live job merely missing from a rotation window isn't pruned; wrongly-pruned live jobs also
+  self-heal — re-harvested next cycle). **⚠️ Founder: check the next harvest log's `PRUNED N stale jobs` line is
+  sane. Rollback: `git revert` the harvester commit.** _(5-part: what=run-every-run + cutoff-query + 14d; impact=dead
+  listings finally clear; states=healthy/error(no-op)/stacking(skip); failure=fail-safe no-op; rollback=git revert.)_
+- [ ] ~~E2-P (orig)~~ `[BUILD][FEATURE-CLASS: data-delete]`.
   The harvester HAS a prune (`prune_stale_jobs`, STALE_DAYS=8, deletes by `ingestedAt`), but it only runs on a
   "verify day" (`cycle_day==7`) AND **not** during STACKING mode — and recent stacking runs (pool build #61) plus
   the Usage screenshot (**Deletes = 0/7 days**) say it hasn't fired. Design risk: the ~205K-job pool may not be

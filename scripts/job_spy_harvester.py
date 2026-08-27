@@ -648,26 +648,32 @@ def harvest_one(db, country, region, location, role):
 
 
 def prune_stale_jobs(db, max_delete, stale_days):
-    from google.cloud import firestore as _fs
+    # E2-P (v251): delete jobs whose ingestedAt is older than the cutoff — i.e. jobs that
+    # DROPPED OFF their source and stopped being re-harvested (a job still live is re-scraped
+    # each run, refreshing its ingestedAt). We query ONLY the stale docs (ingestedAt < cutoff)
+    # instead of reading the oldest N and filtering client-side: cheaper, and it can never
+    # touch fresh jobs. FAIL-SAFE: any query/index error is caught → returns 0 (no deletes)
+    # rather than risk a wrong delete. STALE_DAYS carries a WIDE margin (default 14d) so a
+    # live job that merely wasn't in a recent rotation window is NOT pruned.
+    try:
+        from google.cloud.firestore_v1.base_query import FieldFilter
+    except Exception:
+        FieldFilter = None
     col = db.collection("jobs")
-    cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=stale_days)
+    cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=stale_days)
     removed = 0
     try:
-        q = col.order_by("ingestedAt", direction=_fs.Query.ASCENDING).limit(max_delete)
+        if FieldFilter is not None:
+            q = col.where(filter=FieldFilter("ingestedAt", "<", cutoff)).limit(max_delete)
+        else:
+            q = col.where("ingestedAt", "<", cutoff).limit(max_delete)
         docs = list(q.stream())
         batch = db.batch(); pending = 0
         for d in docs:
-            data = d.to_dict() or {}
-            ing = data.get("ingestedAt")
-            try:
-                ing_dt = ing if isinstance(ing, datetime.datetime) else ing.replace(tzinfo=None)
-            except Exception:
-                continue
-            if ing_dt and ing_dt < cutoff:
-                batch.delete(d.reference); removed += 1; pending += 1
-                if pending % 450 == 0:
-                    batch.commit(); batch = db.batch()
-        if pending % 450 != 0:
+            batch.delete(d.reference); removed += 1; pending += 1
+            if pending % 450 == 0:
+                batch.commit(); batch = db.batch()
+        if pending > 0 and pending % 450 != 0:
             batch.commit()
     except Exception as e:
         print("prune skipped (index/permission?):", e, file=sys.stderr)
@@ -816,9 +822,13 @@ def main():
                 total += n
 
     removed = 0
-    if is_verify_day:
+    # E2-P (v251): prune on EVERY normal (non-stacking) run — not just the once-a-week
+    # "verify day". The old (cycle_day==7 AND not stacking) gate meant it effectively never
+    # ran (and on 8/25 the harvest crashed before reaching it), so dead listings piled up.
+    # Stacking runs still SKIP pruning (they deliberately flood the DB).
+    if not stacking:
         max_delete = int(os.environ.get("MAX_PRUNE_PER_RUN", "10000"))
-        stale_days = int(os.environ.get("STALE_DAYS", "8"))
+        stale_days = int(os.environ.get("STALE_DAYS", "14"))
         print("PRUNING stale jobs older than {} days (cap {})…".format(stale_days, max_delete))
         removed = prune_stale_jobs(db, max_delete, stale_days)
         print("PRUNED {} stale jobs".format(removed))
