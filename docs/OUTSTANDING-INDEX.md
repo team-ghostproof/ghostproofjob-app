@@ -65,7 +65,20 @@
 
 ## 2. NEW — found in the 2026-08-27 live audit (not yet in the roadmap)
 
-- [ ] **🔴 N11 · P0 — Daily Job Harvest is FAILING (jobs going stale).** `[BUILD][INFRA][data-write]`
+- [x] **N11 · Harvest was failing → RESOLVED.** ✅ 8/25 was a transient Google-side blip (`400 Invalid database id`);
+  the 2026-08-27 manual re-run **succeeded**, and I **pinned the Firestore write stack** (`requirements.txt`:
+  firestore 2.29.0 / api-core 2.34.0 / grpcio 1.83.0 / protobuf 7.36.0 / auth 2.57.0 …) to the exact working set so
+  a transitive bump can never silently break writes again. Takes effect next harvest (or trigger a manual run to confirm).
+- [ ] **N13 · Circular company/job logo + one consistent default** `[UI-REVIEW]` (founder-requested; bundle with N1).
+  Make all company/job logos **circular**; use **one** consistent no-logo default (today it's inconsistent: 💼 job card /
+  🏢 company / 🧑 person). Founder to pick the default: **(A)** ghost 👻 in a circle · **(B)** brand-gradient monogram ·
+  **(C)** 🏢. Build together with N1 (aggregator-host blocklist) so wrong logos fall back to the chosen circular default.
+- [ ] **N14 · `www.ghostproofjob.com` does not redirect to the apex** `[FOUNDER/INFRA]` (found via the N9 Diagnostics tool).
+  www returns 200 as a **separate origin** → its own Service Worker + cache, so www users can lag on an old build (a v239
+  SW-update error showed up there) + an SEO duplicate signal. Fix: **Vercel → Domains → set `ghostproofjob.com` primary**
+  (auto-redirects www), or a `vercel.json` www→apex 301. The clustered apex SW-update errors are benign (update-check
+  blips during the v247→v248 rollout; `sw.js` serves 200 correctly).
+- [ ] ~~**🔴 N11 · P0 — Daily Job Harvest is FAILING (jobs going stale).**~~ `[BUILD][INFRA][data-write]`
   Run #76 (8/25) crashed: `google.api_core.exceptions.InvalidArgument: 400 Invalid database id (default)` at
   `batch.commit()`; today's run was **cancelled at the 60-min timeout**. Root structure confirmed: `init_firestore`
   is correct, but the **google dependency stack is UNPINNED** — `firebase-admin==6.5.0` (2024) now auto-pulls
