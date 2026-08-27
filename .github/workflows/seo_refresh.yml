@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  issues: write          # N12: failure alert opens/comments a workflow-failure issue
 
 jobs:
   seo:
@@ -38,3 +39,17 @@ jobs:
             git commit -m "chore(seo): weekly refresh of city + company pages from live data"
             git push
           fi
+      # N12 (founder-approved): alert on a silent cron failure via a workflow-failure issue.
+      - name: Alert on failure (N12)
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const wf = context.workflow;
+            const url = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const title = `🔴 ${wf} FAILED`;
+            const body = `🔴 **${wf}** failed.\n\n**Run:** ${url}\n**When:** ${new Date().toISOString()}\n\nOpen the run log for the failing step + error.`;
+            const found = await github.rest.issues.listForRepo({ owner: context.repo.owner, repo: context.repo.repo, state: 'open', labels: 'workflow-failure', per_page: 30 });
+            const hit = found.data.find(i => i.title === title);
+            if (hit) await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: hit.number, body });
+            else await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body, labels: ['workflow-failure'] });
