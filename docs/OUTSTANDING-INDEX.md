@@ -45,8 +45,8 @@
   ~3,800→~6). **Remaining:** session-cache Browse + company-view reads, cap query sizes, paginate; check
   reverse-match nightly + Ghosts read volume. Founder budget cap ~ $20 total.
   **Read-cost audit DONE 2026-08-27 -> `docs/E2-read-cost-audit.md`.** Ranked fixes (read-path only; no `[UI-REVIEW]`; each ships a state-coverage test):
-  - [ ] **E2-1 · Lower live-fallback caps + pool-freshness signal** — removes the surprise-bill tail risk (a stale pool makes every fetch a 3,000-8,000-doc live read). **Do first.**
-  - [ ] **E2-2 · Company view reuses the in-memory pool** instead of `loadCompanyJobs` (<=800 reads/open) — biggest normal-path saver.
+  - [x] **E2-1 · Live-fallback caps → 1,500 · ✅ SHIPPED v248 (live)** (freshness ADMIN indicator deferred = [UI-REVIEW]) — removes the surprise-bill tail risk (a stale pool makes every fetch a 3,000-8,000-doc live read). **Do first.**
+  - [ ] **E2-2 · Company view reuses the in-memory pool** ⏸ **deferred to v249 (careful data-path build)** — instead of `loadCompanyJobs` (<=800 reads/open) — biggest normal-path saver.
   - [ ] **E2-3 · Session-memoize ghost counters** (`countJobReports`/`countGhostReports` read <=200 docs each; the job counter fires on every card paint).
   - [ ] **E2-4 · Two-slot session cache + longer TTL** (single slot thrashes on region<->nationwide; 10-min TTL re-reads).
   - [ ] **E2-5 · Cache the per-fetch internal-jobs query** (`limit(300)` on every `fetchJobs`; minor until the employer side grows).
@@ -77,7 +77,7 @@
   notification** (see N12). Impact: no fresh jobs since ~8/24 → pool content ages; the app may drift to the live-query
   read-path (explains reads at 32K). **Consequence for E2-P prune:** even on 8/25's verify-day the prune never ran —
   the harvest crashed before reaching it.
-- [ ] **N12 · No failure alerting on daily actions.** `[BUILD][INFRA]` Nothing tells the founder (or Claude) when a
+- [x] **N12 · Failure alerting on the daily harvest.** `[BUILD][INFRA]` **✅ SHIPPED (job_harvest.yml `if: failure()` → opens/comments a `harvest-failure` GitHub issue; GitHub emails you).** Caveat: a step-crash triggers it; a job TIMEOUT/cancel does not (GitHub's native run-failure email covers that) — a scheduled **watchdog** workflow is the fuller follow-up (proposed). **Extended to the reverse-match / SEO / resources crons (v248 batch).** Original: nothing told the founder (or Claude) when a
   cron workflow fails — it died quietly for days. **Fix:** add an `if: failure()` step to `job_harvest.yml` (+ the
   other crons) that emails via the existing **Resend** wiring (and/or opens a GitHub issue) with the failing step +
   error. Native, no inbox scraping. Optionally a daily pool-freshness health check (builtAt < 36h).
@@ -98,16 +98,16 @@
 - [ ] **N4 · Mobile tap targets < 44px.** `[UI-REVIEW]` Sign In (28px), Support Us (28px), Match to Job (30px),
   Cover Letter (30px), filter chips (29px) are below the 44px iOS / 48dp Android minimum. Padding-only fix;
   add a mobile Playwright assertion (primary buttons ≥44px tall).
-- [ ] **N5 · Cross-surface brand-purple mismatch.** App light `--cyber` = `#7C3AED` but Resources pages
+- [x] **N5 · Cross-surface brand-purple mismatch.** ✅ SHIPPED v248 — App light `--cyber` = `#7C3AED` but Resources pages
   (`resources/index.html`) use `#7A3CA8`. Unify (folds into F-WORDING/B3).
-- [ ] **N6 · "Resume Optimizer" label appears twice** in Résumé Studio (collapsed header + expanded block reuse
+- [x] **N6 · "Resume Optimizer" label appears twice** ✅ SHIPPED v248 — in Résumé Studio (collapsed header + expanded block reuse
   the same title). Minor copy/polish.
-- [ ] **N7 · Repo cruft** — delete the stray empty `ran` file and `${OUT}v246_salary_tiles.png` (leaked shell
+- [x] **N7 · Repo cruft** ✅ DONE (removed v248) — deleted the stray empty `ran` file and `${OUT}v246_salary_tiles.png` (leaked shell
   var in a filename) at repo root. (Trivial; "ask before deleting" — confirm.)
 - [ ] **N8 · Automate the live-URL post-deploy smoke** (= E3 below) — the local gate can't catch a stale deploy.
-- [ ] **N9 · Admin Diagnostics — readable Bug & Error report** `[UI-REVIEW][BUILD]` · founder-requested.
-  **🔨 BUILT v247 (2026-08-27) — awaiting deploy + founder test T12.** Benchmark GREEN · 8 backend suites PASS ·
-  N9 state-coverage 4/4 · smoke 12/12 · both-theme visual proof captured. Full Playwright running. Not yet pushed (needs go-ahead).
+- [x] **N9 · Admin Diagnostics — readable Bug & Error report** `[UI-REVIEW][BUILD]` · founder-requested.
+  **✅ SHIPPED v247 (2026-08-27) · live-verified.** Benchmark GREEN · 8 backend suites · Playwright **866/0/0** ·
+  both-theme visual proof. Deployed to production (ghostproofjob.com == v247). **Founder: run test T12 on your admin account.**
   Today the admin panel shows only the 🐞 24h client-error COUNT (`adminLoadErrCount`), and the actual data
   lives where the founder can't easily read it: `client_errors` docs `{msg,src,line,ua,v,ts}` (admin-read;
   auto-captured from `window.onerror`/`unhandledrejection`) are only viewable in the **Firebase console**, and
@@ -121,7 +121,7 @@
   **capped** (e.g. last 100 errors + last 50 reports) → a bounded handful of reads only when opened, never on the
   candidate hot path — consistent with the existing count-only design. **[STATE-COVERAGE]:** admin (renders) ·
   non-admin (hidden/denied) · empty (honest "no errors/reports in range") · read-fail (message, never blank).
-- [ ] **N10 · Bug-report reply-to is a dead inbox.** `[BUG]` **🔨 BUILT v247 (folded into N9).** The bug-report send (`index.html:15826`) sets the
+- [x] **N10 · Bug-report reply-to is a dead inbox.** `[BUG]` **✅ SHIPPED v247 (live).** The bug-report send (`index.html:15826`) set the
   Worker `/contact` payload `email:'bugs@ghostproofjob.com'` — **`bugs@` is not an active mailbox.** The report
   itself IS delivered (Worker always sends **to `support@`**; it's also written to Firestore `bugReports`), but
   `email` becomes the **reply-to**, so replying to a bug-report email bounces. **Fix:** set the reply-to to the
