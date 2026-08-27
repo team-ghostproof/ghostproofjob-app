@@ -102,7 +102,7 @@
   (index.html ~14985) has **no job-board/aggregator host exclusion**. **Fix:** blocklist linkedin/indeed/
   glassdoor/ziprecruiter/monster/greenhouse/lever/ashbyhq/myworkdayjobs/icims/google/bing → return `''` →
   falls to the brand-map → existing **💼 / 🏢 placeholder**. Single-point fix; add a state-coverage test.
-- [ ] **N2 · "98% Match" on every Browse card.** Live-confirmed the tracked over-generous score — Murray/Dow/
+- [x] **N2 · "98% Match" on every card — FIXED.** ✅ **SHIPPED v250 (live).** De-saturated `_gpjScoreMatch`/`scoreCore.js` into capped IN-FIELD (~68) + DEPTH (~28) components; new spread strong 96 / exact-thin 83 / partial 41 / out 22. **Founder: live-verify the new % distribution on your deck (caps are tunable).** Original: over-generous score — Murray/Dow/
   Conroe/Houston Methodist all read 98% while the relevance chips read 12%/26%/8%. Same-field over-generosity
   was never tightened (v212/v216 fixed cross-level + messaging only). **Fix:** tighten `computeMatch`/`scoreCore`
   generosity so a weak in-field fit isn't in the 90s. (This IS the Sprint-B "Match %-honesty" item.)
@@ -153,7 +153,7 @@
 - [ ] **B2 · Rater + ATS-preview** (F-RATER, F-ATSPREVIEW) — confirm the rater reads the WHOLE résumé, scores on
   the stable 7-day corpus, two honest labelled scores; confirm the ATS preview shows the REAL parsed data
   (never audited — launch-readiness open Q3).
-- [ ] **B2b · Match %-honesty** (= N2) — tighten same-field generosity; cross-field cap holds.
+- [x] **B2b · Match %-honesty** (= N2) — ✅ SHIPPED v250; awaiting founder live-verification of the new distribution.
 - [ ] **B3 · Site-wide wording / pricing consistency sweep** (F-WORDING) — one honest story everywhere (app +
   static + Resources + checker); folds in N5 brand-purple unify.
 - [ ] **B-misc · Spell-check reachability** — `resumeSpellCheck()` runs only at import; "Improve My Whole Resume"
