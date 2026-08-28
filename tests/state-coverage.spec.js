@@ -9701,3 +9701,37 @@ test.describe('[STATE-COVERAGE] v255 C6 hero + N18 wording', () => {
     expect(r.hasOldPhrase, 'no visible "Free until you\'re hired" copy remains').toBe(false);
   });
 });
+
+/* v256 (N17 logo-from-apply-URL-domain). Pure-function coverage: a direct-employer
+   apply URL yields the real registrable domain; every aggregator / ATS / redirect
+   host yields '' (never a job board's logo for the real employer). */
+test.describe('[STATE-COVERAGE] v256 N17 logo-from-apply-URL', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1000);
+  });
+  test('direct-employer apply URLs resolve a real domain; aggregators/ATS/redirects resolve nothing', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      geisinger: window._gpjLogoDomainFromUrl('https://careers.geisinger.org/job/12345?src=indeed'),
+      apex: window._gpjLogoDomainFromUrl('https://www.terracon.com/careers/apply/987'),
+      indeed: window._gpjLogoDomainFromUrl('https://www.indeed.com/viewjob?jk=abc'),
+      greenhouse: window._gpjLogoDomainFromUrl('https://boards.greenhouse.io/acme/jobs/55'),
+      jooble: window._gpjLogoDomainFromUrl('https://jooble.org/away/123'),
+      adp: window._gpjLogoDomainFromUrl('https://workforcenow.adp.com/mascsr/default/mdf/x'),
+      taleo: window._gpjLogoDomainFromUrl('https://acme.taleo.net/careersection/2/jobdetail.ftl'),
+      empty: window._gpjLogoDomainFromUrl(''),
+      reg2: window._gpjRegDomain('careers.geisinger.org'),
+      regCoUk: window._gpjRegDomain('jobs.acme.co.uk'),
+    }));
+    expect(r.geisinger, 'careers.geisinger.org → geisinger.org').toBe('geisinger.org');
+    expect(r.apex, 'terracon.com resolves').toBe('terracon.com');
+    expect(r.indeed, 'indeed blocked').toBe('');
+    expect(r.greenhouse, 'greenhouse ATS blocked').toBe('');
+    expect(r.jooble, 'jooble redirect blocked').toBe('');
+    expect(r.adp, 'ADP ATS blocked').toBe('');
+    expect(r.taleo, 'Taleo ATS blocked').toBe('');
+    expect(r.empty, 'empty URL → empty').toBe('');
+    expect(r.reg2, 'registrable domain from subdomain').toBe('geisinger.org');
+    expect(r.regCoUk, 'ccTLD handled').toBe('acme.co.uk');
+  });
+});
