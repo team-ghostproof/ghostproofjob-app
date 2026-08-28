@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v257** (`CACHE_VERSION = gpj-v257`; live == repo, verified 2026-08-28).
+> **Current live build: v258** (`CACHE_VERSION = gpj-v258`; live == repo, verified 2026-08-28).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -182,10 +182,10 @@
 - [x] **B2b · Match %-honesty** (= N2) — ✅ SHIPPED v250; awaiting founder live-verification of the new distribution.
 - [~] **B3 · Site-wide wording / pricing consistency sweep** (F-WORDING) — one honest story everywhere (app +
   static + Resources + checker); folds in N5 brand-purple unify. **N18 slice DONE v255:** the misleading
-  "Free until you're hired" (implied you pay after being hired) reframed to **"Always free"** across the footer
-  promise (+ JS twins), swipe status, pricing lines, and the SEO hub page. **Remaining:** the generated SEO
-  *city* pages still use the old phrase (generator template — separate change); N5 brand-purple unify; a final
-  full pricing/tier consistency pass across Resources + checker.
+  "Free until you're hired" (implied you pay after being hired) reframed to **"Always free"** — **app side DONE
+  (v255 + v258):** footer promise (+ JS twins), swipe status, pricing lines, the Ghosts-page stat, the Support-Us
+  menu header, and the SEO hub page. **Remaining:** the generated SEO *city* pages still use the old phrase
+  (generator template — separate change); N5 brand-purple unify; a final pricing/tier pass across Resources + checker.
 - [ ] **B-misc · Spell-check reachability** — `resumeSpellCheck()` runs only at import; "Improve My Whole Resume"
   doesn't spell-check and there's no button (feature-audit A3). Decide: wire it into Jett / add a button.
 
@@ -298,7 +298,7 @@
 > and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
 
 ### T0 · Confirm you're on the current build (do this first, every deploy)
-- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v257**
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v258**
   (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
 
 ### T1 · In-app Self-Test (the fastest health check — 19+ checks)
