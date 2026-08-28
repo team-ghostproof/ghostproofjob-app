@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v255** (`CACHE_VERSION = gpj-v255`; live == repo, verified 2026-08-28).
+> **Current live build: v256** (`CACHE_VERSION = gpj-v256`; live == repo, verified 2026-08-28).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -222,9 +222,13 @@
 - [x] **E1 · Resources cron GO-LIVE** — ✅ LIVE (v243 go-live; every-other-day publisher). Monitor output.
 
 ### Company real-data (cross-cutting)
-- [ ] **Company logo/website from the apply-URL domain** `[BUILD]` — derive the employer domain from a
-  direct-employer "View Full Posting" URL (e.g. `jobs.geisinger.org`→`geisinger.org`) for the logo + a real
-  Website button; exclude aggregator/ATS hosts (shares the N1 blocklist). Fixes Geisinger's missing logo.
+- [x] **N17 · Company logo from the apply-URL domain** — ✅ **SHIPPED v256 (2026-08-28), live.** When a role's
+  "View Full Posting" points at the employer's OWN domain, the logo is derived from it
+  (`careers.geisinger.org`→`geisinger.org` favicon), wired into both the swipe-card logo and the shared
+  `_gpjLogoHtml` chain (after stored-website + curated brand map). New `_gpjRegDomain` (ccTLD-aware) +
+  `_gpjLogoDomainFromUrl`; the N1 blocklist gained ~30 aggregator/ATS/redirect hosts (jooble, adzuna, ADP,
+  Taleo, workday, …) so a job board's mark is never shown for the real employer. 1 new `[STATE-COVERAGE]` test.
+  **Remaining (small):** surface a real "Website" button on the company card from the same derived domain.
 - [ ] **Harvester long-tail logos** — `company_url`→`companyWebsite` (v240) populates as the pool self-heals (~8 days). Verify on a live harvest.
 
 ---
@@ -290,7 +294,7 @@
 > and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
 
 ### T0 · Confirm you're on the current build (do this first, every deploy)
-- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v255**
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v256**
   (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
 
 ### T1 · In-app Self-Test (the fastest health check — 19+ checks)
