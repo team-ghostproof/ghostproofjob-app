@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v256** (`CACHE_VERSION = gpj-v256`; live == repo, verified 2026-08-28).
+> **Current live build: v257** (`CACHE_VERSION = gpj-v257`; live == repo, verified 2026-08-28).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -128,9 +128,13 @@
   Conroe/Houston Methodist all read 98% while the relevance chips read 12%/26%/8%. Same-field over-generosity
   was never tightened (v212/v216 fixed cross-level + messaging only). **Fix:** tighten `computeMatch`/`scoreCore`
   generosity so a weak in-field fit isn't in the 90s. (This IS the Sprint-B "Match %-honesty" item.)
-- [ ] **N3 · Ghost-page empty-state copy.** `[UI][DECISION]` Replace bare "—" with "a report is logged; a
-  community % appears once there's enough signal"; relabel "hiring near your search" companies that have **zero
-  live roles** when tapped. (Same as the roadmap "Ghost-page intuitiveness pass".)
+- [x] **N3 · Ghost-page (empty-state + flagged-companies).** ✅ **SHIPPED v257 (2026-08-28), live.** Founder
+  decisions from the live audit: **(a)** a company you FLAG (file a ghost report on, or confirm ghosted you) is
+  now **removed from your hunt** — its roles leave the deck + Browse via the undoable `hideCompanyRoles`
+  (Settings → Hidden companies). **(b)** the "Around your hunt" cards' bare **"—"** now reads **"no reports yet"**
+  with an explanatory tooltip (community ghost-risk shows once enough hunters report). "Hiring near your search"
+  is sourced from the live pool, so it only shows companies that genuinely have live roles (accurate). 2 new
+  `[STATE-COVERAGE]` tests. **Deferred (founder, on hold):** ghost-% card-face placement + button icon/word centering.
 - [ ] **N4 · Mobile tap targets < 44px.** `[UI-REVIEW]` Sign In (28px), Support Us (28px), Match to Job (30px),
   Cover Letter (30px), filter chips (29px) are below the 44px iOS / 48dp Android minimum. Padding-only fix;
   add a mobile Playwright assertion (primary buttons ≥44px tall).
@@ -284,7 +288,7 @@
 
 - [ ] **Button *word* vs *icon* centering** (10px, site-wide) — A: keep icon, pin left · B: drop icon. On hold; remind after Sprint C.
 - [ ] **Ghost-% placement** — v245 hid the card-face tile (kept the drawer one). Reversible in 2 CSS lines if you prefer at-a-glance on the card face.
-- [ ] **N3 Ghost-page decisions** — (a) do flagged companies still surface in your hunt? (b) exact "hiring near your search" relabel/hide rule.
+- [x] **N3 Ghost-page decisions** — ✅ RESOLVED + SHIPPED v257: (a) flagged companies **do not** surface in your hunt (auto-hidden, undoable); (b) "hiring near your search" is live-pool-sourced (accurate). Deferred: ghost-% placement, button centering.
 
 ---
 
@@ -294,7 +298,7 @@
 > and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
 
 ### T0 · Confirm you're on the current build (do this first, every deploy)
-- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v256**
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v257**
   (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
 
 ### T1 · In-app Self-Test (the fastest health check — 19+ checks)
@@ -327,10 +331,12 @@
 - [ ] **Browse** your list → the green **"Match"** badge is **not 98% on every card**; a weak/out-of-field role
   reads a believable lower number. Open a strong match and a weak one → the numbers differ sensibly.
 
-### T4 · Ghost-page intuitiveness (the N3 fix — after we ship it)
-- [ ] **Ghosts** → companies with no community data show the honest "**a community % appears once there's enough
-  signal**" line, not a bare "—" with no context. Tap a "hiring near your search" company → it either shows real
-  open roles or is honestly relabeled (no dead "none found" surprise).
+### T4 · Ghost-page (the N3 fix — SHIPPED v257)
+- [ ] **Ghosts** → companies with no community data show **"no reports yet"** (not a bare "—") in the "Around your
+  hunt" cards. Companies under "hiring near your search" come from your live search, so they genuinely have roles.
+- [ ] **Flag a company** (file a ghost report on it, or answer "yes, they ghosted me" in the monthly check) → you
+  see "…is hidden from your hunt". **Swipe/Browse** → that company's roles no longer appear. **Settings → Hidden
+  companies** → the company is listed with an **Unhide** that brings its roles back. Check dark + light.
 
 ### T5 · Mobile tap targets (the N4 fix — after we ship it)
 - [ ] On a **phone**: Sign In, Support Us, **🎯 Match to Job**, **✨ Cover Letter**, and the filter chips are
