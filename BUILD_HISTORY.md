@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-27 · Current live build: **v253**_
+_Last updated: 2026-08-28 · Current live build: **v254**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v254** — v254 (D2): full Inbox tab — one home for every message/event (reach-outs, interviews, responses, applicants, matches, reviews, plan). Reuses the notification data layer (window._notifs via _gpjNotifLoad) = ZERO extra Firestore reads; each row routes via notifGo() to the live reply/interview/rate/candidate-card control (no duplicated UI). Both roles, both themes. Entry: desktop rail + 'Open full Inbox' in the bell dropdown (no bottom-nav layout change).
 - **v253** — N15: de-duplicate repeated job-text (a posting that repeats its overview/EEO or echoes the Benefits list at the desc tail no longer looks truncated/broken) via _gpjDedupText in the drawer; N16 (founder-approved): filter undisclosed-employer + scam-signal jobs (crypto pay + Telegram shifts + sub-min-wage) from the deck + Browse via _gpjIsJunkJob
 - **v252** — logo default correction: company cards default to 🏢 (job cards stay 💼), both circular (N13 follow-up per founder); F-CLQ cover-letter quality: p3 no longer repeats p2's emphasized themes verbatim — leads with the candidate's specific relevant skills instead; harvest timeout 60→75m (separate workflow commit) so a fully-successful run no longer shows 'cancelled'
 - **v251** — E2-4: two-slot session cache (region + nationwide) on roomy devices + 10→30min TTL — fewer redundant pool re-reads when alternating deck/nationwide/company views (low-mem devices keep 1 slot, preserving the v139 iPhone-OOM fix); F-CL-PDF: cover letters now export as a real PDF (matches the résumé) via the loaded jsPDF, with a TXT option kept

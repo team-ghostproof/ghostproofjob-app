@@ -9562,3 +9562,78 @@ test.describe('[STATE-COVERAGE] v253 N15 dedup + N16 junk-job filter', () => {
     expect(r.realAgency, 'a legit staffing agency with a real name passes').toBe(false);
   });
 });
+
+/* v254 (D2 full Inbox tab). Signed-out is the CI-testable state; the
+   authenticated feed is populated by _gpjNotifLoad (covered by the notif tests).
+   Here we prove: the view exists, the pure classifiers are correct, and the
+   guest state degrades gracefully (sign-in prompt, no crash, no reads). */
+test.describe('[STATE-COVERAGE] v254 D2 full Inbox', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1200);
+  });
+  test('#view-inbox exists and every inbox fn is defined', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      view: !!document.getElementById('view-inbox'),
+      list: !!document.getElementById('inbox-list'),
+      fns: ['renderInbox','openFullInbox','inboxOpen','inboxMarkAllRead','_inboxMeta','_inboxAgo']
+        .filter(n => typeof window[n] !== 'function'),
+    }));
+    expect(r.view, '#view-inbox present').toBe(true);
+    expect(r.list, '#inbox-list present').toBe(true);
+    expect(r.fns, 'all inbox fns defined').toEqual([]);
+  });
+  test('_inboxMeta groups each notif id into the right bucket + action verb', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      slots: window._inboxMeta({ id: 'ro:abc:slots' }),
+      msg:   window._inboxMeta({ id: 'ro:abc:new' }),
+      ivw:   window._inboxMeta({ id: 'ivw:abc:123' }),
+      resp:  window._inboxMeta({ id: 'resp:abc:int' }),
+      app:   window._inboxMeta({ id: 'app:job1:3' }),
+      mat:   window._inboxMeta({ id: 'mat:job1:2' }),
+      rev:   window._inboxMeta({ id: 'rev:acme' }),
+      plan:  window._inboxMeta({ id: 'plan:1700000000000' }),
+      unk:   window._inboxMeta({ id: 'weird:xyz' }),
+    }));
+    expect(r.slots.grp).toBe('Interviews');
+    expect(r.slots.act).toMatch(/time/i);
+    expect(r.msg.grp).toBe('Messages');
+    expect(r.ivw.grp).toBe('Interviews');
+    expect(r.resp.grp).toBe('Responses');
+    expect(r.app.grp).toBe('Applicants');
+    expect(r.mat.grp).toBe('Matches');
+    expect(r.rev.grp).toBe('Reviews');
+    expect(r.plan.grp).toBe('Account');
+    expect(r.unk.grp).toBe('Updates');
+  });
+  test('_inboxAgo returns human relative time; guest renderInbox shows a sign-in prompt without crashing', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const ago = {
+        now: window._inboxAgo(Date.now() - 5000),
+        h: window._inboxAgo(Date.now() - 3 * 3600 * 1000),
+        d: window._inboxAgo(Date.now() - 3 * 86400 * 1000),
+        zero: window._inboxAgo(0),
+      };
+      let threw = false;
+      try { await window.renderInbox(); } catch (e) { threw = true; }
+      const box = document.getElementById('inbox-list');
+      return { ago, threw, html: box ? box.innerHTML : '' };
+    });
+    expect(r.ago.now).toMatch(/just now/i);
+    expect(r.ago.h).toMatch(/3h ago/);
+    expect(r.ago.d).toMatch(/3d ago/);
+    expect(r.ago.zero).toBe('');
+    expect(r.threw, 'renderInbox never throws for a guest').toBe(false);
+    expect(r.html, 'guest sees a sign-in prompt').toMatch(/sign in/i);
+  });
+  test('openFullInbox switches to the inbox view without throwing', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      let threw = false;
+      try { window.openFullInbox(); } catch (e) { threw = true; }
+      const v = document.getElementById('view-inbox');
+      return { threw, active: !!(v && v.classList.contains('active')) };
+    });
+    expect(r.threw, 'openFullInbox never throws').toBe(false);
+    expect(r.active, 'the inbox view becomes active').toBe(true);
+  });
+});

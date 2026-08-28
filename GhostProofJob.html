@@ -1350,6 +1350,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
               <div id="notif-readall" onclick="markAllNotifRead()" style="font-size:10.5px;color:var(--cyber);cursor:pointer;font-weight:700;">Mark all read</div>
             </div>
             <div id="notif-list"></div>
+            <div onclick="openFullInbox()" style="text-align:center;margin-top:4px;padding:9px;border-top:1px solid var(--plum4);font-size:11.5px;font-weight:800;color:var(--mint);cursor:pointer;">📬 Open full Inbox →</div>
           </div>
         </div>
         <div id="upgrade-trigger" onclick="toggleUpgrade()" style="background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.3);color:var(--mint);font-size:11px;font-weight:700;padding:6px 10px;border-radius:10px;cursor:pointer;">Support Us ▾</div>
@@ -3277,6 +3278,25 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
       </div>
     </div>
 
+    <!-- FULL INBOX (v254 · D2) — one home for every message/event. It reuses the
+         notification data layer (window._notifs via _gpjNotifLoad) so it adds ZERO
+         Firestore reads beyond the existing bell. Both account roles render here
+         (both titled "Inbox"); every row action routes through notifGo(), which lands
+         on the live reply / interview / rate / candidate-card control (no duplicated
+         UI = no regression). Theming is entirely via CSS vars (light + dark). -->
+    <div class="view" id="view-inbox">
+      <div style="padding:16px 16px 40px;max-width:720px;margin:0 auto;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:2px;">
+          <div>
+            <div style="font-size:20px;font-weight:800;color:var(--off);">✉️ Inbox</div>
+            <div id="inbox-sub" style="font-size:12px;color:var(--muted);margin-top:2px;">Messages, interviews, matches &amp; reminders — all in one place.</div>
+          </div>
+          <div onclick="inboxMarkAllRead()" id="inbox-markall" style="font-size:12px;color:var(--cyber);font-weight:700;cursor:pointer;white-space:nowrap;padding:6px 8px;border-radius:8px;display:none;">Mark all read</div>
+        </div>
+        <div id="inbox-list" style="margin-top:10px;"></div>
+      </div>
+    </div>
+
     <!-- GLOBAL FOOTER — inside the scroll area so it sits below each view's content -->
     <div id="gpj-global-footer" style="text-align:center;padding:16px 16px 20px;font-size:10px;color:var(--muted);line-height:2;">
       <!-- v215: uniform link colour (was a mix of green/purple/grey); "Home" dropped
@@ -3287,7 +3307,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v253</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v254</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3470,6 +3490,7 @@ function switchView(id,el){
     }catch(e){}
   }
   if(id==='account'){ try{ _renderHiddenCosList(); }catch(e){} try{ renderOptimizedList(); }catch(e){} try{ renderCoverLettersList(); }catch(e){} }   /* v146: hidden-companies manager · A3: refresh tailored-pill counts */
+  if(id==='inbox'){ try{ renderInbox(); }catch(e){} }   /* v254 D2: full Inbox tab */
   try{ if(typeof _gpjRecruiterMode==='function' && _gpjRecruiterMode()) _gpjRenderRecPanel(id); }catch(e){}   /* v110 R9 */
 }
 
@@ -5253,6 +5274,96 @@ function markAllNotifRead(){
   const seen=_notifSeen(); (window._notifs||[]).forEach(n=>seen.add(n.id)); _notifSaveSeen(seen);
   _gpjNotifPaint(); renderNotifPanel();
 }
+
+/* ============================================================
+   FULL INBOX (v254 · D2) — a full-tab home for every message/event.
+   It renders the SAME data the bell uses (window._notifs, filled by
+   _gpjNotifLoad) so it adds ZERO Firestore reads beyond the bell. Each row
+   opens via notifGo(id), which already marks it read AND lands on the live
+   reply / interview-picker / rate / candidate-card control — so the inbox
+   surfaces everything in one place without duplicating (and risking a
+   regression in) those working controls. Both roles; both themes. ============ */
+function openFullInbox(){
+  try{ const p=document.getElementById('notif-panel'); if(p) p.style.display='none'; }catch(e){}
+  try{ switchView('inbox', document.querySelector('[data-view=inbox]')); }catch(e){ try{ switchView('inbox'); }catch(_e){} }
+}
+function _inboxAgo(ts){
+  ts=Number(ts)||0; if(!ts) return '';
+  const s=Math.max(0,(Date.now()-ts)/1000);
+  if(s<60) return 'just now';
+  const m=s/60; if(m<60) return Math.floor(m)+'m ago';
+  const h=m/60; if(h<24) return Math.floor(h)+'h ago';
+  const d=h/24; if(d<7) return Math.floor(d)+'d ago';
+  const w=d/7; if(w<5) return Math.floor(w)+'w ago';
+  try{ return new Date(ts).toLocaleDateString(); }catch(e){ return ''; }
+}
+/* map a notif to its inbox GROUP + the verb shown on its action row */
+function _inboxMeta(n){
+  const id=String((n&&n.id)||'');
+  if(/^ro:.*:slots$/.test(id)) return {grp:'Interviews',act:'Pick a time'};
+  if(/^ro:/.test(id))          return {grp:'Messages',act:'Open'};
+  if(/^ivw/.test(id))          return {grp:'Interviews',act:'View details'};
+  if(/^resp:/.test(id))        return {grp:'Responses',act:'Open'};
+  if(/^app:/.test(id))         return {grp:'Applicants',act:'View applicants'};
+  if(/^mat:/.test(id))         return {grp:'Matches',act:'View matches'};
+  if(/^rev:/.test(id))         return {grp:'Reviews',act:'Review'};
+  if(/^adm:/.test(id))         return {grp:'Admin',act:'Open'};
+  if(/^plan/.test(id))         return {grp:'Account',act:'Manage'};
+  return {grp:'Updates',act:'Open'};
+}
+const _INBOX_GRP_ORDER=['Messages','Interviews','Responses','Applicants','Matches','Reviews','Admin','Account','Updates'];
+async function renderInbox(){
+  const box=document.getElementById('inbox-list'); if(!box) return;
+  const sub=document.getElementById('inbox-sub');
+  const ma=document.getElementById('inbox-markall');
+  const signedIn=!!(window.fb&&fb.current&&fb.current());
+  if(!signedIn){
+    if(ma) ma.style.display='none';
+    if(sub) sub.textContent='Sign in to see your messages, interviews and matches.';
+    box.innerHTML='<div style="padding:34px 14px 18px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7;">🔒 <b style="color:var(--off);">Sign in to open your inbox.</b><br>Employer messages, interview invites and matches land here.</div>'
+      +'<div onclick="openAuth()" style="max-width:240px;margin:0 auto;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:12px;text-align:center;cursor:pointer;">Sign in</div>';
+    return;
+  }
+  box.innerHTML='<div style="padding:26px;text-align:center;color:var(--muted);font-size:12px;">Loading your inbox…</div>';
+  try{ await _gpjNotifLoad(); }catch(e){}
+  const list=(window._notifs||[]).slice();
+  const seen=_notifSeen();
+  const unread=list.filter(n=>!seen.has(n.id)).length;
+  if(sub) sub.textContent=list.length?((unread?unread+' unread · ':'')+list.length+' total'):'You’re all caught up — nothing new.';
+  if(ma) ma.style.display=unread?'':'none';
+  if(!list.length){
+    box.innerHTML='<div style="padding:40px 14px;text-align:center;color:var(--muted);font-size:13px;line-height:1.8;">📭 <b style="color:var(--off);">Nothing here yet.</b><br>When an employer messages you, proposes an interview, or a match comes in, it shows up here — and we email you too, so you never miss it.</div>';
+    return;
+  }
+  const groups={};
+  list.forEach(n=>{ const m=_inboxMeta(n); (groups[m.grp]=groups[m.grp]||[]).push(n); });
+  let html='';
+  _INBOX_GRP_ORDER.forEach(g=>{
+    const rows=groups[g]; if(!rows||!rows.length) return;
+    html+='<div style="font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:16px 2px 7px;">'+_esc(g)+'</div>';
+    html+=rows.map(n=>{
+      const isu=!seen.has(n.id), m=_inboxMeta(n), idc=_esc(String(n.id)).replace(/'/g,'');
+      return '<div onclick="inboxOpen(\''+idc+'\')" style="display:flex;gap:12px;align-items:flex-start;padding:13px;border-radius:14px;cursor:pointer;background:'+(isu?'rgba(181,95,230,.10)':'var(--plum2)')+';border:1px solid '+(isu?'rgba(181,95,230,.28)':'var(--plum4)')+';margin-bottom:8px;">'
+        +'<div style="font-size:20px;line-height:1.2;flex:none;">'+(n.icon||'•')+'</div>'
+        +'<div style="flex:1;min-width:0;">'
+          +'<div style="font-size:13.5px;font-weight:'+(isu?'800':'700')+';color:var(--off);line-height:1.4;">'+_esc(n.title)+'</div>'
+          +'<div style="font-size:12px;color:var(--muted);line-height:1.55;margin-top:3px;">'+_esc(n.body)+'</div>'
+          +'<div style="display:flex;align-items:center;gap:10px;margin-top:8px;">'
+            +'<span style="font-size:12px;font-weight:800;color:var(--mint);">'+_esc(m.act)+' →</span>'
+            +(n.ts?'<span style="font-size:10.5px;color:var(--plum4);">'+_esc(_inboxAgo(n.ts))+'</span>':'')
+          +'</div>'
+        +'</div>'
+        +(isu?'<div style="width:8px;height:8px;border-radius:50%;background:var(--cyber);flex:none;margin-top:5px;"></div>':'')
+        +'</div>';
+    }).join('');
+  });
+  box.innerHTML=html;
+}
+/* open a row: notifGo marks it read + navigates to the live control. We do NOT
+   re-render here (that would re-hit _gpjNotifLoad = extra reads); the inbox
+   re-renders from its view hook when the user returns. */
+function inboxOpen(id){ try{ notifGo(id); }catch(e){} }
+function inboxMarkAllRead(){ try{ markAllNotifRead(); }catch(e){} try{ renderInbox(); }catch(e){} }
 document.addEventListener('click',e=>{
   if(!e.target.closest('#notif-wrap')){ const p=document.getElementById('notif-panel'); if(p) p.style.display='none'; }
 });
@@ -14460,6 +14571,7 @@ function buildDesktopGrid(){
     {v:'browse', icon:'🔍', label:'Browse'},
     {v:'resume', icon:'📄', label:'Resume'},
     {v:'ghost',  icon:'👻', label:'Ghosts'},
+    {v:'inbox',  icon:'✉️', label:'Inbox'},
     {v:'profile',icon:'🙂', label:'Account / Profile'},
     {v:'account',icon:'⚙️', label:'Settings'}
   ];
@@ -14470,7 +14582,7 @@ function buildDesktopGrid(){
      v109 (R9-A): view-employer was NEVER moved here → on desktop it rendered
      outside the clipped grid, so "For Employers" appeared to do nothing. It now
      rides in the workspace like every other view. */
-  ['view-swipe','view-browse','view-resume','view-ghost','view-profile','view-account','view-employer'].forEach(id=>{
+  ['view-swipe','view-browse','view-resume','view-ghost','view-inbox','view-profile','view-account','view-employer'].forEach(id=>{
     const v=document.getElementById(id); if(v) main.appendChild(v);
   });
   /* the global footer rides along at the bottom of the workspace */
@@ -14491,7 +14603,7 @@ window.addEventListener('resize',function(){
 /* desktop: show exactly one view in the main panel */
 function deskShowOnly(view){
   const LIGHT=['swipe','browse'];   /* feed views get the light workspace theme */
-  ['swipe','browse','resume','ghost','profile','account','employer'].forEach(v=>{
+  ['swipe','browse','resume','ghost','inbox','profile','account','employer'].forEach(v=>{
     const el=document.getElementById('view-'+v);
     if(!el) return;
     el.classList.toggle('gpj-light', LIGHT.includes(v));
@@ -14517,6 +14629,7 @@ function deskNav(view,el){
     if(view==='resume'){ fillProfileFields&&fillProfileFields(); hydrateResumeFields&&hydrateResumeFields(); }
     if(view==='ghost'){ renderUserReports&&renderUserReports(); }
     if(view==='browse'){ renderBrowse&&renderBrowse(); }
+    if(view==='inbox'){ renderInbox&&renderInbox(); }   /* v254 D2 */
     if(view==='employer'){ renderEmployerView&&renderEmployerView(); }   /* v109 R9-A */
   }catch(e){}
   deskShowOnly(view);
@@ -14531,7 +14644,7 @@ deskMQ.addEventListener('change',()=>location.reload());
 const _origSwitchView=switchView;
 switchView=function(id,el){
   if(document.body.classList.contains('desk')){
-    const known=['swipe','browse','resume','ghost','profile','account'];
+    const known=['swipe','browse','resume','ghost','inbox','profile','account'];
     if(known.includes(id)){ deskNav(id,null); return; }
     /* v109 R9-A: employer renders in the desk workspace (was bounced to swipe on
        desktop — the view was never moved into #desk-main, so it appeared to do
@@ -15341,8 +15454,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v253';
+const APP_VERSION = 'v254';
 const CHANGELOG = {
+  'v254':['v254 (D2): full Inbox tab — one home for every message/event (reach-outs, interviews, responses, applicants, matches, reviews, plan). Reuses the notification data layer (window._notifs via _gpjNotifLoad) = ZERO extra Firestore reads; each row routes via notifGo() to the live reply/interview/rate/candidate-card control (no duplicated UI). Both roles, both themes. Entry: desktop rail + \'Open full Inbox\' in the bell dropdown (no bottom-nav layout change).'],
   'v253':['N15: de-duplicate repeated job-text (a posting that repeats its overview/EEO or echoes the Benefits list at the desc tail no longer looks truncated/broken) via _gpjDedupText in the drawer; N16 (founder-approved): filter undisclosed-employer + scam-signal jobs (crypto pay + Telegram shifts + sub-min-wage) from the deck + Browse via _gpjIsJunkJob'],
   'v252':['logo default correction: company cards default to 🏢 (job cards stay 💼), both circular (N13 follow-up per founder); F-CLQ cover-letter quality: p3 no longer repeats p2\'s emphasized themes verbatim — leads with the candidate\'s specific relevant skills instead; harvest timeout 60→75m (separate workflow commit) so a fully-successful run no longer shows \'cancelled\''],
   'v251':['E2-4: two-slot session cache (region + nationwide) on roomy devices + 10→30min TTL — fewer redundant pool re-reads when alternating deck/nationwide/company views (low-mem devices keep 1 slot, preserving the v139 iPhone-OOM fix); F-CL-PDF: cover letters now export as a real PDF (matches the résumé) via the loaded jsPDF, with a TXT option kept'],

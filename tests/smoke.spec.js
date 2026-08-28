@@ -49,6 +49,8 @@ test('core functions still exist (regression guard)', async ({ page }) => {
     'downloadCoverLetterPDF',
     // v253 N15 dedup + N16 junk-job filter
     '_gpjDedupText', '_gpjIsJunkJob',
+    // v254 D2 full Inbox tab
+    'renderInbox', 'openFullInbox', 'inboxOpen', 'inboxMarkAllRead', '_inboxMeta', '_inboxAgo',
   ];
   const missing = await page.evaluate(
     (names) => names.filter((n) => typeof window[n] !== 'function'),
