@@ -9338,11 +9338,11 @@ test.describe('[STATE-COVERAGE] v242 gap consistency + A7 tiles + honest stats',
     const r = await page.evaluate(() => {
       try { switchView('ghost'); } catch (e) {}
       const t = document.body.innerText;
-      return { noReports: !/2,?847/.test(t), noAcc: !/94%\s*Data Accuracy/i.test(t), honest: /Until you.{0,3}re hired/i.test(t) };
+      return { noReports: !/2,?847/.test(t), noAcc: !/94%\s*Data Accuracy/i.test(t), honest: /Always, even after hired/i.test(t) };
     });
     expect(r.noReports, 'no fabricated "2,847" community reports').toBe(true);
     expect(r.noAcc, 'no fabricated "94% Data Accuracy"').toBe(true);
-    expect(r.honest, 'honest brand fact shown instead').toBe(true);
+    expect(r.honest, 'honest always-free brand fact shown instead (v258 N18)').toBe(true);
   });
 });
 

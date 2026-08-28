@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-28 · Current live build: **v257**_
+_Last updated: 2026-08-28 · Current live build: **v258**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v258** — v258 (full-site-test fixes): completes the N18 always-free sweep — the Ghosts-page stat 'Free / Until you're hired' → 'Free / Always, even after hired', and the Support-Us menu header 'YOU'RE FREE UNTIL YOU'RE HIRED' → 'ALWAYS FREE TO GET HIRED' (both missed by the phrase-grep, found in the live audit). Also: undisclosed-employer placeholders ('Hiring Company'/'Confidential') no longer appear in the Ghosts 'Around your hunt' list (same honesty guard the deck uses).
 - **v257** — v257 (N3 ghost-page): (a) a company you FLAG (file a ghost report on, or confirm ghosted you) is now removed from your hunt — its roles leave the deck + Browse via the existing undoable hideCompanyRoles (Settings → Hidden companies), founder decision. (b) honest empty-state on the 'Around your hunt' cards — a bare '—' now reads 'no reports yet' + an explanatory tooltip (community ghost-risk shows once enough hunters report). 'Hiring near your search' already sources from the live pool (accurate).
 - **v256** — v256 (N17): logo-from-apply-URL-domain — when a role's View Full Posting points at the employer's OWN domain, derive the real logo from it (careers.geisinger.org → geisinger.org favicon). Aggregator/ATS/redirect hosts (indeed/greenhouse/jooble/adzuna/ADP/Taleo/etc.) are blocklist-filtered so a job board's mark is never shown for the real employer. Wired into both the swipe-card logo and the shared _gpjLogoHtml chain, after stored-website + curated brand map. Expands the N1 blocklist with ~30 aggregator/redirect/ATS hosts.
 - **v255** — v255 (C6 + N18): signed-out home HERO landing (first-paint for new logged-out visitors) — rotating headline, value pillars (Build/Optimize/Apply/Simplify), muted looping demo, honest proof (no fabricated numbers), real theme-adaptive logo, both themes, responsive. Additive: shows only when logged out via the SAME gate the onboarding modal used (skipped for ngj_returning, hidden on sign-in); app sits intact behind it; onboarding modal neutralized. N18 value-prop sweep: 'Free until you're hired' → 'Always free' framing across footer/swipe/pricing + SEO page.

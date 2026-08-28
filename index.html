@@ -1358,7 +1358,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
     </div>
     <div id="upgrade-menu">
       <div id="upgrade-candidate">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;">YOU'RE FREE UNTIL YOU'RE HIRED</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;">ALWAYS FREE TO GET HIRED</div>
         <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Full access for 90 days or until you land a job — whichever comes first. If you want to keep us after that:</div>
         <div class="upgrade-btn" onclick="openCheckout('life')" style="position:relative;">⚡ Lifetime — $12 once<div style="font-size:9px;font-weight:600;opacity:.8;">Best value · never pay again</div></div>
         <div onclick="openCheckout('month')" style="background:rgba(181,95,230,.15);border:1px solid rgba(181,95,230,.4);color:var(--cyber);border-radius:10px;padding:9px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">🪙 Just $0.99 / month<div style="font-size:9px;font-weight:600;opacity:.8;">Cancel anytime, zero pressure</div></div>
@@ -3017,7 +3017,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            were HARDCODED demo numbers — removed. Honest, verifiable brand facts instead (no
            fabricated metrics). Real community counts surface per-company when they exist. -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px 12px;">
-        <div class="mini-stat"><div class="mini-stat-val" style="color:var(--mint);">Free</div><div class="mini-stat-lbl">Until you’re hired</div></div>
+        <div class="mini-stat"><div class="mini-stat-val" style="color:var(--mint);">Free</div><div class="mini-stat-lbl">Always, even after hired</div></div>
         <div class="mini-stat"><div class="mini-stat-val" style="color:var(--cyber);">0</div><div class="mini-stat-lbl">Ads · no data selling</div></div>
       </div>
       <div style="margin:0 16px 12px;position:relative;">
@@ -3402,7 +3402,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Always free 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v257</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v258</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -15626,8 +15626,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v257';
+const APP_VERSION = 'v258';
 const CHANGELOG = {
+  'v258':['v258 (full-site-test fixes): completes the N18 always-free sweep — the Ghosts-page stat \'Free / Until you\'re hired\' → \'Free / Always, even after hired\', and the Support-Us menu header \'YOU\'RE FREE UNTIL YOU\'RE HIRED\' → \'ALWAYS FREE TO GET HIRED\' (both missed by the phrase-grep, found in the live audit). Also: undisclosed-employer placeholders (\'Hiring Company\'/\'Confidential\') no longer appear in the Ghosts \'Around your hunt\' list (same honesty guard the deck uses).'],
   'v257':['v257 (N3 ghost-page): (a) a company you FLAG (file a ghost report on, or confirm ghosted you) is now removed from your hunt — its roles leave the deck + Browse via the existing undoable hideCompanyRoles (Settings → Hidden companies), founder decision. (b) honest empty-state on the \'Around your hunt\' cards — a bare \'—\' now reads \'no reports yet\' + an explanatory tooltip (community ghost-risk shows once enough hunters report). \'Hiring near your search\' already sources from the live pool (accurate).'],
   'v256':['v256 (N17): logo-from-apply-URL-domain — when a role\'s View Full Posting points at the employer\'s OWN domain, derive the real logo from it (careers.geisinger.org → geisinger.org favicon). Aggregator/ATS/redirect hosts (indeed/greenhouse/jooble/adzuna/ADP/Taleo/etc.) are blocklist-filtered so a job board\'s mark is never shown for the real employer. Wired into both the swipe-card logo and the shared _gpjLogoHtml chain, after stored-website + curated brand map. Expands the N1 blocklist with ~30 aggregator/redirect/ATS hosts.'],
   'v255':['v255 (C6 + N18): signed-out home HERO landing (first-paint for new logged-out visitors) — rotating headline, value pillars (Build/Optimize/Apply/Simplify), muted looping demo, honest proof (no fabricated numbers), real theme-adaptive logo, both themes, responsive. Additive: shows only when logged out via the SAME gate the onboarding modal used (skipped for ngj_returning, hidden on sign-in); app sits intact behind it; onboarding modal neutralized. N18 value-prop sweep: \'Free until you\'re hired\' → \'Always free\' framing across footer/swipe/pricing + SEO page.'],
@@ -17360,7 +17361,10 @@ function renderGhostCompanies(){
   const _hidden=(typeof gpjHiddenCos==='function')?gpjHiddenCos():new Set();
   const _dismissed=_gpjHuntDismissed();   /* v180: cards the user dismissed from THIS list (roles stay in deck/Browse) */
   /* v236: carry a real domain when we have one so the row shows the company logo */
-  const push=(co,label,dom)=>{ if(co&&!seen.has(co)&&!_hidden.has(_coKey(co))&&!_dismissed.has(_coKey(co))&&picks.length<6){ seen.add(co); picks.push({co:co,label:label,dom:dom||''}); } };
+  /* N16/N3 (v258): never surface an undisclosed-employer placeholder ("Hiring
+     Company"/"Confidential") in the hunt list — same honesty guard the deck uses. */
+  const _isPlaceholderCo=(c)=>{ const s=String(c||'').trim(); return !s || _PLACEHOLDER_CO.test(s) || /^(confidential|undisclosed|company confidential)$/i.test(s); };
+  const push=(co,label,dom)=>{ if(co&&!_isPlaceholderCo(co)&&!seen.has(co)&&!_hidden.has(_coKey(co))&&!_dismissed.has(_coKey(co))&&picks.length<6){ seen.add(co); picks.push({co:co,label:label,dom:dom||''}); } };
   lists.applied.slice(-8).reverse().forEach(r=>push(r.co,'from your applications',r.companyWebsite||r.website||r.domain));
   liveJobs.slice(0,8).forEach(j=>push(j.co,'hiring near your search',j.companyWebsite||j.website||j.domain));
   (userCompanies||[]).forEach(c=>push(c,'from your resume'));
