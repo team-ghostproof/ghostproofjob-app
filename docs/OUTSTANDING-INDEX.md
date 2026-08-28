@@ -72,7 +72,13 @@
 
 ## 2. NEW — found in the 2026-08-27 live audit (not yet in the roadmap)
 
-- [ ] **N16 · "Hiring Company" / undisclosed-employer (often SCAM) jobs surface** `[BUILD][DECISION]` (founder repro 2026-08-28:
+- [x] **N15 · Job text "looks truncated/incomplete" — FIXED.** ✅ **SHIPPED v253 (live).** `_gpjDedupText` in the drawer removes
+  repeated content (a posting that repeats its overview/EEO — Gordian — or echoes the Benefits list at the desc tail — Wiza —
+  no longer looks cut mid-phrase). Applied to Expectations / More / Benefits.
+- [x] **N16 · Undisclosed-employer / scam jobs filtered — SHIPPED v253 (live).** ✅ `_gpjIsJunkJob` hides empty/"Hiring Company"/
+  "Confidential" employers + scam-signal postings (crypto pay + Telegram shifts + sub-min-wage) from the deck + Browse; fail-safe.
+  **⚠️ Watch for false hides of legit "confidential" listings** (per the founder-approved "ship + watch" plan); optional targeted
+  company-backfill later only if needed. _Original detail:_ (founder repro 2026-08-28:
   an Indeed "Marketing Agent – Dropper" 1-day-old posting — Telegram dept, USDC/Binance pay, $1.55/hr, hidden employer =
   a classic recruitment scam). Root: harvester stores no company → mapper falls back to "Hiring Company" (index.html:5895/9652);
   `_gpjEmployerFromUrl` can't recover it from an aggregator (indeed.com) URL. **Mission conflict: GPJ surfaces "verified real
@@ -179,11 +185,11 @@
 - [ ] **C4 · Motion & delight (applicant only)** — swipe spring/touch-drag physics, count-up stats, streak flame,
   extend Apply/Hired celebrations. Employer side stays calm; respect `prefers-reduced-motion`; never block the core action.
 - [ ] **C5 · Skeleton loaders + mascot empty/first-run states** — cheapest "feels fast + finished"; kill blank flashes.
-- [ ] **C6 · Signed-out home hero + honest social-proof bar** — first thing a new user sees; muted looping demo
+- [ ] **C6 · Signed-out home hero** — 📐 **INTERACTIVE MOCKUP DELIVERED (theme-aware, real logo, responsive) — awaiting founder approval to build.** first thing a new user sees; muted looping demo
   swipe; aggregate numbers ONLY when real (ties to F-GHOST data).
 
 ### Sprint D — Signature Features (3 of 4 already built → VERIFY; D2 is the one build)
-- [ ] **D2 · Full Inbox tab** `[UI-REVIEW]` **[BUILD]** — replace the interim per-message dismiss (v196) with a
+- [ ] **D2 · Full Inbox tab** `[UI-REVIEW]` **[BUILD]** — 📐 **INTERACTIVE MOCKUP + COMPLETE WIRING PLAN DELIVERED (theme-aware, real logo, responsive, every control→function, data model, states, tests) — awaiting founder approval to build.** replace the interim per-message dismiss (v196) with a
   real inbox (anti-ghosting record + employer + candidate in one place). Founder: important, launch-window.
 - [ ] **D1 · F-GHOST aggregated flag counts** — VERIFY the count aggregates with real volume + the "another hunter
   reported this" popup surfaces everywhere.
