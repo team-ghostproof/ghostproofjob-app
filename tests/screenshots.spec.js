@@ -40,6 +40,7 @@ test.describe('visual capture', () => {
       // hide first-run overlays so they don't cover the captured view
       try { const t = document.getElementById('tutorial'); if (t) t.style.display = 'none'; } catch (e) {}
       try { const o = document.getElementById('onboard-modal'); if (o) o.classList.remove('open'); } catch (e) {}
+      try { const h = document.getElementById('gpj-hero'); if (h) h.style.display = 'none'; } catch (e) {}   /* v255 C6: hide the signed-out landing so screenshots capture the app views */
       try { document.querySelectorAll('.modal-scrim.open').forEach((m) => m.classList.remove('open')); } catch (e) {}
     });
   }

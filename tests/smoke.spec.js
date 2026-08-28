@@ -51,6 +51,8 @@ test('core functions still exist (regression guard)', async ({ page }) => {
     '_gpjDedupText', '_gpjIsJunkJob',
     // v254 D2 full Inbox tab
     'renderInbox', 'openFullInbox', 'inboxOpen', 'inboxMarkAllRead', '_inboxMeta', '_inboxAgo',
+    // v255 C6 signed-out hero
+    'heroGetStarted', 'heroSignIn', 'heroExplore', 'heroUploadResume', 'heroEmployer', '_gpjHideHero', '_gpjHeroGate',
   ];
   const missing = await page.evaluate(
     (names) => names.filter((n) => typeof window[n] !== 'function'),

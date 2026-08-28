@@ -4558,7 +4558,7 @@ test.describe('[STATE-COVERAGE] v111 recruiter header chrome (identity, menu, pl
     expect(r.rec.footerLink, 'an employer should not be offered "For Employers"').toBe('none');
     expect(r.rec.promise, 'the footer promise speaks to employers').toMatch(/never sold/i);
     expect(r.cand.pill, 'candidates keep their day counter').toMatch(/Day/);
-    expect(r.cand.promise, 'candidates keep the free-until-hired promise').toMatch(/Free until/i);
+    expect(r.cand.promise, 'candidates keep the always-free promise (v255 N18 reframe)').toMatch(/Always free/i);
     expect(r.guestLink, 'guests still get the employer marketing entry').not.toBe('none');
   });
 
@@ -9635,5 +9635,69 @@ test.describe('[STATE-COVERAGE] v254 D2 full Inbox', () => {
     });
     expect(r.threw, 'openFullInbox never throws').toBe(false);
     expect(r.active, 'the inbox view becomes active').toBe(true);
+  });
+});
+
+/* v255 (C6 signed-out hero + N18 wording). Guest first-visit is the CI-testable
+   state. We prove: the hero exists + shows for a logged-out first-time visitor,
+   the escape hatch reveals the app, the gate hides it for a returning visitor,
+   and the N18 "always free" reframe landed (no "Free until you're hired"). */
+test.describe('[STATE-COVERAGE] v255 C6 hero + N18 wording', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1200);
+  });
+  test('Q1 guest first-visit: #gpj-hero exists, is visible, and all hero fns are defined', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      exists: !!document.getElementById('gpj-hero'),
+      visible: (() => { const h = document.getElementById('gpj-hero'); return !!(h && h.style.display !== 'none'); })(),
+      fns: ['heroGetStarted','heroSignIn','heroExplore','heroUploadResume','heroEmployer','_gpjHideHero','_gpjHeroGate']
+        .filter(n => typeof window[n] !== 'function'),
+      hasHeadline: !!document.getElementById('hero-hl'),
+    }));
+    expect(r.exists, '#gpj-hero present').toBe(true);
+    expect(r.visible, 'hero shows for a logged-out first-time visitor').toBe(true);
+    expect(r.fns, 'all hero fns defined').toEqual([]);
+    expect(r.hasHeadline, 'rotating headline element present').toBe(true);
+  });
+  test('heroExplore hides the hero, marks returning, and reveals the swipe app', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      let threw = false;
+      try { window.heroExplore(); } catch (e) { threw = true; }
+      return {
+        threw,
+        heroHidden: document.getElementById('gpj-hero').style.display === 'none',
+        returning: localStorage.getItem('ngj_returning'),
+        swipeActive: document.getElementById('view-swipe').classList.contains('active'),
+      };
+    });
+    expect(r.threw).toBe(false);
+    expect(r.heroHidden, 'hero is dismissed').toBe(true);
+    expect(r.returning, 'returning marker set so it will not reappear').toBe('1');
+    expect(r.swipeActive, 'the app deck is revealed').toBe(true);
+  });
+  test('_gpjHeroGate hides the hero for a returning visitor (ngj_returning set)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const h = document.getElementById('gpj-hero');
+      h.style.display = 'block';                 // pretend it is showing
+      localStorage.setItem('ngj_returning', '1');
+      window._gpjHeroGate();
+      return { hidden: h.style.display === 'none' };
+    });
+    expect(r.hidden, 'returning visitor never sees the hero again').toBe(true);
+  });
+  test('N18: the footer promise reads "Always free", never "Free until you\'re hired"', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const fp = document.getElementById('footer-promise');
+      const bodyText = document.body.innerText || '';
+      return {
+        footer: fp ? fp.textContent : '',
+        heroPill: (document.querySelector('#gpj-hero') || document.body).innerText.includes('Always free'),
+        hasOldPhrase: /Free until you're hired/i.test(bodyText),
+      };
+    });
+    expect(r.footer, 'footer promise reframed').toMatch(/Always free/i);
+    expect(r.heroPill, 'hero carries the always-free value line').toBe(true);
+    expect(r.hasOldPhrase, 'no visible "Free until you\'re hired" copy remains').toBe(false);
   });
 });

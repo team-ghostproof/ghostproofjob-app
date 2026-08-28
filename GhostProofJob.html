@@ -1296,7 +1296,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
     <div style="font-size:30px;margin-bottom:8px;" class="ghost-glow">👻</div>
     <div class="brand-text" style="font-size:24px;font-weight:800;">GhostProofJob</div>
     <div style="font-size:13px;color:var(--off);line-height:1.7;margin-top:12px;">Job hunting is broken — you apply into the void and never hear back. <strong style="color:var(--mint);">GhostProofJob fixes it:</strong> swipe real verified openings, jump straight to apply, and see every company's community-sourced <strong style="color:var(--cyber);">ghosting risk</strong> before you invest a single interview.</div>
-    <div style="font-size:13px;color:var(--mint);font-weight:800;margin-top:10px;">Free until you're hired. Because the only metric we care about is you, employed. 💚</div>
+    <div style="font-size:13px;color:var(--mint);font-weight:800;margin-top:10px;">Always free. Because the only metric we care about is you, employed. 💚</div>
   </div>
 </aside>
 <aside class="desk-pane" id="desk-right">
@@ -1428,7 +1428,11 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
   </div>
 
   <!-- ONBOARDING — SHOWS FIRST -->
-  <div class="modal-scrim open" id="onboard-modal" style="z-index:320;">
+  <!-- v255 C6: the signed-out HERO (#gpj-hero) is now the first-paint landing for
+       new logged-out visitors; this legacy onboarding modal no longer auto-opens
+       (the `open` class was removed). Kept in the DOM because closeOnboard/skipToApp
+       still reference it harmlessly; the hero folds in its role. -->
+  <div class="modal-scrim" id="onboard-modal" style="z-index:320;">
     <div class="modal-box">
       <div style="font-size:34px;margin-bottom:8px;">👻💚</div>
       <div style="font-size:17px;font-weight:800;margin-bottom:6px;">Welcome. Let's get you hired.</div>
@@ -2129,6 +2133,97 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
     <div id="legal-body"></div>
   </div>
 
+  <!-- ============================================================
+       C6 · SIGNED-OUT HOME HERO (v255) — the first thing a NEW visitor sees.
+       ADDITIVE + INSERT-ONLY: this is a self-contained full-screen landing that
+       shows ONLY for logged-out first-time visitors (same gate the onboarding
+       modal used: skipped when ngj_returning is set, hidden on sign-in). The
+       whole app sits intact behind it, byte-untouched — if anything here
+       misbehaves the visitor falls straight through to today's flow. Rendered in
+       the initial HTML so crawlers read real marketing copy (SEO). Themes via CSS
+       vars (light + dark); honest — no fabricated numbers, real logo. ========= -->
+  <style id="hero-css">
+    #gpj-hero .hero-accent{background:linear-gradient(135deg,var(--mint),var(--cyber));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+    #gpj-hero .hero-pillar{background:var(--plum2);border:1px solid var(--plum4);border-radius:16px;padding:18px 16px;text-align:left;}
+    #gpj-hero .hero-cta-primary{transition:transform .15s ease, box-shadow .15s ease;}
+    #gpj-hero .hero-cta-primary:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,245,160,.36);}
+    #gpj-hero .hero-demo-card{animation:heroDemo 4.2s ease-in-out infinite;}
+    #gpj-hero .hero-demo-badge{animation:heroBadge 4.2s ease-in-out infinite;}
+    @keyframes heroDemo{0%,18%{transform:rotate(0) translateX(0);}34%,46%{transform:rotate(7deg) translateX(52px);}62%{transform:rotate(0) translateX(0);}100%{transform:rotate(0) translateX(0);}}
+    @keyframes heroBadge{0%,20%{opacity:0;}34%,46%{opacity:1;}60%,100%{opacity:0;}}
+    @media (prefers-reduced-motion: reduce){#gpj-hero .hero-demo-card,#gpj-hero .hero-demo-badge{animation:none;} #gpj-hero .hero-demo-badge{opacity:1;}}
+  </style>
+  <div id="gpj-hero" style="position:fixed;inset:0;z-index:335;overflow-y:auto;background:var(--plum);-webkit-overflow-scrolling:touch;">
+    <!-- top bar -->
+    <div style="max-width:1080px;margin:0 auto;padding:15px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+        <img src="/assets/logo-mark.png" alt="GhostProofJob" class="ghost-glow" style="width:34px;height:34px;flex-shrink:0;object-fit:contain;"/>
+        <span class="brand-text" style="font-size:19px;font-weight:800;letter-spacing:-.3px;">GhostProofJob</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+        <div onclick="gpjToggleTheme()" title="Switch theme" style="cursor:pointer;font-size:14px;padding:7px 10px;border-radius:10px;border:1px solid var(--plum4);color:var(--muted);">🌓</div>
+        <div onclick="heroSignIn()" style="cursor:pointer;font-size:13px;font-weight:700;padding:8px 15px;border-radius:10px;border:1px solid rgba(181,95,230,.35);background:rgba(181,95,230,.12);color:var(--cyber);">Sign in</div>
+      </div>
+    </div>
+
+    <!-- hero -->
+    <div style="max-width:840px;margin:0 auto;padding:26px 22px 6px;text-align:center;">
+      <div style="display:inline-flex;align-items:center;gap:7px;background:rgba(0,245,160,.10);border:1px solid rgba(0,245,160,.28);color:var(--mint);font-size:12px;font-weight:700;padding:6px 13px;border-radius:999px;margin-bottom:18px;">💚 Always free — no ads, no data selling, ever</div>
+      <h1 id="hero-hl" style="font-size:clamp(30px,6.2vw,52px);font-weight:800;line-height:1.08;letter-spacing:-1px;margin:0 0 15px;color:var(--off);transition:opacity .3s ease;">Get answered, <span class="hero-accent">not ghosted.</span></h1>
+      <p style="font-size:clamp(15px,2.4vw,18px);color:var(--muted);line-height:1.6;max-width:580px;margin:0 auto 24px;">Job hunting is broken — you apply into the void and never hear back. GhostProofJob surfaces <b style="color:var(--off);">verified openings</b>, flags a company's <b style="color:var(--off);">ghosting risk</b> before you waste an interview, and tailors your résumé per role with an AI co-pilot.</p>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:11px;">
+        <div onclick="heroGetStarted()" class="hero-cta-primary" style="cursor:pointer;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;font-size:15px;padding:14px 26px;border-radius:14px;box-shadow:0 8px 24px rgba(0,245,160,.28);">Get started — it's free →</div>
+        <div onclick="heroExplore()" style="cursor:pointer;border:1px solid var(--plum4);color:var(--off);font-weight:700;font-size:15px;padding:14px 24px;border-radius:14px;">Jump straight to swiping</div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);">No credit card. No résumé required to start. <span onclick="heroUploadResume()" style="color:var(--mint);cursor:pointer;text-decoration:underline;">Upload a résumé</span> to see your matches instantly.</div>
+    </div>
+
+    <!-- muted looping demo swipe (decorative; no real data) -->
+    <div style="max-width:320px;margin:24px auto 4px;padding:0 22px;" aria-hidden="true">
+      <div style="position:relative;height:190px;">
+        <div style="position:absolute;inset:0;background:var(--plum3);border:1px solid var(--plum4);border-radius:18px;transform:scale(.94) translateY(10px);opacity:.5;"></div>
+        <div class="hero-demo-card" style="position:absolute;inset:0;background:var(--plum2);border:1px solid var(--plum4);border-radius:18px;padding:16px;box-shadow:0 14px 34px rgba(0,0,0,.32);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--cyber),var(--mint));flex:none;"></div>
+            <div style="min-width:0;"><div style="height:11px;width:120px;background:var(--plum4);border-radius:6px;margin-bottom:6px;"></div><div style="height:9px;width:80px;background:var(--plum4);border-radius:6px;opacity:.6;"></div></div>
+            <div style="margin-left:auto;background:rgba(0,245,160,.14);color:var(--mint);font-size:11px;font-weight:800;padding:4px 9px;border-radius:999px;">92%</div>
+          </div>
+          <div style="height:9px;width:100%;background:var(--plum4);border-radius:6px;margin-bottom:7px;opacity:.5;"></div>
+          <div style="height:9px;width:90%;background:var(--plum4);border-radius:6px;margin-bottom:7px;opacity:.5;"></div>
+          <div style="height:9px;width:60%;background:var(--plum4);border-radius:6px;opacity:.5;"></div>
+          <div class="hero-demo-badge" style="position:absolute;top:14px;right:14px;background:var(--mint);color:var(--plum);font-size:13px;font-weight:800;padding:6px 12px;border-radius:10px;transform:rotate(8deg);opacity:0;">APPLY ❤</div>
+        </div>
+      </div>
+      <div style="text-align:center;font-size:11px;color:var(--plum4);margin-top:14px;">Swipe right to apply · left to skip</div>
+    </div>
+
+    <!-- pillars: Build · Optimize · Apply · Simplify -->
+    <div style="max-width:940px;margin:20px auto 0;padding:0 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;">
+      <div class="hero-pillar"><div style="font-size:22px;margin-bottom:8px;">🔍</div><div style="font-weight:800;color:var(--off);margin-bottom:4px;">Build</div><div style="font-size:12.5px;color:var(--muted);line-height:1.55;">Swipe verified, live openings near you — with a ghost-risk flag on every one.</div></div>
+      <div class="hero-pillar"><div style="font-size:22px;margin-bottom:8px;">✨</div><div style="font-weight:800;color:var(--off);margin-bottom:4px;">Optimize</div><div style="font-size:12.5px;color:var(--muted);line-height:1.55;">Jett, your AI co-pilot, tailors your résumé + cover letter per role — using only your real experience.</div></div>
+      <div class="hero-pillar"><div style="font-size:22px;margin-bottom:8px;">🚀</div><div style="font-weight:800;color:var(--off);margin-bottom:4px;">Apply</div><div style="font-size:12.5px;color:var(--muted);line-height:1.55;">Jump straight to the real posting. Track every application so nothing falls through the cracks.</div></div>
+      <div class="hero-pillar"><div style="font-size:22px;margin-bottom:8px;">💚</div><div style="font-weight:800;color:var(--off);margin-bottom:4px;">Simplify</div><div style="font-size:12.5px;color:var(--muted);line-height:1.55;">One inbox for every message, interview and match. Get answered — not ghosted.</div></div>
+    </div>
+
+    <!-- honest proof (NO fabricated numbers) -->
+    <div style="max-width:680px;margin:26px auto 6px;padding:0 22px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.75;">
+      Every role is a real, live posting. Ghost-risk comes from real community reports and verified-employer signals — <b style="color:var(--off);">never a made-up number</b>. Every AI suggestion is yours to edit before it's saved. We win when you win — that's the whole model.
+    </div>
+
+    <!-- bottom CTA -->
+    <div style="text-align:center;padding:14px 22px 8px;">
+      <div onclick="heroGetStarted()" class="hero-cta-primary" style="display:inline-block;cursor:pointer;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;font-size:15px;padding:14px 30px;border-radius:14px;box-shadow:0 8px 24px rgba(0,245,160,.28);">Get started — it's free →</div>
+      <div style="margin-top:12px;font-size:12.5px;color:var(--muted);">Already have an account? <span onclick="heroSignIn()" style="color:var(--cyber);cursor:pointer;font-weight:700;text-decoration:underline;">Sign in</span></div>
+    </div>
+
+    <!-- hero footer -->
+    <div style="max-width:880px;margin:22px auto 0;padding:16px 22px 28px;border-top:1px solid var(--plum4);text-align:center;font-size:11px;color:var(--muted);line-height:1.9;">
+      <div><a href="/resume-checker.html" style="text-decoration:underline;color:var(--muted);">📄 Free Résumé Checker</a> · <a href="/resources/" style="text-decoration:underline;color:var(--muted);">📚 Resources</a> · <span onclick="openLegal('faq')" style="cursor:pointer;text-decoration:underline;">FAQ</span> · <span onclick="openLegal('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy</span> · <span onclick="openLegal('terms')" style="cursor:pointer;text-decoration:underline;">Terms</span></div>
+      <div style="margin-top:4px;"><span onclick="heroEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
+      <div style="color:var(--plum4);margin-top:4px;">GhostProofJob · Always free 💚 · No ads, no data selling, ever.</div>
+    </div>
+  </div>
+
   <div class="view-content">
 
     <!-- VIEW: SWIPE -->
@@ -2337,7 +2432,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
       </div>
       <div class="swipe-controls">
         <button class="ctrl-btn skip-btn" onclick="swipeCard('left')" aria-label="Skip job">🚫</button>
-        <div style="text-align:center;"><div style="font-size:11px;color:var(--mint);font-weight:700;" id="swipe-status-top">Free until you're hired 💚</div><div style="font-size:10px;color:var(--muted);" id="swipe-limit-text">(unlimited applies · <span onclick="openLegal('faq')" style="color:var(--cyber);cursor:pointer;text-decoration:underline;">how it works</span>)</div></div>
+        <div style="text-align:center;"><div style="font-size:11px;color:var(--mint);font-weight:700;" id="swipe-status-top">Always free 💚</div><div style="font-size:10px;color:var(--muted);" id="swipe-limit-text">(unlimited applies · <span onclick="openLegal('faq')" style="color:var(--cyber);cursor:pointer;text-decoration:underline;">how it works</span>)</div></div>
         <button class="ctrl-btn apply-btn" id="apply-btn" onclick="swipeCard('right')" aria-label="Auto-apply">❤️</button>
       </div>
       <!-- v209 (deck wow): visible centered UNDO — surfaces the v199 rewind on mobile AND
@@ -3123,7 +3218,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
         <div style="font-size:15px;font-weight:800;">Create a free account to unlock your Settings</div>
         <div style="font-size:12px;color:var(--muted);line-height:1.6;margin:6px 0 12px;">Match preferences, location auto-match, notifications, and data controls personalize once we know you. Until then — everything below is the honest stuff: pricing & legal.</div>
         <div onclick="openAuth()" style="background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:12px;padding:12px;font-size:14px;cursor:pointer;margin-bottom:8px;">Create Account / Log In</div>
-        <div style="font-size:10px;color:var(--muted);">Free until you're hired. No card required.</div>
+        <div style="font-size:10px;color:var(--muted);">Always free. No card required.</div>
       </div>
 
       <!-- LOCATION -->
@@ -3259,7 +3354,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
 
       <div class="pref-section">
         <div class="pref-section-title">Support GhostProofJob</div>
-        <div style="font-size:11px;color:var(--muted);margin:-2px 2px 10px;line-height:1.6;">You're <strong style="color:var(--mint);">free until you're hired</strong> — with full unlimited access early on, then generous daily limits that keep your search alive for free. Nothing below is required to find a job.</div>
+        <div style="font-size:11px;color:var(--muted);margin:-2px 2px 10px;line-height:1.6;">You're <strong style="color:var(--mint);">free to get hired — and free after, too</strong> — with full unlimited access early on, then generous daily limits that keep your search alive for free. Paid perks are optional and never required to find a job.</div>
         <div class="pref-row" onclick="openCheckout('life')" style="cursor:pointer;background:linear-gradient(135deg,rgba(0,245,160,.06),rgba(181,95,230,.06));border-color:rgba(0,245,160,.2);">
           <div class="pref-icon" style="background:rgba(0,245,160,.15);">⚡</div>
           <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--mint);">Lifetime — $12 once</div><div style="font-size:11px;color:var(--muted);">Best value · never pay again</div></div>
@@ -3306,8 +3401,8 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
       <!-- RECRUITER TIER (R1): employer entry. v109 R9-A: hidden for signed-in
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
-      <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v254</span> · Built with 👻 by hunters, for hunters</div>
+      <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Always free 💚 · No ads, no data selling, ever.</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v255</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3431,6 +3526,48 @@ try{
     document.getElementById('onboard-modal').classList.remove('open');
   }
 }catch(e){}
+
+/* ===== C6 SIGNED-OUT HERO (v255) — the first-paint landing for new logged-out
+   visitors. Same gate the onboarding modal used: hidden for returning visitors
+   and for anyone already signed in; otherwise the hero (visible by default in the
+   HTML) stays up. The app sits intact behind it. ===== */
+function _gpjHideHero(){ try{ const h=document.getElementById('gpj-hero'); if(h) h.style.display='none'; }catch(e){} }
+function _gpjHeroVisible(){ try{ const h=document.getElementById('gpj-hero'); return !!(h&&h.style.display!=='none'); }catch(e){ return false; } }
+function _gpjHeroGate(){
+  try{
+    const signedIn=!!(window.fb&&fb.current&&fb.current());
+    const returning=(localStorage.getItem('ngj_returning')==='1');
+    if(signedIn||returning) _gpjHideHero();
+  }catch(e){}
+}
+_gpjHeroGate();
+/* a returning/signed-in session resolves auth async — re-check so the hero never
+   lingers over a signed-in user (and never flashes for a returning one) */
+try{ setTimeout(_gpjHeroGate,900); setTimeout(_gpjHeroGate,2500); }catch(e){}
+function _gpjHeroDone(){ try{ localStorage.setItem('ngj_returning','1'); }catch(e){} _gpjHideHero(); }
+/* Sign in / Get started keep the hero BEHIND the auth modal (z 335 < 340); on a
+   real sign-in the auth chain hides it. We mark returning so it won't re-appear. */
+function heroGetStarted(){ try{ localStorage.setItem('ngj_returning','1'); }catch(e){} try{ showAuthModal('signup'); }catch(e){} }
+function heroSignIn(){ try{ localStorage.setItem('ngj_returning','1'); }catch(e){} try{ showAuthModal('login'); }catch(e){} }
+function heroExplore(){ _gpjHeroDone(); try{ switchView('swipe',document.querySelector('[data-view=swipe]')); }catch(e){} }
+function heroUploadResume(){ _gpjHeroDone(); try{ if(typeof goStraightToResume==='function'){ goStraightToResume(); return; } }catch(e){} try{ switchView('resume',document.querySelector('[data-view=resume]')); }catch(e){} }
+function heroEmployer(){ _gpjHeroDone(); try{ openEmployer(); }catch(e){} }
+/* rotating headline (respects prefers-reduced-motion; pauses while hidden) */
+(function(){
+  try{
+    if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const heads=['Get answered, <span class="hero-accent">not ghosted.</span>',
+                 'Applications that <span class="hero-accent">don\'t get ghosted.</span>',
+                 'Stop applying <span class="hero-accent">into the void.</span>'];
+    let i=0;
+    setInterval(function(){
+      if(!_gpjHeroVisible()) return;
+      const h=document.getElementById('hero-hl'); if(!h) return;
+      i=(i+1)%heads.length; h.style.opacity='0';
+      setTimeout(function(){ h.innerHTML=heads[i]; h.style.opacity='1'; },300);
+    },4600);
+  }catch(e){}
+})();
 
 /* ===== TUTORIAL ===== */
 let tutStep=0, tutTimers=[];
@@ -4209,6 +4346,8 @@ function _gpjSetAuthChip(emoji,name){
   chip.appendChild(document.createTextNode(emoji));
   const s=document.createElement('span'); s.className='chip-name';
   s.textContent=' '+(name||''); chip.appendChild(s);
+  /* v255 C6: the chip only carries an identity when signed in — hide the hero. */
+  try{ if(window.fb&&fb.current&&fb.current()&&typeof _gpjHideHero==='function') _gpjHideHero(); }catch(e){}
 }
 window._gpjSetAuthChip=_gpjSetAuthChip;
 function _gpjApplyRecruiterChrome(on){
@@ -4233,12 +4372,12 @@ function _gpjApplyRecruiterChrome(on){
   /* the 45-day counter means nothing to a company — show their plan instead.
      (refreshGraceDisplays is role-aware too, so nothing repaints over this.) */
   try{ refreshGraceDisplays(); }catch(e){}
-  /* the footer promise is written for hunters ("free until you're hired") — an
+  /* the footer promise is written for hunters ("always free") — an
      employer needs the promise that actually applies to THEM. */
   const fp=document.getElementById('footer-promise');
   if(fp) fp.textContent=on
     ? 'GhostProofJob · Hire without ghosting 💚 · Candidate contact is never sold, ever.'
-    : 'GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.';
+    : 'GhostProofJob · Always free 💚 · No ads, no data selling, ever.';
 }
 function _renderRecPlanMenu(){
   const cur=document.getElementById('rec-plan-current'), opts=document.getElementById('rec-plan-opts');
@@ -13832,6 +13971,7 @@ window.gpjAuthChanged=function(user){
     try{
       const _ob=document.getElementById('onboard-modal');
       if(_ob&&_ob.classList.contains('open')){ _ob.classList.remove('open'); }
+      try{ if(typeof _gpjHideHero==='function') _gpjHideHero(); }catch(e2){}   /* v255 C6: signed-in → hide the signed-out hero */
       localStorage.setItem('ngj_returning','1');
     }catch(e){}
     /* cloud profile is the source of truth — pull it now */
@@ -15436,7 +15576,7 @@ function injectLegalFooters(){
     '<span onclick="openLegal(\'privacy\')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span> \u00b7 '+
     '<span onclick="openLegal(\'terms\')" style="cursor:pointer;text-decoration:underline;">Terms of Service</span> \u00b7 '+
     '<span onclick="openLegal(\'security\')" style="cursor:pointer;text-decoration:underline;">Security</span>'+
-    '<br/><span style="color:var(--plum4);">GhostProofJob \u00b7 Free until you\u2019re hired \ud83d\udc9a \u00b7 No ads, no data selling, ever.</span>'+
+    '<br/><span style="color:var(--plum4);">GhostProofJob \u00b7 Always free \ud83d\udc9a \u00b7 No ads, no data selling, ever.</span>'+
     '<div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">'+
     '<span onclick="window.open(\'https://www.tiktok.com/@ghostproofjob\',\'_blank\',\'noopener\')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>'+
     '<span onclick="window.open(\'https://www.instagram.com/ghostproofjob\',\'_blank\',\'noopener\')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>'+
@@ -15454,8 +15594,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v254';
+const APP_VERSION = 'v255';
 const CHANGELOG = {
+  'v255':['v255 (C6 + N18): signed-out home HERO landing (first-paint for new logged-out visitors) — rotating headline, value pillars (Build/Optimize/Apply/Simplify), muted looping demo, honest proof (no fabricated numbers), real theme-adaptive logo, both themes, responsive. Additive: shows only when logged out via the SAME gate the onboarding modal used (skipped for ngj_returning, hidden on sign-in); app sits intact behind it; onboarding modal neutralized. N18 value-prop sweep: \'Free until you\'re hired\' → \'Always free\' framing across footer/swipe/pricing + SEO page.'],
   'v254':['v254 (D2): full Inbox tab — one home for every message/event (reach-outs, interviews, responses, applicants, matches, reviews, plan). Reuses the notification data layer (window._notifs via _gpjNotifLoad) = ZERO extra Firestore reads; each row routes via notifGo() to the live reply/interview/rate/candidate-card control (no duplicated UI). Both roles, both themes. Entry: desktop rail + \'Open full Inbox\' in the bell dropdown (no bottom-nav layout change).'],
   'v253':['N15: de-duplicate repeated job-text (a posting that repeats its overview/EEO or echoes the Benefits list at the desc tail no longer looks truncated/broken) via _gpjDedupText in the drawer; N16 (founder-approved): filter undisclosed-employer + scam-signal jobs (crypto pay + Telegram shifts + sub-min-wage) from the deck + Browse via _gpjIsJunkJob'],
   'v252':['logo default correction: company cards default to 🏢 (job cards stay 💼), both circular (N13 follow-up per founder); F-CLQ cover-letter quality: p3 no longer repeats p2\'s emphasized themes verbatim — leads with the candidate\'s specific relevant skills instead; harvest timeout 60→75m (separate workflow commit) so a fully-successful run no longer shows \'cancelled\''],
