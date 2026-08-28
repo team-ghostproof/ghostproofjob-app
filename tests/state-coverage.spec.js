@@ -9024,18 +9024,18 @@ test.describe('[STATE-COVERAGE] v235 company-card logo box', () => {
     await page.waitForTimeout(200);
   });
 
-  test('the company card has a logo box: 💼 placeholder without a domain, online logo with one', async ({ page }) => {
+  test('the company card has a logo box: 🏢 placeholder without a domain, online logo with one', async ({ page }) => {
     const r = await page.evaluate(() => {
       openCompanyView('CCMC', { title: 'X', t: 'X', co: 'CCMC', desc: 'd' }); // no domain
       const noDom = document.getElementById('cm-logo').innerHTML;
       openCompanyView('Acme', { title: 'X', t: 'X', co: 'Acme', companyWebsite: 'https://acme.com', desc: 'd' }); // real domain
       const withDom = document.getElementById('cm-logo').innerHTML;
       return {
-        placeholder: noDom.includes('💼') && !noDom.includes('<img'),   /* N13 (v249): unified default is now the circular briefcase */
+        placeholder: noDom.includes('🏢') && !noDom.includes('<img'),   /* v252: company cards default to 🏢 (job cards use 💼); both circular */
         online: withDom.includes('icons.duckduckgo.com/ip3/acme.com'),
       };
     });
-    expect(r.placeholder, 'no domain → 💼 placeholder box (no wrong logo)').toBe(true);
+    expect(r.placeholder, 'no domain → 🏢 placeholder box (no wrong logo)').toBe(true);
     expect(r.online, 'real domain → online logo in the box').toBe(true);
   });
 });

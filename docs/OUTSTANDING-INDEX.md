@@ -72,6 +72,15 @@
 
 ## 2. NEW — found in the 2026-08-27 live audit (not yet in the roadmap)
 
+- [ ] **N16 · "Hiring Company" / undisclosed-employer (often SCAM) jobs surface** `[BUILD][DECISION]` (founder repro 2026-08-28:
+  an Indeed "Marketing Agent – Dropper" 1-day-old posting — Telegram dept, USDC/Binance pay, $1.55/hr, hidden employer =
+  a classic recruitment scam). Root: harvester stores no company → mapper falls back to "Hiring Company" (index.html:5895/9652);
+  `_gpjEmployerFromUrl` can't recover it from an aggregator (indeed.com) URL. **Mission conflict: GPJ surfaces "verified real
+  jobs, flag ghost jobs" — it should NOT show these.** **Fix (needs founder DECISION):** (A) client-side HIDE undisclosed-employer
+  jobs (company empty/"Hiring Company"/"Confidential") from deck+Browse · (B) relabel "Company not disclosed" + demote + high
+  ghost-risk · (C) both + a scam-signal flag (crypto-pay + Telegram + below-min-wage). Rec: **A + C's scam flag.** Awaiting founder pick.
+
+
 - [x] **N11 · Harvest was failing → RESOLVED.** ✅ 8/25 was a transient Google-side blip (`400 Invalid database id`);
   the 2026-08-27 manual re-run **succeeded**, and I **pinned the Firestore write stack** (`requirements.txt`:
   firestore 2.29.0 / api-core 2.34.0 / grpcio 1.83.0 / protobuf 7.36.0 / auth 2.57.0 …) to the exact working set so
