@@ -21,7 +21,9 @@ jobs:
       contents: read
       issues: write          # N12: the failure-alert step opens/updates a "harvest-failure" issue
     # 6h cap for a stacking run, 60m for normal. (Public-repo runners allow 360.)
-    timeout-minutes: ${{ github.event.inputs.mode == 'stack' && 360 || 60 }}
+    # normal run: JobSpy (~54m budget) + D1 pool build (~5m) + cleanup can exceed 60m, which
+    # marked a fully-successful run as "cancelled". 75m gives headroom (public runners allow 360).
+    timeout-minutes: ${{ github.event.inputs.mode == 'stack' && 360 || 75 }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
