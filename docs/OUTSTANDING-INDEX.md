@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v254** (`CACHE_VERSION = gpj-v254`; live == repo, verified 2026-08-28).
+> **Current live build: v255** (`CACHE_VERSION = gpj-v255`; live == repo, verified 2026-08-28).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -176,8 +176,12 @@
   the stable 7-day corpus, two honest labelled scores; confirm the ATS preview shows the REAL parsed data
   (never audited — launch-readiness open Q3).
 - [x] **B2b · Match %-honesty** (= N2) — ✅ SHIPPED v250; awaiting founder live-verification of the new distribution.
-- [ ] **B3 · Site-wide wording / pricing consistency sweep** (F-WORDING) — one honest story everywhere (app +
-  static + Resources + checker); folds in N5 brand-purple unify.
+- [~] **B3 · Site-wide wording / pricing consistency sweep** (F-WORDING) — one honest story everywhere (app +
+  static + Resources + checker); folds in N5 brand-purple unify. **N18 slice DONE v255:** the misleading
+  "Free until you're hired" (implied you pay after being hired) reframed to **"Always free"** across the footer
+  promise (+ JS twins), swipe status, pricing lines, and the SEO hub page. **Remaining:** the generated SEO
+  *city* pages still use the old phrase (generator template — separate change); N5 brand-purple unify; a final
+  full pricing/tier consistency pass across Resources + checker.
 - [ ] **B-misc · Spell-check reachability** — `resumeSpellCheck()` runs only at import; "Improve My Whole Resume"
   doesn't spell-check and there's no button (feature-audit A3). Decide: wire it into Jett / add a button.
 
@@ -185,8 +189,14 @@
 - [ ] **C4 · Motion & delight (applicant only)** — swipe spring/touch-drag physics, count-up stats, streak flame,
   extend Apply/Hired celebrations. Employer side stays calm; respect `prefers-reduced-motion`; never block the core action.
 - [ ] **C5 · Skeleton loaders + mascot empty/first-run states** — cheapest "feels fast + finished"; kill blank flashes.
-- [ ] **C6 · Signed-out home hero** — 📐 **INTERACTIVE MOCKUP DELIVERED (theme-aware, real logo, responsive) — awaiting founder approval to build.** first thing a new user sees; muted looping demo
-  swipe; aggregate numbers ONLY when real (ties to F-GHOST data).
+- [x] **C6 · Signed-out home hero** — ✅ **SHIPPED v255 (2026-08-28), browser-verified.** A self-contained
+  full-screen signed-out landing (`#gpj-hero`) — the first paint for new logged-out visitors: rotating headline,
+  value pillars (Build/Optimize/Apply/Simplify), muted looping demo swipe, honest proof (no fabricated numbers —
+  aggregate stats stay omitted until F-GHOST has real volume), real theme-adaptive logo, both themes, responsive.
+  **Additive/INSERT-ONLY:** shows only when logged out via the SAME gate the onboarding modal used (skipped for
+  `ngj_returning`, hidden on sign-in); the app sits intact behind it; the legacy onboarding modal is neutralized.
+  Rendered in the initial HTML so crawlers read real marketing copy (SEO). Auth modal (z340) layers above the
+  hero (z335). Verified guest first-visit × dark/light × mobile/desktop; 4 new `[STATE-COVERAGE]` tests.
 
 ### Sprint D — Signature Features (3 of 4 already built → VERIFY; D2 is the one build)
 - [x] **D2 · Full Inbox tab** `[UI-REVIEW]` — ✅ **SHIPPED v254 (2026-08-28), live-verified.** A real full-tab
@@ -280,12 +290,20 @@
 > and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
 
 ### T0 · Confirm you're on the current build (do this first, every deploy)
-- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v254**
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v255**
   (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
 
 ### T1 · In-app Self-Test (the fastest health check — 19+ checks)
 - [ ] Profile chip (top-right "Aaliyah") → **Run Self-Test** → wait for it to finish → **every row green**.
   Any red = tell me the row name; that's a real failure, not a flake.
+
+### T-C6 · Signed-out home hero (SHIPPED v255 — test in a logged-OUT / private window)
+- [ ] Open `ghostproofjob.com` in a **private/incognito window** (so you're a fresh, logged-out visitor). You should
+  land on the **hero landing page** — big headline "Get answered, not ghosted." that **rotates** through 3 lines,
+  value pillars, a looping demo card, and a green **"Always free"** pill. Check **dark + light** (🌓 top-right) and **phone + desktop**.
+- [ ] **"Jump straight to swiping"** → the hero disappears and you're in the app deck. Refresh → it does **not** come
+  back (you're now a returning visitor). **"Sign in"** / **"Get started"** → the login/signup box opens **on top** of the hero.
+- [ ] Sign in → the hero is gone. Existing (already-signed-in) sessions should **never** see the hero.
 
 ### T-D2 · Full Inbox tab (SHIPPED v254 — test this build)
 - [ ] **Desktop:** the left rail now has **✉️ Inbox** (between Ghosts and Account/Profile). Click it → you land on
