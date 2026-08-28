@@ -9735,3 +9735,51 @@ test.describe('[STATE-COVERAGE] v256 N17 logo-from-apply-URL', () => {
     expect(r.regCoUk, 'ccTLD handled').toBe('acme.co.uk');
   });
 });
+
+/* v257 (N3 ghost-page). Founder decision: a company you flag leaves your hunt.
+   Authenticated state is stubbed (fb.current) so submitGhostReport runs. */
+test.describe('[STATE-COVERAGE] v257 N3 flag → leaves the hunt', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1200);
+  });
+  test('filing a ghost report hides that company from deck + Browse (undoable)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.fb = window.fb || {}; window.fb.current = () => ({ uid: 'demo' });
+      window.applySwipeFilters = window.applySwipeFilters || function () {};
+      window.renderUserReports = window.renderUserReports || function () {};
+      const co = 'Ghosty Corp ' + Math.floor(Math.random() * 1e6);
+      document.getElementById('gr-company').value = co;
+      document.getElementById('gr-stage').value = 'After Round 1 interview';   // a real <option>
+      const before = window.gpjHiddenCos().has(window._coKey(co));
+      let threw = false;
+      try { window.submitGhostReport(); } catch (e) { threw = true; }
+      const after = window.gpjHiddenCos().has(window._coKey(co));
+      // undo restores it
+      window.unhideCompany(co);
+      const afterUndo = window.gpjHiddenCos().has(window._coKey(co));
+      let reported = false;
+      try { reported = ((JSON.parse(localStorage.getItem('gpj_reports') || '{}')[co]) || []).length > 0; } catch (e) {}
+      return { threw, before, after, afterUndo, reported };
+    });
+    expect(r.threw, 'submitGhostReport never throws').toBe(false);
+    expect(r.before, 'not hidden before').toBe(false);
+    expect(r.after, 'flagged company is hidden from the hunt').toBe(true);
+    expect(r.reported, 'the report was still filed').toBe(true);
+    expect(r.afterUndo, 'unhide restores it (undoable)').toBe(false);
+  });
+  test('programmatic fileGhostReport (confirmed ghosted) also hides the company', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.fb = window.fb || {}; window.fb.current = () => ({ uid: 'demo' });
+      window.applySwipeFilters = window.applySwipeFilters || function () {};
+      const co = 'Voidhire ' + Math.floor(Math.random() * 1e6);
+      let threw = false;
+      try { window.fileGhostReport(co, 'No response'); } catch (e) { threw = true; }
+      const hidden = window.gpjHiddenCos().has(window._coKey(co));
+      window.unhideCompany(co);
+      return { threw, hidden };
+    });
+    expect(r.threw).toBe(false);
+    expect(r.hidden, 'confirmed-ghosted company leaves the hunt').toBe(true);
+  });
+});
