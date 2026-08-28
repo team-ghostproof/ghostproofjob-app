@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v246** (`CACHE_VERSION = gpj-v246`; live == repo, verified 2026-08-27).
+> **Current live build: v254** (`CACHE_VERSION = gpj-v254`; live == repo, verified 2026-08-28).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -189,8 +189,16 @@
   swipe; aggregate numbers ONLY when real (ties to F-GHOST data).
 
 ### Sprint D — Signature Features (3 of 4 already built → VERIFY; D2 is the one build)
-- [ ] **D2 · Full Inbox tab** `[UI-REVIEW]` **[BUILD]** — 📐 **INTERACTIVE MOCKUP + COMPLETE WIRING PLAN DELIVERED (theme-aware, real logo, responsive, every control→function, data model, states, tests) — awaiting founder approval to build.** replace the interim per-message dismiss (v196) with a
-  real inbox (anti-ghosting record + employer + candidate in one place). Founder: important, launch-window.
+- [x] **D2 · Full Inbox tab** `[UI-REVIEW]` — ✅ **SHIPPED v254 (2026-08-28), live-verified.** A real full-tab
+  Inbox that surfaces every message/event in one place (Messages / Interviews / Responses / Applicants /
+  Matches / Reviews / Admin / Account), replacing the interim per-message dismiss (v196). Reuses the
+  notification data layer (`window._notifs` via `_gpjNotifLoad`) → **ZERO extra Firestore reads** beyond the
+  bell; each row routes via `notifGo()` to the live reply / interview-picker / rate / candidate-card control
+  (no duplicated UI = no regression). Both roles (both titled "Inbox"), both themes, mobile + desktop.
+  Entry: desktop rail + "📬 Open full Inbox →" in the bell dropdown — **no mobile bottom-nav layout change.**
+  Browser-verified guest/populated × dark/light × mobile/desktop; 4 new `[STATE-COVERAGE]` tests (882/882 both projects).
+  Follow-ups (future, not blocking): inline reply/slot-pick without leaving the tab; "Add to Google Calendar"
+  + reschedule/cancel; employer applicant cards + next-steps/rejection actions (all currently reachable via the row → its live control).
 - [ ] **D1 · F-GHOST aggregated flag counts** — VERIFY the count aggregates with real volume + the "another hunter
   reported this" popup surfaces everywhere.
 - [ ] **D3 · 5 résumé templates** — VERIFY each exports cleanly (accent/headshot/spacing/address toggles intact).
@@ -272,12 +280,22 @@
 > and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
 
 ### T0 · Confirm you're on the current build (do this first, every deploy)
-- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v246**
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v254**
   (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
 
 ### T1 · In-app Self-Test (the fastest health check — 19+ checks)
 - [ ] Profile chip (top-right "Aaliyah") → **Run Self-Test** → wait for it to finish → **every row green**.
   Any red = tell me the row name; that's a real failure, not a flake.
+
+### T-D2 · Full Inbox tab (SHIPPED v254 — test this build)
+- [ ] **Desktop:** the left rail now has **✉️ Inbox** (between Ghosts and Account/Profile). Click it → you land on
+  the Inbox. **Mobile:** tap the **🔔 bell** (top-right) → **📬 Open full Inbox →** at the bottom of the dropdown.
+- [ ] If you have any real messages/interviews/matches, they appear **grouped** (Messages / Interviews / Responses /
+  etc.), newest first, with an **unread purple tint + dot**; if not, you see an honest "**Nothing here yet**" note.
+- [ ] Tap a row → it takes you to the **live control** for that item (the reply box / interview picker / rating /
+  candidate card) and marks it **read**. Come back to Inbox → the dot is gone and the "unread" count drops.
+- [ ] **Mark all read** clears every dot. Check **both dark + light** and **phone + desktop** — spacing stays clean,
+  and the **mobile bottom nav is unchanged** (still Swipe / Browse / Resume / Ghosts / Employers).
 
 ### T2 · Company logos (the N1 fix — after we ship it)
 - [ ] **Swipe** a few cards + open **Ghosts** → company logos are either the **real company logo** or the
