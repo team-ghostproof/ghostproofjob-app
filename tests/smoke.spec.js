@@ -47,6 +47,8 @@ test('core functions still exist (regression guard)', async ({ page }) => {
     'adminLoadDiagnostics', 'copyDiagReport',
     // v251 F-CL-PDF cover-letter PDF export
     'downloadCoverLetterPDF',
+    // v253 N15 dedup + N16 junk-job filter
+    '_gpjDedupText', '_gpjIsJunkJob',
   ];
   const missing = await page.evaluate(
     (names) => names.filter((n) => typeof window[n] !== 'function'),

@@ -3287,7 +3287,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Free until you’re hired 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v252</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v253</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -6600,6 +6600,7 @@ function renderBrowse(){
     const _seen=seenJobKeys();
     let hits=liveJobs.filter(j=>{
       if(_seen.has(jobKey(j))) return false;   /* unified: hide applied/skipped/saved */
+      if(_gpjIsJunkJob(j)) return false;   /* N16 (v253): hide undisclosed-employer / scam-signal jobs */
       /* F-GEO: distance cap over the loaded pool. null distance (remote / unknown
          city on either side) always passes — we never hide a role we can't measure. */
       if(maxMi>0){ const d=_jobDistanceMiles(j); if(d!==null && d>maxMi) return false; }
@@ -12182,6 +12183,7 @@ function applySwipeFilters(){
     (!hide || (j.ghost!==undefined && j.ghost<=35)) &&
     !hiddenKeys.has(jobKey(j)) &&
     !hiddenCos.has(_coKey(j.co)) &&
+    !_gpjIsJunkJob(j) &&   /* N16 (v253): never surface undisclosed-employer / scam-signal jobs */
     /* freshness: New(<30) / Active(<90). Keep jobs with unknown age so a missing
        source date never wrongly hides a job. */
     (!swFreshDays || j.posting_age_days==null || j.posting_age_days<=swFreshDays)
@@ -12298,6 +12300,46 @@ function _sameJobText(a,b){
   var minlen=Math.min(ka.length,kb.length);
   return minlen>0 && (inter/minlen)>=0.8;
 }
+/* N15 (v253): de-dup repeated content in a displayed job-text block so a posting that repeats
+   its own overview/EEO (founder repro: Gordian) or echoes the Benefits list at the description
+   tail (Wiza) doesn't look truncated/broken. Drops a paragraph that near-matches an EARLIER
+   kept one (internal repetition) or one already shown in another section (`others` = e.g. the
+   Benefits/Requirements text). Reuses _sameJobText for the similarity test. */
+function _gpjDedupText(text, others){
+  var s=String(text||''); if(!s.trim()) return s;
+  others=(others||[]).filter(Boolean);
+  var paras=s.split(/\n{1,}/).map(function(p){return p.trim();}).filter(Boolean);
+  var kept=[];
+  for(var i=0;i<paras.length;i++){
+    var p=paras[i];
+    if(p.length<12){ kept.push(p); continue; }   /* keep short headers/labels as-is */
+    var dup=false, j;
+    for(j=0;j<kept.length;j++){ if(kept[j].length>=12 && _sameJobText(p,kept[j])){ dup=true; break; } }
+    if(!dup){ for(j=0;j<others.length;j++){ if(_sameJobText(p,others[j])){ dup=true; break; } } }
+    if(!dup) kept.push(p);
+  }
+  return kept.join('\n\n');
+}
+/* N16 (v253, founder-approved): a posting with NO disclosed employer, or clear recruitment-scam
+   signals (crypto pay + Telegram/Discord "shifts" + far-below-minimum wage), is a red flag GPJ
+   should not surface (founder repro: an Indeed "dropper" role, $1.55/hr in USDC via Telegram,
+   hidden employer). Returns true → filtered out of the deck + Browse. FAIL-SAFE: any error → false
+   (never hide the whole deck). Watch for over-filtering of legit "confidential" listings. */
+function _gpjIsJunkJob(job){
+  try{
+    var co=String((job&&(job.co||job.company))||'').toLowerCase().replace(/\s+/g,' ').trim();
+    if(!co || /^(hiring company|the (hiring )?company|company|employer|confidential|undisclosed|not disclosed|n\/?a|unknown|private)$/.test(co)) return true;
+    var blob=((job&&job.desc)||'')+' '+((job&&job.req)||'')+' '+((job&&job.benefits)||'')+' '+((job&&(job.t||job.title))||'');
+    blob=blob.toLowerCase();
+    var scam=0;
+    if(/\b(usdc|usdt|binance|bitcoin|btc|ethereum|crypto)\b/.test(blob)) scam++;
+    if(/\btelegram\b/.test(blob) && /\b(department|shift|dropper|agent|backup role)\b/.test(blob)) scam++;
+    if(/\$\s?[0-3](\.\d+)?\s*(?:usd)?\s*(?:per hour|\/\s?hr|hourly|an hour)/.test(blob)) scam++;   /* far below minimum wage */
+    if(/\b(bandicam|obs studio|screen recording)\b/.test(blob) && /\b(telegram|discord)\b/.test(blob)) scam++;
+    return scam>=2;
+  }catch(e){ return false; }
+}
+window._gpjDedupText=_gpjDedupText; window._gpjIsJunkJob=_gpjIsJunkJob;
 function hydrateDrawer(){
   const topCard=document.querySelector('.job-card.top');
   const _tj=(typeof _currentTopJob==='function'?_currentTopJob():null);
@@ -12352,9 +12394,9 @@ function hydrateDrawer(){
     if(lead||u||bn||_int){
       sumBox.innerHTML=
         '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📋 Job Expectations & Summary</div>'+
-        (lead?('<div class="desc-clamp">'+_fmtJobText(lead)+'</div>'):(_int?'':'<div style="font-size:11px;color:var(--muted);">Full details live on the original posting.</div>'))+
-        ((rq&&d&&!_dupRD)?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px;">ℹ️ More about the role</div><div class="desc-clamp">'+_fmtJobText(d)+'</div>'):'')+
-        (bn?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px;">🎁 Benefits</div><div class="desc-clamp">'+_fmtJobText(bn)+'</div>'):'')+
+        (lead?('<div class="desc-clamp">'+_fmtJobText(_gpjDedupText(lead,[bn]))+'</div>'):(_int?'':'<div style="font-size:11px;color:var(--muted);">Full details live on the original posting.</div>'))+
+        ((rq&&d&&!_dupRD)?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px;">ℹ️ More about the role</div><div class="desc-clamp">'+_fmtJobText(_gpjDedupText(d,[bn,rq,lead]))+'</div>'):'')+
+        (bn?('<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px;">🎁 Benefits</div><div class="desc-clamp">'+_fmtJobText(_gpjDedupText(bn,[]))+'</div>'):'')+
         (_int
           ?('<div style="font-size:11px;color:var(--mint);margin-top:10px;display:flex;align-items:center;gap:6px;">✅ Hosted &amp; verified on GhostProofJob — apply in-app, no third-party site.</div>'
             +'<div onclick="applyInternalById(\''+String(_tj.id).replace(/\x27/g,'')+'\',\''+String((_tj.t||'')).replace(/\x27/g,'')+'\',\''+String(co||'').replace(/\x27/g,'')+'\')" style="margin-top:6px;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);font-weight:800;border-radius:10px;padding:11px;text-align:center;font-size:13px;cursor:pointer;">📨 Apply to this role</div>')
@@ -15299,8 +15341,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v252';
+const APP_VERSION = 'v253';
 const CHANGELOG = {
+  'v253':['N15: de-duplicate repeated job-text (a posting that repeats its overview/EEO or echoes the Benefits list at the desc tail no longer looks truncated/broken) via _gpjDedupText in the drawer; N16 (founder-approved): filter undisclosed-employer + scam-signal jobs (crypto pay + Telegram shifts + sub-min-wage) from the deck + Browse via _gpjIsJunkJob'],
   'v252':['logo default correction: company cards default to 🏢 (job cards stay 💼), both circular (N13 follow-up per founder); F-CLQ cover-letter quality: p3 no longer repeats p2\'s emphasized themes verbatim — leads with the candidate\'s specific relevant skills instead; harvest timeout 60→75m (separate workflow commit) so a fully-successful run no longer shows \'cancelled\''],
   'v251':['E2-4: two-slot session cache (region + nationwide) on roomy devices + 10→30min TTL — fewer redundant pool re-reads when alternating deck/nationwide/company views (low-mem devices keep 1 slot, preserving the v139 iPhone-OOM fix); F-CL-PDF: cover letters now export as a real PDF (matches the résumé) via the loaded jsPDF, with a TXT option kept'],
   'v250':['N2: de-saturate the match score so it discriminates instead of clamping at 98 for every in-field job — split into capped IN-FIELD (~68) + DEPTH (~28) components so the 90s require real skill/JD depth, not a single field-word match; mirrored lock-step in api/match/scoreCore.js (convergence test green)'],

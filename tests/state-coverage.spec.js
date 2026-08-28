@@ -9518,3 +9518,47 @@ test.describe('[STATE-COVERAGE] v251 cover-letter PDF export', () => {
     expect(r.toast, 'empty input prompts, does not silently download').toMatch(/nothing to export/i);
   });
 });
+
+/* v253 (N15 dedup + N16 junk-job filter). */
+test.describe('[STATE-COVERAGE] v253 N15 dedup + N16 junk-job filter', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1200);
+  });
+  test('N15: repeated paragraphs (internal + cross-section) are de-duplicated', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const overview = 'Fortive makes the world safer and more productive. We accelerate transformation in high-impact fields like workplace safety and healthcare.';
+      const desc = overview + '\n\nWhat you own: the full marketing strategy and demand generation.\n\n' + overview; // Gordian: overview twice
+      const internal = window._gpjDedupText(desc, []);
+      const benefits = 'Competitive compensation. Extended health benefits medical dental vision. Flexible vacation policy.';
+      const descWithBenefits = 'Lead our marketing team and own the number.\n\n' + benefits; // Wiza: benefits echoed at desc tail
+      const cross = window._gpjDedupText(descWithBenefits, [benefits]);
+      return {
+        internalOnce: (internal.match(/We accelerate transformation/g) || []).length,
+        keepsUnique: internal.includes('own: the full marketing strategy'),
+        crossStripped: !cross.includes('Extended health benefits'),
+        crossKeeps: cross.includes('Lead our marketing team'),
+      };
+    });
+    expect(r.internalOnce, 'a repeated paragraph appears once').toBe(1);
+    expect(r.keepsUnique, 'unique content kept').toBe(true);
+    expect(r.crossStripped, 'benefits echoed in the desc tail are stripped').toBe(true);
+    expect(r.crossKeeps, 'the real desc content is kept').toBe(true);
+  });
+  test('N16: undisclosed-employer + scam jobs are filtered; real jobs (incl. named agencies) pass', async ({ page }) => {
+    const r = await page.evaluate(() => ({
+      undisclosed: window._gpjIsJunkJob({ co: 'Hiring Company', t: 'Marketing Agent' }),
+      empty: window._gpjIsJunkJob({ co: '', t: 'X' }),
+      confidential: window._gpjIsJunkJob({ co: 'Confidential', t: 'X' }),
+      scam: window._gpjIsJunkJob({ co: 'Aura X Agency', t: 'Marketing Agent - Dropper', desc: 'Telegram department backup role. Base Rate: $1.55 USD per hour, paid in USDC via Binance. Screen recording with OBS required.' }),
+      real: window._gpjIsJunkJob({ co: 'Gordian', t: 'Senior Marketing Manager', desc: 'Lead marketing strategy for RSMeans. $114,000-$190,000. Medical, dental, 401k.' }),
+      realAgency: window._gpjIsJunkJob({ co: 'Murray Resources', t: 'Marketing Manager', desc: 'Our client seeks a marketing manager. Competitive salary and full benefits.' }),
+    }));
+    expect(r.undisclosed, 'Hiring Company → junk').toBe(true);
+    expect(r.empty, 'empty company → junk').toBe(true);
+    expect(r.confidential, 'Confidential → junk').toBe(true);
+    expect(r.scam, 'crypto + telegram + sub-min-wage → junk').toBe(true);
+    expect(r.real, 'a real disclosed job passes').toBe(false);
+    expect(r.realAgency, 'a legit staffing agency with a real name passes').toBe(false);
+  });
+});
