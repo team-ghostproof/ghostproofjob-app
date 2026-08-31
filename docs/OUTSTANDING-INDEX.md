@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v262** (`CACHE_VERSION = gpj-v262`; live == repo, verified 2026-08-28).
+> **Current live build: v263** (`CACHE_VERSION = gpj-v263`; live == repo, verified 2026-08-28).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -72,6 +72,13 @@
 
 ## 2. NEW — found in the 2026-08-27 live audit (not yet in the roadmap)
 
+- [x] **N20 · Service-worker update errors spamming the diagnostics log** — ✅ **FIXED v263 (2026-08-31), live.**
+  Diagnostics showed `Failed to update a ServiceWorker … unknown error when fetching the script` ×20 (v254).
+  `reg.update()` returns a promise but the 3 calls were in synchronous `try/catch` (can't catch async rejection),
+  so a transient `sw.js` miss during a Vercel deploy became an unhandled rejection the v125 reporter logged.
+  Caught each `reg.update()` promise + drop benign SW update/register noise in `_gpjReportErr`. **Not user-facing**
+  (the SW keeps serving the cached app). The **`www.` variant** (v239, 5d ago) is the stale SW on the
+  un-redirected `www` host → resolved by **N14** (www→apex redirect, founder/infra). 1 new state test.
 - [x] **N19 · Favicon = the transparent ghost + mint glow, on every page** — ✅ **SHIPPED v260–v262 (2026-08-30), live.** The
   browser-tab icon was the OLD logo (dark navy rounded-square, dated Jul 3) — it predated the Aug 20
   transparent-ghost upgrade (`assets/logo-mark.png`); and `resume-checker.html` + every resources article
@@ -150,7 +157,8 @@
   `[STATE-COVERAGE]` tests. **Deferred (founder, on hold):** ghost-% card-face placement + button icon/word centering.
 - [ ] **N4 · Mobile tap targets < 44px.** `[UI-REVIEW]` Sign In (28px), Support Us (28px), Match to Job (30px),
   Cover Letter (30px), filter chips (29px) are below the 44px iOS / 48dp Android minimum. Padding-only fix;
-  add a mobile Playwright assertion (primary buttons ≥44px tall).
+  add a mobile Playwright assertion (primary buttons ≥44px tall). **📐 MOCKUP DELIVERED (2026-08-31,
+  `scratchpad/N4-tap-targets-mockup.html`, before/after toggle) — awaiting founder yes/no to build.**
 - [x] **N5 · Cross-surface brand-purple mismatch.** ✅ SHIPPED v248 — App light `--cyber` = `#7C3AED` but Resources pages
   (`resources/index.html`) use `#7A3CA8`. Unify (folds into F-WORDING/B3).
 - [x] **N6 · "Resume Optimizer" label appears twice** ✅ SHIPPED v248 — in Résumé Studio (collapsed header + expanded block reuse
@@ -186,9 +194,19 @@
 ## 3. OPEN WORK BY SPRINT (Sprint A is ✅ complete)
 
 ### Sprint B — Trust the Intelligence (verify + harden the core value)
-- [ ] **B1 · Cover-letter / AI quality** (F-AI, F-COVERLETTER) — verify end-to-end now the Worker is redeployed;
-  fix any unfilled phrasing ("the this role position") / forced emphasis; confirm honest fallback labels +
-  per-tier caps. Live-quality is a founder gate (Worker prompt is outside the repo).
+- [~] **B1 · Cover-letter / AI quality** (F-AI, F-COVERLETTER) — **🔴 DIAGNOSED 2026-08-31 via founder live-test
+  (Talkiatry "Senior Lifecycle Marketing Manager", real résumé + cover letter). THREE compounding bugs in
+  `tailorCoverLetter` (index.html ~9116):** **(A)** p3 built `'the '+skillsTop+' I bring'` and `skillsTop`
+  resolved to a generic tool skill → **"put the Excel I bring to work where outcomes matter"** (embarrassing;
+  generic tool skills like Excel/Word/PowerPoint must never lead, and the phrasing only reads for phrase-skills).
+  **(B)** `lead` themes were generic/vacuous — **"Your posting emphasizes marketing and design"** ("marketing"
+  is vacuous for a marketing role; "design" isn't in a lifecycle role). **(C)** the quoted bullet matched the
+  generic word "marketing" → surfaced the OLDEST, off-domain bullet ("directed marketing … four-state territory",
+  a 2014 sports-training GM role) instead of the on-target lifecycle content that's literally in the summary.
+  **Fix plan (next build):** generic-skill blocklist + phrase-guard for the p3 lead; drop vacuous/self-evident
+  themes (the role's own noun) and prefer distinctive multi-word terms; bias bullet pick toward recent +
+  quantified + on-domain. Add a state test asserting the Talkiatry case never emits "the Excel I bring" / "and
+  design". Live-quality still a founder gate (Worker prompt is outside the repo).
 - [ ] **B2 · Rater + ATS-preview** (F-RATER, F-ATSPREVIEW) — confirm the rater reads the WHOLE résumé, scores on
   the stable 7-day corpus, two honest labelled scores; confirm the ATS preview shows the REAL parsed data
   (never audited — launch-readiness open Q3).
@@ -311,7 +329,7 @@
 > and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
 
 ### T0 · Confirm you're on the current build (do this first, every deploy)
-- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v262**
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v263**
   (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
 
 ### T1 · In-app Self-Test (the fastest health check — 19+ checks)
