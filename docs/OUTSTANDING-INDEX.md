@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v268** (`CACHE_VERSION = gpj-v268`; live == repo, verified 2026-08-28).
+> **Current live build: v269** (`CACHE_VERSION = gpj-v269`; live == repo, verified 2026-08-28).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -77,8 +77,11 @@
   can't click to drill into; with 0 roles the page just says "post one under Listings." **Proposed:** make each tile
   filter/scroll to its list; clarify the empty state ("post a role → applicants land here"); tap-role → applicants →
   candidate card (the intended flow). Needs a recruiter login to live-test (see §5).
-- [ ] **N23 · Recruiter "Listing strength" is shallow (char-count feel)** `[BUILD]` (founder live-test 2026-08-31).
-  Today it scores length + presence of requirements/benefits/salary (a gibberish body still scored 38%). **Proposed:**
+- [x] **N23 · Recruiter "Listing strength" is shallow (char-count feel)** — ✅ **SHIPPED v269 (2026-08-31), live.**
+  New `_recCoherence` heuristic (distinct function words + real word shapes − monster tokens; no dictionary/read/
+  network) gates `_recListingScore`: keyboard-mash/placeholder caps low + the tip becomes "write a real, readable
+  description"; a short-but-genuine listing is unaffected. Founder's gibberish 38% → ≤20%. State test both projects.
+  _Original:_ Today it scores length + presence of requirements/benefits/salary (a gibberish body still scored 38%). **Proposed:**
   score real quality signals — a genuine title, sentence/keyword coherence (not keyboard-mash), a salary RANGE,
   distinct requirements + benefits sections, reasonable length band — and give concrete "add X" tips. Honesty: never
   reward gibberish. (Candidate-facing match already ignores junk; this is the employer-side authoring aid.)
@@ -358,7 +361,7 @@
 > and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
 
 ### T0 · Confirm you're on the current build (do this first, every deploy)
-- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v268**
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v269**
   (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
 
 ### T1 · In-app Self-Test (the fastest health check — 19+ checks)
