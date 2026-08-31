@@ -9813,3 +9813,26 @@ test.describe('[STATE-COVERAGE] v259 E2-3 memoized ghost count', () => {
     expect(r.empty, 'empty company short-circuits to null with no read').toBe(null);
   });
 });
+
+/* v263 (bug: SW-update error spam). _gpjReportErr must drop benign transient
+   service-worker update/register noise but still queue real errors. */
+test.describe('[STATE-COVERAGE] v263 SW error-noise filter', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1000);
+  });
+  test('service-worker update failures are not logged; real errors still are', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window._gpjErrQ = []; window._gpjErrCount = 0;
+      const _f = window._gpjFlushErrs; window._gpjFlushErrs = () => {};
+      window._gpjReportErr("unhandledrejection: Failed to update a ServiceWorker for scope ('https://ghostproofjob.com/') with script ('https://ghostproofjob.com/sw.js'): An unknown error occurred when fetching the script.", 'promise', 0);
+      const afterSW = window._gpjErrQ.length;
+      window._gpjReportErr('TypeError: doThing is not a function', 'index.html', 42);
+      const afterReal = window._gpjErrQ.length;
+      window._gpjFlushErrs = _f;
+      return { afterSW, afterReal };
+    });
+    expect(r.afterSW, 'SW update noise is dropped (not queued)').toBe(0);
+    expect(r.afterReal, 'a genuine error is still queued').toBe(1);
+  });
+});

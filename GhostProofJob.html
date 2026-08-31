@@ -3404,7 +3404,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Always free 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v262</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v263</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3647,6 +3647,13 @@ let _recruiterAuthMode='signup';   /* 'signup' | 'login' */
 window._gpjErrQ=[];
 function _gpjReportErr(msg,src,line){
   try{
+    /* v263: drop benign, transient service-worker UPDATE noise. The browser
+       re-fetches sw.js on its own schedule (independent of our reg.update());
+       a momentary miss during a Vercel deploy rejects as "unknown error when
+       fetching the script" and, uncaught, spammed the diagnostics log ×20. It is
+       not a user-facing failure — the SW keeps serving the cached app — so it must
+       not pollute real error signal. (Our own reg.update() calls are now caught too.) */
+    if(/Failed to (update|register) a ServiceWorker|error occurred when fetching the script/i.test(String(msg||''))) return;
     /* cap counts REPORTS this session — the queue drains on flush, so its
        length can't be the limiter (the v125 test caught exactly that) */
     if(!window._gpjErrQ || (window._gpjErrCount||0)>=3) return;
@@ -15647,8 +15654,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v262';
+const APP_VERSION = 'v263';
 const CHANGELOG = {
+  'v263':['v263 (bug: SW-update error spam): the diagnostics log showed \'Failed to update a ServiceWorker … unknown error when fetching the script\' ×20 (v254). Root cause: reg.update() returns a PROMISE but the three calls were in synchronous try/catch (can\'t catch async rejection), so a transient sw.js miss during a Vercel deploy became an unhandled rejection the v125 reporter logged. Fix: catch each reg.update() promise; AND drop benign SW update/register noise in _gpjReportErr (the browser re-fetches sw.js on its own schedule too). Not user-facing — the SW keeps serving the cached app. The \'www.\' variant is the stale SW on the un-redirected www host = N14.'],
   'v262':['v262 (favicon size): the tab ghost was small — the source PNG has a big transparent margin and I\'d inset it further for glow room. build_icons.py now trims the source to its opaque bbox and fits the ghost to ~92% of the frame (aspect-preserving), so it fills the tab icon; glow blur tightened to match. Cache-buster ?v=3 → ?v=4.'],
   'v261':['v261 (favicon glow): bake the on-page .ghost-glow (filter:drop-shadow(0 0 6px var(--mint))) into the icon PNGs so the browser-tab favicon matches the logo — a soft mint halo that keeps the transparent white ghost legible on light AND dark tab chrome (it was washing out on light). scripts/build_icons.py now composites a blurred mint silhouette behind the ghost (inset for glow room) for favicon-32/icon-192/icon-512 + the .ico, and a subtler glow on the plum-bg apple-touch/maskable. Cache-buster ?v=2 → ?v=4.'],
   'v260':['v260 (favicon = transparent ghost, on every page): regenerated all brand icons from assets/logo-mark.png (the upgraded transparent business-ghost) via scripts/build_icons.py — favicon-32/icon-192/icon-512 stay transparent (ghost has a dark outline, legible on light+dark tabs); apple-touch + maskable sit on the Midnight Plum brand bg (iOS/Android home-screen-safe); added a multi-size favicon.ico. Added the favicon links to the pages that had NONE (resume-checker.html + all resources articles + the resources generator template). ?v=4 busts the old dark-square favicon cache.'],
@@ -15988,8 +15996,8 @@ renderUserReports();
     if('serviceWorker' in navigator){
       navigator.serviceWorker.register('sw.js').then(reg=>{
         /* check for a new deployed version every time the app opens + hourly */
-        try{ reg.update(); }catch(e){}
-        setInterval(()=>{ try{ reg.update(); }catch(e){} }, 60*60*1000);
+        try{ const _u=reg.update(); if(_u&&_u.catch) _u.catch(()=>{}); }catch(e){}
+        setInterval(()=>{ try{ const _u=reg.update(); if(_u&&_u.catch) _u.catch(()=>{}); }catch(e){} }, 60*60*1000);
         /* B-UPDATE-STUCK (v80): also re-check on every tab FOCUS and verify the
            deployed version DIRECTLY (bypassing every cache) — a client whose SW
            update flow is wedged still learns a new build exists, so the banner +
@@ -16002,7 +16010,7 @@ renderUserReports();
            session, so no reload loop (after reload APP_VERSION matches). */
         const _isStandalone=(function(){ try{ return (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true) && !navigator.webdriver; }catch(e){ return false; } })();
         const _vCheck=async()=>{
-          try{ reg.update(); }catch(e){}
+          try{ const _u=reg.update(); if(_u&&_u.catch) _u.catch(()=>{}); }catch(e){}
           try{
             const txt=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'');
             const m=txt.match(/gpj-v(\d+)/);
