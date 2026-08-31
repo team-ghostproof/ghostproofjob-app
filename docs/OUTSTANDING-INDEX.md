@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v267** (`CACHE_VERSION = gpj-v267`; live == repo, verified 2026-08-28).
+> **Current live build: v268** (`CACHE_VERSION = gpj-v268`; live == repo, verified 2026-08-28).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -268,8 +268,11 @@
   (no duplicated UI = no regression). Both roles (both titled "Inbox"), both themes, mobile + desktop.
   Entry: desktop rail + "📬 Open full Inbox →" in the bell dropdown — **no mobile bottom-nav layout change.**
   Browser-verified guest/populated × dark/light × mobile/desktop; 4 new `[STATE-COVERAGE]` tests (882/882 both projects).
-  Follow-ups (future, not blocking): inline reply/slot-pick without leaving the tab; "Add to Google Calendar"
-  + reschedule/cancel; employer applicant cards + next-steps/rejection actions (all currently reachable via the row → its live control).
+  **v268 REBUILD (founder live-test: "clicking a message just takes me back to Settings"):** candidate messages
+  now **EXPAND INLINE** in the Inbox with their real actions (accept / pick a slot / appeal / reschedule / cancel /
+  dismiss), reusing the same global action fns — no more bounce to Settings; the 🔔 bell routes candidate messages
+  into the Inbox too; `_notifCandidate` caches the full reach-out objects (zero extra reads). 908/908 both projects.
+  Follow-ups (future, not blocking): "Add to Google Calendar" + employer applicant cards + next-steps/rejection actions.
 - [ ] **D1 · F-GHOST aggregated flag counts** — VERIFY the count aggregates with real volume + the "another hunter
   reported this" popup surfaces everywhere.
 - [ ] **D3 · 5 résumé templates** — VERIFY each exports cleanly (accent/headshot/spacing/address toggles intact).
@@ -355,7 +358,7 @@
 > and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
 
 ### T0 · Confirm you're on the current build (do this first, every deploy)
-- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v267**
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v268**
   (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
 
 ### T1 · In-app Self-Test (the fastest health check — 19+ checks)
