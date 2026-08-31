@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-30 · Current live build: **v263**_
+_Last updated: 2026-08-30 · Current live build: **v264**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v264** — v264 (N4, founder-approved): comfortable >=44px mobile tap targets. A scoped @media(max-width:1023px) block grows the tap HEIGHT (min-height + vertical centering) on the most-tapped controls — Sign In (#auth-chip), Support Us (#upgrade-trigger), the bell (#notif-bell), Match to Job + Cover Letter card buttons, and the .quick-chip filter chips — to 44-46px (chips 38px). NO change to colors/labels/icons/layout, desktop untouched, and the ghost LOGO + wordmark + day pill are NOT touched (the header just gets slightly taller so the logo stays put). Mobile Playwright assertion added.
 - **v263** — v263 (bug: SW-update error spam): the diagnostics log showed 'Failed to update a ServiceWorker … unknown error when fetching the script' ×20 (v254). Root cause: reg.update() returns a PROMISE but the three calls were in synchronous try/catch (can't catch async rejection), so a transient sw.js miss during a Vercel deploy became an unhandled rejection the v125 reporter logged. Fix: catch each reg.update() promise; AND drop benign SW update/register noise in _gpjReportErr (the browser re-fetches sw.js on its own schedule too). Not user-facing — the SW keeps serving the cached app. The 'www.' variant is the stale SW on the un-redirected www host = N14.
 - **v262** — v262 (favicon size): the tab ghost was small — the source PNG has a big transparent margin and I'd inset it further for glow room. build_icons.py now trims the source to its opaque bbox and fits the ghost to ~92% of the frame (aspect-preserving), so it fills the tab icon; glow blur tightened to match. Cache-buster ?v=3 → ?v=4.
 - **v261** — v261 (favicon glow): bake the on-page .ghost-glow (filter:drop-shadow(0 0 6px var(--mint))) into the icon PNGs so the browser-tab favicon matches the logo — a soft mint halo that keeps the transparent white ghost legible on light AND dark tab chrome (it was washing out on light). scripts/build_icons.py now composites a blurred mint silhouette behind the ghost (inset for glow room) for favicon-32/icon-192/icon-512 + the .ico, and a subtler glow on the plum-bg apple-touch/maskable. Cache-buster ?v=2 → ?v=3.

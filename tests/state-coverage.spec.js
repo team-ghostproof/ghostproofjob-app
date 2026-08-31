@@ -9836,3 +9836,33 @@ test.describe('[STATE-COVERAGE] v263 SW error-noise filter', () => {
     expect(r.afterReal, 'a genuine error is still queued').toBe(1);
   });
 });
+
+/* v264 (N4 mobile tap targets). On a phone viewport the most-tapped controls must
+   be >=44px tall; desktop is unaffected (media query gated at max-width:1023px). */
+test.describe('[STATE-COVERAGE] v264 N4 tap targets', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1000);
+  });
+  test('header chips reach 44px on mobile; the logo is never removed', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const h = (id) => { const e = document.getElementById(id); return e ? Math.round(e.getBoundingClientRect().height) : -1; };
+      const logo = document.querySelector('#header-row img');
+      return {
+        w: window.innerWidth,
+        signIn: h('auth-chip'),
+        support: h('upgrade-trigger'),
+        logoPresent: !!(logo && logo.getAttribute('src') && /logo-mark/.test(logo.getAttribute('src'))),
+        logoH: logo ? Math.round(logo.getBoundingClientRect().height) : -1,
+      };
+    });
+    expect(r.logoPresent, 'the ghost logo is still in the header (N4 never removes it)').toBe(true);
+    if (r.w < 1024) {
+      expect(r.signIn, 'Sign In >=44px on mobile').toBeGreaterThanOrEqual(44);
+      expect(r.support, 'Support Us >=44px on mobile').toBeGreaterThanOrEqual(44);
+      expect(r.logoH, 'logo keeps its own ~34px size, not enlarged').toBeLessThanOrEqual(40);
+    } else {
+      expect(r.signIn, 'desktop chip still present/sized').toBeGreaterThan(0);
+    }
+  });
+});
