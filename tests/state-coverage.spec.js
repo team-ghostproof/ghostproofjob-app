@@ -9939,3 +9939,40 @@ test.describe('[STATE-COVERAGE] v266 C5 deck skeleton', () => {
     expect(r.threw, 'never throws').toBe(false);
   });
 });
+
+/* v268 (D2 Inbox rebuild). A candidate message expands INLINE with real actions,
+   instead of bouncing to Settings. */
+test.describe('[STATE-COVERAGE] v268 Inbox inline actions', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.renderInbox === 'function' && typeof window.inboxOpen === 'function', null, { timeout: 15000 });
+  });
+  test('a reach-out message expands inline (slots + Accept) — no Settings bounce', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      window._recruiter = null;
+      window.fb = window.fb || {};
+      window.fb.current = () => ({ uid: 'demo' });
+      window.fb.loadMyReachouts = async () => [{ id: 'rx1', company: 'Acme', jobTitle: 'PM', status: 'sent', proposedTimes: ['Mon 10am', 'Tue 2pm'], ts: Date.now() }];
+      await window.renderInbox();
+      const notif = (window._notifs || []).find(n => /^ro:rx1/.test(n.id));
+      const key = notif ? notif.id.replace(/[^a-z0-9]/gi, '_') : '';
+      const before = document.getElementById('inbox-detail-' + key);
+      const hiddenBefore = before ? before.style.display : 'MISSING';
+      let threw = false;
+      try { window.inboxOpen(notif.id); } catch (e) { threw = true; }
+      const after = document.getElementById('inbox-detail-' + key);
+      return {
+        hasNotif: !!notif, cached: !!(window._myRO && window._myRO.rx1),
+        hiddenBefore, shown: after ? after.style.display : 'MISSING',
+        html: after ? after.innerHTML : '', threw,
+      };
+    });
+    expect(r.hasNotif, 'the reach-out produced an inbox notif').toBe(true);
+    expect(r.cached, 'full reach-out cached for inline actions (no extra read)').toBe(true);
+    expect(r.hiddenBefore, 'detail hidden before click').toBe('none');
+    expect(r.shown, 'detail expands inline on click (not a Settings bounce)').toBe('block');
+    expect(r.html, 'shows the interview-slot picker inline').toMatch(/Pick an interview time/i);
+    expect(r.html, 'shows the Accept action inline').toMatch(/Accept|Interested/);
+    expect(r.threw, 'never throws').toBe(false);
+  });
+});
