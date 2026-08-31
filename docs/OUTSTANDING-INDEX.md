@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v263** (`CACHE_VERSION = gpj-v263`; live == repo, verified 2026-08-28).
+> **Current live build: v264** (`CACHE_VERSION = gpj-v264`; live == repo, verified 2026-08-28).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -155,10 +155,11 @@
   with an explanatory tooltip (community ghost-risk shows once enough hunters report). "Hiring near your search"
   is sourced from the live pool, so it only shows companies that genuinely have live roles (accurate). 2 new
   `[STATE-COVERAGE]` tests. **Deferred (founder, on hold):** ghost-% card-face placement + button icon/word centering.
-- [ ] **N4 · Mobile tap targets < 44px.** `[UI-REVIEW]` Sign In (28px), Support Us (28px), Match to Job (30px),
-  Cover Letter (30px), filter chips (29px) are below the 44px iOS / 48dp Android minimum. Padding-only fix;
-  add a mobile Playwright assertion (primary buttons ≥44px tall). **📐 MOCKUP DELIVERED (2026-08-31,
-  `scratchpad/N4-tap-targets-mockup.html`, before/after toggle) — awaiting founder yes/no to build.**
+- [x] **N4 · Mobile tap targets < 44px.** ✅ **SHIPPED v264 (2026-08-31), founder-approved, live.** A scoped
+  `@media(max-width:1023px)` block grows the tap HEIGHT (min-height + vertical centering) on Sign In, Support Us,
+  the bell, Match to Job + Cover Letter, and the `.quick-chip` filter chips → 44–46px (chips 38px). No change to
+  colors/labels/layout; desktop untouched; **the ghost logo is NOT touched** (founder asked — a Playwright test
+  asserts the logo stays in the header at ~34px while the chips measure ≥44px on mobile). 902/902 both projects.
 - [x] **N5 · Cross-surface brand-purple mismatch.** ✅ SHIPPED v248 — App light `--cyber` = `#7C3AED` but Resources pages
   (`resources/index.html`) use `#7A3CA8`. Unify (folds into F-WORDING/B3).
 - [x] **N6 · "Resume Optimizer" label appears twice** ✅ SHIPPED v248 — in Résumé Studio (collapsed header + expanded block reuse
@@ -329,7 +330,7 @@
 > and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
 
 ### T0 · Confirm you're on the current build (do this first, every deploy)
-- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v263**
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v264**
   (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
 
 ### T1 · In-app Self-Test (the fastest health check — 19+ checks)
