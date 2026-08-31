@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v261** (`CACHE_VERSION = gpj-v261`; live == repo, verified 2026-08-28).
+> **Current live build: v262** (`CACHE_VERSION = gpj-v262`; live == repo, verified 2026-08-28).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -72,7 +72,7 @@
 
 ## 2. NEW — found in the 2026-08-27 live audit (not yet in the roadmap)
 
-- [x] **N19 · Favicon = the transparent ghost + mint glow, on every page** — ✅ **SHIPPED v260–v261 (2026-08-30), live.** The
+- [x] **N19 · Favicon = the transparent ghost + mint glow, on every page** — ✅ **SHIPPED v260–v262 (2026-08-30), live.** The
   browser-tab icon was the OLD logo (dark navy rounded-square, dated Jul 3) — it predated the Aug 20
   transparent-ghost upgrade (`assets/logo-mark.png`); and `resume-checker.html` + every resources article
   declared NO favicon at all. `scripts/build_icons.py` regenerates all brand icons from `logo-mark.png`
@@ -81,7 +81,9 @@
   resources generator template. **v261 refinement (founder):** the on-page logo carries a soft mint `.ghost-glow`
   (`filter:drop-shadow(0 0 6px var(--mint))`, both themes) that the flat favicon lacked, so the transparent white
   ghost washed out on light browser-tab chrome — the glow is now baked into the icon PNGs (blurred mint halo
-  behind the ghost, inset for room), legible on light + dark; cache-buster `?v=3`. **Founder note:** hard-refresh
+  behind the ghost, inset for room), legible on light + dark. **v262 refinement (founder):** the tab ghost looked
+  small — the source has a big transparent margin — so `build_icons.py` now trims the source to its opaque bbox and
+  fits the ghost to ~92% of the frame (aspect-preserving); cache-buster now `?v=4`. **Founder note:** hard-refresh
   to see the new tab icon immediately; SEO city pages point at the same (now-updated) asset and refresh as their cache expires.
 - [x] **N15 · Job text "looks truncated/incomplete" — FIXED.** ✅ **SHIPPED v253 (live).** `_gpjDedupText` in the drawer removes
   repeated content (a posting that repeats its overview/EEO — Gordian — or echoes the Benefits list at the desc tail — Wiza —
@@ -309,7 +311,7 @@
 > and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
 
 ### T0 · Confirm you're on the current build (do this first, every deploy)
-- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v261**
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v262**
   (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
 
 ### T1 · In-app Self-Test (the fastest health check — 19+ checks)
