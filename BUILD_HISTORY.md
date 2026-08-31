@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-30 · Current live build: **v261**_
+_Last updated: 2026-08-30 · Current live build: **v262**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v262** — v262 (favicon size): the tab ghost was small — the source PNG has a big transparent margin and I'd inset it further for glow room. build_icons.py now trims the source to its opaque bbox and fits the ghost to ~92% of the frame (aspect-preserving), so it fills the tab icon; glow blur tightened to match. Cache-buster ?v=3 → ?v=4.
 - **v261** — v261 (favicon glow): bake the on-page .ghost-glow (filter:drop-shadow(0 0 6px var(--mint))) into the icon PNGs so the browser-tab favicon matches the logo — a soft mint halo that keeps the transparent white ghost legible on light AND dark tab chrome (it was washing out on light). scripts/build_icons.py now composites a blurred mint silhouette behind the ghost (inset for glow room) for favicon-32/icon-192/icon-512 + the .ico, and a subtler glow on the plum-bg apple-touch/maskable. Cache-buster ?v=2 → ?v=3.
 - **v260** — v260 (favicon = transparent ghost, on every page): regenerated all brand icons from assets/logo-mark.png (the upgraded transparent business-ghost) via scripts/build_icons.py — favicon-32/icon-192/icon-512 stay transparent (ghost has a dark outline, legible on light+dark tabs); apple-touch + maskable sit on the Midnight Plum brand bg (iOS/Android home-screen-safe); added a multi-size favicon.ico. Added the favicon links to the pages that had NONE (resume-checker.html + all resources articles + the resources generator template). ?v=2 busts the old dark-square favicon cache.
 - **v259** — v259 (E2-3, D1 read-cost): session-memoize the recruiter ghost-report count. fb.countGhostReports (reads up to ~200 docs) was called uncached in renderRecReviews AND the notif loader (fires on every bell/inbox open) — repeated reads of the same company's count each session. New _gpjCountGhostReports wraps it with a 5-min TTL cache, collapsing those to one read per window. The high-volume candidate counter (countJobReports, per card) was already cached via _jobReportCache. Read-path only; recruiter-side; no UI change. Firebase trial credit expires 2026-09-19.

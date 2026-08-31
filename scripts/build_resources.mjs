@@ -94,7 +94,7 @@ const THEME_JS = `(function(){try{var t=localStorage.getItem('gpj_theme');if(t)d
 function pageShell({ title, desc, canonical, body }) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" href="/assets/favicon.ico?v=3" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png?v=3"><link rel="apple-touch-icon" href="/assets/apple-touch-icon.png?v=3">
+<link rel="icon" href="/assets/favicon.ico?v=4" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png?v=4"><link rel="apple-touch-icon" href="/assets/apple-touch-icon.png?v=4">
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(desc)}">
 <link rel="canonical" href="${esc(canonical)}">

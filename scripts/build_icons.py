@@ -37,22 +37,33 @@ def _mint_glow(ghost_full, size, blur_frac=0.11, intensity=1.6):
     return glow
 
 
+def _trim(im):
+    """Crop the source to its opaque bounding box so the ghost fills the frame
+    (logo-mark.png has a big transparent margin that made the tab icon look tiny)."""
+    bbox = im.split()[3].getbbox()
+    return im.crop(bbox) if bbox else im
+
+
 def _placed(src, size, inner_frac):
-    """Ghost resized to inner_frac of the canvas, centered, on a transparent full-size layer
-    (leaves room for the glow so it isn't clipped at the edges)."""
+    """Trimmed ghost fit (aspect-preserving) to inner_frac of the canvas, centered
+    on a transparent full-size layer. inner_frac < 1 leaves room for the glow."""
     inner = max(1, int(round(size * inner_frac)))
-    ghost = src.resize((inner, inner), Image.LANCZOS)
+    g = _trim(src)
+    w, h = g.size
+    scale = inner / max(w, h)
+    nw, nh = max(1, int(round(w * scale))), max(1, int(round(h * scale)))
+    ghost = g.resize((nw, nh), Image.LANCZOS)
     layer = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    off = (size - inner) // 2
-    layer.alpha_composite(ghost, (off, off))
+    layer.alpha_composite(ghost, ((size - nw) // 2, (size - nh) // 2))
     return layer
 
 
 def resize_transparent(src, size):
-    """Transparent icon WITH the mint glow baked in (browser tab + PWA)."""
-    ghost = _placed(src, size, 0.84)               # inset a touch so the glow has room
+    """Transparent icon WITH the mint glow baked in (browser tab + PWA). The ghost
+    fills ~92% of the frame; the soft glow occupies the small remaining margin."""
+    ghost = _placed(src, size, 0.92)
     out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    out.alpha_composite(_mint_glow(ghost, size))
+    out.alpha_composite(_mint_glow(ghost, size, blur_frac=0.07, intensity=1.7))
     out.alpha_composite(ghost)
     return out
 
