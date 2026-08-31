@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v264** (`CACHE_VERSION = gpj-v264`; live == repo, verified 2026-08-28).
+> **Current live build: v265** (`CACHE_VERSION = gpj-v265`; live == repo, verified 2026-08-28).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -195,7 +195,12 @@
 ## 3. OPEN WORK BY SPRINT (Sprint A is ✅ complete)
 
 ### Sprint B — Trust the Intelligence (verify + harden the core value)
-- [~] **B1 · Cover-letter / AI quality** (F-AI, F-COVERLETTER) — **🔴 DIAGNOSED 2026-08-31 via founder live-test
+- [x] **B1 · Cover-letter / AI quality** (F-AI, F-COVERLETTER) — ✅ **FIXED v265 (2026-08-31), live.** The three
+  founder-repro bugs are gone (Talkiatry live-test): no "put the Excel I bring to work" (generic tools filtered),
+  no "emphasizes marketing and design" (whole-word themes + title-word drop; "design"←"designed" false-positive
+  killed), and it now quotes the RECENT Salesforce/CRM bullet, not a 2014 one (recency boost). Brand nouns keep
+  caps ("Salesforce"). New state test runs the real résumé+job and asserts all three. Live-quality remains a
+  founder gate (Worker prompt is outside the repo). **Was: 🔴 DIAGNOSED 2026-08-31 via founder live-test
   (Talkiatry "Senior Lifecycle Marketing Manager", real résumé + cover letter). THREE compounding bugs in
   `tailorCoverLetter` (index.html ~9116):** **(A)** p3 built `'the '+skillsTop+' I bring'` and `skillsTop`
   resolved to a generic tool skill → **"put the Excel I bring to work where outcomes matter"** (embarrassing;
@@ -330,7 +335,7 @@
 > and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
 
 ### T0 · Confirm you're on the current build (do this first, every deploy)
-- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v264**
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v265**
   (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
 
 ### T1 · In-app Self-Test (the fastest health check — 19+ checks)
