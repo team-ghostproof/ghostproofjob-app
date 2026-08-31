@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v259** (`CACHE_VERSION = gpj-v259`; live == repo, verified 2026-08-28).
+> **Current live build: v260** (`CACHE_VERSION = gpj-v260`; live == repo, verified 2026-08-28).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -72,6 +72,14 @@
 
 ## 2. NEW — found in the 2026-08-27 live audit (not yet in the roadmap)
 
+- [x] **N19 · Favicon = the transparent ghost, on every page** — ✅ **SHIPPED v260 (2026-08-30), live.** The
+  browser-tab icon was the OLD logo (dark navy rounded-square, dated Jul 3) — it predated the Aug 20
+  transparent-ghost upgrade (`assets/logo-mark.png`); and `resume-checker.html` + every resources article
+  declared NO favicon at all. `scripts/build_icons.py` regenerates all brand icons from `logo-mark.png`
+  (favicon-32/icon-192/icon-512 transparent; apple-touch + maskable on Midnight Plum for iOS/Android home
+  screens) + a multi-size `favicon.ico`; favicon `<link>`s added to the checker, all 6 resources pages, and the
+  resources generator template; `?v=2` busts the cached old icon. **Founder note:** hard-refresh to see the new
+  tab icon immediately; SEO city pages point at the same (now-updated) asset and refresh as their cache expires.
 - [x] **N15 · Job text "looks truncated/incomplete" — FIXED.** ✅ **SHIPPED v253 (live).** `_gpjDedupText` in the drawer removes
   repeated content (a posting that repeats its overview/EEO — Gordian — or echoes the Benefits list at the desc tail — Wiza —
   no longer looks cut mid-phrase). Applied to Expectations / More / Benefits.
@@ -298,7 +306,7 @@
 > and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
 
 ### T0 · Confirm you're on the current build (do this first, every deploy)
-- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v259**
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v260**
   (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
 
 ### T1 · In-app Self-Test (the fastest health check — 19+ checks)
