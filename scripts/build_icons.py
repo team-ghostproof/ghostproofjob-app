@@ -11,12 +11,13 @@ Run:  python scripts/build_icons.py   (needs Pillow)
 Rerun whenever assets/logo-mark.png changes.
 """
 import os
-from PIL import Image
+from PIL import Image, ImageFilter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(HERE, "..", "assets")
 SRC = os.path.join(ASSETS, "logo-mark.png")
-PLUM = (18, 15, 29, 255)  # Midnight Plum #120F1D
+PLUM = (18, 15, 29, 255)   # Midnight Plum #120F1D
+MINT = (0, 245, 160)       # Digital Mint Green #00F5A0 — the .ghost-glow colour
 
 
 def load_src():
@@ -24,17 +25,44 @@ def load_src():
     return im
 
 
+def _mint_glow(ghost_full, size, blur_frac=0.11, intensity=1.6):
+    """A soft mint halo behind the ghost — bakes in the on-page CSS
+    filter:drop-shadow(0 0 6px var(--mint)) so the icon matches the logo."""
+    glow = Image.new("RGBA", (size, size), MINT + (0,))
+    glow.putalpha(ghost_full.split()[3])           # halo has the ghost's silhouette
+    r = max(1, int(round(size * blur_frac)))
+    glow = glow.filter(ImageFilter.GaussianBlur(r))
+    a = glow.split()[3].point(lambda v: min(255, int(v * intensity)))
+    glow.putalpha(a)
+    return glow
+
+
+def _placed(src, size, inner_frac):
+    """Ghost resized to inner_frac of the canvas, centered, on a transparent full-size layer
+    (leaves room for the glow so it isn't clipped at the edges)."""
+    inner = max(1, int(round(size * inner_frac)))
+    ghost = src.resize((inner, inner), Image.LANCZOS)
+    layer = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    off = (size - inner) // 2
+    layer.alpha_composite(ghost, (off, off))
+    return layer
+
+
 def resize_transparent(src, size):
-    return src.resize((size, size), Image.LANCZOS)
+    """Transparent icon WITH the mint glow baked in (browser tab + PWA)."""
+    ghost = _placed(src, size, 0.84)               # inset a touch so the glow has room
+    out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    out.alpha_composite(_mint_glow(ghost, size))
+    out.alpha_composite(ghost)
+    return out
 
 
 def on_brand_bg(src, size, pad_frac):
-    """Ghost centered on the plum brand bg, with pad_frac padding each side."""
+    """Ghost + mint glow centered on the plum brand bg (iOS/Android home screens)."""
     canvas = Image.new("RGBA", (size, size), PLUM)
-    inner = max(1, int(round(size * (1 - 2 * pad_frac))))
-    ghost = src.resize((inner, inner), Image.LANCZOS)
-    off = (size - inner) // 2
-    canvas.paste(ghost, (off, off), ghost)  # alpha-composite the ghost
+    ghost = _placed(src, size, 1 - 2 * pad_frac)
+    canvas.alpha_composite(_mint_glow(ghost, size, blur_frac=0.06, intensity=1.3))
+    canvas.alpha_composite(ghost)
     return canvas
 
 
@@ -54,9 +82,10 @@ def main():
     # brand-background (home screens)
     save(on_brand_bg(src, 180, 0.08), "apple-touch-icon.png")
     save(on_brand_bg(src, 512, 0.18), "icon-maskable-512.png")
-    # a multi-size favicon.ico for bare /favicon.ico requests (transparent)
+    # a multi-size favicon.ico for bare /favicon.ico requests (transparent + glow)
     ico = os.path.join(ASSETS, "favicon.ico")
-    src.save(ico, sizes=[(16, 16), (32, 32), (48, 48)])
+    ico48 = resize_transparent(src, 48)
+    ico48.save(ico, sizes=[(16, 16), (32, 32), (48, 48)])
     print(f"  wrote favicon.ico             multi-size ({os.path.getsize(ico)} bytes)")
     print("done.")
 
