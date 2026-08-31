@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-30 · Current live build: **v264**_
+_Last updated: 2026-08-30 · Current live build: **v265**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v265** — v265 (B1 cover-letter fix, founder live-test Talkiatry): three compounding bugs in tailorCoverLetter fixed. (A) generic TOOL skills (Excel/Word/PowerPoint/Photoshop/…) are filtered from the letter lead AND themes, and p3 now reads 'put my <skills> to work where it counts' — killing 'put the Excel I bring to work'. (B) theme matching is now WHOLE-WORD (a posting 'design' is no longer matched by résumé verb 'designed'), and self-evident TITLE words are dropped (no vacuous 'your posting emphasizes marketing' for a Marketing Manager). (C) mild recency boost so a recent bullet beats an ancient one on a thematic tie. Dropped the 'outcomes…outcomes' echo in p3.
 - **v264** — v264 (N4, founder-approved): comfortable >=44px mobile tap targets. A scoped @media(max-width:1023px) block grows the tap HEIGHT (min-height + vertical centering) on the most-tapped controls — Sign In (#auth-chip), Support Us (#upgrade-trigger), the bell (#notif-bell), Match to Job + Cover Letter card buttons, and the .quick-chip filter chips — to 44-46px (chips 38px). NO change to colors/labels/icons/layout, desktop untouched, and the ghost LOGO + wordmark + day pill are NOT touched (the header just gets slightly taller so the logo stays put). Mobile Playwright assertion added.
 - **v263** — v263 (bug: SW-update error spam): the diagnostics log showed 'Failed to update a ServiceWorker … unknown error when fetching the script' ×20 (v254). Root cause: reg.update() returns a PROMISE but the three calls were in synchronous try/catch (can't catch async rejection), so a transient sw.js miss during a Vercel deploy became an unhandled rejection the v125 reporter logged. Fix: catch each reg.update() promise; AND drop benign SW update/register noise in _gpjReportErr (the browser re-fetches sw.js on its own schedule too). Not user-facing — the SW keeps serving the cached app. The 'www.' variant is the stale SW on the un-redirected www host = N14.
 - **v262** — v262 (favicon size): the tab ghost was small — the source PNG has a big transparent margin and I'd inset it further for glow room. build_icons.py now trims the source to its opaque bbox and fits the ghost to ~92% of the frame (aspect-preserving), so it fills the tab icon; glow blur tightened to match. Cache-buster ?v=3 → ?v=4.

@@ -9866,3 +9866,46 @@ test.describe('[STATE-COVERAGE] v264 N4 tap targets', () => {
     }
   });
 });
+
+/* v265 (B1 cover-letter fix). Runs tailorCoverLetter against the founder's real
+   Talkiatry live-test (Senior Lifecycle Marketing Manager + the actual résumé) and
+   asserts the three bugs are gone: no "the Excel I bring", no "and design", no
+   vacuous "emphasizes marketing", and p3 reads cleanly. */
+test.describe('[STATE-COVERAGE] v265 B1 cover-letter quality', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.tailorCoverLetter === 'function', null, { timeout: 15000 });
+  });
+  test('Talkiatry case: no Excel injection, no design-from-designed, no vacuous marketing theme', async ({ page }) => {
+    const letter = await page.evaluate(() => {
+      const me = {
+        name: 'Aaliyah Sosa', contact: 'a@x.com', title: 'Marketing Specialist', topCo: 'Poolsure',
+        skills: ['Photoshop','Excel','PowerPoint','Salesforce','HubSpot','Sales','CRM','Compliance','Training','Leadership','Communication','Scheduling','Documentation','Word','Data-Driven Decision Making'],
+        bullets: [
+          'Optimized an $80K+ corporate tradeshow budget, enhancing cost-efficiency and resource allocation.',
+          'Managed logistics for 40+ annual corporate tradeshows nationwide, overseeing vendor sourcing and travel.',
+          'Leveraged Salesforce and CRM systems for client account management, ensuring accurate audits.',
+          'Drove client success strategy and revenue growth for a portfolio of 500+ locations.',
+          'Designed and implemented technical training procedures, simplifying complex hardware requirements.',
+          'Directed marketing operations across a four-state territory including Texas, Louisiana, Oklahoma, and Arizona.',
+          'Coordinated regional scheduling, budgeting, operational reporting, and logistical communications across multiple states.',
+        ],
+      };
+      const c = {
+        title: 'Senior Lifecycle Marketing Manager', co: 'Talkiatry',
+        desc: 'Talkiatry seeks a Senior Lifecycle Marketing Manager to own patient onboarding, activation, and retention. You will design and run lifecycle email campaigns, partner on CRM (Salesforce, HubSpot) and analytics, build reporting dashboards in Excel, and drive engagement. Strong marketing and communication skills required.',
+        req: '',
+      };
+      return window.tailorCoverLetter(c, 2, me);
+    });
+    // the three founder-reported bugs must be gone:
+    expect(letter, 'no generic tool-skill injection anywhere ("the Excel I bring")').not.toMatch(/\bexcel\b/i);
+    expect(letter, 'no "design" from the résumé verb "designed"').not.toMatch(/\band design\b|emphasizes[^.]*\bdesign\b/i);
+    expect(letter, 'no vacuous title-word theme ("emphasizes marketing")').not.toMatch(/emphasizes[^.]*\bmarketing\b/i);
+    // and p3 reads cleanly with real strengths:
+    expect(letter, 'p3 reads "put my … to work where it counts"').toMatch(/put my .+ to work where it counts/i);
+    // still a real, on-overlap theme surfaced (or the clean no-theme fallback):
+    expect(letter, 'surfaces a genuine overlap theme').toMatch(/onboarding|reporting|communication|What I.?d bring/i);
+    console.log('--- v265 Talkiatry letter ---\n' + letter);
+  });
+});
