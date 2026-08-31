@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v258** (`CACHE_VERSION = gpj-v258`; live == repo, verified 2026-08-28).
+> **Current live build: v259** (`CACHE_VERSION = gpj-v259`; live == repo, verified 2026-08-28).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -47,7 +47,7 @@
   **Read-cost audit DONE 2026-08-27 -> `docs/E2-read-cost-audit.md`.** Ranked fixes (read-path only; no `[UI-REVIEW]`; each ships a state-coverage test):
   - [x] **E2-1 · Live-fallback caps → 1,500 · ✅ SHIPPED v248 (live)** (freshness ADMIN indicator deferred = [UI-REVIEW]) — removes the surprise-bill tail risk (a stale pool makes every fetch a 3,000-8,000-doc live read). **Do first.**
   - [x] **E2-2 · Company view read cost** ✅ **NO BUILD NEEDED — audit corrected 2026-08-27.** The company view already uses the pool-cached `fetchJobs`; the "≤800 reads" I flagged was actually `fb.mineHires` (rater path, reads the small `hired` collection, self-limiting). Residual cache-thrash on company-view open folds into **E2-4** below.
-  - [ ] **E2-3 · Session-memoize ghost counters** (`countJobReports`/`countGhostReports` read <=200 docs each; the job counter fires on every card paint).
+  - [x] **E2-3 · Session-memoize ghost counters** ✅ **SHIPPED v259 (live).** `countGhostReports` (recruiter Reviews tab + the notif loader, which fires on every bell/inbox open) now goes through `_gpjCountGhostReports` — a 5-min TTL cache, collapsing repeat reads of the same company to one per window. The high-volume candidate counter (`countJobReports`, per card paint) was **already** cached via `_jobReportCache`. Read-path only; 1 new state test.
   - [x] **E2-4 · Two-slot session cache + 30-min TTL** ✅ **SHIPPED v251 (live)** (region + nationwide both cached on roomy devices; low-mem keeps 1 slot per the v139 OOM fix).
   - [ ] **E2-5 · Cache the per-fetch internal-jobs query** (`limit(300)` on every `fetchJobs`; minor until the employer side grows).
 - [ ] **Founder step:** screenshot **Firebase console -> Firestore -> Usage** (reads/day + trend) — tells us if we're already under 50K.
@@ -298,7 +298,7 @@
 > and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
 
 ### T0 · Confirm you're on the current build (do this first, every deploy)
-- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v258**
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v259**
   (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
 
 ### T1 · In-app Self-Test (the fastest health check — 19+ checks)
