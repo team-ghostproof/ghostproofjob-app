@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v265** (`CACHE_VERSION = gpj-v265`; live == repo, verified 2026-08-28).
+> **Current live build: v267** (`CACHE_VERSION = gpj-v267`; live == repo, verified 2026-08-28).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -72,6 +72,22 @@
 
 ## 2. NEW — found in the 2026-08-27 live audit (not yet in the roadmap)
 
+- [ ] **N24 · Recruiter "Applicants" page — top counters not clickable + unclear flow** `[UI-REVIEW]` (founder
+  live-test 2026-08-31). The 4 tiles (Applicants / Replies sent / Interviews / Active roles) are static counts you
+  can't click to drill into; with 0 roles the page just says "post one under Listings." **Proposed:** make each tile
+  filter/scroll to its list; clarify the empty state ("post a role → applicants land here"); tap-role → applicants →
+  candidate card (the intended flow). Needs a recruiter login to live-test (see §5).
+- [ ] **N23 · Recruiter "Listing strength" is shallow (char-count feel)** `[BUILD]` (founder live-test 2026-08-31).
+  Today it scores length + presence of requirements/benefits/salary (a gibberish body still scored 38%). **Proposed:**
+  score real quality signals — a genuine title, sentence/keyword coherence (not keyboard-mash), a salary RANGE,
+  distinct requirements + benefits sections, reasonable length band — and give concrete "add X" tips. Honesty: never
+  reward gibberish. (Candidate-facing match already ignores junk; this is the employer-side authoring aid.)
+- [x] **N22 · Logo uniformity across pages** — ✅ **SHIPPED v267 (2026-08-31), live.** Resources logo was 26px + no
+  glow → 30px + mint `.ghost-glow` (generator + 6 existing articles); résumé-checker header/footer normalized to the
+  same mint glow. Glow uses `var(--mint)` so it adapts light/dark. Favicon already uniform (N19). SEO pages carry the
+  favicon only (no on-page logo by design — flag if you want one added).
+- [x] **N21 · Hero secondary CTA was a dead-end** — ✅ **SHIPPED v267 (2026-08-31), live.** "Jump straight to swiping"
+  (empty deck + can't apply/save for a logged-out visitor) → "🔍 Try the free résumé checker →" (real no-account value).
 - [x] **N20 · Service-worker update errors spamming the diagnostics log** — ✅ **FIXED v263 (2026-08-31), live.**
   Diagnostics showed `Failed to update a ServiceWorker … unknown error when fetching the script` ×20 (v254).
   `reg.update()` returns a promise but the 3 calls were in synchronous `try/catch` (can't catch async rejection),
@@ -229,7 +245,11 @@
 ### Sprint C — The Wow Pass (all `[UI-REVIEW]`; C1/C2/C3 shipped)
 - [ ] **C4 · Motion & delight (applicant only)** — swipe spring/touch-drag physics, count-up stats, streak flame,
   extend Apply/Hired celebrations. Employer side stays calm; respect `prefers-reduced-motion`; never block the core action.
-- [ ] **C5 · Skeleton loaders + mascot empty/first-run states** — cheapest "feels fast + finished"; kill blank flashes.
+  **📐 MOCKUP APPROVED (2026-08-31, `scratchpad/C4-motion-mockup.html`).** Queued LAST — touches the core swipe
+  gesture, so it needs careful integration (tap-to-drawer, ❤/🚫, apply/skip record, undo) + full regression.
+- [x] **C5 · Skeleton loaders + mascot empty/first-run states** — ✅ **SHIPPED v266 (2026-08-31), live.** `#deck-skeleton`
+  shimmer shows only during an active deck fetch with no card yet (never flickers over existing cards), hides when
+  real cards paint or the deck resolves to the (pre-existing) mascot empty state. Reduced-motion → static tint. 1 state test.
 - [x] **C6 · Signed-out home hero** — ✅ **SHIPPED v255 (2026-08-28), browser-verified.** A self-contained
   full-screen signed-out landing (`#gpj-hero`) — the first paint for new logged-out visitors: rotating headline,
   value pillars (Build/Optimize/Apply/Simplify), muted looping demo swipe, honest proof (no fabricated numbers —
@@ -335,7 +355,7 @@
 > and **desktop + mobile** (resize the window / open on a phone). Hard-refresh first so you're on the latest build.
 
 ### T0 · Confirm you're on the current build (do this first, every deploy)
-- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v265**
+- [ ] Open `ghostproofjob.com`. In the browser console type `APP_VERSION` (or check "What's New") → it should read **v267**
   (or the version we just shipped). If it's older, you're on a **stale/cached deploy** — hard-refresh (Ctrl/Cmd-Shift-R) or re-upload `index.html`.
 
 ### T1 · In-app Self-Test (the fastest health check — 19+ checks)
