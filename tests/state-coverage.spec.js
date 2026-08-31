@@ -9783,3 +9783,33 @@ test.describe('[STATE-COVERAGE] v257 N3 flag → leaves the hunt', () => {
     expect(r.hidden, 'confirmed-ghosted company leaves the hunt').toBe(true);
   });
 });
+
+/* v259 (E2-3 D1 read-cost). Session-memoize the recruiter ghost-report count:
+   repeated reads of the same company collapse to ONE Firestore read per TTL. */
+test.describe('[STATE-COVERAGE] v259 E2-3 memoized ghost count', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1000);
+  });
+  test('same company is read once per window; a new company reads again; TTL 0 forces a re-read', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      let calls = 0;
+      window.fb = window.fb || {};
+      window.fb.countGhostReports = async () => { calls++; return 7; };
+      window._gpjGhostCountCache = {};
+      const a = await window._gpjCountGhostReports('Acme Co');
+      const b = await window._gpjCountGhostReports('Acme Co');   // cached — no new read
+      const c = await window._gpjCountGhostReports('Other Inc'); // new key — +1 read
+      const callsAfterCache = calls;
+      const d = await window._gpjCountGhostReports('Acme Co', 0); // ttl 0 — forces a re-read
+      const empty = await window._gpjCountGhostReports('');       // no key — null, no read
+      return { a, b, c, d, empty, callsAfterCache, callsAfterTTL: calls };
+    });
+    expect(r.a, 'returns the count').toBe(7);
+    expect(r.b, 'cached hit still returns the value').toBe(7);
+    expect(r.callsAfterCache, 'Acme read once + Other read once = 2 reads (not 3)').toBe(2);
+    expect(r.d, 'ttl:0 still returns the value').toBe(7);
+    expect(r.callsAfterTTL, 'ttl:0 forced exactly one more read').toBe(3);
+    expect(r.empty, 'empty company short-circuits to null with no read').toBe(null);
+  });
+});

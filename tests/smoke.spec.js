@@ -55,6 +55,8 @@ test('core functions still exist (regression guard)', async ({ page }) => {
     'heroGetStarted', 'heroSignIn', 'heroExplore', 'heroUploadResume', 'heroEmployer', '_gpjHideHero', '_gpjHeroGate',
     // v256 N17 logo-from-apply-URL-domain
     '_gpjLogoDomainFromUrl', '_gpjRegDomain',
+    // v259 E2-3 memoized ghost-report count
+    '_gpjCountGhostReports',
   ];
   const missing = await page.evaluate(
     (names) => names.filter((n) => typeof window[n] !== 'function'),
