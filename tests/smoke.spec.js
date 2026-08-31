@@ -52,7 +52,7 @@ test('core functions still exist (regression guard)', async ({ page }) => {
     // v254 D2 full Inbox tab
     'renderInbox', 'openFullInbox', 'inboxOpen', 'inboxMarkAllRead', '_inboxMeta', '_inboxAgo',
     // v255 C6 signed-out hero
-    'heroGetStarted', 'heroSignIn', 'heroExplore', 'heroUploadResume', 'heroEmployer', '_gpjHideHero', '_gpjHeroGate',
+    'heroGetStarted', 'heroSignIn', 'heroExplore', 'heroUploadResume', 'heroEmployer', 'heroResumeChecker', '_gpjHideHero', '_gpjHeroGate',
     // v256 N17 logo-from-apply-URL-domain
     '_gpjLogoDomainFromUrl', '_gpjRegDomain',
     // v259 E2-3 memoized ghost-report count
