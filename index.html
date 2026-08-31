@@ -1097,10 +1097,16 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
      are already fine); the header just gets a touch taller so the logo stays put. */
   @media(max-width:1023px){
     #auth-chip,#upgrade-trigger{min-height:44px;display:inline-flex;align-items:center;justify-content:center;}
-    #notif-bell{min-height:44px;padding:0 12px!important;line-height:44px;}
+    #notif-bell{min-height:44px;line-height:44px;padding-top:0!important;padding-bottom:0!important;}   /* 44px height WITHOUT widening (keeps the inline 9px sides — v266 header-squeeze fix) */
     [onclick*="matchToJobFromCard"],[onclick*="copyOptCard"]{min-height:46px;}
     .quick-chip{min-height:38px;display:inline-flex;align-items:center;}
   }
+  /* C5 (v266, [UI-REVIEW] approved): skeleton shimmer for the deck while it loads —
+     "feels fast + finished", kills the blank flash. Reduced-motion → static tint. */
+  .gpj-sk{background:linear-gradient(90deg,var(--plum3) 25%,var(--plum4) 37%,var(--plum3) 63%);background-size:400% 100%;animation:gpjShimmer 1.3s ease-in-out infinite;border-radius:7px;}
+  @keyframes gpjShimmer{0%{background-position:100% 0;}100%{background-position:-100% 0;}}
+  @media(prefers-reduced-motion:reduce){.gpj-sk{animation:none;background:var(--plum3);}}
+  #deck-skeleton .gpj-skcard{position:absolute;inset:0;background:var(--plum2);border:1px solid var(--plum4);border-radius:18px;padding:18px;}
   .buzz-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--plum3);}
   .buzz-row:last-child{border:none;}
   .buzz-add{background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.35);color:var(--mint);font-size:11px;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;gap:4px;}
@@ -2307,6 +2313,22 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
           <div id="deck-empty-cta" onclick="switchView('resume',null)" style="display:inline-block;background:linear-gradient(135deg,#06B6D4,#0891B2);color:#fff;font-weight:800;border-radius:999px;padding:11px 24px;font-size:13px;cursor:pointer;">📄 Upload your resume</div>
         </div>
         <div id="swipe-overlay" class="like">APPLY ❤️</div>
+        <!-- C5 (v266): skeleton shown ONLY during an active deck fetch (via _gpjDeckSkeleton),
+             hidden the moment real cards paint. Decorative; pointer-events off so it never
+             blocks a tap that lands as the cards arrive. -->
+        <div id="deck-skeleton" style="display:none;position:absolute;inset:0;z-index:6;pointer-events:none;" aria-hidden="true">
+          <div class="gpj-skcard">
+            <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px;">
+              <div class="gpj-sk" style="width:44px;height:44px;border-radius:12px;flex:none;"></div>
+              <div style="flex:1;min-width:0;"><div class="gpj-sk" style="height:13px;width:72%;margin-bottom:8px;"></div><div class="gpj-sk" style="height:10px;width:46%;"></div></div>
+              <div class="gpj-sk" style="width:46px;height:24px;border-radius:999px;flex:none;"></div>
+            </div>
+            <div class="gpj-sk" style="height:56px;border-radius:12px;margin-bottom:14px;"></div>
+            <div class="gpj-sk" style="height:11px;width:100%;margin-bottom:8px;"></div>
+            <div class="gpj-sk" style="height:11px;width:90%;margin-bottom:8px;"></div>
+            <div class="gpj-sk" style="height:11px;width:64%;"></div>
+          </div>
+        </div>
         <div id="job-card-2" class="job-card bot" style="visibility:hidden;">
           <div class="card-header">
             <div style="display:flex;align-items:center;gap:10px;">
@@ -3415,7 +3437,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Always free 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v265</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v266</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -9771,6 +9793,9 @@ function resolveSalMax(r){
 
 function fetchLiveMarketJobs(){ return _fetchLiveMarketJobs.apply(this,arguments); }
 async function _fetchLiveMarketJobs(){
+  /* C5 (v266): show the skeleton shimmer while this fetch runs — but ONLY when the
+     deck has no real card yet, so a background refresh never flickers over good cards. */
+  try{ if(typeof _currentTopJob!=='function' || !_currentTopJob()) _gpjDeckSkeleton(true); }catch(e){}
   /* ── DECK SOURCES FROM THE PROFILE MASTER, NOT THE BROWSE BOXES ──────────────
      The swipe deck anchors on the SAVED master location (gpj_loc / cloud profile)
      and the résumé's most-recent role. Browse's keyword / industry / city / state
@@ -11736,8 +11761,13 @@ function fillSlot(cardEl, job){
   }
 }
 
+/* C5 (v266): toggle the deck skeleton shimmer. Shown only during an active fetch
+   with an empty deck; hidden the moment real cards paint or the deck resolves. */
+function _gpjDeckSkeleton(on){ try{ var s=document.getElementById('deck-skeleton'); if(s) s.style.display=on?'block':'none'; }catch(e){} }
+window._gpjDeckSkeleton=_gpjDeckSkeleton;
 function reloadDeckFromQueue(){
   try{ clearDeckMessage(); }catch(e){}
+  try{ _gpjDeckSkeleton(false); }catch(e){}   /* C5: real cards about to paint */
   try{ document.body.classList.remove('card-open'); const _dr=document.getElementById('card-drawer'); if(_dr) _dr.classList.remove('open'); const dk=document.getElementById('card-deck'); if(dk) dk.style.height=(document.body.classList.contains('desk')?440:300)+'px'; }catch(e){}
   /* refresh the three card shells with the head of the live queue — NO wrap-around,
      so a short queue shows real jobs then blanks, never recycles. */
@@ -11781,6 +11811,7 @@ function reloadDeckFromQueue(){
     const empty=document.getElementById('deck-empty');
     if(empty){
       const hasJobs=vis.length>0;
+      try{ _gpjDeckSkeleton(false); }catch(e){}   /* C5: deck resolved (jobs or empty state) — drop the shimmer */
       empty.style.display=hasJobs?'none':'block';
       if(!hasJobs){
         const hasResume=!!(resumeData&&(resumeData.name||(resumeData.jobs&&resumeData.jobs.length)));
@@ -15682,8 +15713,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v265';
+const APP_VERSION = 'v266';
 const CHANGELOG = {
+  'v266':['v266 (C5, founder-approved): skeleton shimmer loader for the swipe deck. #deck-skeleton overlay shows ONLY during an active _fetchLiveMarketJobs when the deck has no card yet (never flickers over existing cards), and hides the moment real cards paint (reloadDeckFromQueue) or the deck resolves empty (mascot empty state, which already existed). Reduced-motion → static tint; pointer-events off. Also: reverted the v264 bell horizontal-padding nudge (keeps 44px height via line-height without widening) to relieve the narrow-width header squeeze.'],
   'v265':['v265 (B1 cover-letter fix, founder live-test Talkiatry): three compounding bugs in tailorCoverLetter fixed. (A) generic TOOL skills (Excel/Word/PowerPoint/Photoshop/…) are filtered from the letter lead AND themes, and p3 now reads \'put my <skills> to work where it counts\' — killing \'put the Excel I bring to work\'. (B) theme matching is now WHOLE-WORD (a posting \'design\' is no longer matched by résumé verb \'designed\'), and self-evident TITLE words are dropped (no vacuous \'your posting emphasizes marketing\' for a Marketing Manager). (C) mild recency boost so a recent bullet beats an ancient one on a thematic tie. Dropped the \'outcomes…outcomes\' echo in p3.'],
   'v264':['v264 (N4, founder-approved): comfortable >=44px mobile tap targets. A scoped @media(max-width:1023px) block grows the tap HEIGHT (min-height + vertical centering) on the most-tapped controls — Sign In (#auth-chip), Support Us (#upgrade-trigger), the bell (#notif-bell), Match to Job + Cover Letter card buttons, and the .quick-chip filter chips — to 44-46px (chips 38px). NO change to colors/labels/icons/layout, desktop untouched, and the ghost LOGO + wordmark + day pill are NOT touched (the header just gets slightly taller so the logo stays put). Mobile Playwright assertion added.'],
   'v263':['v263 (bug: SW-update error spam): the diagnostics log showed \'Failed to update a ServiceWorker … unknown error when fetching the script\' ×20 (v254). Root cause: reg.update() returns a PROMISE but the three calls were in synchronous try/catch (can\'t catch async rejection), so a transient sw.js miss during a Vercel deploy became an unhandled rejection the v125 reporter logged. Fix: catch each reg.update() promise; AND drop benign SW update/register noise in _gpjReportErr (the browser re-fetches sw.js on its own schedule too). Not user-facing — the SW keeps serving the cached app. The \'www.\' variant is the stale SW on the un-redirected www host = N14.'],

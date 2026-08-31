@@ -9909,3 +9909,33 @@ test.describe('[STATE-COVERAGE] v265 B1 cover-letter quality', () => {
     console.log('--- v265 Talkiatry letter ---\n' + letter);
   });
 });
+
+/* v266 (C5 deck skeleton). The skeleton exists, is hidden by default, and the
+   helper toggles it without touching any flow. */
+test.describe('[STATE-COVERAGE] v266 C5 deck skeleton', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1000);
+  });
+  test('skeleton exists + hidden by default + helper toggles + has shimmer shapes', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const el = document.getElementById('deck-skeleton');
+      const out = { helper: typeof window._gpjDeckSkeleton === 'function', exists: !!el,
+        hiddenDefault: el ? getComputedStyle(el).display === 'none' : null, sk: el ? el.querySelectorAll('.gpj-sk').length : 0 };
+      let threw = false;
+      try { window._gpjDeckSkeleton(true); } catch (e) { threw = true; }
+      out.shown = el ? el.style.display : '';
+      try { window._gpjDeckSkeleton(false); } catch (e) { threw = true; }
+      out.hid = el ? el.style.display : '';
+      out.threw = threw;
+      return out;
+    });
+    expect(r.helper, '_gpjDeckSkeleton defined').toBe(true);
+    expect(r.exists, '#deck-skeleton present').toBe(true);
+    expect(r.hiddenDefault, 'hidden by default (no flicker when idle)').toBe(true);
+    expect(r.sk, 'has shimmer placeholder shapes').toBeGreaterThan(3);
+    expect(r.shown, 'helper shows it').toBe('block');
+    expect(r.hid, 'helper hides it').toBe('none');
+    expect(r.threw, 'never throws').toBe(false);
+  });
+});
