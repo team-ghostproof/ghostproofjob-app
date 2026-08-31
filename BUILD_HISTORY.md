@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-31 · Current live build: **v268**_
+_Last updated: 2026-08-31 · Current live build: **v269**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v269** — v269 (N23, founder live-test): recruiter 'Listing strength' now judges COHERENCE, not just length — keyboard-mash/placeholder text can no longer score healthy (the founder's gibberish scored 38%; now caps low + says 'write a real, readable description'). New _recCoherence heuristic (common words + vowel structure + normal token lengths − monster tokens; no dictionary/read/network). A short but REAL description is unaffected (gate only applies once there's enough text to judge fairly). Employer-side authoring aid; no candidate-facing change.
 - **v268** — v268 (D2 Inbox rebuild — founder: 'clicking a message just takes me back to Settings'): candidate messages (reach-outs/interviews) now EXPAND INLINE in the Inbox with their real actions (accept / pick a slot / appeal / reschedule / cancel / dismiss), reusing the SAME global action functions the Settings section uses — no more bounce to Settings. The 🔔 bell routes candidate messages into the Inbox too (was also bouncing to Settings). _notifCandidate caches the full reach-out objects (window._myRO) so inline actions have data with ZERO extra reads. Non-message notifs (matches/plan/admin/recruiter responses) still route to their home views.
 - **v267** — v267 (founder): (1) hero secondary CTA 'Jump straight to swiping' (a dead-end for a logged-out, résumé-less visitor) → '🔍 Try the free résumé checker →' (real no-account value + funnel). (2) Logo uniformity: the Resources logo was 26px with NO mint glow — now 30px + drop-shadow(0 0 6px var(--mint)) matching the app's .ghost-glow (generator + all 6 existing articles); résumé-checker header glow normalized to the same mint spec + footer logo gets the glow. Glow uses var(--mint) so it adapts light/dark. SEO pages carry the uniform favicon (no on-page logo by design).
 - **v266** — v266 (C5, founder-approved): skeleton shimmer loader for the swipe deck. #deck-skeleton overlay shows ONLY during an active _fetchLiveMarketJobs when the deck has no card yet (never flickers over existing cards), and hides the moment real cards paint (reloadDeckFromQueue) or the deck resolves empty (mascot empty state, which already existed). Reduced-motion → static tint; pointer-events off. Also: reverted the v264 bell horizontal-padding nudge (keeps 44px height via line-height without widening) to relieve the narrow-width header squeeze.

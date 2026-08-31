@@ -3437,7 +3437,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Always free 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v268</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v269</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -4698,6 +4698,30 @@ async function renderRecListings(){
    number an employer sees is the number candidates' matching uses. It is not a
    vanity meter — overstating it would be lying to the employer about reach. */
 const REC_MIN_DESC=250;
+/* N23 (v269, founder live-test: gibberish "ajsnefanwelfabwefl…;fweufb…" scored 38%).
+   Length alone rewarded keyboard-mash. This 0..1 coherence check reads like a human:
+   real copy has common words, vowels, normal token lengths; mash has monster tokens,
+   few common words, low vowel structure. Purely heuristic — no dictionary/read/network.
+   HONESTY: a listing that reads as placeholder must NOT show a healthy strength. */
+function _recCoherence(text){
+  const words=(String(text||'').toLowerCase().match(/[a-z']+/g))||[];
+  if(words.length<6) return words.length?0.2:0;   /* too little real text to judge */
+  const COMMON=new Set(('the and an to of in for with you your we our us will or are is be as on at this that who what how role team work works working experience skills skill year years manage lead build support help strong ability able including join looking seeking responsibilities requirements benefits company they their must have has had need needs about across drive own run design plan grow customer product market marketing sales data health remote hybrid time full part who we will you our a i we\'re you\'ll').split(' '));
+  /* DISTINCT common (function) words are the tell: real copy carries many; keyboard-
+     mash carries ~none (repeating "a" 10× is still one). Ignore 1-char tokens. */
+  let gib=0, vowelly=0; const distinct=new Set();
+  words.forEach(function(w){
+    if(w.length>=2 && COMMON.has(w)) distinct.add(w);
+    const v=(w.match(/[aeiou]/g)||[]).length/w.length;
+    if(w.length>=3 && v>=0.2 && v<=0.8) vowelly++;   /* plausible real word shape */
+    if(w.length>=16) gib++;                            /* a monster token = mash */
+  });
+  const vowelRatio=vowelly/words.length;
+  let c=Math.min(1, distinct.size/8)*0.7            /* 8+ distinct function words → full on this axis */
+       + Math.min(1, vowelRatio/0.7)*0.3;            /* secondary: real word shapes */
+  if(gib>=2) c-=0.30;                                 /* several monster tokens = strong mash signal */
+  return Math.max(0,Math.min(1,c));
+}
 function _recListingScore(o){
   const d=(o.desc||'').trim(), r=(o.req||'').trim(), b=(o.benefits||'').trim();
   const gaps=[]; let score=0;
@@ -4708,6 +4732,12 @@ function _recListingScore(o){
   else gaps.push('requirements — candidates match against these');
   if(b.length>=60) score+=15; else gaps.push('benefits');
   if(o.smin||o.smax) score+=10; else gaps.push('a salary range (listings with pay get far more applicants)');
+  /* N23 (v269): coherence gate — placeholder/keyboard-mash can never read as strong.
+     Only judge once there's enough text to be fair (a short REAL line stays fine). */
+  if(d.length>=40){
+    const coh=_recCoherence(d+' '+r+' '+b);
+    if(coh<0.5){ score=Math.min(score, Math.round(coh*40)); gaps.unshift('a real, readable description — this reads like placeholder text'); }
+  }
   return { score:Math.max(0,Math.min(100,score)), gaps:gaps };
 }
 /* live meter under the description field; safe no-op if the form isn't mounted */
@@ -15789,8 +15819,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v268';
+const APP_VERSION = 'v269';
 const CHANGELOG = {
+  'v269':['v269 (N23, founder live-test): recruiter \'Listing strength\' now judges COHERENCE, not just length — keyboard-mash/placeholder text can no longer score healthy (the founder\'s gibberish scored 38%; now caps low + says \'write a real, readable description\'). New _recCoherence heuristic (common words + vowel structure + normal token lengths − monster tokens; no dictionary/read/network). A short but REAL description is unaffected (gate only applies once there\'s enough text to judge fairly). Employer-side authoring aid; no candidate-facing change.'],
   'v268':['v268 (D2 Inbox rebuild — founder: \'clicking a message just takes me back to Settings\'): candidate messages (reach-outs/interviews) now EXPAND INLINE in the Inbox with their real actions (accept / pick a slot / appeal / reschedule / cancel / dismiss), reusing the SAME global action functions the Settings section uses — no more bounce to Settings. The 🔔 bell routes candidate messages into the Inbox too (was also bouncing to Settings). _notifCandidate caches the full reach-out objects (window._myRO) so inline actions have data with ZERO extra reads. Non-message notifs (matches/plan/admin/recruiter responses) still route to their home views.'],
   'v267':['v267 (founder): (1) hero secondary CTA \'Jump straight to swiping\' (a dead-end for a logged-out, résumé-less visitor) → \'🔍 Try the free résumé checker →\' (real no-account value + funnel). (2) Logo uniformity: the Resources logo was 26px with NO mint glow — now 30px + drop-shadow(0 0 6px var(--mint)) matching the app\'s .ghost-glow (generator + all 6 existing articles); résumé-checker header glow normalized to the same mint spec + footer logo gets the glow. Glow uses var(--mint) so it adapts light/dark. SEO pages carry the uniform favicon (no on-page logo by design).'],
   'v266':['v266 (C5, founder-approved): skeleton shimmer loader for the swipe deck. #deck-skeleton overlay shows ONLY during an active _fetchLiveMarketJobs when the deck has no card yet (never flickers over existing cards), and hides the moment real cards paint (reloadDeckFromQueue) or the deck resolves empty (mascot empty state, which already existed). Reduced-motion → static tint; pointer-events off. Also: reverted the v264 bell horizontal-padding nudge (keeps 44px height via line-height without widening) to relieve the narrow-width header squeeze.'],

@@ -9976,3 +9976,26 @@ test.describe('[STATE-COVERAGE] v268 Inbox inline actions', () => {
     expect(r.threw, 'never throws').toBe(false);
   });
 });
+
+/* v269 (N23 recruiter listing strength). Keyboard-mash scores low; a real
+   description is unaffected. */
+test.describe('[STATE-COVERAGE] v269 N23 listing-strength coherence', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._recListingScore === 'function', null, { timeout: 15000 });
+  });
+  test('gibberish scores low + names the real fix; a genuine description scores well', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const gib = 'Marketing manager ,ajsnefanwelfabwefluabwelfnaweufanwlkfebnawubfwbpaufblwjenfauwbefan weifbawe;fweufb a;ejrn;aunefa;nweofnaew;fjnawoin;a/nrg;awien wknfianwe lna fhina weifanjw efianmw eofnawlef wgna wrn ewnrgsiewrng auerng aeirn gamerga argkabwe oanbw ginaw linfel anwevc awben awibf ewinfaewfwaefawefgawrgwefkawbef awefawbe aweg wevkbawlegfbaw wefkbaw efawbefwe fwefkwelfiuwebfl awekbawe ekbawelwbevlikwabveefa newf ew ewlrkguaenlrgbualeirbug';
+      const real = 'We are looking for a Senior Lifecycle Marketing Manager to own patient onboarding, activation, and retention. You will design and run lifecycle email campaigns, partner with CRM and analytics, build reporting dashboards, and drive engagement across the customer journey. Strong marketing and communication skills required, with several years of experience leading teams.';
+      const g = window._recListingScore({ desc: gib, req: '', benefits: '', smin: '', smax: '' });
+      const rr = window._recListingScore({ desc: real, req: 'Must have 5+ years of lifecycle or growth marketing experience, strong written communication, hands-on CRM and analytics, and a track record of driving measurable retention.', benefits: 'Comprehensive health, dental and vision coverage, a 401(k) match, flexible remote days, and generous flexible PTO.', smin: '90000', smax: '140000' });
+      return { gibScore: g.score, gibGap: (g.gaps[0] || ''), realScore: rr.score, cohGib: window._recCoherence(gib), cohReal: window._recCoherence(real) };
+    });
+    expect(r.cohGib, 'gibberish reads as incoherent').toBeLessThan(0.5);
+    expect(r.cohReal, 'real copy reads as coherent').toBeGreaterThanOrEqual(0.5);
+    expect(r.gibScore, 'gibberish can no longer score healthy').toBeLessThanOrEqual(20);
+    expect(r.gibGap, 'and it names the real fix').toMatch(/real, readable/i);
+    expect(r.realScore, 'a genuine, complete listing scores well').toBeGreaterThanOrEqual(70);
+  });
+});
