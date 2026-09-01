@@ -4152,13 +4152,13 @@ test.describe('[STATE-COVERAGE] v119 founder live-test batch 2', () => {
       // resumeData is a let-global: window.resumeData would be a DIFFERENT object.
       // Mutate the real binding so rateResume sees the fixture.
       Object.assign(resumeData, { title: 'Marketing Specialist', skills: 'Marketing · SEO', jobs: [{ t: 'Marketing Specialist', c: 'Acme', b: 'Ran campaigns' }], name: 'A', contact: 'a@b.c' });
-      localStorage.removeItem('gpj_corpus_v1'); window._roleCorpusCache = null;
+      localStorage.removeItem('gpj_corpus_v2'); window._roleCorpusCache = null;   /* v276: cache key bumped v1→v2 */
       let mines = 0;
       window.fb = window.fb || {};
       fb.mineRoleKeywords = async () => { mines++; return { matched: 30, terms: [{ term: 'social media', pct: 80 }, { term: 'seo', pct: 60 }] }; };
       fb.mineHires = async () => [];
       await rateResume(); await rateResume();
-      const stored = JSON.parse(localStorage.getItem('gpj_corpus_v1') || 'null');
+      const stored = JSON.parse(localStorage.getItem('gpj_corpus_v2') || 'null');
       window._roleCorpusCache = null;              // simulate a NEW session
       await rateResume();
       return { mines, storedRole: stored && stored.role, storedTerms: stored && stored.corpus.terms.length };
@@ -10343,5 +10343,41 @@ test.describe('[STATE-COVERAGE] v275 My Data view + phone optional', () => {
     expect(r.modelHasPrefs, 'model reads real preferences').toBe(true);
     expect(r.phoneOptional, 'signup phone label marked optional').toBe(true);
     expect(r.fakeExportGone, 'the old fake "Export requested / check your email" placeholder is gone').toBe(true);
+  });
+});
+
+/* v276 (Role Fit unified to the card engine): with a real-posting sample, Role Fit is the
+   median of computeMatch across it — the same rater as the swipe cards. Existing rater tests
+   stub mineRoleKeywords WITHOUT a sample, so they keep the coverage fallback (unchanged). */
+test.describe('[STATE-COVERAGE] v276 Role Fit uses the card engine (computeMatch)', () => {
+  test('a live-posting sample routes Role Fit through computeMatch (median); copy says "same rater"', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.rateResume === 'function' && typeof window.computeMatch === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(async () => {
+      resumeData.title = 'Marketing Manager';
+      resumeData.contact = 'a@example.com · Houston, TX';
+      resumeData.summary = 'Marketing manager with lifecycle, CRM and email campaign experience.';
+      resumeData.skills = 'lifecycle marketing, CRM, email, analytics, salesforce, campaigns';
+      resumeData.jobs = [{ t: 'Marketing Manager', c: 'Acme', b: 'Ran lifecycle email campaigns\nBuilt CRM reporting and analytics\nDrove retention with segmentation' }];
+      try { if (typeof buildFromProfile === 'function') buildFromProfile(); } catch (e) {}
+      const _cm = window.computeMatch; let cmCalls = 0;
+      window.computeMatch = function () { cmCalls++; return _cm.apply(this, arguments); };
+      window._roleCorpusCache = null; try { localStorage.removeItem('gpj_corpus_v2'); } catch (e) {}
+      const sample = [
+        { title: 'Marketing Manager', description: 'Own lifecycle email campaigns, CRM, analytics and reporting for retention.' },
+        { title: 'Lifecycle Marketing Manager', description: 'Design lifecycle journeys, email segmentation, CRM and campaign analytics.' },
+        { title: 'Marketing Manager', description: 'Lead marketing, email campaigns, analytics and CRM reporting.' },
+        { title: 'Growth Marketing Manager', description: 'Growth, lifecycle retention, email and CRM.' },
+        { title: 'Marketing Manager', description: 'Run campaigns, CRM, reporting and email marketing.' },
+      ];
+      window.fb = Object.assign(window.fb || {}, { mineRoleKeywords: async () => ({ matched: 5, terms: [{ term: 'lifecycle', pct: 60 }, { term: 'crm', pct: 55 }, { term: 'email', pct: 50 }], sample: sample }) });
+      await rateResume();
+      window.computeMatch = _cm;
+      const t = (document.getElementById('resume-rating-body') || {}).textContent || '';
+      return { cmCalls, hasRoleFit: t.indexOf('Role Fit') > -1, sameRater: t.indexOf('Same rater') > -1 };
+    });
+    expect(r.hasRoleFit, 'Role Fit renders').toBe(true);
+    expect(r.cmCalls, 'computeMatch (the card engine) is called across the posting sample').toBeGreaterThanOrEqual(5);
+    expect(r.sameRater, 'copy reflects the unified "same rater, different scope" scoring').toBe(true);
   });
 });
