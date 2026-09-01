@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v272** (`CACHE_VERSION = gpj-v272`; live == repo, verified 2026-09-01). v271 recruiter fixes + v272 **N24** were all **live-verified in the founder's recruiter session**. v271: footer centers ✓ · logo persists after refresh ✓ · candidate toasts silent in rec-mode ✓ · card-face ghost-% chip. v272 N24: Applicants counters are clickable drill-in filters (Replies-sent counter surfaced the founder's real sent reach-out ✓), + a 3-step "How this page works" empty state ✓.
+> **Current live build: v273** (`CACHE_VERSION = gpj-v273`; live == repo, verified 2026-09-01). This sprint (v270→v273) all **live-verified in the founder's recruiter session**. v270: C4 desktop drag · header · rail-leak. v271: footer centers ✓ · logo persists ✓ · candidate toasts silent in rec-mode ✓ · card-face ghost-% chip. v272 **N24**: Applicants counters are clickable drill-in filters (surfaced the founder's real sent reach-out ✓) + 3-step empty state ✓. v273 **N28**: mobile recruiter pipeline = stacked collapsible stage list, live-verified at 375px in light AND dark ✓; desktop kanban unchanged. N27 (reverse-match) verified running.
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -103,10 +103,12 @@
   workflows to clear the Node 20 deprecation warning that run showed.)
 - [ ] **N28 · Mobile pipeline layout — founder decision** 🟡 `[UI-REVIEW]` — the applicant pipeline is a 6-column horizontal-scroll
   kanban (Applied→Reviewed→Interview→Offer→Hired→Closed). Great on desktop; on a phone it's a lot of sideways scrolling. Decide:
-  keep the kanban, or collapse to a single list with a per-candidate stage dropdown on mobile. **📐 MOCKUP SENT (2026-09-01,
-  `scratchpad/N28-mobile-pipeline-mockup.html`) — my rec: desktop keeps the kanban, mobile becomes a stacked collapsible stage
-  list (same move dropdown + 💬/💌, no sideways scroll). Awaiting founder approval, then build the mobile branch in
-  `_recRenderKanban` (desktop path untouched).**
+  keep the kanban, or collapse to a single list. ✅ **SHIPPED v273 (2026-09-01), live-verified on a phone viewport in BOTH themes.**
+  On `!body.desk`, `_recRenderKanban` early-returns to `_recRenderPipelineMobile`: the 6 stages render as **stacked, collapsible
+  sections** (tap a header to fold), each candidate row keeping the move-stage dropdown + 💬 Reach out / 💌 Decline + tap-to-open +
+  ☑ bulk-select. No horizontal scroll; larger touch targets; brand-token colours → auto light/dark. **Desktop kanban is
+  byte-unchanged** (guaranteed by the early-return — the kanban code isn't touched). Live proof: rendered a stub pipeline at 375px
+  in light AND dark. 1 new state test; full suite 928/928.
 - [x] **N25 · Recruiter-side candidate-leak cleanup** — ✅ **SHIPPED v271 (2026-08-31); live-verified in the recruiter session (2026-09-01).**
   Three founder-repro leaks where candidate surfaces bled onto the recruiter side: **(a)** the candidate streak/goal/market/Jett
   **desktop rail** painted in the recruiter "Candidates" view (CSS specificity — the rail's `display:flex` (2,3,1) out-specified
