@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v269** (`CACHE_VERSION = gpj-v269`; live == repo, verified 2026-08-28).
+> **Current live build: v270** (`CACHE_VERSION = gpj-v270`; live == repo, verified 2026-08-31). **v271 built + gating** (recruiter-side leak cleanup: footer centering in rec-mode + candidate-toast gate + company-logo persistence; + the founder-approved card-face ghost-% chip).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -85,6 +85,17 @@
   score real quality signals — a genuine title, sentence/keyword coherence (not keyboard-mash), a salary RANGE,
   distinct requirements + benefits sections, reasonable length band — and give concrete "add X" tips. Honesty: never
   reward gibberish. (Candidate-facing match already ignores junk; this is the employer-side authoring aid.)
+- [x] **N25 · Recruiter-side candidate-leak cleanup** — ✅ **SHIPPED v271 (2026-08-31); founder to live-verify in the recruiter session.**
+  Three founder-repro leaks where candidate surfaces bled onto the recruiter side: **(a)** the candidate streak/goal/market/Jett
+  **desktop rail** painted in the recruiter "Candidates" view (CSS specificity — the rail's `display:flex` (2,3,1) out-specified
+  the rec-mode hide (0,3,0); added a (3,5,1) override) — *shipped v270*; **(b)** the console **footer** was shoved 324px left in
+  rec-mode by the candidate-rail reservation (added a rec-mode footer rule, no rail padding); **(c)** candidate deck **toasts**
+  ("Pulling live market jobs…", "N fresh jobs match your resume") fired on the recruiter side (gated `_fetchLiveMarketJobs` +
+  `maybeAlertNewMatches` to candidate-only). 3 state tests.
+- [x] **N26 · Company logo lost after save + refresh** — ✅ **SHIPPED v271 (2026-08-31); founder to live-verify.** The logo was
+  saved (to the company doc) but every recruiter rehydrate reads the *recruiter* doc, which never carried it → refresh dropped it
+  to the 🏢 emoji. Now rehydrate pulls the logo back from the company doc (1 recruiter-only read, candidate-first invariant intact)
+  and repaints the Company form; also carried on the recruiter doc going forward (zero-read fast path). 1 state test (module-race-safe).
 - [x] **N22 · Logo uniformity across pages** — ✅ **SHIPPED v267 (2026-08-31), live.** Resources logo was 26px + no
   glow → 30px + mint `.ghost-glow` (generator + 6 existing articles); résumé-checker header/footer normalized to the
   same mint glow. Glow uses `var(--mint)` so it adapts light/dark. Favicon already uniform (N19). SEO pages carry the
@@ -246,10 +257,13 @@
   doesn't spell-check and there's no button (feature-audit A3). Decide: wire it into Jett / add a button.
 
 ### Sprint C — The Wow Pass (all `[UI-REVIEW]`; C1/C2/C3 shipped)
-- [ ] **C4 · Motion & delight (applicant only)** — swipe spring/touch-drag physics, count-up stats, streak flame,
-  extend Apply/Hired celebrations. Employer side stays calm; respect `prefers-reduced-motion`; never block the core action.
-  **📐 MOCKUP APPROVED (2026-08-31, `scratchpad/C4-motion-mockup.html`).** Queued LAST — touches the core swipe
-  gesture, so it needs careful integration (tap-to-drawer, ❤/🚫, apply/skip record, undo) + full regression.
+- [x] **C4 · Motion & delight (applicant only)** — ✅ **SHIPPED v270 (2026-08-31), live.** The bulk shipped earlier
+  (v208 streak/weekly-goal/Apply+Hired celebration bursts, v209 touch-drag physics + haptics + undo pill, v241/C3
+  animated match-ring count-up); v270 completes the **desktop half** — mouse users can now drag-swipe the top card
+  (mirrors the touch handlers) with tap-vs-drag disambiguation (`#card-deck[data-gpj-dragged]` so a drag never also
+  toggles the drawer), a self-disabling guard once any touch is seen, and reduced-motion snap-back. Core swipe intact
+  (tap-to-drawer, ❤/🚫, apply/skip record, undo all covered). 1 state test. **Touch drag-feel still worth a founder
+  spot-check on a real phone (tests can't judge "feel").**
 - [x] **C5 · Skeleton loaders + mascot empty/first-run states** — ✅ **SHIPPED v266 (2026-08-31), live.** `#deck-skeleton`
   shimmer shows only during an active deck fetch with no card yet (never flickers over existing cards), hides when
   real cards paint or the deck resolves to the (pre-existing) mascot empty state. Reduced-motion → static tint. 1 state test.
@@ -350,7 +364,11 @@
 ## 6. PARKED DECISIONS (need a founder call)
 
 - [ ] **Button *word* vs *icon* centering** (10px, site-wide) — A: keep icon, pin left · B: drop icon. On hold; remind after Sprint C.
-- [ ] **Ghost-% placement** — v245 hid the card-face tile (kept the drawer one). Reversible in 2 CSS lines if you prefer at-a-glance on the card face.
+- [x] **Ghost-% placement** — ✅ **RESOLVED + SHIPPED v271 (2026-08-31), mockup approved (`scratchpad/ghost-chip-mockup.html`).**
+  Reversed the v245 de-dup hide: the card-face community ghost-risk pill is now SHOWN whenever it has a value
+  (`.s-ghost:not(:empty)` — 👻 N% / 👻 — / ✅ Verified, color-coded, real-data-only per v119), sitting in the Match group
+  and reading as tappable (opens the drawer's full community breakdown, which is kept). Empty pre-fill state stays hidden.
+  v245 dedup test updated to assert the reversal + a new state test (populated shows / empty hidden / verified ✅).
 - [x] **N3 Ghost-page decisions** — ✅ RESOLVED + SHIPPED v257: (a) flagged companies **do not** surface in your hunt (auto-hidden, undoable); (b) "hiring near your search" is live-pool-sourced (accurate). Deferred: ghost-% placement, button centering.
 
 ---

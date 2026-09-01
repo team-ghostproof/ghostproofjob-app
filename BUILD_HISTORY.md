@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-08-31 · Current live build: **v270**_
+_Last updated: 2026-08-31 · Current live build: **v271**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v271** — Recruiter-side leak cleanup + ghost-chip affordance: footer centers to the console in rec-mode (was shoved 324px left by the candidate-rail reservation); candidate deck toasts ('Pulling live market jobs', 'N fresh jobs match your resume') no longer fire on the recruiter side; company logo persists after refresh (rehydrated from the company doc + carried on the recruiter doc); ghost-risk pill on the card face reads as tappable
 - **v270** — C4 desktop pointer-drag on the swipe deck (mouse users can now drag-swipe, not just click ❤/🚫; tap-vs-drag disambiguation, reduced-motion snap-back, touch unchanged); header narrow-width fix (logo-only wordmark ≤380px so chips stop crowding); recruiter rail-leak fix (candidate streak/goal/market/Jett rail no longer bleeds into the recruiter Candidates desktop view — CSS specificity)
 - **v269** — v269 (N23, founder live-test): recruiter 'Listing strength' now judges COHERENCE, not just length — keyboard-mash/placeholder text can no longer score healthy (the founder's gibberish scored 38%; now caps low + says 'write a real, readable description'). New _recCoherence heuristic (common words + vowel structure + normal token lengths − monster tokens; no dictionary/read/network). A short but REAL description is unaffected (gate only applies once there's enough text to judge fairly). Employer-side authoring aid; no candidate-facing change.
 - **v268** — v268 (D2 Inbox rebuild — founder: 'clicking a message just takes me back to Settings'): candidate messages (reach-outs/interviews) now EXPAND INLINE in the Inbox with their real actions (accept / pick a slot / appeal / reschedule / cancel / dismiss), reusing the SAME global action functions the Settings section uses — no more bounce to Settings. The 🔔 bell routes candidate messages into the Inbox too (was also bouncing to Settings). _notifCandidate caches the full reach-out objects (window._myRO) so inline actions have data with ZERO extra reads. Non-message notifs (matches/plan/admin/recruiter responses) still route to their home views.

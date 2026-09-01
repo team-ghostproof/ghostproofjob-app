@@ -9317,7 +9317,7 @@ test.describe('[STATE-COVERAGE] v242 gap consistency + A7 tiles + honest stats',
     expect(r.pillText, 'no false "No gaps"').not.toMatch(/No gaps/);
   });
 
-  test('A7/v245: the gap is a centered rounded tile; the card-face ghost tile is hidden (de-dup); company card links to Google reviews', async ({ page }) => {
+  test('A7/v245→v271: the gap is a centered rounded tile; the card-face ghost pill is now SHOWN (founder-approved); company card links to Google reviews', async ({ page }) => {
     const r = await page.evaluate(() => {
       const top = document.querySelector('.job-card.top');
       fillSlot(top, { t: 'Analyst', co: 'Acme', desc: 'x', ghost: 22 });
@@ -9337,8 +9337,8 @@ test.describe('[STATE-COVERAGE] v242 gap consistency + A7 tiles + honest stats',
       };
     });
     expect(r.flex, 'the ghost/gap row is a flex row').toBe('flex');
-    expect(r.justify, 'v245: the single gap button is centered').toBe('center');
-    expect(r.ghostHidden, 'v245: the card-face ghost % tile is hidden (kept in the drawer, no dup)').toBe(true);
+    expect(r.justify, 'the risk/gap row is centered').toBe('center');
+    expect(r.ghostHidden, 'v271 (founder-approved reversal): a POPULATED card-face ghost pill is now shown (community signal); the drawer copy still carries the full breakdown').toBe(false);
     expect(r.radius, 'the gap is a rounded tile (~12px), not a pill').toBeGreaterThanOrEqual(10);
     expect(r.minH, 'the gap tile has a real tap height').toBeGreaterThanOrEqual(40);
     expect(/google\.com\/search/.test(r.google), 'company card links out to Google reviews').toBe(true);
@@ -10079,5 +10079,107 @@ test.describe('[STATE-COVERAGE] v270 C4 drag-vs-tap disambiguation', () => {
     expect(r.openedAfterDrag, "a drag's click does NOT toggle the drawer").toBe(false);
     expect(r.flagCleared, 'the drag flag is consumed once').toBe(true);
     expect(r.openedClean, 'a clean click (no drag) still opens the drawer').toBe(true);
+  });
+});
+
+/* v271 (recruiter-side leak cleanup: footer centering + candidate-toast gate + logo persistence). */
+test.describe('[STATE-COVERAGE] v271 recruiter footer centering', () => {
+  test('footer drops the 324px rail reservation in rec-mode (centers to the console)', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 820 });
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.body.classList.contains('desk'), null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      const vs = document.getElementById('view-swipe');
+      const ft = document.getElementById('gpj-global-footer');
+      if (!ft || !vs) return { missing: true };
+      vs.classList.add('gpj-rail-on'); vs.classList.add('active');
+      vs.classList.remove('rec-mode');
+      const candidate = getComputedStyle(ft).paddingRight;   /* candidate: rail reserved */
+      vs.classList.add('rec-mode');
+      const recruiter = getComputedStyle(ft).paddingRight;    /* recruiter: no rail → no reservation */
+      vs.classList.remove('rec-mode');
+      return { missing: false, candidate, recruiter };
+    });
+    expect(r.missing, 'footer + view present in the desktop grid').toBe(false);
+    expect(r.candidate, 'candidate view reserves the rail column').toBe('324px');
+    expect(r.recruiter, 'recruiter rec-mode: reservation removed so the footer centers').toBe('0px');
+  });
+});
+
+test.describe('[STATE-COVERAGE] v271 candidate deck toasts never fire on the recruiter side', () => {
+  test('_fetchLiveMarketJobs + maybeAlertNewMatches early-return in recruiter mode (no toast, no skeleton)', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._fetchLiveMarketJobs === 'function' && typeof window.maybeAlertNewMatches === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(async () => {
+      const toasts = [];
+      const _st = window.showToast; window.showToast = (m) => { toasts.push(String(m)); };
+      const _sk = window._gpjDeckSkeleton; let skel = false; window._gpjDeckSkeleton = (on) => { if (on) skel = true; };
+      window._recruiter = { uid: 'rec1' };   /* _gpjRecruiterMode() → true */
+      try { await window._fetchLiveMarketJobs(); } catch (e) {}
+      try { window.maybeAlertNewMatches(); } catch (e) {}
+      window.showToast = _st; window._gpjDeckSkeleton = _sk; window._recruiter = null;
+      return {
+        pulled: toasts.some(t => /Pulling live market/i.test(t)),
+        matched: toasts.some(t => /match your resume/i.test(t)),
+        skel,
+      };
+    });
+    expect(r.pulled, 'no "Pulling live market jobs" toast in recruiter mode').toBe(false);
+    expect(r.matched, 'no "match your resume" toast in recruiter mode').toBe(false);
+    expect(r.skel, 'no candidate deck skeleton in recruiter mode').toBe(false);
+  });
+});
+
+test.describe('[STATE-COVERAGE] v271 company logo persists across refresh', () => {
+  test('recruiter rehydrate pulls the logo back from the company doc into _recruiter', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    /* gate on the firebase MODULE landing (it replaces window.fb wholesale + its signed-out
+       callback nulls _recruiter) — then wait for that callback so it can't clobber our stub
+       mid-test. See memory: gpj-firebase-module-test-race. */
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(1200);   /* generous — let the initial signed-out callback fire (esp. slow mobile) before we drive the rehydrate, so it can't null _recruiter after us */
+    await page.evaluate(() => {
+      try { localStorage.setItem('gpj_role', 'recruiter'); } catch (e) {}
+      window.fb = window.fb || {};
+      window.fb.loadRecruiter = async () => ({ company: 'Acme', companyId: 'acme.com' });   /* recruiter doc: NO logo (the bug) */
+      window.__readCompany = false;
+      window.fb.loadCompany = async (cid) => { window.__readCompany = (cid === 'acme.com'); return { name: 'Acme', logo: 'data:image/png;base64,AAAA' }; };   /* logo lives here */
+      window._gpjApplyRecruiterSkin = function () {};   /* stub heavy side-effects (fresh page next test) */
+      window.switchView = window.switchView || function () {};
+      window._gpjRecruiterAuthApply({ uid: 'u1', email: 'me@acme.com' });
+    });
+    /* poll for the async chain (loadRecruiter → _apply → loadCompany → merge logo) instead of a fixed sleep */
+    await page.waitForFunction(() => !!(window._recruiter && window._recruiter.logo), null, { timeout: 6000 });
+    const r = await page.evaluate(() => {
+      const out = { logo: (window._recruiter && window._recruiter.logo) || '', readCompany: !!window.__readCompany };
+      try { localStorage.removeItem('gpj_role'); } catch (e) {}
+      window._recruiter = null;
+      return out;
+    });
+    expect(r.readCompany, 'the company doc is read on recruiter rehydrate').toBe(true);
+    expect(r.logo, 'the logo is merged back into _recruiter (survives refresh)').toContain('data:image/png');
+  });
+});
+
+test.describe('[STATE-COVERAGE] v271 ghost-chip surfaced on the card face (founder-approved)', () => {
+  test('a populated ghost pill shows on the card; an empty one stays hidden; verified reads ✅', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.fillSlot === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      const top = document.querySelector('.job-card.top');
+      const g = top.querySelector('.s-ghost');
+      g.textContent = '';                                                   /* pre-fill / empty */
+      const emptyDisp = getComputedStyle(g).display;
+      fillSlot(top, { t: 'Analyst', co: 'Acme', desc: 'x', ghost: 42 });    /* real risk % */
+      const riskDisp = getComputedStyle(g).display, riskText = g.textContent.trim();
+      fillSlot(top, { t: 'Analyst', co: 'Acme', desc: 'x', _verifiedCo: true }); /* verified employer */
+      const vDisp = getComputedStyle(g).display, vText = g.textContent.trim();
+      return { emptyDisp, riskDisp, riskText, vDisp, vText };
+    });
+    expect(r.emptyDisp, 'empty ghost pill stays hidden — no stray box before a job loads').toBe('none');
+    expect(r.riskDisp, 'a populated ghost pill is now shown on the card face').not.toBe('none');
+    expect(r.riskText, 'shows the real risk %').toMatch(/42%/);
+    expect(r.vDisp, 'a verified-employer pill is shown').not.toBe('none');
+    expect(r.vText, 'verified employer reads ✅ / Verified').toMatch(/✅|Verified/);
   });
 });
