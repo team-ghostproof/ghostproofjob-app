@@ -7981,9 +7981,10 @@ test.describe('[STATE-COVERAGE] v204 employer metrics strip', () => {
       document.body.insertAdjacentHTML('beforeend', '<div id="ra-metrics"></div>');
       window.fb = window.fb || {};
       window.fb.countJobApplicants = async (id) => (id === 'J1' ? 3 : id === 'J2' ? 2 : 0);
-      window.fb.countMyReachouts = async () => 7;
+      /* v272 N24: replies is now derived from loadSentReachouts.length (one read powers
+         Replies + Interviews + their drill-ins) — countMyReachouts is no longer called. */
       window.fb.loadSentReachouts = async () => ([
-        { status: 'interested', acceptedTime: 'Tue 2pm' },   // interview
+        { status: 'interested', acceptedTime: 'Tue 2pm' },   // interview (accepted time)
         { status: 'interested' },                            // no time — not an interview
         { status: 'sent' },
       ]);
@@ -7996,7 +7997,7 @@ test.describe('[STATE-COVERAGE] v204 employer metrics strip', () => {
       return document.getElementById('ra-metrics').innerText.replace(/\s+/g, ' ');
     });
     expect(r).toContain('5 APPLICANTS');    // 3 + 2
-    expect(r).toContain('7 REPLIES SENT');
+    expect(r).toContain('3 REPLIES SENT');  // v272: = loadSentReachouts.length (all sent reach-outs)
     expect(r).toContain('1 INTERVIEWS');    // only the accepted-time one
     expect(r).toContain('2 ACTIVE ROLES');  // J1, J2 (J3 filled)
   });
@@ -10181,5 +10182,51 @@ test.describe('[STATE-COVERAGE] v271 ghost-chip surfaced on the card face (found
     expect(r.riskText, 'shows the real risk %').toMatch(/42%/);
     expect(r.vDisp, 'a verified-employer pill is shown').not.toBe('none');
     expect(r.vText, 'verified employer reads ✅ / Verified').toMatch(/✅|Verified/);
+  });
+});
+
+/* v272 (N24 recruiter Applicants clickable counters + empty-state explainer). */
+test.describe('[STATE-COVERAGE] v272 N24 Applicants clickable counters', () => {
+  test('each counter drills into its items; empty state explains the flow; re-tap clears', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._raRenderList === 'function' && typeof window._raSetFilter === 'function' && typeof window._recPaintTiles === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      const host = document.createElement('div');
+      host.innerHTML = '<div id="ra-metrics"></div><div id="ra-filterbar"></div><div id="ra-jobs"></div>';
+      document.body.appendChild(host);
+      window._raCache = {
+        jobs: [{ id: 'j1', title: 'PM' }],
+        sent: [
+          { status: 'interested', acceptedTime: 'Tue 2pm', acceptedTs: 1, candidateName: 'A. Rivera', jobTitle: 'PM', candidateContact: { name: 'A. Rivera', email: 'a@x.com' } },
+          { status: 'sent', kind: 'reachout', candidateName: 'J. Chen', jobTitle: 'PM', ts: 2 },
+        ],
+        applicants: 3, replies: 2, interviews: 1, live: 1,
+      };
+      window._raHasRoles = true;
+      window._raRoleCardsHtml = '<div class="rec-card" id="rolecard">PM · 3 applicants</div>';
+      const out = {};
+      window._raFilter = ''; window._raSetFilter('interviews');
+      out.ivJobs = document.getElementById('ra-jobs').innerHTML;
+      out.ivChip = document.getElementById('ra-filterbar').textContent;
+      window._raSetFilter('replies');
+      out.replies = document.getElementById('ra-jobs').innerHTML;
+      window._raSetFilter('roles');
+      out.roles = document.getElementById('ra-jobs').innerHTML;
+      window._raHasRoles = false; window._raFilter = ''; window._raRenderList();
+      out.empty = document.getElementById('ra-jobs').innerHTML;
+      window._raFilter = 'interviews'; window._raSetFilter('interviews');   // re-tap the active tile
+      out.cleared = window._raFilter;
+      host.remove();
+      return out;
+    });
+    expect(r.ivJobs, 'Interviews drill-in shows the accepted time').toContain('Tue 2pm');
+    expect(r.ivJobs, 'and the revealed candidate contact (post-accept)').toContain('a@x.com');
+    expect(r.ivChip, 'a clear-filter chip labels the active view').toMatch(/Scheduled interviews/);
+    expect(r.replies, 'Replies drill-in lists the sent messages').toContain('A. Rivera');
+    expect(r.replies, 'and their status').toMatch(/Interested/);
+    expect(r.roles, 'Active roles restores the roles list').toContain('rolecard');
+    expect(r.empty, 'no roles → the 3-step explainer').toMatch(/How this page works/);
+    expect(r.empty, 'with a post-a-role CTA').toMatch(/Post your first role/);
+    expect(r.cleared, 're-tapping the active counter clears the filter').toBe('');
   });
 });
