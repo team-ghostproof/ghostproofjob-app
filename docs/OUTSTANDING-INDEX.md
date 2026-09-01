@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v273** (`CACHE_VERSION = gpj-v273`; live == repo, verified 2026-09-01). This sprint (v270→v273) all **live-verified in the founder's recruiter session**. v270: C4 desktop drag · header · rail-leak. v271: footer centers ✓ · logo persists ✓ · candidate toasts silent in rec-mode ✓ · card-face ghost-% chip. v272 **N24**: Applicants counters are clickable drill-in filters (surfaced the founder's real sent reach-out ✓) + 3-step empty state ✓. v273 **N28**: mobile recruiter pipeline = stacked collapsible stage list, live-verified at 375px in light AND dark ✓; desktop kanban unchanged. N27 (reverse-match) verified running.
+> **Current live build: v276** (`CACHE_VERSION = gpj-v276`; live == repo, verified 2026-09-01). Sprint v270→v276, all **live-verified**. v270 C4 desktop drag/header/rail-leak · v271 footer/logo/candidate-toast/ghost-% chip · v272 **N24** Applicants clickable counters · v273 **N28** mobile recruiter pipeline · v274 notification-toggle honesty (default ON to match in-app behaviour) · v275 **P2-6 My Data** (real transparency view + real JSON export replacing the fake, live-verified with real data) + phone optional at signup · v276 **Role Fit unified to the card engine** (median of computeMatch across a live-posting sample — Role Fit went 100→72 to match the ~77% cards, live-verified, computeMatch called 40×). **N8 post-deploy smoke shipped.** N27 (reverse-match) verified running. **Full candidate-side + AI live-tested in the founder's session** (deck/ghost-chip/rater/Match-to-Job/Cover-Letter/Jett — all work + honest, zero fabrication). Read-cost is a non-issue (~$0.09/day; founder to set a $5 Firebase cap). **Next: weekly matches-first email digest (P1-3) to make the notification toggles send.**
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -359,7 +359,9 @@
 - [ ] **P1-3 / G7 · Digest emails ×3** — approved, unbuilt (cheap now the pool is live).
 - [ ] **P1-7 / F7 · Hire data captured but not surfaced** — do NOT publicly claim hire numbers until an aggregate view exists.
 - [ ] **P2-5 · Offline queue** — an action taken offline may never reach the cloud (unknown/unbuilt).
-- [ ] **P2-6 · "My Data" audit view** — let users see what's stored (unbuilt).
+- [x] **P2-6 · "My Data" audit view** — ✅ **SHIPPED v275 (2026-09-01), live-verified with real data.** New collapsible Settings section
+  showing everything stored (Account / Résumé / Preferences / Activity / Local), labeled by where it lives + what's shared, with the
+  no-selling promise, a **real client-side JSON export** (replaced the old fake "check your email" toast) + Delete. Responsive + themed.
 - [ ] **P2-7 · Backup branch auto-update on green** — the deep backup branch is far behind (intentional fallback); automation approved, unbuilt.
 - [ ] **P2-8 · Speed Insights re-add + guard** — was merged then silently lost in a full-file rewrite.
 - [ ] **P2-10 · Dead files** — `manifest.json` (unreferenced; note `manifest.webmanifest` is the live one) +
