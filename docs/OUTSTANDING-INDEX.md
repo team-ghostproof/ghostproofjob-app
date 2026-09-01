@@ -95,15 +95,18 @@
   both drill-ins, dropping the old `countMyReachouts` call). Live-verified: the Replies-sent counter surfaced the founder's real
   sent reach-out (previously unreachable). 1 new state test + v204 metrics test updated.
   **Follow-up option (not built):** mirror responses into the Inbox tab too, if the founder wants them there as well.
-- [ ] **N27 · Verify the reverse-match actually runs (FOUNDER CONSOLE, not code)** 🔴 — the recruiter **Candidates** tab is
-  populated by the nightly GitHub Action writing `jobs/{id}/recommended_candidates`. Per our notes it likely writes **nothing**
-  without the `FIREBASE_SERVICE_ACCOUNT` secret, so that tab may be **permanently empty** — a silent dead feature (the whole
-  "matched candidates" half of the product). **Action: confirm the secret is set and a recent Action run succeeded/wrote docs.**
-  Highest-impact open item; code is fine, it's a wiring/secret check. (Same secret class as [[gpj-d1-pool-never-written]].)
+- [x] **N27 · Reverse-match IS running** ✅ **VERIFIED 2026-09-01 (founder screenshots).** `FIREBASE_SERVICE_ACCOUNT` secret is
+  set (3 months); the nightly **Reverse Match #51 ran Success** (2m18s). Earlier "it may write nothing" concern was stale — the
+  pipeline is wired and executing. Remaining nuance: "Success" ≠ proven writes, and the founder's account has **0 live roles**, so
+  an empty **Candidates** tab right now is EXPECTED (nothing to match). True confirmation = post a verified role + a discoverable
+  candidate, then check after the next nightly. (Housekeeping done same day: bumped `actions/checkout`+`setup-node` v4→v5 across all
+  workflows to clear the Node 20 deprecation warning that run showed.)
 - [ ] **N28 · Mobile pipeline layout — founder decision** 🟡 `[UI-REVIEW]` — the applicant pipeline is a 6-column horizontal-scroll
   kanban (Applied→Reviewed→Interview→Offer→Hired→Closed). Great on desktop; on a phone it's a lot of sideways scrolling. Decide:
-  keep the kanban, or collapse to a single list with a per-candidate stage dropdown on mobile. No wrong answer — needs the
-  founder's preference before building.
+  keep the kanban, or collapse to a single list with a per-candidate stage dropdown on mobile. **📐 MOCKUP SENT (2026-09-01,
+  `scratchpad/N28-mobile-pipeline-mockup.html`) — my rec: desktop keeps the kanban, mobile becomes a stacked collapsible stage
+  list (same move dropdown + 💬/💌, no sideways scroll). Awaiting founder approval, then build the mobile branch in
+  `_recRenderKanban` (desktop path untouched).**
 - [x] **N25 · Recruiter-side candidate-leak cleanup** — ✅ **SHIPPED v271 (2026-08-31); live-verified in the recruiter session (2026-09-01).**
   Three founder-repro leaks where candidate surfaces bled onto the recruiter side: **(a)** the candidate streak/goal/market/Jett
   **desktop rail** painted in the recruiter "Candidates" view (CSS specificity — the rail's `display:flex` (2,3,1) out-specified
