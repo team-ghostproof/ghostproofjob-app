@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v270** (`CACHE_VERSION = gpj-v270`; live == repo, verified 2026-08-31). **v271 built + gating** (recruiter-side leak cleanup: footer centering in rec-mode + candidate-toast gate + company-logo persistence; + the founder-approved card-face ghost-% chip).
+> **Current live build: v271** (`CACHE_VERSION = gpj-v271`; live == repo, verified 2026-09-01). v271 recruiter-side fixes were **live-verified in the founder's recruiter session** (footer centers to the console ✓ · company logo persists after refresh ✓ · candidate deck toasts produce nothing in rec-mode ✓); the founder-approved card-face ghost-% chip shipped too. **N24 (Applicants clickable counters) — mockup sent, awaiting approval** (`scratchpad/N24-applicants-counters-mockup.html`).
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -85,14 +85,22 @@
   score real quality signals — a genuine title, sentence/keyword coherence (not keyboard-mash), a salary RANGE,
   distinct requirements + benefits sections, reasonable length band — and give concrete "add X" tips. Honesty: never
   reward gibberish. (Candidate-facing match already ignores junk; this is the employer-side authoring aid.)
-- [x] **N25 · Recruiter-side candidate-leak cleanup** — ✅ **SHIPPED v271 (2026-08-31); founder to live-verify in the recruiter session.**
+- [ ] **N24 · Recruiter Applicants page — clickable counters + flow clarity** `[UI-REVIEW]` — 📐 **MOCKUP SENT (2026-09-01,
+  `scratchpad/N24-applicants-counters-mockup.html`), awaiting founder approval.** Founder repro: "I can see the counters at the
+  top but can't click them to see those specific items — how is this page supposed to work?" The 4 tiles (`_recMetricTile`:
+  Applicants / Replies sent / Interviews / Active roles) are static. Proposal: each tile becomes a tap-to-drill filter over the
+  list below — Applicants→expand all roles' applicants, Interviews→filter to Interview-stage candidates, Replies sent→sent
+  reach-outs (Inbox data), Active roles→the roles list; active tile highlights + a clear-filter chip. All from already-loaded data
+  (no new reads). Additive; the tap-a-role → kanban → applicant-card flow is untouched. **Needs the founder's recruiter session
+  to live-verify (now available).**
+- [x] **N25 · Recruiter-side candidate-leak cleanup** — ✅ **SHIPPED v271 (2026-08-31); live-verified in the recruiter session (2026-09-01).**
   Three founder-repro leaks where candidate surfaces bled onto the recruiter side: **(a)** the candidate streak/goal/market/Jett
   **desktop rail** painted in the recruiter "Candidates" view (CSS specificity — the rail's `display:flex` (2,3,1) out-specified
   the rec-mode hide (0,3,0); added a (3,5,1) override) — *shipped v270*; **(b)** the console **footer** was shoved 324px left in
   rec-mode by the candidate-rail reservation (added a rec-mode footer rule, no rail padding); **(c)** candidate deck **toasts**
   ("Pulling live market jobs…", "N fresh jobs match your resume") fired on the recruiter side (gated `_fetchLiveMarketJobs` +
   `maybeAlertNewMatches` to candidate-only). 3 state tests.
-- [x] **N26 · Company logo lost after save + refresh** — ✅ **SHIPPED v271 (2026-08-31); founder to live-verify.** The logo was
+- [x] **N26 · Company logo lost after save + refresh** — ✅ **SHIPPED v271 (2026-08-31); live-verified in the recruiter session (2026-09-01) — the Company form shows the real logo after a fresh reload.** The logo was
   saved (to the company doc) but every recruiter rehydrate reads the *recruiter* doc, which never carried it → refresh dropped it
   to the 🏢 emoji. Now rehydrate pulls the logo back from the company doc (1 recruiter-only read, candidate-first invariant intact)
   and repaints the Company form; also carried on the recruiter doc going forward (zero-read fast path). 1 state test (module-race-safe).
