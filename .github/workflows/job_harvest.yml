@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: ${{ github.event.inputs.mode == 'stack' && 360 || 75 }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
@@ -71,7 +71,7 @@ jobs:
       # a failure here must not turn the harvest red.
       - name: Set up Node 20 (job pool builder)
         if: always()
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with: { node-version: '24' }
       - name: Rebuild the D1 job pool
         if: always()

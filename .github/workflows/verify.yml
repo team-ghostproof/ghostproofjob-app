@@ -23,8 +23,8 @@ jobs:
     name: "§4 benchmark (boot harness, mirror, ids, handlers, versions)"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: '24' }
       - run: npm ci || npm install
       - name: Run the §4 benchmark
@@ -34,8 +34,8 @@ jobs:
     name: "Backend suites"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: '24' }
       - run: npm ci || npm install
       - run: npm run test:match
@@ -52,8 +52,8 @@ jobs:
     name: "Firestore rules (emulator)"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: '24' }
       - uses: actions/setup-java@v4
         with: { distribution: 'temurin', java-version: '21' }
@@ -65,8 +65,8 @@ jobs:
     name: "Playwright"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: '24' }
       - run: npm ci || npm install
       - run: npx playwright install --with-deps chromium
@@ -121,7 +121,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
       - name: Fast-forward stable to this verified commit
         run: |
