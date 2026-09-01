@@ -4896,9 +4896,19 @@ test.describe('[STATE-COVERAGE] v144 P1-1B listing quality floor + honest streng
   });
 
   test('the founder-repro 26-char listing scores poorly and names what is missing', async ({ page }) => {
+    /* v270: the "strong" case must be REAL prose, not 'x'.repeat(900). Since v269 the
+       score has a coherence gate (keyboard-mash / placeholder can't read as strong), and
+       900 identical characters is — correctly — incoherent, so it now caps low. A genuine
+       complete listing is coherent prose; that is what a real recruiter writes and what
+       must score ≥95. (App behaviour is intended + shipped in v269 — this fixes the fixture.) */
     const r = await page.evaluate(() => ({
       weak: _recListingScore({ desc: 'Manage marketing\nBudgeting', req: '', benefits: '', smin: '', smax: '' }),
-      strong: _recListingScore({ desc: 'x'.repeat(900), req: 'y'.repeat(200), benefits: 'z'.repeat(90), smin: '60000', smax: '80000' }),
+      strong: _recListingScore({
+        desc: 'We are hiring a Senior Lifecycle Marketing Manager to own the full patient journey from first touch through onboarding, activation, and long-term retention. You will design, build, and run lifecycle email and SMS campaigns, partner closely with our CRM, product, and analytics teams, and use data to continuously improve engagement at every stage. This role owns the roadmap for automated journeys, A/B testing, and segmentation, and reports to the Director of Marketing. You will set measurable goals for open rates, click-through, and conversion, and present results to leadership every month. We want someone strategic and hands-on, comfortable writing copy, pulling their own reports, and coordinating across teams to ship campaigns on time. If you care about marketing that genuinely helps people, your work here has real impact.',
+        req: 'You have at least five years of lifecycle, CRM, or growth marketing experience, strong written communication, hands-on work with email platforms and analytics, and a track record of driving measurable retention.',
+        benefits: 'Comprehensive health, dental, and vision coverage, a 401(k) match, flexible remote days, and generous paid time off.',
+        smin: '60000', smax: '80000',
+      }),
     }));
     expect(r.weak.score, 'the 26-char posting that lost to scraped listings scores badly').toBeLessThan(20);
     expect(r.weak.gaps.join(' ')).toContain('requirements');
@@ -9997,5 +10007,77 @@ test.describe('[STATE-COVERAGE] v269 N23 listing-strength coherence', () => {
     expect(r.gibScore, 'gibberish can no longer score healthy').toBeLessThanOrEqual(20);
     expect(r.gibGap, 'and it names the real fix').toMatch(/real, readable/i);
     expect(r.realScore, 'a genuine, complete listing scores well').toBeGreaterThanOrEqual(70);
+  });
+});
+
+/* v270 (C4 desktop pointer-drag + header narrow-width + recruiter rail-leak fix). */
+test.describe('[STATE-COVERAGE] v270 recruiter rail-leak (Candidates desktop view)', () => {
+  test('candidate streak/goal/market rail is HIDDEN in recruiter rec-mode on desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 820 });
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.body.classList.contains('desk'), null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      const vs = document.getElementById('view-swipe');
+      const rail = document.getElementById('gpj-deck-rail');
+      vs.classList.add('gpj-rail-on'); vs.classList.add('active');
+      vs.classList.remove('rec-mode');
+      const candidate = getComputedStyle(rail).display;   /* candidate: rail shows */
+      vs.classList.add('rec-mode');
+      const recruiter = getComputedStyle(rail).display;    /* recruiter: rail must be gone */
+      vs.classList.remove('rec-mode');
+      return { candidate, recruiter, inDeskMain: rail.closest('#desk-main') != null };
+    });
+    expect(r.inDeskMain, 'rail lives inside the desktop grid').toBe(true);
+    expect(r.candidate, 'candidate desktop: rail visible').not.toBe('none');
+    expect(r.recruiter, 'recruiter Candidates view: candidate rail hidden (the leak fix)').toBe('none');
+  });
+});
+
+test.describe('[STATE-COVERAGE] v270 header narrow-width (logo-only wordmark)', () => {
+  test('wordmark text hides ≤380px (logo carries the brand); returns above 380px', async ({ page }) => {
+    /* load AT 360px (mobile) so we never cross the desktop breakpoint mid-test — that
+       crossing makes the app self-reload and destroys the evaluate context. Both widths
+       below stay within the mobile range, so no reload. */
+    await page.setViewportSize({ width: 360, height: 760 });
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    const narrow = await page.evaluate(() => {
+      const bt = document.querySelector('#header-row .brand-text');
+      const logo = document.querySelector('#header-row img');
+      return { brand: bt ? getComputedStyle(bt).display : 'MISSING', logo: logo ? getComputedStyle(logo).display : 'MISSING' };
+    });
+    expect(narrow.brand, 'cramped: wordmark text hidden').toBe('none');
+    expect(narrow.logo, 'cramped: logo mark still shows').not.toBe('none');
+    await page.setViewportSize({ width: 430, height: 760 });   /* still mobile — no desk crossing */
+    await page.waitForTimeout(300);
+    const wide = await page.evaluate(() => {
+      const bt = document.querySelector('#header-row .brand-text');
+      return bt ? getComputedStyle(bt).display : 'MISSING';
+    });
+    expect(wide, 'roomy: wordmark text returns').not.toBe('none');
+  });
+});
+
+test.describe('[STATE-COVERAGE] v270 C4 drag-vs-tap disambiguation', () => {
+  test('a drag suppresses the follow-up click (no drawer toggle); a clean click still opens', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.toggleDrawer === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      const dk = document.getElementById('card-deck');
+      const dr = document.getElementById('card-drawer');
+      if (!dk || !dr) return { missing: true };
+      dr.classList.remove('open'); document.body.classList.remove('card-open');
+      dk.dataset.gpjDragged = '1';                 /* a real drag just ended */
+      window.toggleDrawer({ target: dk });          /* the click a drag fires */
+      const openedAfterDrag = dr.classList.contains('open');
+      const flagCleared = !dk.dataset.gpjDragged;
+      window.toggleDrawer({ target: dk });          /* a clean click */
+      const openedClean = dr.classList.contains('open');
+      return { missing: false, openedAfterDrag, flagCleared, openedClean };
+    });
+    expect(r.missing, 'deck + drawer present').toBe(false);
+    expect(r.openedAfterDrag, "a drag's click does NOT toggle the drawer").toBe(false);
+    expect(r.flagCleared, 'the drag flag is consumed once').toBe(true);
+    expect(r.openedClean, 'a clean click (no drag) still opens the drawer').toBe(true);
   });
 });
