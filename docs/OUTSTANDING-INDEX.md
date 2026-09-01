@@ -3,7 +3,7 @@
 > **Purpose:** the ONE place to see every open item by its ID, its status, and where the
 > detail lives — plus a step-by-step manual-test checklist the founder runs. Check items off
 > (`- [ ]` → `- [x]`) as we complete them.
-> **Current live build: v271** (`CACHE_VERSION = gpj-v271`; live == repo, verified 2026-09-01). v271 recruiter-side fixes were **live-verified in the founder's recruiter session** (footer centers to the console ✓ · company logo persists after refresh ✓ · candidate deck toasts produce nothing in rec-mode ✓); the founder-approved card-face ghost-% chip shipped too. **N24 (Applicants clickable counters) — mockup sent, awaiting approval** (`scratchpad/N24-applicants-counters-mockup.html`).
+> **Current live build: v272** (`CACHE_VERSION = gpj-v272`; live == repo, verified 2026-09-01). v271 recruiter fixes + v272 **N24** were all **live-verified in the founder's recruiter session**. v271: footer centers ✓ · logo persists after refresh ✓ · candidate toasts silent in rec-mode ✓ · card-face ghost-% chip. v272 N24: Applicants counters are clickable drill-in filters (Replies-sent counter surfaced the founder's real sent reach-out ✓), + a 3-step "How this page works" empty state ✓.
 > **Companions:** `sprint-roadmap.md` (per-item detail), `BUILD_HISTORY.md` (per-build log),
 > `guardrails.md` (rules), `feature-audit.md` + `launch-readiness.md` (older P0/P1/P2 study).
 > **Maintained by hand each change** (the roadmap is auto-noted by `bump_version.py`; this sheet is curated).
@@ -85,14 +85,25 @@
   score real quality signals — a genuine title, sentence/keyword coherence (not keyboard-mash), a salary RANGE,
   distinct requirements + benefits sections, reasonable length band — and give concrete "add X" tips. Honesty: never
   reward gibberish. (Candidate-facing match already ignores junk; this is the employer-side authoring aid.)
-- [ ] **N24 · Recruiter Applicants page — clickable counters + flow clarity** `[UI-REVIEW]` — 📐 **MOCKUP SENT (2026-09-01,
-  `scratchpad/N24-applicants-counters-mockup.html`), awaiting founder approval.** Founder repro: "I can see the counters at the
-  top but can't click them to see those specific items — how is this page supposed to work?" The 4 tiles (`_recMetricTile`:
-  Applicants / Replies sent / Interviews / Active roles) are static. Proposal: each tile becomes a tap-to-drill filter over the
-  list below — Applicants→expand all roles' applicants, Interviews→filter to Interview-stage candidates, Replies sent→sent
-  reach-outs (Inbox data), Active roles→the roles list; active tile highlights + a clear-filter chip. All from already-loaded data
-  (no new reads). Additive; the tap-a-role → kanban → applicant-card flow is untouched. **Needs the founder's recruiter session
-  to live-verify (now available).**
+- [x] **N24 · Recruiter Applicants page — clickable counters + flow clarity** `[UI-REVIEW]` — ✅ **SHIPPED v272 (2026-09-01),
+  live-verified in the recruiter session.** The 4 metric tiles are now tap-to-drill filters: **Applicants**→expand all pipelines ·
+  **Replies sent**→your sent reach-outs · **Interviews**→scheduled interviews (with the candidate's post-accept contact) ·
+  **Active roles**→the roles list. Active tile highlights mint + a clear-filter chip names the view; re-tap clears. Also gives
+  reach-out RESPONSES a persistent home on the page (Interviews/Replies), next to the pipeline — closes the "where do replies go"
+  loop **without** touching the shared Inbox render. Added a 3-step "How this page works" empty state + a "Post your first role"
+  CTA, and a clearer "N applicants ▾" role affordance. **Zero new reads** (one `loadSentReachouts` powers Replies + Interviews +
+  both drill-ins, dropping the old `countMyReachouts` call). Live-verified: the Replies-sent counter surfaced the founder's real
+  sent reach-out (previously unreachable). 1 new state test + v204 metrics test updated.
+  **Follow-up option (not built):** mirror responses into the Inbox tab too, if the founder wants them there as well.
+- [ ] **N27 · Verify the reverse-match actually runs (FOUNDER CONSOLE, not code)** 🔴 — the recruiter **Candidates** tab is
+  populated by the nightly GitHub Action writing `jobs/{id}/recommended_candidates`. Per our notes it likely writes **nothing**
+  without the `FIREBASE_SERVICE_ACCOUNT` secret, so that tab may be **permanently empty** — a silent dead feature (the whole
+  "matched candidates" half of the product). **Action: confirm the secret is set and a recent Action run succeeded/wrote docs.**
+  Highest-impact open item; code is fine, it's a wiring/secret check. (Same secret class as [[gpj-d1-pool-never-written]].)
+- [ ] **N28 · Mobile pipeline layout — founder decision** 🟡 `[UI-REVIEW]` — the applicant pipeline is a 6-column horizontal-scroll
+  kanban (Applied→Reviewed→Interview→Offer→Hired→Closed). Great on desktop; on a phone it's a lot of sideways scrolling. Decide:
+  keep the kanban, or collapse to a single list with a per-candidate stage dropdown on mobile. No wrong answer — needs the
+  founder's preference before building.
 - [x] **N25 · Recruiter-side candidate-leak cleanup** — ✅ **SHIPPED v271 (2026-08-31); live-verified in the recruiter session (2026-09-01).**
   Three founder-repro leaks where candidate surfaces bled onto the recruiter side: **(a)** the candidate streak/goal/market/Jett
   **desktop rail** painted in the recruiter "Candidates" view (CSS specificity — the rail's `display:flex` (2,3,1) out-specified
