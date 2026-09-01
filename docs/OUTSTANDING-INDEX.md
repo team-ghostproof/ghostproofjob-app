@@ -220,7 +220,12 @@
   the same title). Minor copy/polish.
 - [x] **N7 · Repo cruft** ✅ DONE (removed v248) — deleted the stray empty `ran` file and `${OUT}v246_salary_tiles.png` (leaked shell
   var in a filename) at repo root. (Trivial; "ask before deleting" — confirm.)
-- [ ] **N8 · Automate the live-URL post-deploy smoke** (= E3 below) — the local gate can't catch a stale deploy.
+- [x] **N8 · Automate the live-URL post-deploy smoke** (= E3) — ✅ **SHIPPED 2026-09-01.** `.github/workflows/post_deploy_smoke.yml`
+  + `scripts/post_deploy_smoke.mjs` (`npm run smoke:live`): after a push that changes the app (path-filtered to
+  `index.html`/`GhostProofJob.html`/`sw.js`), it polls the live URL until it serves THIS commit's `APP_VERSION` with a valid
+  shell (up to 10 min), else the run goes red — catching a stale/failed/paste-truncated deploy the local §4 gate can't see.
+  Both pass + fail paths validated locally against the live site. Zero secrets, zero cost beyond a public GET; independent of
+  the verify.yml gate and promote-stable.
 - [x] **N9 · Admin Diagnostics — readable Bug & Error report** `[UI-REVIEW][BUILD]` · founder-requested.
   **✅ SHIPPED v247 (2026-08-27) · live-verified.** Benchmark GREEN · 8 backend suites · Playwright **866/0/0** ·
   both-theme visual proof. Deployed to production (ghostproofjob.com == v247). **Founder: run test T12 on your admin account.**

@@ -1,0 +1,32 @@
+name: Post-deploy smoke (live URL)
+
+# N8 / E3 — catches a DEPLOY that never landed or landed broken (the one thing the
+# local §4 gate + Playwright can't see). After a push that changes the app, poll the
+# live URL until it actually serves THIS commit's APP_VERSION with a valid shell.
+#
+# Path-filtered to the app files, so docs / workflow / script-only pushes don't spend a
+# run (their APP_VERSION already matches live → nothing to verify). Independent of the
+# verify.yml gate and of promote-stable — this is a live-reality check, not a code gate.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'GhostProofJob.html'
+      - 'sw.js'
+  workflow_dispatch:
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: "Live URL serves the pushed version"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: '24' }
+      - name: Poll the live site until it serves this commit's APP_VERSION
+        run: node scripts/post_deploy_smoke.mjs

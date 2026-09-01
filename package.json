@@ -29,6 +29,7 @@
     "resources:init": "node scripts/build_resources.mjs --init",
     "test:resources": "node --test tests/growth/resourcesEngine.test.mjs",
     "benchmark": "node scripts/benchmark.mjs",
+    "smoke:live": "node scripts/post_deploy_smoke.mjs",
     "verify": "npm run benchmark && npm run test:match && npm run test:growth && npm run test:email && npm run test:apply && npm run test:seo && npm run test:billing && npm run pool:check && npm run test:e2e:full && npm run test:rules",
     "test:e2e:full": "playwright test --workers=2",
     "verify:nojava": "npm run benchmark && npm run test:match && npm run test:growth && npm run test:email && npm run test:apply && npm run test:seo && npm run test:billing && npm run pool:check && npm run test:e2e:full"
