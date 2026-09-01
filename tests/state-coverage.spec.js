@@ -10310,3 +10310,38 @@ test.describe('[STATE-COVERAGE] v274 notification toggles default ON to match in
     expect(r.noMisleadingTag, 'reframed away from the misleading "EMAIL NOT LIVE YET"').toBe(true);
   });
 });
+
+/* v275 (P2-6 My Data transparency view + real export; phone optional at signup). */
+test.describe('[STATE-COVERAGE] v275 My Data view + phone optional', () => {
+  test('My Data renders the 5 cards + real model + a real export; the fake export is gone; phone is optional', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.renderMyData === 'function' && typeof window._gpjToggleMyData === 'function' && typeof window._gpjDownloadMyData === 'function' && typeof window._gpjMyDataModel === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      window._gpjToggleMyData();                 // expand + render
+      const body = document.getElementById('my-data-body');
+      const html = body ? body.innerHTML : '';
+      const model = window._gpjMyDataModel();
+      const lbl = (function () { const el = document.getElementById('auth-phone'); const l = el && el.previousElementSibling; return l ? l.textContent : ''; })();
+      return {
+        sectionExists: !!document.getElementById('sec-mydata'),
+        promise: /no ads, no data selling, ever/.test(html),
+        cards: ['👤 Account', '📄 Résumé on file', '⚙️ Preferences', '📊 Your activity', '💾 On this device only'].filter(t => html.indexOf(t) > -1).length,
+        hasDownload: html.indexOf('Download all my data (JSON)') > -1,
+        hasDelete: html.indexOf('Delete my account') > -1,
+        modelHasActivity: model && typeof model.applied === 'number' && typeof model.skipped === 'number',
+        modelHasPrefs: model && typeof model.pMatches === 'boolean',
+        phoneOptional: /optional/i.test(lbl),
+        fakeExportGone: !/Export requested/i.test(document.body.innerHTML),
+      };
+    });
+    expect(r.sectionExists, 'My Data section present in Settings').toBe(true);
+    expect(r.promise, 'the no-selling promise leads the view').toBe(true);
+    expect(r.cards, 'all 5 data cards render').toBe(5);
+    expect(r.hasDownload, 'real JSON download action').toBe(true);
+    expect(r.hasDelete, 'delete action present').toBe(true);
+    expect(r.modelHasActivity, 'model reads real activity counts').toBe(true);
+    expect(r.modelHasPrefs, 'model reads real preferences').toBe(true);
+    expect(r.phoneOptional, 'signup phone label marked optional').toBe(true);
+    expect(r.fakeExportGone, 'the old fake "Export requested / check your email" placeholder is gone').toBe(true);
+  });
+});

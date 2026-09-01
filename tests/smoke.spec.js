@@ -61,6 +61,8 @@ test('core functions still exist (regression guard)', async ({ page }) => {
     '_raSetFilter', '_raRenderList', '_recPaintTiles', '_raGoListings', 'renderRecApplicants',
     // v273 N28 mobile pipeline
     '_recRenderPipelineMobile', '_recToggleStage', '_recRenderKanban',
+    // v275 P2-6 My Data
+    'renderMyData', '_gpjToggleMyData', '_gpjDownloadMyData', '_gpjMyDataModel',
   ];
   const missing = await page.evaluate(
     (names) => names.filter((n) => typeof window[n] !== 'function'),

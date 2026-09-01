@@ -1717,7 +1717,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
           <div><div class="field-label">First Name</div><input class="field-input" id="auth-first" name="given-name" autocomplete="given-name" placeholder="First" style="margin-bottom:8px;"/></div>
           <div><div class="field-label">Last Name</div><input class="field-input" id="auth-last" name="family-name" autocomplete="family-name" placeholder="Last" style="margin-bottom:8px;"/></div>
         </div>
-        <div class="field-label">Phone (10-digit US)</div>
+        <div class="field-label">Phone <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional · 10-digit US)</span></div>
         <input class="field-input" id="auth-phone" name="tel" autocomplete="tel" type="tel" inputmode="numeric" placeholder="(713) 555-0100" oninput="validatePhone(this)" style="margin-bottom:2px;"/>
         <div id="auth-phone-err" style="display:none;font-size:10px;color:var(--danger);margin-bottom:6px;">Enter a complete 10-digit US number.</div>
         <!-- v121 (founder-approved): marketing attribution — optional, one tap,
@@ -3394,6 +3394,16 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
           <div class="toggle-switch" id="discoverable-toggle" onclick="toggleDiscoverable(this)"></div></div>
       </div>
 
+      <!-- P2-6 (v275, founder-approved): My Data — a plain-language, real-data view of
+           EVERYTHING stored about the user, labelled by where it lives + what's shared, with a
+           REAL client-side JSON export (replaces the old fake "check your email" toast). Rendered
+           only from the user's own profile/résumé/lists — nothing invented. Collapsible; built on
+           brand tokens + flex so it themes light/dark and reflows on every device. -->
+      <div class="pref-section" id="sec-mydata">
+        <div class="pref-section-title" onclick="_gpjToggleMyData()" style="cursor:pointer;display:flex;align-items:center;gap:6px;">🔐 My Data <span style="text-transform:none;font-weight:400;color:var(--muted);">— everything we store about you</span><span id="mydata-caret" style="margin-left:auto;color:var(--muted);font-weight:400;">▸</span></div>
+        <div id="my-data-body" style="display:none;"></div>
+      </div>
+
       <div class="pref-section">
         <div class="pref-section-title">Privacy, Legal & Security</div>
         <div class="pref-row" onclick="contactSupport()" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(100,200,255,.12);">📨</div><div style="flex:1;font-size:13px;font-weight:600;">Contact Support / Ask a Question</div><div style="color:var(--muted);">›</div></div>
@@ -3402,7 +3412,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
         <div class="pref-row" onclick="openLegal('privacy')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(181,95,230,.12);">🔒</div><div style="flex:1;font-size:13px;font-weight:600;">Privacy Policy</div><div style="color:var(--muted);">›</div></div>
         <div class="pref-row" onclick="openLegal('terms')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(0,245,160,.12);">📜</div><div style="flex:1;font-size:13px;font-weight:600;">Terms of Service</div><div style="color:var(--muted);">›</div></div>
         <div class="pref-row" onclick="openLegal('security')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(255,179,71,.12);">🛡️</div><div style="flex:1;font-size:13px;font-weight:600;">Security & Data Handling</div><div style="color:var(--muted);">›</div></div>
-        <div class="pref-row" id="row-export" onclick="showToast('📤 Export requested. Check your email.')" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(100,200,255,.12);">📤</div><div style="flex:1;font-size:13px;font-weight:600;">Export My Data</div><div style="color:var(--muted);">›</div></div>
+        <div class="pref-row" id="row-export" onclick="_gpjDownloadMyData()" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(100,200,255,.12);">📤</div><div style="flex:1;font-size:13px;font-weight:600;">Download My Data <span style="text-transform:none;font-weight:400;color:var(--muted);font-size:11px;">(JSON, instant)</span></div><div style="color:var(--muted);">›</div></div>
         <div class="pref-row" id="row-purge" onclick="purgeProfile()" style="cursor:pointer;"><div class="pref-icon" style="background:rgba(255,77,106,.12);">🗑️</div><div style="flex:1;font-size:13px;font-weight:600;color:var(--danger);">Permanently Purge My Profile</div><div style="color:var(--muted);">›</div></div>
       </div>
 
@@ -3456,7 +3466,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Always free 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v274</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v275</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -15385,6 +15395,85 @@ function toggleDiscoverable(el){
   }catch(e){}
   showToast(on?'🤝 Verified employers can now find you — turn off anytime':'🔒 You’re hidden from employer discovery');
 }
+/* ===== P2-6 (v275, founder-approved): My Data — a real-data transparency view + a genuine
+   client-side JSON export. Everything is read from the user's OWN profile/résumé/lists —
+   nothing invented. Built on brand tokens + flex, so it themes light/dark and reflows on
+   every device. Replaces the old fake "Export → check your email" placeholder. */
+function _gpjMaskPhone(ph){ var d=String(ph||'').replace(/\D/g,''); return d.length>=4?('(•••) •••-'+d.slice(-4)):''; }
+function _gpjMyDataModel(){
+  var p={},u=null,rd={},L={};
+  try{ p=(typeof getProfile==='function'&&getProfile())||{}; }catch(e){}
+  try{ u=(window.fb&&fb.current&&fb.current())||null; }catch(e){}
+  try{ rd=(typeof resumeData!=='undefined'&&resumeData)||{}; }catch(e){}
+  try{ L=(typeof lists!=='undefined'&&lists)||{}; }catch(e){}
+  var pref=p.preferences||{};
+  var theme=''; try{ theme=localStorage.getItem('gpj_theme')||''; }catch(e){}
+  var reports=0; try{ var rr=JSON.parse(localStorage.getItem('gpj_reports')||'[]'); reports=Array.isArray(rr)?rr.length:0; }catch(e){}
+  var savedJobs=0,savedCos=0;
+  try{ savedJobs=(JSON.parse(localStorage.getItem('gpj_saved_jobs')||'[]')||[]).length; }catch(e){}
+  try{ savedCos=(JSON.parse(localStorage.getItem('gpj_saved_cos')||'[]')||[]).length; }catch(e){}
+  var name=[p.first,p.last].filter(Boolean).join(' ')||p.name||rd.name||'';
+  var skills=String(rd.skills||'').split(/[·,]/).map(function(s){return s.trim();}).filter(Boolean);
+  return {
+    name:name, email:(u&&u.email)||p.email||'', phone:p.phone||rd.phone||'',
+    rTitle:rd.title||'', rRoles:(rd.jobs||[]).filter(function(j){return j&&j.t&&j.t!=='(role)';}).length,
+    rEdu:!!(rd.eduStruct||(rd.edu&&String(rd.edu).trim())), skills:skills,
+    pMatches:pref.newJobMatches!==false, pGhost:pref.ghostRiskAlerts!==false, pRatings:pref.companyRatingReminders!==false, pCover:pref.coverLetterOffers!==false,
+    theme:theme||'follows system', discoverable:p.discoverable===true,
+    applied:(L.applied||[]).length, skipped:(L.skipped||[]).length, savedJobs:savedJobs, savedCos:savedCos, reports:reports
+  };
+}
+function _gpjToggleMyData(){
+  var b=document.getElementById('my-data-body'); var c=document.getElementById('mydata-caret'); if(!b) return;
+  var show=(b.style.display==='none');
+  b.style.display=show?'':'none'; if(c) c.textContent=show?'▾':'▸';
+  if(show){ try{ renderMyData(); }catch(e){ b.innerHTML='<div style="font-size:12px;color:var(--muted);padding:10px;">Couldn’t load your data view.</div>'; } }
+}
+window._gpjToggleMyData=_gpjToggleMyData;
+function renderMyData(){
+  var b=document.getElementById('my-data-body'); if(!b) return;
+  var m=_gpjMyDataModel();
+  var esc=(typeof _esc==='function')?_esc:function(x){return String(x==null?'':x).replace(/[<>&]/g,'');};
+  var cloud='background:rgba(181,95,230,.15);color:var(--cyber);', local='background:var(--plum3);color:var(--muted);';
+  var card=function(title,badge,badgeCls,rows,note){
+    return '<div style="background:var(--plum2);border:1px solid var(--plum3);border-radius:12px;padding:12px 14px;margin-bottom:10px;">'
+      +'<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:var(--off);margin-bottom:8px;">'+title+(badge?('<span style="margin-left:auto;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:20px;'+badgeCls+'">'+badge+'</span>'):'')+'</div>'
+      +rows+(note?('<div style="font-size:10.5px;color:var(--faint);margin-top:7px;line-height:1.5;">'+note+'</div>'):'')+'</div>';
+  };
+  var row=function(k,v,vcol){ return '<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:12px;border-top:1px solid rgba(255,255,255,.05);"><span style="color:var(--muted);flex:0 0 auto;">'+k+'</span><span style="color:'+(vcol||'var(--off)')+';text-align:right;font-weight:600;overflow-wrap:anywhere;">'+v+'</span></div>'; };
+  var onoff=function(v){ return v?'<span style="color:var(--mint);">On</span>':'<span style="color:var(--muted);">Off</span>'; };
+  var chips=m.skills.slice(0,10).map(function(s){return '<span style="display:inline-block;background:rgba(181,95,230,.14);color:var(--cyber);border-radius:6px;padding:2px 8px;font-size:10.5px;font-weight:700;margin:0 5px 5px 0;">'+esc(s)+'</span>';}).join('')+(m.skills.length>10?('<span style="font-size:10.5px;color:var(--muted);">+'+(m.skills.length-10)+'</span>'):'');
+  b.innerHTML=''
+    +'<div style="background:rgba(0,245,160,.09);border:1px solid rgba(0,245,160,.35);border-radius:12px;padding:11px 13px;margin-bottom:12px;font-size:11.5px;color:var(--off);line-height:1.55;">💚 <b style="color:var(--mint);">Our promise:</b> no ads, no data selling, ever. Your résumé + activity sync only to <b>your</b> account. An employer sees your info <b>only</b> when you apply or accept a reach-out — never before, never sold.</div>'
+    +card('👤 Account','Cloud · your account',cloud, row('Name',esc(m.name||'—'))+row('Email',esc(m.email||'—'))+row('Phone',m.phone?esc(_gpjMaskPhone(m.phone)):'<span style="color:var(--muted)">not provided</span>'), '')
+    +card('📄 Résumé on file','Cloud · your account',cloud, (m.rTitle?row('Title',esc(m.rTitle)):'')+row('Experience',m.rRoles+' role'+(m.rRoles===1?'':'s')+(m.rEdu?' · education on file':''))+(m.skills.length?('<div style="padding-top:8px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Skills we parsed</div>'+chips+'</div>'):''), 'Shared with an employer <b>only</b> when you apply to their role (a bounded snapshot) — that apply is your consent.')
+    +card('⚙️ Preferences','Cloud · your account',cloud, row('Notifications','Matches '+onoff(m.pMatches)+' · Ghost '+onoff(m.pGhost)+' · Ratings '+onoff(m.pRatings))+row('Appearance',esc(m.theme))+row('Discoverable to employers', m.discoverable?'<span style="color:var(--mint)">On</span>':'<span style="color:var(--muted)">Off (default)</span>'), 'While discoverable is off, no employer can find you.')
+    +card('📊 Your activity','Cloud · your account',cloud, row('Applied',m.applied+' roles')+row('Skipped',m.skipped+' roles')+row('Saved jobs / companies',m.savedJobs+' · '+m.savedCos)+row('Ghost reports you filed',String(m.reports)), 'Ghost reports power the <b>community</b> score as an <b>anonymous aggregate</b> — never tied to your name.')
+    +card('💾 On this device only','Local',local, row('Draft edits, theme, seen-job memory','stays in this browser','var(--muted)'), 'Clearing your browser data removes these; your account (above) is untouched.')
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">'
+      +'<div onclick="_gpjDownloadMyData()" style="flex:1;min-width:150px;text-align:center;background:linear-gradient(135deg,var(--mint),var(--mint2));color:var(--plum);border-radius:10px;padding:11px;font-size:12.5px;font-weight:800;cursor:pointer;">⬇ Download all my data (JSON)</div>'
+      +'<div onclick="purgeProfile()" style="flex:1;min-width:150px;text-align:center;background:rgba(255,77,106,.10);border:1px solid rgba(255,77,106,.4);color:var(--danger);border-radius:10px;padding:11px;font-size:12.5px;font-weight:800;cursor:pointer;">🗑 Delete my account</div>'
+    +'</div>'
+    +'<div style="font-size:10.5px;color:var(--faint);margin-top:10px;text-align:center;line-height:1.5;">Every figure here is read from your stored data — nothing invented. Read-only; nothing changes unless you tap an action.</div>';
+}
+window.renderMyData=renderMyData;
+function _gpjDownloadMyData(){
+  try{
+    var m=_gpjMyDataModel();
+    var payload={ exportedAt:new Date().toISOString(), source:'GhostProofJob — My Data export',
+      account:{name:m.name,email:m.email,phone:m.phone},
+      resume:{title:m.rTitle,roles:m.rRoles,education:m.rEdu,skills:m.skills},
+      preferences:{newJobMatches:m.pMatches,ghostRiskAlerts:m.pGhost,companyRatingReminders:m.pRatings,coverLetterOffers:m.pCover,theme:m.theme,discoverableToEmployers:m.discoverable},
+      activity:{applied:m.applied,skipped:m.skipped,savedJobs:m.savedJobs,savedCompanies:m.savedCos,ghostReportsFiled:m.reports},
+      note:'This is your own data, generated in your browser. GhostProofJob never sells your data or shows ads.' };
+    var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a'); a.href=url; a.download='ghostproofjob-my-data.json'; document.body.appendChild(a); a.click();
+    setTimeout(function(){ try{ URL.revokeObjectURL(url); a.remove(); }catch(_){} }, 1500);
+    try{ showToast('📤 Downloaded your data — it never leaves your device unless you share it'); }catch(_){}
+  }catch(e){ try{ showToast('Could not build the export — try again'); }catch(_){} }
+}
+window._gpjDownloadMyData=_gpjDownloadMyData;
 /* ===== Referral engine (v107) ===== */
 /* capture ?ref=CODE once, before signup, so it survives until the account exists */
 function _gpjCaptureRef(){
@@ -16065,8 +16154,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v274';
+const APP_VERSION = 'v275';
 const CHANGELOG = {
+  'v275':['P2-6 My Data (founder-approved): a real-data transparency view in Settings — Account/Résumé/Preferences/Activity/Local grouped, labeled by where it lives + what\'s shared, with the \'no selling\' promise and a REAL client-side JSON export (replaces the old fake \'check your email\' toast) + Delete. Read-only, real-data-only, brand-token themed + responsive. Also: phone at signup is now labeled OPTIONAL (the logic already allowed it — only the label implied required).'],
   'v274':['Notification toggle honesty (founder: fix the toggle-default inconsistency): the 3 New-Matches/Ghost-Risk/Rating-Reminder switches gate a real in-app alert that fires by DEFAULT (notifOn defaults true) but displayed OFF — so the switch lied and clicking off did nothing. Now default ON to match, reframed \'in-app now, email later\' (honest: no emailed digest sends yet). Turning one off truly silences its in-app alert. No behaviour change — display/copy only.'],
   'v273':['N28: mobile recruiter pipeline — phones render the applicant stages as a stacked, collapsible list (tap a stage header to fold; each candidate row keeps the move-stage dropdown + reach-out/kind-decline + tap-to-open + bulk-select), instead of the 6-column side-scrolling kanban. Desktop keeps the drag kanban byte-unchanged (early-return branch on !body.desk). Brand-token colours = auto light/dark; larger touch targets.'],
   'v272':['N24: recruiter Applicants counters are now clickable drill-in filters (Applicants→all pipelines · Replies sent→your messages · Interviews→scheduled interviews w/ candidate contact · Active roles→roles list) + active-tile highlight + clear-filter chip; 3-step \'how this works\' empty state when no roles; clearer \'N applicants ▾\' role affordance. Zero new reads (one loadSentReachouts powers Replies+Interviews+drill-ins, replacing a separate count call). Interviews/Replies give reach-out responses a persistent home on the page.'],

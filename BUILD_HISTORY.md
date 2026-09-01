@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-09-01 · Current live build: **v274**_
+_Last updated: 2026-09-01 · Current live build: **v275**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v275** — P2-6 My Data (founder-approved): a real-data transparency view in Settings — Account/Résumé/Preferences/Activity/Local grouped, labeled by where it lives + what's shared, with the 'no selling' promise and a REAL client-side JSON export (replaces the old fake 'check your email' toast) + Delete. Read-only, real-data-only, brand-token themed + responsive. Also: phone at signup is now labeled OPTIONAL (the logic already allowed it — only the label implied required).
 - **v274** — Notification toggle honesty (founder: fix the toggle-default inconsistency): the 3 New-Matches/Ghost-Risk/Rating-Reminder switches gate a real in-app alert that fires by DEFAULT (notifOn defaults true) but displayed OFF — so the switch lied and clicking off did nothing. Now default ON to match, reframed 'in-app now, email later' (honest: no emailed digest sends yet). Turning one off truly silences its in-app alert. No behaviour change — display/copy only.
 - **v273** — N28: mobile recruiter pipeline — phones render the applicant stages as a stacked, collapsible list (tap a stage header to fold; each candidate row keeps the move-stage dropdown + reach-out/kind-decline + tap-to-open + bulk-select), instead of the 6-column side-scrolling kanban. Desktop keeps the drag kanban byte-unchanged (early-return branch on !body.desk). Brand-token colours = auto light/dark; larger touch targets.
 - **v272** — N24: recruiter Applicants counters are now clickable drill-in filters (Applicants→all pipelines · Replies sent→your messages · Interviews→scheduled interviews w/ candidate contact · Active roles→roles list) + active-tile highlight + clear-filter chip; 3-step 'how this works' empty state when no roles; clearer 'N applicants ▾' role affordance. Zero new reads (one loadSentReachouts powers Replies+Interviews+drill-ins, replacing a separate count call). Interviews/Replies give reach-out responses a persistent home on the page.
