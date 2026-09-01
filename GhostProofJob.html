@@ -3368,18 +3368,20 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
 
       <div class="pref-section" id="sec-notif">
         <div class="pref-section-title">Notifications</div>
-        <!-- v141 HONESTY AUDIT (founder: "verify each toggle is wired and fires").
-             These three save a real preference AND the backend gate honours it
-             (sendAutomatedEmail.isAllowed), but NOTHING currently calls that sender
-             — no cron, no route, no workflow. So they controlled nothing while
-             looking live, which is the same fake precision we removed from the
-             ghost score, and breaks the no-misleading-copy rule. They now say so
-             plainly and stay OFF until a real sender exists. The in-app bell and
-             the Cover Letter offer below are unaffected: those DO fire today. -->
-        <div class="pref-row" style="opacity:.72;"><div class="pref-icon" style="background:rgba(0,245,160,.12);">🔔</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">New Job Matches <span style="font-size:10px;font-weight:800;color:var(--warn);">· EMAIL NOT LIVE YET</span></div><div style="font-size:11px;color:var(--muted);">Your choice is saved. We don't send this email yet — matches appear on the 🔔 bell in-app.</div></div><div class="toggle-switch" id="notif-newmatches" onclick="setNotifPref(this,'newJobMatches')"></div></div>
-        <div class="pref-row" style="opacity:.72;"><div class="pref-icon" style="background:rgba(255,77,106,.12);">👻</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Ghost Risk Alerts <span style="font-size:10px;font-weight:800;color:var(--warn);">· EMAIL NOT LIVE YET</span></div><div style="font-size:11px;color:var(--muted);">Your choice is saved. Ghost risk always shows on the job card itself.</div></div><div class="toggle-switch" id="notif-ghostrisk" onclick="setNotifPref(this,'ghostRiskAlerts')"></div></div>
+        <!-- v274 (founder: "fix the toggle-default inconsistency"). These three gate BOTH a
+             future emailed digest AND a real IN-APP alert (the bell / a toast) that fires by
+             DEFAULT (notifOn returns true when the pref is unset). Before, the switch showed OFF
+             while the in-app alert was ON — so the display lied and clicking "off" (already
+             visually off) did nothing. Fixed: they DEFAULT ON to match the in-app behaviour,
+             framed honestly as "in-app now, email later" (no emailed digest is sent yet — that's
+             the P1-3 sender build; the pref is saved for when it lands). Turning one OFF now truly
+             silences its in-app alert (setNotifPref -> notifOn=false at the fire site). The Cover
+             Letter offer below was already consistent (on/on). NO behaviour change — the toasts
+             already fired; this only makes the switch honest. -->
+        <div class="pref-row"><div class="pref-icon" style="background:rgba(0,245,160,.12);">🔔</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">New Job Matches <span style="font-size:10px;font-weight:800;color:var(--muted);">· in-app now, email later</span></div><div style="font-size:11px;color:var(--muted);">On: fresh matches show on the 🔔 bell in-app. The emailed version isn't live yet — your choice is saved for when it is.</div></div><div class="toggle-switch on" id="notif-newmatches" onclick="setNotifPref(this,'newJobMatches')"></div></div>
+        <div class="pref-row"><div class="pref-icon" style="background:rgba(255,77,106,.12);">👻</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Ghost Risk Alerts <span style="font-size:10px;font-weight:800;color:var(--muted);">· in-app now, email later</span></div><div style="font-size:11px;color:var(--muted);">On: a heads-up when a company you open has high ghost risk (risk always shows on the job card too). Emailed version isn't live yet.</div></div><div class="toggle-switch on" id="notif-ghostrisk" onclick="setNotifPref(this,'ghostRiskAlerts')"></div></div>
         <div class="pref-row"><div class="pref-icon" style="background:rgba(0,245,160,.12);">✉️</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Tailored Cover Letter Offers</div><div style="font-size:11px;color:var(--muted);">Ask after each apply · free, with generous daily limits</div></div><div class="toggle-switch on" id="cl-offers-toggle" onclick="setNotifPref(this,'coverLetterOffers');setCLOptOut(!this.classList.contains('on'))"></div></div>
-        <div class="pref-row" style="opacity:.72;"><div class="pref-icon" style="background:rgba(181,95,230,.12);">⭐</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Company Rating Reminders <span style="font-size:10px;font-weight:800;color:var(--warn);">· EMAIL NOT LIVE YET</span></div><div style="font-size:11px;color:var(--muted);">Your choice is saved. We ask for ratings in-app instead.</div></div><div class="toggle-switch" id="notif-ratingreminders" onclick="setNotifPref(this,'companyRatingReminders')"></div></div>
+        <div class="pref-row"><div class="pref-icon" style="background:rgba(181,95,230,.12);">⭐</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Company Rating Reminders <span style="font-size:10px;font-weight:800;color:var(--muted);">· in-app now, email later</span></div><div style="font-size:11px;color:var(--muted);">On: a nudge to rate a company after you apply — it warns the next applicant. Emailed version isn't live yet.</div></div><div class="toggle-switch on" id="notif-ratingreminders" onclick="setNotifPref(this,'companyRatingReminders')"></div></div>
       </div>
 
       <!-- R2-D: candidate discoverable opt-in (default OFF). Plain consent copy;
@@ -3454,7 +3456,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Always free 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v273</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v274</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -16063,8 +16065,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v273';
+const APP_VERSION = 'v274';
 const CHANGELOG = {
+  'v274':['Notification toggle honesty (founder: fix the toggle-default inconsistency): the 3 New-Matches/Ghost-Risk/Rating-Reminder switches gate a real in-app alert that fires by DEFAULT (notifOn defaults true) but displayed OFF — so the switch lied and clicking off did nothing. Now default ON to match, reframed \'in-app now, email later\' (honest: no emailed digest sends yet). Turning one off truly silences its in-app alert. No behaviour change — display/copy only.'],
   'v273':['N28: mobile recruiter pipeline — phones render the applicant stages as a stacked, collapsible list (tap a stage header to fold; each candidate row keeps the move-stage dropdown + reach-out/kind-decline + tap-to-open + bulk-select), instead of the 6-column side-scrolling kanban. Desktop keeps the drag kanban byte-unchanged (early-return branch on !body.desk). Brand-token colours = auto light/dark; larger touch targets.'],
   'v272':['N24: recruiter Applicants counters are now clickable drill-in filters (Applicants→all pipelines · Replies sent→your messages · Interviews→scheduled interviews w/ candidate contact · Active roles→roles list) + active-tile highlight + clear-filter chip; 3-step \'how this works\' empty state when no roles; clearer \'N applicants ▾\' role affordance. Zero new reads (one loadSentReachouts powers Replies+Interviews+drill-ins, replacing a separate count call). Interviews/Replies give reach-out responses a persistent home on the page.'],
   'v271':['Recruiter-side leak cleanup + ghost-chip affordance: footer centers to the console in rec-mode (was shoved 324px left by the candidate-rail reservation); candidate deck toasts (\'Pulling live market jobs\', \'N fresh jobs match your resume\') no longer fire on the recruiter side; company logo persists after refresh (rehydrated from the company doc + carried on the recruiter doc); ghost-risk pill on the card face reads as tappable'],

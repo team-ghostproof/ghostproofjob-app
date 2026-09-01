@@ -3198,16 +3198,20 @@ test.describe('[STATE-COVERAGE] v141 notification toggles tell the truth', () =>
     await page.waitForTimeout(400);
   });
 
-  test('a toggle that sends nothing must SAY so, and must not default to on', async ({ page }) => {
+  /* v274 (founder: fix the toggle-default inconsistency) — these three gate a REAL in-app
+     alert (fires by default), so the switch now defaults ON to match, while the copy stays
+     honest that the emailed version isn't live yet. (Superseded the v141 "must not default
+     ON" rule, which was written when only the never-sent email was in view.) */
+  test('the emailed version is disclosed honestly; toggles default ON to match the in-app alert', async ({ page }) => {
     const r = await page.evaluate(() => {
       const row = (id) => { const t = document.getElementById(id); return { on: t.classList.contains('on'), text: (t.closest('.pref-row') || {}).textContent || '' }; };
       return { m: row('notif-newmatches'), g: row('notif-ghostrisk'), r: row('notif-ratingreminders'), cl: row('cl-offers-toggle') };
     });
     for (const k of ['m', 'g', 'r']) {
-      expect(r[k].text, 'a non-sending toggle is labelled honestly').toMatch(/EMAIL NOT LIVE YET/);
-      expect(r[k].on, 'never default-ON for something that does nothing').toBe(false);
+      expect(r[k].text, 'still honest that the EMAIL is not live yet').toMatch(/email later|isn.?t live yet/i);
+      expect(r[k].on, 'v274: defaults ON to match its in-app alert (was a lie when shown OFF)').toBe(true);
     }
-    expect(r.cl.text, 'the REAL toggle carries no false disclaimer').not.toMatch(/EMAIL NOT LIVE YET/);
+    expect(r.cl.text, 'the REAL toggle carries no email disclaimer').not.toMatch(/EMAIL NOT LIVE YET|email later/i);
   });
 
   test('every toggle still persists the user\'s choice (local + cloud)', async ({ page }) => {
@@ -10275,5 +10279,34 @@ test.describe('[STATE-COVERAGE] v273 N28 mobile pipeline', () => {
     expect(r.deskHasKanban, 'DESKTOP path is unchanged — still the horizontal kanban').toBe(true);
     expect(r.deskHasName, 'desktop still shows the candidate').toBe(true);
     expect(r.deskDraggable, 'desktop cards stay draggable').toBe(true);
+  });
+});
+
+/* v274 (notification toggle default-vs-behaviour consistency). */
+test.describe('[STATE-COVERAGE] v274 notification toggles default ON to match in-app behaviour', () => {
+  test('the 3 in-app-alert toggles show ON by default, matching notifOn (which defaults true)', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.notifOn === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      // fresh visitor: no saved preferences
+      try { const p = (typeof getProfile === 'function' && getProfile()) || {}; delete p.preferences; localStorage.setItem('gpj_profile', JSON.stringify(p)); } catch (e) {}
+      const ids = { newJobMatches: 'notif-newmatches', ghostRiskAlerts: 'notif-ghostrisk', companyRatingReminders: 'notif-ratingreminders', coverLetterOffers: 'cl-offers-toggle' };
+      const out = {};
+      Object.keys(ids).forEach(k => {
+        const el = document.getElementById(ids[k]);
+        out[k] = { switchOn: el ? el.classList.contains('on') : null, behaviourOn: window.notifOn(k) };
+      });
+      // and the copy no longer says the misleading "EMAIL NOT LIVE YET"
+      const sec = document.getElementById('sec-notif');
+      out.noMisleadingTag = sec ? sec.innerText.indexOf('EMAIL NOT LIVE YET') === -1 : false;
+      return out;
+    });
+    // for every gated notification, the SWITCH state matches the actual in-app behaviour
+    ['newJobMatches', 'ghostRiskAlerts', 'companyRatingReminders', 'coverLetterOffers'].forEach(k => {
+      expect(r[k].switchOn, `${k}: switch shown ON by default`).toBe(true);
+      expect(r[k].behaviourOn, `${k}: in-app behaviour ON by default`).toBe(true);
+      expect(r[k].switchOn, `${k}: switch matches behaviour (no lie)`).toBe(r[k].behaviourOn);
+    });
+    expect(r.noMisleadingTag, 'reframed away from the misleading "EMAIL NOT LIVE YET"').toBe(true);
   });
 });
