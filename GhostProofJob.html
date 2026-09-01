@@ -3454,7 +3454,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Always free 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v272</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v273</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -5150,6 +5150,7 @@ async function recToggleApplicants(jobId,title){
 }
 function _recRenderKanban(jobId){
   const el=document.getElementById('ra-'+jobId); if(!el) return;
+  if(!document.body.classList.contains('desk')){ return _recRenderPipelineMobile(jobId); }   /* N28 (v273, founder-approved): phones get the stacked stage list (no sideways scroll); DESKTOP keeps the exact drag kanban below, byte-untouched. */
   const apps=(window._recApps&&window._recApps[jobId])||[];
   const selS=_recSelState(jobId);   /* v207: bulk-select state (per job) */
   const cols=_REC_STAGES.map(function(st){
@@ -5196,6 +5197,66 @@ function _recRenderKanban(jobId){
     +'</div>'):'';
   el.innerHTML=toolbar+bulkbar+'<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;">'+cols+'</div>';
 }
+/* N28 (v273, founder-approved): the MOBILE pipeline. Same data, same stages, same move
+   mechanic (_recMoveStage) + reach-out/decline + tap-to-open + ☑ bulk-select as desktop —
+   just laid out as STACKED, collapsible stage sections instead of 6 side-scrolling columns.
+   All colours are brand tokens, so it themes light/dark automatically; touch targets are
+   sized up for phones/tablets. Drag is desktop-only (the dropdown moves candidates here). */
+function _recStageColor(stage){ return ({applied:'var(--muted)',reviewed:'var(--cyber)',interview:'var(--mint)',offer:'var(--warn)',hired:'var(--mint2)',closed:'var(--faint)'})[stage]||'var(--muted)'; }
+function _recToggleStage(jobId,stage){ window._recStageCollapsed=window._recStageCollapsed||{}; window._recStageCollapsed[jobId]=window._recStageCollapsed[jobId]||{}; var c=window._recStageCollapsed[jobId]; c[stage]=!c[stage]; _recRenderKanban(jobId); }
+window._recToggleStage=_recToggleStage;
+function _recMobileCardHtml(jobId,a,i,stage,selS){
+  const nm=(a.resume&&a.resume.name)||'Applicant';
+  const m=(typeof a.match==='number')?(a.match+'%'):'';
+  const opts=_REC_STAGES.map(function(s){ return '<option value="'+s[0]+'"'+(s[0]===stage?' selected':'')+'>'+s[1]+'</option>'; }).join('');
+  const _rNm=String(nm).replace(/['"<>\\]/g,'');
+  const _rJt=String((window._recJobTitle&&window._recJobTitle[jobId])||'this role').replace(/['"<>\\]/g,'');
+  const actions=a.uid?('<div style="display:flex;gap:6px;margin-top:8px;">'
+    +'<div onclick="event.stopPropagation();reachOutTo(\''+_esc(a.uid)+'\',\''+_esc(jobId)+'\',\''+_rJt+'\',\''+_rNm+'\',\'reachout\')" title="Reach out" style="flex:1;text-align:center;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);border-radius:7px;padding:8px;font-size:12.5px;font-weight:800;cursor:pointer;">💬 Reach out</div>'
+    +'<div onclick="event.stopPropagation();reachOutTo(\''+_esc(a.uid)+'\',\''+_esc(jobId)+'\',\''+_rJt+'\',\''+_rNm+'\',\'rejection\')" title="Kind decline" style="flex:1;text-align:center;background:rgba(255,77,106,.10);border:1px solid rgba(255,77,106,.35);color:var(--danger);border-radius:7px;padding:8px;font-size:12.5px;font-weight:800;cursor:pointer;">💌 Decline</div>'
+    +'</div>'):'';
+  const isSel=!!(a.uid&&selS.set[a.uid]);
+  const check=selS.mode?('<div style="width:20px;height:20px;border-radius:5px;border:1.5px solid '+(isSel?'var(--mint)':'var(--plum4)')+';background:'+(isSel?'var(--mint)':'transparent')+';color:var(--plum);font-size:13px;font-weight:900;display:grid;place-items:center;flex:0 0 auto;">'+(isSel?'✓':'')+'</div>'):'';
+  return '<div class="rk-card" onclick="_recCardClick(event,\''+_esc(jobId)+'\','+i+',\''+_esc(a.uid||'')+'\')" style="background:var(--plum3);border:1px solid '+(isSel?'var(--mint)':'var(--plum4)')+';border-radius:10px;padding:11px 12px;margin-top:8px;cursor:pointer;">'
+    +'<div style="display:flex;align-items:center;gap:8px;">'+check+'<div style="font-size:13.5px;font-weight:700;color:var(--off);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_esc(nm)+'</div>'+(m?'<span style="font-size:11px;font-weight:800;color:var(--mint);">'+m+'</span>':'')+'</div>'
+    +(selS.mode?'':('<select onchange="_recMoveStage(\''+_esc(jobId)+'\',\''+_esc(a.uid||'')+'\',this.value)" onclick="event.stopPropagation();" style="width:100%;margin-top:8px;font-size:12.5px;background:var(--plum2);color:var(--off);border:1px solid var(--plum4);border-radius:7px;padding:8px;">'+opts+'</select>'+actions))
+    +'</div>';
+}
+function _recRenderPipelineMobile(jobId){
+  const el=document.getElementById('ra-'+jobId); if(!el) return;
+  const apps=(window._recApps&&window._recApps[jobId])||[];
+  const selS=_recSelState(jobId);
+  const collapsed=(window._recStageCollapsed&&window._recStageCollapsed[jobId])||{};
+  const secs=_REC_STAGES.map(function(st){
+    const stage=st[0], label=st[1];
+    const cards=apps.map(function(a,i){ return {a:a,i:i}; }).filter(function(x){ return _recStageOf(x.a)===stage; });
+    const body=cards.map(function(x){ return _recMobileCardHtml(jobId,x.a,x.i,stage,selS); }).join('')||'<div style="font-size:11px;color:var(--faint);text-align:center;padding:10px;">No one at this stage</div>';
+    const isC=!!collapsed[stage];
+    return '<div style="background:var(--plum2);border:1px solid var(--plum3);border-radius:12px;overflow:hidden;margin-bottom:9px;">'
+      +'<div onclick="_recToggleStage(\''+_esc(jobId)+'\',\''+stage+'\')" style="display:flex;align-items:center;gap:9px;padding:11px 13px;cursor:pointer;user-select:none;">'
+        +'<span style="width:9px;height:9px;border-radius:50%;background:'+_recStageColor(stage)+';flex:0 0 auto;"></span>'
+        +'<span style="font-size:12.5px;font-weight:800;color:var(--off);flex:1;">'+label+'</span>'
+        +'<span style="font-size:11px;font-weight:800;color:var(--muted);background:var(--plum3);border-radius:20px;padding:1px 9px;min-width:26px;text-align:center;">'+cards.length+'</span>'
+        +'<span style="color:var(--muted);font-size:11px;display:inline-block;transform:rotate('+(isC?'-90deg':'0deg')+');">▾</span>'
+      +'</div>'
+      +'<div style="display:'+(isC?'none':'block')+';padding:0 11px 11px;">'+body+'</div>'
+      +'</div>';
+  }).join('');
+  const cnt=Object.keys(selS.set).length;
+  const stageOpts=_REC_STAGES.map(function(s){ return '<option value="'+s[0]+'">'+s[1]+'</option>'; }).join('');
+  const toolbar='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">'
+    +'<div style="font-size:10.5px;color:var(--muted);flex:1;min-width:120px;">'+(selS.mode?'Tap candidates to select, then move them together.':'Move a candidate with its dropdown · tap a name to open their résumé.')+'</div>'
+    +'<div onclick="_recSetSelMode(\''+_esc(jobId)+'\','+(selS.mode?'false':'true')+')" style="font-size:11px;font-weight:800;color:'+(selS.mode?'var(--muted)':'var(--cyber)')+';border:1px solid var(--plum4);border-radius:7px;padding:6px 11px;cursor:pointer;">'+(selS.mode?'✕ Done':'☑ Select')+'</div>'
+    +'</div>';
+  const bulkbar=(selS.mode&&cnt>0)?('<div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;padding:9px 11px;background:rgba(181,95,230,.12);border:1px solid var(--plum4);border-radius:9px;flex-wrap:wrap;">'
+    +'<span style="font-size:11.5px;font-weight:800;color:var(--off);">'+cnt+' selected</span>'
+    +'<span style="font-size:11px;color:var(--muted);">Move to</span>'
+    +'<select onchange="_recBulkMove(\''+_esc(jobId)+'\',this.value);this.selectedIndex=0;" style="font-size:12px;background:var(--plum3);color:var(--off);border:1px solid var(--plum4);border-radius:6px;padding:5px 7px;"><option value="">stage…</option>'+stageOpts+'</select>'
+    +'<div onclick="_recClearSel(\''+_esc(jobId)+'\')" style="font-size:11px;color:var(--muted);cursor:pointer;margin-left:auto;">Clear</div>'
+    +'</div>'):'';
+  el.innerHTML=toolbar+bulkbar+secs;
+}
+window._recRenderPipelineMobile=_recRenderPipelineMobile;
 /* v207: bulk-select state + actions. Declines stay INDIVIDUAL by design — a one-click
    mass-reject is exactly the impersonal ghosting GhostProofJob exists to fight — so bulk
    is limited to reversible pipeline moves. */
@@ -16002,8 +16063,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v272';
+const APP_VERSION = 'v273';
 const CHANGELOG = {
+  'v273':['N28: mobile recruiter pipeline — phones render the applicant stages as a stacked, collapsible list (tap a stage header to fold; each candidate row keeps the move-stage dropdown + reach-out/kind-decline + tap-to-open + bulk-select), instead of the 6-column side-scrolling kanban. Desktop keeps the drag kanban byte-unchanged (early-return branch on !body.desk). Brand-token colours = auto light/dark; larger touch targets.'],
   'v272':['N24: recruiter Applicants counters are now clickable drill-in filters (Applicants→all pipelines · Replies sent→your messages · Interviews→scheduled interviews w/ candidate contact · Active roles→roles list) + active-tile highlight + clear-filter chip; 3-step \'how this works\' empty state when no roles; clearer \'N applicants ▾\' role affordance. Zero new reads (one loadSentReachouts powers Replies+Interviews+drill-ins, replacing a separate count call). Interviews/Replies give reach-out responses a persistent home on the page.'],
   'v271':['Recruiter-side leak cleanup + ghost-chip affordance: footer centers to the console in rec-mode (was shoved 324px left by the candidate-rail reservation); candidate deck toasts (\'Pulling live market jobs\', \'N fresh jobs match your resume\') no longer fire on the recruiter side; company logo persists after refresh (rehydrated from the company doc + carried on the recruiter doc); ghost-risk pill on the card face reads as tappable'],
   'v270':['C4 desktop pointer-drag on the swipe deck (mouse users can now drag-swipe, not just click ❤/🚫; tap-vs-drag disambiguation, reduced-motion snap-back, touch unchanged); header narrow-width fix (logo-only wordmark ≤380px so chips stop crowding); recruiter rail-leak fix (candidate streak/goal/market/Jett rail no longer bleeds into the recruiter Candidates desktop view — CSS specificity)'],

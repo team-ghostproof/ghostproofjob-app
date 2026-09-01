@@ -10230,3 +10230,50 @@ test.describe('[STATE-COVERAGE] v272 N24 Applicants clickable counters', () => {
     expect(r.cleared, 're-tapping the active counter clears the filter').toBe('');
   });
 });
+
+/* v273 (N28 mobile recruiter pipeline: stacked stage list on phones; desktop kanban unchanged). */
+test.describe('[STATE-COVERAGE] v273 N28 mobile pipeline', () => {
+  test('mobile routes to a stacked stage list (no side-scroll); desktop keeps the kanban; controls + collapse preserved', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._recRenderKanban === 'function' && typeof window._recRenderPipelineMobile === 'function' && typeof window._recToggleStage === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      document.body.insertAdjacentHTML('beforeend', '<div id="ra-J1" style="display:block"></div>');
+      window._recApps = { J1: [ { uid: 'u1', resume: { name: 'A One' }, match: 96, stage: 'interview' }, { uid: 'u2', resume: { name: 'B Two' }, match: 80, stage: 'applied' } ] };
+      window._recJobTitle = { J1: 'PM' };
+      window.fb = window.fb || {}; window.fb.setApplicationStage = async () => true;
+      const hadDesk = document.body.classList.contains('desk');
+      // MOBILE branch
+      document.body.classList.remove('desk');
+      _recRenderKanban('J1');
+      const mob = document.getElementById('ra-J1').innerHTML;
+      _recToggleStage('J1', 'interview');
+      const mobCollapsed = document.getElementById('ra-J1').innerHTML;
+      // DESKTOP branch
+      document.body.classList.add('desk');
+      _recRenderKanban('J1');
+      const desk = document.getElementById('ra-J1').innerHTML;
+      if (!hadDesk) document.body.classList.remove('desk');
+      document.getElementById('ra-J1').remove();
+      return {
+        mobNoHScroll: mob.indexOf('overflow-x') === -1,
+        mobHasName: mob.indexOf('A One') > -1,
+        mobHasSelect: mob.indexOf('<select') > -1,
+        mobHasReach: mob.indexOf('Reach out') > -1,
+        mobStageHeaders: (mob.match(/_recToggleStage/g) || []).length,
+        mobCollapsedChevron: /rotate\(-90deg\)/.test(mobCollapsed),
+        deskHasKanban: desk.indexOf('overflow-x:auto') > -1,
+        deskHasName: desk.indexOf('A One') > -1,
+        deskDraggable: desk.indexOf('draggable="true"') > -1,
+      };
+    });
+    expect(r.mobNoHScroll, 'mobile pipeline has no horizontal-scroll container').toBe(true);
+    expect(r.mobHasName, 'mobile shows the candidate').toBe(true);
+    expect(r.mobHasSelect, 'mobile keeps the move-stage dropdown').toBe(true);
+    expect(r.mobHasReach, 'mobile keeps the reach-out action').toBe(true);
+    expect(r.mobStageHeaders, 'all 6 stages rendered as sections').toBe(6);
+    expect(r.mobCollapsedChevron, 'tapping a stage header collapses it').toBe(true);
+    expect(r.deskHasKanban, 'DESKTOP path is unchanged — still the horizontal kanban').toBe(true);
+    expect(r.deskHasName, 'desktop still shows the candidate').toBe(true);
+    expect(r.deskDraggable, 'desktop cards stay draggable').toBe(true);
+  });
+});
