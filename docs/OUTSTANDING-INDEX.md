@@ -356,7 +356,14 @@
 **Still open:**
 - [ ] **P1-2 · Reverse match returns nothing** — blocked on the `FIREBASE_SERVICE_ACCOUNT` secret / one run-log
   line (open since v145). **Founder action.**
-- [ ] **P1-3 / G7 · Digest emails ×3** — approved, unbuilt (cheap now the pool is live).
+- [x] **P1-3 · Candidate matches email digest** — ✅ **SHIPPED 2026-09-01 (DRY-RUN gated).** `scripts/candidate_digest.mjs` +
+  `.github/workflows/candidate_digest.yml` (`npm run digest:candidates` · `digest:check` fixture): reads the D1 pool + a bounded
+  batch of profiles, scores every pool job against each résumé with the SHARED `api/match/scoreCore` (the exact card engine → the
+  email matches the app), and emails each candidate their top new matches. Honors `newJobMatches` + `emailOptOut`; SEND_CAP guards
+  Resend's 100/day. **GO-LIVE GATE:** default DRY-RUN (emails only a founder preview, never a real candidate); weekly cron commented
+  + `DIGEST_LIVE` unset until the founder runs the dry-run, reviews, and enables both. offline self-test + 4 email-suite tests (23/23).
+  Ghost-risk + rating-reminder sections are the fast follow into the same weekly email once matches is live. (This makes the v274
+  "email later" toggles real.)
 - [ ] **P1-7 / F7 · Hire data captured but not surfaced** — do NOT publicly claim hire numbers until an aggregate view exists.
 - [ ] **P2-5 · Offline queue** — an action taken offline may never reach the cloud (unknown/unbuilt).
 - [x] **P2-6 · "My Data" audit view** — ✅ **SHIPPED v275 (2026-09-01), live-verified with real data.** New collapsible Settings section
