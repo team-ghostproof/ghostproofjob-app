@@ -1,0 +1,37 @@
+name: Candidate digest (weekly matches)
+
+# P1-3: emails opted-in candidates their top new job matches (matches-first), scored with
+# the SAME engine as the app (api/match/scoreCore). Honors the "New Job Matches" toggle +
+# the email opt-out; bounded reads (one pool read + one bounded profiles read).
+#
+# GO-LIVE GATE — read before enabling:
+#   • workflow_dispatch is ON so the founder can run a DRY-RUN by hand. In DRY-RUN the script
+#     does ALL the real work but emails ONLY a preview to the founder (DIGEST_TEST_EMAIL) —
+#     never a real candidate.
+#   • The weekly `schedule` cron stays COMMENTED, and `DIGEST_LIVE` stays unset, until the
+#     founder has run the dry-run, reviewed the preview email, and is happy with it.
+#   • To go live: uncomment the cron AND set DIGEST_LIVE: '1' below.
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: '0 14 * * 1'      # Mondays 14:00 UTC — UNCOMMENT after the dry-run is approved
+
+concurrency:
+  group: cand-digest
+  cancel-in-progress: true
+
+jobs:
+  digest:
+    name: "Weekly candidate matches digest"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: '24' }
+      - run: npm ci || npm install
+      - name: Send the digest (DRY-RUN unless DIGEST_LIVE=1)
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          # DIGEST_LIVE: '1'    # UNCOMMENT to email real candidates (only after the dry-run is approved)
+        run: node scripts/candidate_digest.mjs

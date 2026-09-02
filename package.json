@@ -13,7 +13,7 @@
     "report": "playwright show-report",
     "test:match": "node --test tests/match/reverseMatch.test.mjs tests/match/r3pipeline.test.mjs tests/match/scoreCore.test.mjs tests/recruiter/domainCheck.test.mjs",
     "test:growth": "node --test tests/growth/ghostContent.test.mjs",
-    "test:email": "node --test tests/email/optout.test.mjs tests/email/interviewEmail.test.mjs tests/email/reachoutEmail.test.mjs",
+    "test:email": "node --test tests/email/optout.test.mjs tests/email/interviewEmail.test.mjs tests/email/reachoutEmail.test.mjs tests/email/candidateDigest.test.mjs",
     "test:apply": "node --test tests/email/applyEmail.test.mjs",
     "test:rules": "firebase emulators:exec --only firestore \"node --test tests/rules/firestore-rules.test.mjs\"",
     "content:weekly": "node ghost-report-generator/run.js",
@@ -30,6 +30,8 @@
     "test:resources": "node --test tests/growth/resourcesEngine.test.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "smoke:live": "node scripts/post_deploy_smoke.mjs",
+    "digest:candidates": "node scripts/candidate_digest.mjs",
+    "digest:check": "node scripts/candidate_digest.mjs --fixture",
     "verify": "npm run benchmark && npm run test:match && npm run test:growth && npm run test:email && npm run test:apply && npm run test:seo && npm run test:billing && npm run pool:check && npm run test:e2e:full && npm run test:rules",
     "test:e2e:full": "playwright test --workers=2",
     "verify:nojava": "npm run benchmark && npm run test:match && npm run test:growth && npm run test:email && npm run test:apply && npm run test:seo && npm run test:billing && npm run pool:check && npm run test:e2e:full"
