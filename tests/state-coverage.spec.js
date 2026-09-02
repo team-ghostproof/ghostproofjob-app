@@ -10381,3 +10381,41 @@ test.describe('[STATE-COVERAGE] v276 Role Fit uses the card engine (computeMatch
     expect(r.sameRater, 'copy reflects the unified "same rater, different scope" scoring').toBe(true);
   });
 });
+
+/* v277 (A: req-pill honesty on clipped text · B: JSON-LD structured data). */
+test.describe('[STATE-COVERAGE] v277 req-pill never claims "No gaps" on unseen text', () => {
+  test('clipped/unhydrated + 0 gaps → hidden; full posting + 0 gaps → "No gaps"', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._paintReqPill === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      resumeReady = true;
+      const mk = () => { const d = document.createElement('div'); d.innerHTML = '<span class="s-req" style="display:none"></span>'; return d; };
+      const read = (el) => { const s = el.querySelector('.s-req'); return { disp: s.style.display, txt: s.textContent }; };   /* _paintReqPill sets the INLINE style; getComputedStyle is empty on a detached node */
+      const c1 = mk(); _paintReqPill(c1, { _clipped: true, title: 'Marketing Manager', desc: 'short stub', req: '' });
+      const c2 = mk(); _paintReqPill(c2, { _hydrated: true, title: 'Marketing Manager', desc: ('a full real posting with plenty of detail. ').repeat(40), req: '' });
+      return { clipped: read(c1), full: read(c2) };
+    });
+    expect(r.clipped.disp, 'clipped + 0 gaps: pill hidden (no false "No gaps")').toBe('none');
+    expect(r.clipped.txt.includes('No gaps'), 'clipped never says No gaps').toBe(false);
+    expect(r.full.txt, 'full posting + 0 gaps: shows "No gaps"').toMatch(/No gaps/);
+  });
+});
+
+test.describe('[STATE-COVERAGE] v277 JSON-LD structured data', () => {
+  test('homepage carries valid Organization + free WebApplication JSON-LD', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    const r = await page.evaluate(() => {
+      const el = document.querySelector('script[type="application/ld+json"]');
+      if (!el) return { present: false };
+      let json = null; try { json = JSON.parse(el.textContent); } catch (e) { return { present: true, valid: false }; }
+      const graph = json['@graph'] || [];
+      const types = graph.map((g) => g['@type']);
+      return { present: true, valid: true, hasOrg: types.includes('Organization'), hasApp: types.includes('WebApplication'), free: JSON.stringify(json).indexOf('"price":"0"') > -1 };
+    });
+    expect(r.present, 'JSON-LD present').toBe(true);
+    expect(r.valid, 'JSON-LD parses').toBe(true);
+    expect(r.hasOrg, 'has Organization').toBe(true);
+    expect(r.hasApp, 'has WebApplication').toBe(true);
+    expect(r.free, 'marks the app free (price 0)').toBe(true);
+  });
+});

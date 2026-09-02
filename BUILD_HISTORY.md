@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-09-01 · Current live build: **v276**_
+_Last updated: 2026-09-01 · Current live build: **v277**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v277** — 3 fixes: (A) req-pill honesty — the swipe card no longer shows '✓ No gaps' on a clipped/unhydrated posting (it flipped to '⚠ N gaps' once the drawer loaded the full text); now it only claims No gaps after the full posting is seen, and gaps found on partial text still show (they can only grow). (B) SEO: JSON-LD structured data (Organization + WebSite + free WebApplication) on the homepage + a WebApplication schema on the résumé checker. (C) SEO: 3 cornerstone evergreen 'ghost job' article templates added to the Resources engine (is-it-real / what-to-do-when-ghosted / why-companies-post-ghost-jobs) — high-intent, low-competition, on-brand.
 - **v276** — Role Fit now uses the SAME rater as the swipe cards (founder: 'it needs to use the same scale/rater'). mineRoleKeywords also returns a bounded sample of the real matched role postings; the résumé rater computes Role Fit = MEDIAN of computeMatch(résumé, posting) across that sample — the identical card engine, averaged over many postings — instead of a separate keyword-coverage number. So Role Fit ≈ the average of the card matches you see; the two can't contradict. Keyword coverage still powers the 'add these terms' suggestions; Résumé Strength untouched. Copy updated to 'same rater, different scope'. Corpus cache key v1→v2 so it re-mines with the sample immediately. Falls back to coverage when no sample is cached.
 - **v275** — P2-6 My Data (founder-approved): a real-data transparency view in Settings — Account/Résumé/Preferences/Activity/Local grouped, labeled by where it lives + what's shared, with the 'no selling' promise and a REAL client-side JSON export (replaces the old fake 'check your email' toast) + Delete. Read-only, real-data-only, brand-token themed + responsive. Also: phone at signup is now labeled OPTIONAL (the logic already allowed it — only the label implied required).
 - **v274** — Notification toggle honesty (founder: fix the toggle-default inconsistency): the 3 New-Matches/Ghost-Risk/Rating-Reminder switches gate a real in-app alert that fires by DEFAULT (notifOn defaults true) but displayed OFF — so the switch lied and clicking off did nothing. Now default ON to match, reframed 'in-app now, email later' (honest: no emailed digest sends yet). Turning one off truly silences its in-app alert. No behaviour change — display/copy only.

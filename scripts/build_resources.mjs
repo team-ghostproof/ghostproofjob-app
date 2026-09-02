@@ -315,6 +315,71 @@ const TEMPLATES = [
         cta: STD_CTA,
       };
     } },
+  /* ---- CORNERSTONE GHOST-JOB EVERGREEN (v277, founder-approved SEO): high-intent, low-competition,
+     on-brand. No live stats needed, so they publish reliably and rank on the topic GhostProofJob owns. ---- */
+  { id: 'ghost-is-it-real', cat: 'tips', build(s) {
+      return {
+        category: 'Ghost jobs', pillClass: 'ghost', byline: 'Jett',
+        title: 'How to tell if a job posting is real before you apply',
+        desc: 'A 5-minute checklist to spot a real, funded opening from a ghost job — before you spend an hour on the application.',
+        lede: `The best time to catch a ghost job is BEFORE you apply, not after weeks of silence. Here's the quick pre-flight check.`,
+        readMin: 4,
+        blocks: [
+          { h: 'The 5-minute checklist', list: [
+            '<b>Find the hiring company.</b> A real role names the company (or a verified employer). "Confidential" + a staffing agency + no details is a yellow flag.',
+            '<b>Check the post date and history.</b> Reposted every few weeks, or "open" for months with no updates? Likely a pipeline-filler.',
+            '<b>Look for specifics.</b> Real teams describe real work — the team, the manager, the tools, the first 90 days. Buzzword soup is a flag.',
+            '<b>Look for pay.</b> Serious, funded roles increasingly post a range. Perpetual silence on pay, across every posting, is worth noting.',
+            '<b>Cross-check the careers page.</b> If the role isn\'t on the company\'s own site, ask why.',
+          ] },
+          { h: 'Then apply smart', p: `When a role passes the check, apply early and tailor your résumé to it. When it fails, skip it or log it — on GhostProofJob every company carries a community <b>ghosting-risk score</b>, so you can see how others fared before you invest an hour.` },
+        ],
+        source: 'Guidance from the GhostProofJob team, based on community ghost reports and verified-employer signals.',
+        cta: STD_CTA,
+      };
+    } },
+  { id: 'ghost-what-to-do', cat: 'tips', build(s) {
+      return {
+        category: 'Ghost jobs', pillClass: 'ghost', byline: 'The GhostProofJob Team',
+        title: 'What to do when a company ghosts you after applying',
+        desc: `You applied — maybe even interviewed — then silence. A calm, practical playbook for being ghosted, and how to make it count for the next person.`,
+        lede: `Being ghosted after an application — or worse, an interview — is common and demoralizing. It is not a reflection of your worth. Here's what actually helps.`,
+        readMin: 4,
+        blocks: [
+          { h: 'A practical playbook', list: [
+            '<b>Send one polite follow-up.</b> After ~7–10 business days, a short note restating your interest is reasonable — once, not five times.',
+            '<b>Set a mental deadline.</b> No reply within two weeks of that follow-up? Treat it as a no and move your energy forward.',
+            '<b>Keep applying in parallel.</b> Never let one role become your only iron in the fire — volume protects your morale.',
+            '<b>Log it.</b> Record which companies went quiet, so the pattern becomes visible instead of just painful.',
+          ] },
+          { h: 'Turn a wasted hour into a warning', p: `On GhostProofJob, filing a ghost report on a company that went silent adds to its community ghosting-risk score — so the next applicant sees the pattern before they invest. Your bad experience becomes someone else's saved week.` },
+          { h: 'Protect your energy', p: `Ghosting is about the employer's broken process, not your candidacy. Favor verified employers and roles that post pay — they tend to run tighter, more respectful hiring.` },
+        ],
+        source: 'Guidance from the GhostProofJob team, reflecting how community ghost reports work.',
+        cta: STD_CTA,
+      };
+    } },
+  { id: 'ghost-why-companies', cat: 'tips', build(s) {
+      return {
+        category: 'Ghost jobs', pillClass: 'ghost', byline: 'The GhostProofJob Team',
+        title: "Why companies post jobs they don't intend to fill",
+        desc: `Ghost jobs aren't always malicious — but knowing WHY they exist helps you spot them faster and waste less time.`,
+        lede: `If a company isn't really hiring, why post at all? Understanding the reasons makes the pattern easier to recognize — and easier to route around.`,
+        readMin: 4,
+        blocks: [
+          { h: 'The common reasons', list: [
+            '<b>Building a pipeline.</b> Collecting résumés for a role they <i>might</i> open later.',
+            '<b>Looking "in growth".</b> A wall of openings can signal momentum to customers and investors, even when hiring is frozen.',
+            '<b>Testing the market.</b> Gauging candidate quality or salary expectations with no budget approved.',
+            '<b>Stale automation.</b> Aggregators and old feeds keep a filled role visible long after it closed.',
+            '<b>Internal-only.</b> A role posted externally for policy reasons that was always going to an internal hire.',
+          ] },
+          { h: 'What it means for you', p: `Most of these aren't personal — and aren't even deliberate deception — but they still cost you real hours. The defense is the same: favor verified employers, prefer roles that post pay and specifics, apply early, and check a company's ghosting-risk before you invest.` },
+        ],
+        source: 'Guidance from the GhostProofJob team, based on posting-behavior patterns and community ghost reports.',
+        cta: STD_CTA,
+      };
+    } },
   { id: 'keyword-match', cat: 'tips', build(s) {
       return {
         category: 'Résumé tips', byline: 'Jett',
