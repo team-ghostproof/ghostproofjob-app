@@ -400,6 +400,128 @@ const TEMPLATES = [
         cta: STD_CTA,
       };
     } },
+  /* ---- CORNERSTONE WAVE 2 (growth, founder-approved): five more high-intent evergreen
+     pieces. No live stats, so they publish reliably. Each links the checker + ghost-risk. ---- */
+  { id: 'ghost-interview', cat: 'tips', build(s) {
+      return {
+        category: 'Ghost jobs', pillClass: 'ghost', byline: 'The GhostProofJob Team',
+        title: 'Ghosted after an interview? What it means and what to do',
+        desc: `Silence after an interview is uniquely painful — you invested real time and hope. Here's what it usually means, and the calm next move.`,
+        lede: `Being ghosted after an interview stings more than a cold application, because you showed up. It is common, it is rarely about you, and there is a sane way through it.`,
+        readMin: 4,
+        blocks: [
+          { h: 'What the silence usually means', list: [
+            '<b>The process stalled internally.</b> Budgets freeze, priorities shift, an internal candidate appears — none of it about your interview.',
+            '<b>They\'re still interviewing.</b> Many teams go quiet for weeks while they see everyone before deciding.',
+            '<b>Broken process.</b> No one owns candidate communication, so "no" simply never gets sent.',
+            '<b>It was never a real, funded role.</b> Some interviews happen for pipelines that were never going to close.',
+          ] },
+          { h: 'The calm next move', list: [
+            '<b>Send one warm follow-up.</b> ~5 business days after the interview (or your stated timeline), a short note restating interest and asking about next steps.',
+            '<b>Set a two-week deadline.</b> No reply after that follow-up? Mentally file it as a no and reinvest your energy.',
+            '<b>Keep the pipeline full.</b> Never let one promising interview pause your other applications.',
+            '<b>Log it.</b> Record the company that went silent so the pattern is visible, not just painful.',
+          ] },
+          { h: 'Make it count for the next person', p: `On GhostProofJob, a ghost report on a company that went dark after an interview feeds its community <b>ghosting-risk score</b> — so the next candidate sees the pattern before they invest a day preparing. Your rough experience becomes someone else's heads-up.` },
+        ],
+        source: 'Guidance from the GhostProofJob team, reflecting how community ghost reports and ghosting-risk scores work.',
+        cta: STD_CTA,
+      };
+    } },
+  { id: 'ghost-follow-up', cat: 'tips', build(s) {
+      return {
+        category: 'Résumé tips', byline: 'Jett',
+        title: 'The follow-up email that actually gets a reply',
+        desc: 'Most follow-ups get ignored because they add pressure, not value. The short, warm structure that earns a response — with a copy-paste template.',
+        lede: `A good follow-up is short, specific, and easy to say yes to. A bad one just asks "any update?" — which gives the reader nothing to reply to.`,
+        readMin: 3,
+        blocks: [
+          { h: 'The four-line structure', list: [
+            '<b>Line 1 — warm opener.</b> Reference the specific role and, if you interviewed, one real detail from the conversation.',
+            '<b>Line 2 — restate fit briefly.</b> One sentence on why you\'re a match, in the posting\'s own language.',
+            '<b>Line 3 — the easy ask.</b> "Is there anything else I can share to help the decision?" beats "any update?" — it invites a reply.',
+            '<b>Line 4 — gracious close.</b> Thank them for their time; no guilt, no pressure.',
+          ] },
+          { h: 'Copy-paste template', p: `<i>"Hi [Name] — thanks again for the conversation about the [Role] role; I especially enjoyed [specific detail]. I\'m still very interested, and I think my experience in [skill] lines up well with what you described. Is there anything else I can share to help? Appreciate your time either way. — [You]"</i>` },
+          { h: 'Timing and limits', p: `Send it ~5–10 business days after applying or interviewing. Follow up once, maybe twice — never five times. If there\'s still silence two weeks after your follow-up, treat it as a no and move forward. Persistent silence across a company\'s roles is worth logging, too.` },
+        ],
+        source: 'Guidance from the GhostProofJob résumé team.',
+        cta: STD_CTA,
+      };
+    } },
+  { id: 'resume-ats', cat: 'tips', build(s) {
+      return {
+        category: 'Résumé tips', byline: 'Jett',
+        title: 'How to get your résumé past the ATS — without keyword stuffing',
+        desc: 'Applicant tracking systems reject on formatting and missing keywords, not on your worth. The honest fixes that pass the scan and still read like a human wrote it.',
+        lede: `An ATS is just software that parses your résumé into fields and scans for relevant terms. You don\'t beat it by stuffing keywords — you beat it by being clean, parseable, and honestly matched to the role.`,
+        readMin: 4,
+        blocks: [
+          { h: 'What actually trips the parser', list: [
+            '<b>Tables, columns, and text boxes.</b> Many parsers read them out of order or drop them entirely — keep the layout single-column.',
+            '<b>Headers/footers for key info.</b> Contact details buried in the header can vanish; put them in the body.',
+            '<b>Images and icons for text.</b> A skills graphic is invisible to the scan — write skills as text.',
+            '<b>Unusual section names.</b> "What I\'ve done" reads worse than "Experience." Use the standard headings.',
+          ] },
+          { h: 'The keyword fix (the honest way)', list: [
+            'Pull the 8–10 terms the posting repeats.',
+            'Mirror the ones you genuinely have — in your real bullets, using their phrasing.',
+            'Never claim a skill you can\'t back up in an interview.',
+          ] },
+          { h: 'A 30-second self-check', p: `Save your résumé as plain text and read it. If the sections are in order and nothing is missing, an ATS can read it too. Our free <a href="/resume-checker.html">Résumé Strength Checker</a> runs on that same parsed text — if it scores your writing well, the machine can see it.` },
+        ],
+        source: 'Guidance from the GhostProofJob résumé team, reflecting how our checker parses and scores résumé text.',
+        cta: STD_CTA,
+      };
+    } },
+  { id: 'cover-letter-real', cat: 'tips', build(s) {
+      return {
+        category: 'Résumé tips', byline: 'Jett',
+        title: "The cover letter that doesn't sound like AI wrote it",
+        desc: 'Generic, AI-flavored cover letters get skimmed and skipped. The structure that sounds like a real person who actually wants this specific job.',
+        lede: `Hiring managers now read a lot of cover letters that open with "I am writing to express my enthusiasm." The ones that land sound like a specific human wrote them for this specific role.`,
+        readMin: 3,
+        blocks: [
+          { h: 'The tells that scream "template"', list: [
+            'A first line that could be pasted into any application.',
+            'Adjectives with no evidence — "passionate," "detail-oriented" — and no example behind them.',
+            'Restating your résumé instead of adding the story behind one achievement.',
+            'No mention of the company that couldn\'t be swapped for any competitor.',
+          ] },
+          { h: 'A structure that sounds human', list: [
+            '<b>Open with a real reason.</b> Something specific about the role, team, or product that actually draws you in.',
+            '<b>Tell one story.</b> Pick a single achievement and explain the situation, what you did, and the result — the part a résumé bullet can\'t hold.',
+            '<b>Connect it to them.</b> One line on how that experience maps to what this role needs.',
+            '<b>Close simply.</b> A short, warm sign-off — no groveling, no clichés.',
+          ] },
+          { h: 'Use AI honestly', p: `AI is great for a first draft and for tightening clumsy sentences — not for inventing enthusiasm or experience. GhostProofJob\'s cover-letter tool builds from <b>your real background and the actual posting</b>, and it never fabricates a story you didn\'t live.` },
+        ],
+        source: 'Guidance from the GhostProofJob résumé team, reflecting how our cover-letter tool works.',
+        cta: STD_CTA,
+      };
+    } },
+  { id: 'find-responsive-employers', cat: 'tips', build(s) {
+      return {
+        category: 'Ghost jobs', pillClass: 'ghost', byline: 'The GhostProofJob Team',
+        title: 'How to find employers that actually respond',
+        desc: 'You can\'t control who ghosts you — but you can weight your search toward companies that tend to reply. The signals worth favoring.',
+        lede: `The fastest way to be ghosted less is to apply more often to the kinds of employers who run a respectful process. A few signals reliably separate them from the black holes.`,
+        readMin: 4,
+        blocks: [
+          { h: 'Signals of a responsive employer', list: [
+            '<b>They post a salary range.</b> Transparency on pay usually tracks with a tighter, more respectful process.',
+            '<b>The posting is specific.</b> A named team, real responsibilities, and a clear first-90-days section signal an actual, funded opening.',
+            '<b>It\'s recent and not on a loop.</b> A fresh post that isn\'t reappearing every few weeks is likelier to be real.',
+            '<b>Verified presence.</b> The role is on the company\'s own careers page, not only on an aggregator.',
+            '<b>Community track record.</b> Others report hearing back — the clearest signal of all.',
+          ] },
+          { h: 'Put the signals to work', p: `Apply early, favor roles that post pay and specifics, and check a company\'s <b>ghosting-risk score</b> before you invest an hour. On GhostProofJob, verified employers are marked and community reports surface which companies tend to go quiet — so you can spend your energy where a reply is actually likely.` },
+          { h: 'A reframe', p: `Being ghosted is about a broken employer process, not your candidacy. Steering toward responsive employers won\'t make it zero — but it meaningfully raises how often your effort earns an answer.` },
+        ],
+        source: 'Guidance from the GhostProofJob team, based on verified-employer signals and community ghost reports.',
+        cta: STD_CTA,
+      };
+    } },
 ];
 
 /* ------------------------------------------------------------- rotation --- */

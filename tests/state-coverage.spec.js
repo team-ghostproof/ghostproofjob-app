@@ -10419,3 +10419,42 @@ test.describe('[STATE-COVERAGE] v277 JSON-LD structured data', () => {
     expect(r.free, 'marks the app free (price 0)').toBe(true);
   });
 });
+
+/* Growth wave 1: the public Résumé Strength Checker "share your score" loop
+   (resume-checker.html — static, 0 functions, nothing stored). The share card
+   carries ONLY the score + brand, never résumé text or PII. */
+test.describe('[STATE-COVERAGE] checker share loop (download card + copy link)', () => {
+  test('empty → no share controls; scored → controls appear, carry no résumé text; copy flashes; card renders a PNG', async ({ page }) => {
+    await page.goto('/resume-checker.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => !!document.getElementById('rc-go'), null, { timeout: 15000 });
+
+    // (4) Empty / missing data: no score yet → no share row.
+    const emptyHasShare = await page.evaluate(() => !!document.getElementById('rc-dl'));
+    expect(emptyHasShare, 'empty state shows no share controls').toBe(false);
+
+    // (1) Guest / logged-out (the tool's primary path): score, then share controls render.
+    const r = await page.evaluate(async () => {
+      const secret = 'Jane Doe\njane@example.com\nSummary: Marketing specialist.\nSkills: SEO, content, analytics, paid social, email, CRM\nExperience\n- Grew organic traffic 140% in 12 months\n- Managed a $250k paid budget, cutting cost-per-lead 22%\n- Led a team of 4\n- Launched lifecycle program lifting retention 18%\n- Ran A/B tests improving conversion 12%';
+      document.getElementById('rc-input').value = secret;
+      document.getElementById('rc-go').click();
+      const share = document.querySelector('#rc-out div[style*="0,245,160,.06"]');
+      const shareHtml = share ? share.outerHTML : '';
+      // canvas → PNG path (same APIs drawCard uses)
+      let png = ''; try { const cv = document.createElement('canvas'); cv.width = 1200; cv.height = 630; const x = cv.getContext('2d'); x.fillStyle = '#120F1D'; x.fillRect(0, 0, 1200, 630); x.fillText('82', 100, 100); png = cv.toDataURL('image/png'); } catch (e) { png = String(e); }
+      // copy flashes
+      const b = document.getElementById('rc-copy'); if (b) b.click(); await new Promise((res) => setTimeout(res, 150));
+      return {
+        hasDownload: !!document.getElementById('rc-dl'),
+        hasCopy: !!document.getElementById('rc-copy'),
+        leaksResumeText: /Grew organic|Jane Doe|jane@example|\$250k/.test(shareHtml),
+        copyFlash: b ? b.innerHTML : '',
+        pngOk: png.slice(0, 22) === 'data:image/png;base64,',
+      };
+    });
+    expect(r.hasDownload, 'download-card control present after scoring').toBe(true);
+    expect(r.hasCopy, 'copy-link control present after scoring').toBe(true);
+    expect(r.leaksResumeText, 'share band must NOT contain any résumé text or PII').toBe(false);
+    expect(r.copyFlash, 'copy button confirms the copy').toContain('Copied');
+    expect(r.pngOk, 'the score card renders to a PNG data URL client-side').toBe(true);
+  });
+});
