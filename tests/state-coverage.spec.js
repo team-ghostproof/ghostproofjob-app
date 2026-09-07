@@ -10458,3 +10458,33 @@ test.describe('[STATE-COVERAGE] checker share loop (download card + copy link)',
     expect(r.pngOk, 'the score card renders to a PNG data URL client-side').toBe(true);
   });
 });
+
+/* v278 UI fixes: (1) blank req-gap pill hidden on the card face; (2) notification
+   bell flex-centered in its pill. (Drawer-truncation change was reverted — it
+   conflicted with the v83 scroll-region behavior; pending a founder decision.) */
+test.describe('[STATE-COVERAGE] v278 card/header UI fixes', () => {
+  test('empty .s-req hidden past the >span display:flex!important; filled shows; bell centers', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => !!document.getElementById('notif-bell'), null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      const cs = getComputedStyle;
+      // (1) blank req pill: empty .s-req inside .job-card .risk-gap-row must be hidden despite the >span display:flex!important rule; with text it shows
+      const card = document.createElement('div'); card.className = 'job-card top';
+      card.innerHTML = '<div class="risk-gap-row"><span class="s-ghost">👻 26%</span><span class="s-req"></span></div>';
+      document.body.appendChild(card);
+      const req = card.querySelector('.s-req');
+      const emptyDisp = cs(req).display;
+      req.textContent = '⚠️ 2 gaps';
+      const filledDisp = cs(req).display;
+      // (2) bell centers when shown (display flex is set by _gpjNotifPaint / inline align+justify)
+      const bell = document.getElementById('notif-bell'); bell.style.display = 'flex';
+      const bAlign = cs(bell).alignItems, bJust = cs(bell).justifyContent;
+      card.remove();
+      return { emptyDisp, filledDisp, bAlign, bJust };
+    });
+    expect(r.emptyDisp, 'empty req pill is hidden on the card face (no blank box)').toBe('none');
+    expect(r.filledDisp, 'req pill shows once it has a gap/no-gap label').not.toBe('none');
+    expect(r.bAlign, 'bell vertically centered').toBe('center');
+    expect(r.bJust, 'bell horizontally centered').toBe('center');
+  });
+});
