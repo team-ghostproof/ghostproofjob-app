@@ -196,6 +196,20 @@ export function poolsFromRows(rows, opts = {}) {
   return { pools: out, stats: { live: rows.length, metros: byMetro.size, docs: out.length, builtAt } };
 }
 
+/** PLAN A: merge today's freshly-harvested pool rows with the prior pool (metro
+ *  accumulation across the rotating harvest — each run scrapes only a subset of
+ *  metros). Today wins on a dupe `_docId`; rows older than staleDays are dropped so
+ *  the pool never references a job doc getJobFull can no longer fetch. Pure. */
+export function mergePoolRows(todayRows, priorRows, opts = {}) {
+  const staleDays = opts.staleDays || 14;
+  const now = opts.now || Date.now();
+  const cutoff = now - staleDays * 86400000;
+  const byId = new Map();
+  for (const r of (priorRows || [])) { if (r && r._docId) byId.set(r._docId, r); }
+  for (const r of (todayRows || [])) { if (r && r._docId) byId.set(r._docId, r); }   // today overwrites prior
+  return [...byId.values()].filter((r) => !r.ingestedAt || r.ingestedAt >= cutoff);
+}
+
 /** Pure: raw docs -> pool documents. Unit-testable wrapper over poolsFromRows
  *  (trims then shards). The live path streams + trims instead — see main(). */
 export function buildPool(docs, opts = {}) {
@@ -225,6 +239,35 @@ function fixtureDocs(n = 60) {
       salary_min: 70000, salary_max: 90000,
     },
   }));
+}
+
+/* Shared write path — used by BOTH the file-mode build (PLAN A) and the legacy
+   stream build. A Firestore commit is capped on writes (500) AND ~10 MiB payload;
+   pool shards run up to ~800 KB, so flush on whichever hits first. */
+async function writePoolDocs(db, pools, stats, mstats) {
+  const MAX_BATCH_BYTES = 8 * 1024 * 1024;   // margin under Firestore's ~10 MiB request limit
+  let wrote = 0, batch = db.batch(), pending = 0, batchBytes = 0;
+  for (const p of pools) {
+    const b = bytes(p.doc);
+    if (pending && (pending >= 400 || batchBytes + b > MAX_BATCH_BYTES)) {
+      await batch.commit(); batch = db.batch(); pending = 0; batchBytes = 0;
+    }
+    batch.set(db.collection(POOL_COLLECTION).doc(p.key), p.doc);
+    wrote++; pending++; batchBytes += b;
+  }
+  if (pending) await batch.commit();
+  await db.collection(POOL_COLLECTION).doc('_manifest').set({
+    builtAt: stats.builtAt, docs: stats.docs, metros: stats.metros, liveJobs: stats.live,
+    keys: pools.map((p) => p.key),
+  });
+  const _top = (obj, n) => Object.fromEntries(Object.entries(obj || {}).sort((a, b) => b[1] - a[1]).slice(0, n));
+  await db.collection('resources').doc('_market_stats').set({
+    builtAt: stats.builtAt,
+    total: mstats.total, remote: mstats.remote, salaryPosted: mstats.salaryPosted, verified: mstats.verified,
+    byField: mstats.byField, byRemoteField: mstats.byRemoteField,
+    byCity: _top(mstats.byCity, 200), bySource: _top(mstats.bySource, 40),
+  });
+  console.log('[pool] wrote', wrote, 'pool docs +1 manifest +1 market_stats —', wrote + 2, 'writes total');
 }
 
 /* --------------------------------- main ----------------------------------- */
@@ -268,6 +311,68 @@ async function main() {
     return;
   }
 
+  /* PLAN A ([FREE-TIER], 2026-09-22): build the pool FROM THE HARVEST FILE + the prior
+     pool, NOT by streaming ~205K jobs back out of Firestore. That read-back blew the
+     free-tier 50K reads/day cap (429 RESOURCE_EXHAUSTED) and took the pipeline AND the
+     live app down. Reads here: ~1 manifest + N prior shards (~45), never 205K. */
+  const ROWS_FILE = process.env.POOL_ROWS_FILE;
+  if (ROWS_FILE) {
+    const fs = await import('fs');
+    let text = '';
+    /* A missing/empty file (e.g. the harvester crashed) is NOT fatal: fall through to
+       prior-pool accumulation so the pool is still refreshed rather than left to go
+       stale. The FLOOR check below is the real guard against writing an empty pool. */
+    try { text = fs.readFileSync(ROWS_FILE, 'utf8'); }
+    catch (e) { console.warn('[pool] POOL_ROWS_FILE unreadable (' + (e && e.message) + ') — rebuilding from prior pool only'); text = ''; }
+    const todayRows = [];
+    for (const line of text.split('\n')) {
+      const s = line.trim(); if (!s) continue;
+      let v; try { v = JSON.parse(s); } catch (e) { continue; }
+      if (v && v.title && v.active !== false) todayRows.push(toPoolRow(v._docId || v.id || '', v));
+    }
+    console.log('[pool] file mode: read', todayRows.length, 'harvested rows from', ROWS_FILE, '(0 read-back)');
+
+    const admin = (await import('firebase-admin')).default;
+    const svc = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!svc) { console.error('[pool] FIREBASE_SERVICE_ACCOUNT is not set'); process.exit(1); }
+    if (!admin.apps.length) admin.initializeApp({ credential: admin.credential.cert(JSON.parse(svc)) });
+    const db = admin.firestore();
+
+    /* prior pool → metro accumulation across the rotating harvest (each run scrapes a
+       subset of metros). ~45 reads (manifest + shards), non-fatal on failure. */
+    let priorRows = [];
+    try {
+      const man = await db.collection(POOL_COLLECTION).doc('_manifest').get();
+      const keys = (man.exists && Array.isArray((man.data() || {}).keys)) ? man.data().keys : [];
+      const snaps = await Promise.all(keys.map((k) => db.collection(POOL_COLLECTION).doc(k).get().catch(() => null)));
+      for (const sn of snaps) { if (sn && sn.exists) { const arr = (sn.data() || {}).jobs; if (Array.isArray(arr)) priorRows.push(...arr); } }
+      console.log('[pool] prior pool:', priorRows.length, 'rows from', keys.length, 'docs (~' + (keys.length + 1) + ' reads, not 205K)');
+    } catch (e) { console.warn('[pool] prior-pool read failed — using today only:', e && e.message); priorRows = []; }
+
+    /* merge: today wins on dupes; drop rows older than the jobs prune window so the pool
+       never references a job doc getJobFull can no longer fetch. */
+    const STALE_DAYS = parseInt(process.env.POOL_STALE_DAYS || '14', 10);
+    const merged = mergePoolRows(todayRows, priorRows, { staleDays: STALE_DAYS });
+    console.log('[pool] merged', merged.length, 'rows (' + todayRows.length + ' today + ' + priorRows.length + ' prior, deduped, <' + STALE_DAYS + 'd)');
+
+    /* SAFETY FLOOR: never overwrite a good pool with almost nothing — a scrape outage
+       must not blank everyone's deck. Abort → the last-good pool stays live. */
+    const FLOOR = parseInt(process.env.POOL_MIN_ROWS || '200', 10);
+    if (merged.length < FLOOR) { console.error('[pool] ABORT: only ' + merged.length + ' rows (< floor ' + FLOOR + ') — keeping last-good pool, writing nothing.'); process.exit(1); }
+
+    const mstats = newStats();
+    for (const r of merged) tally(mstats, r);
+
+    const { pools, stats } = poolsFromRows(merged);
+    let maxBytes = 0; for (const p of pools) maxBytes = Math.max(maxBytes, bytes(p.doc));
+    console.log('[pool] built', stats.docs, 'pool docs across', stats.metros, 'metros; largest', (maxBytes / 1024).toFixed(1) + 'KB');
+    if (maxBytes > 1024 * 1024) { console.error('[pool] ABORT: a shard exceeds the 1MiB Firestore limit'); process.exit(1); }
+    if (DRY) { console.log('[pool] --dry-run (file mode): nothing written'); return; }
+
+    await writePoolDocs(db, pools, stats, mstats);
+    return;
+  }
+
   const admin = (await import('firebase-admin')).default;
   const svc = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!svc) { console.error('[pool] FIREBASE_SERVICE_ACCOUNT is not set'); process.exit(1); }
@@ -308,41 +413,7 @@ async function main() {
 
   if (DRY) { console.log('[pool] --dry-run: nothing written'); return; }
 
-  /* A Firestore commit is capped on TWO axes: 500 writes AND ~10 MiB total request
-     PAYLOAD. Pool shards run up to ~800 KB each, so batching by COUNT alone packed
-     ~40 near-max docs into one commit (~32 MB) and Firestore rejected it with
-     "INVALID_ARGUMENT: Request payload size exceeds the limit" — which is exactly
-     why the pool had NEVER been written. Flush on whichever cap hits first: byte
-     budget (safe margin under 10 MiB) or the write count. */
-  const MAX_BATCH_BYTES = 8 * 1024 * 1024;   // margin under Firestore's ~10 MiB request limit
-  let wrote = 0, batch = db.batch(), pending = 0, batchBytes = 0;
-  for (const p of pools) {
-    const b = bytes(p.doc);
-    if (pending && (pending >= 400 || batchBytes + b > MAX_BATCH_BYTES)) {
-      await batch.commit(); batch = db.batch(); pending = 0; batchBytes = 0;
-    }
-    batch.set(db.collection(POOL_COLLECTION).doc(p.key), p.doc);
-    wrote++; pending++; batchBytes += b;
-  }
-  if (pending) await batch.commit();
-  /* a tiny manifest so the client can discover keys without guessing */
-  await db.collection(POOL_COLLECTION).doc('_manifest').set({
-    builtAt: stats.builtAt, docs: stats.docs, metros: stats.metros, liveJobs: stats.live,
-    keys: pools.map((p) => p.key),
-  });
-  /* Resources engine: the daily market snapshot, computed FREE in the stream above.
-     build_resources.mjs reads this ONE doc (not the whole collection) to write an
-     article — that is the [FREE-TIER] seam. Trim the long-tail maps (6k+ cities) to
-     the top slice the articles actually use, so the doc stays tiny and can never
-     approach the 1 MiB doc limit. */
-  const _top = (obj, n) => Object.fromEntries(Object.entries(obj || {}).sort((a, b) => b[1] - a[1]).slice(0, n));
-  await db.collection('resources').doc('_market_stats').set({
-    builtAt: stats.builtAt,
-    total: mstats.total, remote: mstats.remote, salaryPosted: mstats.salaryPosted, verified: mstats.verified,
-    byField: mstats.byField, byRemoteField: mstats.byRemoteField,
-    byCity: _top(mstats.byCity, 200), bySource: _top(mstats.bySource, 40),
-  });
-  console.log('[pool] wrote', wrote, 'pool docs +1 manifest +1 market_stats —', wrote + 2, 'writes total');
+  await writePoolDocs(db, pools, stats, mstats);
 }
 
 if (!process.env.GPJ_POOL_NO_MAIN) {

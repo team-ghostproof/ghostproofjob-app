@@ -36,6 +36,31 @@ import re as _re
 
 COLLECTION = "jobs"
 RESULTS_PER_QUERY = int(os.environ.get("RESULTS_PER_QUERY", "200"))
+
+# PLAN A ([FREE-TIER], 2026-09-22): once the Blaze trial credit expired, the D1 pool
+# builder (build_job_pool.mjs) streaming ALL ~205K active jobs back OUT of Firestore
+# to aggregate them blew the free-tier 50K reads/day cap (429 RESOURCE_EXHAUSTED),
+# which took the whole pipeline AND the live app down. The harvester ALREADY holds
+# every scraped row, so — when POOL_ROWS_FILE is set — it also appends each row to
+# that JSONL file and build_job_pool.mjs builds the pool FROM THE FILE (0 read-back).
+# Purely additive: the Firestore job writes below are unchanged, so getJobFull still
+# lazy-loads the full posting text on demand.
+POOL_ROWS_PATH = os.environ.get("POOL_ROWS_FILE", "").strip()
+_ROWS_FH = None
+
+def _dump_pool_row(rec, did, now_ms):
+    """Append one file-safe row for the pool builder. Never raises — a bad row must
+    not break the harvest or the file (the row is still written to Firestore)."""
+    if _ROWS_FH is None:
+        return
+    try:
+        fr = dict(rec)
+        fr["_docId"] = did
+        fr["ingestedAt"] = now_ms   # real epoch-ms (rec's ingestedAt is a SERVER_TIMESTAMP sentinel)
+        fr["active"] = True
+        _ROWS_FH.write(json.dumps(fr, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
 # ZipRecruiter removed: it consistently returns 403 (Cloudflare bot-block) and
 # wastes ~2 min per attempt failing. LinkedIn + Indeed return reliably.
 SITES = [s.strip() for s in os.environ.get("SITES", "linkedin,indeed").split(",") if s.strip()]   # env-overridable; add ",google" / ",zip_recruiter" to widen capture
@@ -624,6 +649,7 @@ def harvest_one(db, country, region, location, role):
     if df is None or len(df) == 0:
         return 0
     records = df.to_dict("records")
+    now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)   # PLAN A: real ts for the pool file
     batch = db.batch()
     col = db.collection(COLLECTION)
     written = 0
@@ -639,6 +665,7 @@ def harvest_one(db, country, region, location, role):
         rec["ingestedAt"] = firestore.SERVER_TIMESTAMP
         rec["active"] = True
         batch.set(col.document(did), rec, merge=True)
+        _dump_pool_row(rec, did, now_ms)   # PLAN A: hand this row to the pool builder (no read-back)
         written += 1
         if written % 450 == 0:
             batch.commit(); batch = db.batch()
@@ -739,6 +766,16 @@ def main():
 
     db = init_firestore()
     total = 0
+    # PLAN A: open the pool-rows file (truncate) so build_job_pool.mjs can build the
+    # pool from THIS run's scrape instead of reading ~205K jobs back out of Firestore.
+    global _ROWS_FH
+    if POOL_ROWS_PATH:
+        try:
+            _ROWS_FH = open(POOL_ROWS_PATH, "w", encoding="utf-8")
+            print("POOL ROWS -> {} (build_job_pool.mjs builds the pool from this file — no 205K read-back)".format(POOL_ROWS_PATH))
+        except Exception as e:
+            _ROWS_FH = None
+            print("could not open POOL_ROWS_FILE: {}".format(e), file=sys.stderr)
     # STACKING MODE: set STACKING_MODE=1 in the workflow to stack hard for a few
     # days — disables pruning and lets the (workflow-provided) wide budget run.
     stacking = os.environ.get("STACKING_MODE", "0") == "1"
@@ -832,6 +869,14 @@ def main():
         print("PRUNING stale jobs older than {} days (cap {})…".format(stale_days, max_delete))
         removed = prune_stale_jobs(db, max_delete, stale_days)
         print("PRUNED {} stale jobs".format(removed))
+
+    # PLAN A: flush + close the pool-rows file so the Node builder reads a complete file.
+    if _ROWS_FH is not None:
+        try:
+            _ROWS_FH.flush(); _ROWS_FH.close()
+            print("POOL ROWS file closed ({})".format(POOL_ROWS_PATH))
+        except Exception as e:
+            print("closing POOL_ROWS_FILE: {}".format(e), file=sys.stderr)
 
     print("DONE. stacking={} cycle_day={} verify={} scrapes={} upserts={} pruned={}".format(
         stacking, cycle_day, is_verify_day, scrapes, total, removed))

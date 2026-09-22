@@ -52,6 +52,10 @@ jobs:
           # or BACKFILL_MAX=50). Never leave a variable set to an empty value.
           SITES: ${{ vars.SITES || 'linkedin,indeed' }}
           BACKFILL_MAX: ${{ vars.BACKFILL_MAX || '0' }}
+          # PLAN A ([FREE-TIER]): the harvester dumps every scraped row here so the pool
+          # builder can aggregate them WITHOUT reading ~205K jobs back out of Firestore
+          # (that read-back blew the free-tier 50K reads/day cap → 429 → app + pipeline down).
+          POOL_ROWS_FILE: ${{ runner.temp }}/harvest_pool_rows.jsonl
         run: python scripts/job_spy_harvester.py
 
       # ---------------------------------------------------------------------
@@ -78,6 +82,9 @@ jobs:
         continue-on-error: true
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          # PLAN A: build the pool FROM the harvester's file (+ prior pool for metro
+          # accumulation), not by streaming ~205K jobs back out of Firestore.
+          POOL_ROWS_FILE: ${{ runner.temp }}/harvest_pool_rows.jsonl
         run: |
           # The SAME secret is proven-valid: the Python harvester above writes jobs
           # with it every day. So a failure here is in THIS Node step, not the creds.
