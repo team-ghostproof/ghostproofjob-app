@@ -1,5 +1,8 @@
 User-agent: *
 Allow: /
+# Serverless API routes are not pages — keep crawlers off them (they return 4xx to a
+# GET, which showed up in GSC as "Blocked due to other 4xx issue" for /api/apply-email).
+Disallow: /api/
 
 # Generated SEO landing pages (static, zero runtime reads) — see seo-generator/
 Sitemap: https://ghostproofjob.com/sitemap.xml

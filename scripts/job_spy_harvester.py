@@ -85,6 +85,33 @@ US_ROLE_LIBRARY = [
     "human resources", "graphic designer", "social worker",
     # service
     "security guard", "janitor", "cook", "barista", "cashier", "receptionist",
+    # ── CAST-NET WIDENING (2026-09-24, founder: "I want all jobs"): the buckets above
+    # skewed the catalog toward broad/service titles, so niche professional roles
+    # (e.g. "Account Retention Specialist") never got harvested and thus could never
+    # be searched. These add high-value professional families + high-diversity
+    # UMBRELLA suffixes ("manager"/"specialist"/"analyst" match a HUGE range of real
+    # titles). Adding terms only widens the ROTATION — it does NOT raise the per-run
+    # query count (US_ROLES_PER_RUN) or RESULTS_PER_QUERY, so daily writes stay flat.
+    # account / sales / success
+    "account manager", "account executive", "account retention", "customer success",
+    "client success", "business development", "sales manager", "inside sales",
+    # marketing / creative
+    "marketing manager", "brand manager", "content", "seo specialist", "social media",
+    "copywriter", "communications", "product marketing",
+    # tech / data / product
+    "product manager", "program manager", "business analyst", "data analyst",
+    "data scientist", "devops engineer", "cloud engineer", "cybersecurity", "qa engineer",
+    "it support", "systems administrator", "ux designer", "network engineer",
+    # finance / hr / ops / admin
+    "financial analyst", "controller", "bookkeeper", "payroll specialist", "auditor",
+    "recruiter", "talent acquisition", "operations manager", "supply chain",
+    "logistics coordinator", "procurement", "office manager", "executive assistant",
+    # healthcare / education / legal (professional)
+    "nurse practitioner", "medical biller", "case manager", "occupational therapist",
+    "instructional designer", "academic advisor", "paralegal", "compliance",
+    # UMBRELLA suffixes — one term surfaces thousands of distinct titles
+    "manager", "specialist", "analyst", "coordinator", "representative",
+    "associate", "director", "consultant", "supervisor",
 ]
 TARGETS = [
     {"country": "usa", "region": "United States", "locations": ["United States", "Houston, TX", "Remote"], "roles": US_ROLE_LIBRARY},
@@ -807,7 +834,13 @@ def main():
         # white-collar users with nothing to match. Instead we (1) ALWAYS include a
         # core of broad professional buckets, then (2) fill the rest by striding
         # ACROSS the whole library so every run still rotates full coverage.
-        core = ["sales", "marketing", "operations", "customer service"]
+        # CAST-NET WIDENING: the daily core is now high-diversity UMBRELLA suffixes —
+        # "manager"/"specialist"/"analyst"/"coordinator"/"representative" each return a
+        # broad spread of real titles (Account Retention Specialist, Customer Success
+        # Manager, Business Analyst…) EVERY run, so niche professional roles are always
+        # in the catalog. The strided fill below still rotates the specific buckets for
+        # depth. Same role count per run → daily writes unchanged.
+        core = ["manager", "specialist", "analyst", "coordinator", "representative", "associate"]
         core = [r for r in core if r in lib][:max(0, roles_per_run - 3)]
         todays_us_roles = list(core)
         seen = set(core)

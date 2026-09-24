@@ -92,10 +92,26 @@ async function build({ write = true, companies = true } = {}) {
        in that case we must NOT wipe every existing page, so we skip the prune and
        let the last-good pages stand. */
     if (companies && coPages.length) {
+      /* 2026-09-24 (GSC "Not found (404)" churn): a company that rotates out of the
+         pool used to be DELETED, so Google's next crawl hit a 404 (38 such URLs in
+         GSC). Instead, replace it with a tiny redirect STUB — noindex + canonical +
+         meta-refresh to the resources hub — so the URL returns 200-then-redirects,
+         Google drops it cleanly (noindex) and users land on live content. The stub is
+         deterministic, so re-writing an already-stubbed page is a no-op (no git churn),
+         and if the company later returns the real page overwrites the stub above. */
+      const STUB = '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">\n'
+        + '<title>Listing moved — GhostProofJob</title>\n'
+        + '<link rel="canonical" href="https://ghostproofjob.com/resources/">\n'
+        + '<meta name="robots" content="noindex,follow">\n'
+        + '<meta http-equiv="refresh" content="0;url=https://ghostproofjob.com/resources/">\n'
+        + '</head><body>This company listing has moved. <a href="https://ghostproofjob.com/resources/">See current openings and resources →</a></body></html>\n';
       const keep = new Set(coPages.map((p) => p.slug + '.html'));
       for (const f of fs.readdirSync(OUT_DIR)) {
         if (/^co-.*\.html$/.test(f) && !keep.has(f)) {
-          try { fs.unlinkSync(path.join(OUT_DIR, f)); pruned++; } catch (e) { /* ignore */ }
+          try {
+            const full = path.join(OUT_DIR, f);
+            if (fs.readFileSync(full, 'utf8') !== STUB) { fs.writeFileSync(full, STUB, 'utf8'); pruned++; }
+          } catch (e) { /* ignore */ }
         }
       }
     }

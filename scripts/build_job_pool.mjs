@@ -363,7 +363,13 @@ async function main() {
     const mstats = newStats();
     for (const r of merged) tally(mstats, r);
 
-    const { pools, stats } = poolsFromRows(merged);
+    /* CAST-NET WIDENING (2026-09-24): raise the searchable national cap so the newly
+       diversified harvest actually reaches keyword search (a niche title outside the
+       old top-3,000-recent was invisible). Env-tunable; the build still reads only the
+       prior pool (~45), so this costs NO extra build reads — it only enlarges the pool
+       the client reads per session (a few more shard docs; well within 50K/day now). */
+    const NATIONAL_CAP = parseInt(process.env.POOL_NATIONAL_CAP || '5000', 10);
+    const { pools, stats } = poolsFromRows(merged, { nationalCap: NATIONAL_CAP });
     let maxBytes = 0; for (const p of pools) maxBytes = Math.max(maxBytes, bytes(p.doc));
     console.log('[pool] built', stats.docs, 'pool docs across', stats.metros, 'metros; largest', (maxBytes / 1024).toFixed(1) + 'KB');
     if (maxBytes > 1024 * 1024) { console.error('[pool] ABORT: a shard exceeds the 1MiB Firestore limit'); process.exit(1); }
