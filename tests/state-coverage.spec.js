@@ -8303,6 +8303,7 @@ test.describe('[STATE-COVERAGE] v211 keyword search — loose fallback actually 
       if (typeof switchView === 'function') switchView('browse');
       document.getElementById('f-keyword').value = 'account retention';
       window.fb = window.fb || {};
+      window.fb.fetchSearchIndex = async () => null;   /* v281: Tier B search reads the index first; force the deck-pool fallback so this test drives the mocked fetchJobs deterministically (not live Firestore search shards) */
       window.fb.fetchJobs = async () => ([
         { title: 'Account Manager', company: 'Acme', location: 'Dallas, TX', description: 'x', url: 'https://a.com' },
         { title: 'Retention Specialist', company: 'Beta', location: 'Austin, TX', description: 'x', url: 'https://b.com' },
@@ -8331,6 +8332,7 @@ test.describe('[STATE-COVERAGE] v211 keyword search — loose fallback actually 
       if (typeof switchView === 'function') switchView('browse');
       document.getElementById('f-keyword').value = 'account retention';
       window.fb = window.fb || {};
+      window.fb.fetchSearchIndex = async () => null;   /* v281: force the deck-pool fallback (see above) */
       window.fb.fetchJobs = async () => ([
         { title: 'Account Retention Lead', company: 'Delta', location: 'Remote', description: 'x', url: 'https://d.com', is_remote: true },
         { title: 'Project Coordinator', company: 'Gamma', location: 'Houston, TX', description: 'x', url: 'https://g.com' },
@@ -8944,20 +8946,28 @@ test.describe('[STATE-COVERAGE] v231 company logos (honest fallback chain)', () 
     await page.waitForTimeout(200);
   });
 
-  test('fallback chain: uploaded → online-by-real-domain → emoji (never a guessed domain)', async ({ page }) => {
+  /* v281 (founder-approved logo improvement): the chain now adds a LAST-RESORT name→domain
+     guess + a Clearbit fallback so non-big-brand employers still get a logo. A wrong/dead
+     guess 404s to the emoji (onerror-safe), so it's still honest. NOTE the Website LINK
+     stays real-only (never guessed) — only the low-harm logo is best-effort. */
+  test('fallback chain: uploaded → real-domain → guessed-domain (last resort) → emoji; always onerror-safe (v281)', async ({ page }) => {
     const r = await page.evaluate(() => ({
       uploaded: _gpjLogoHtml({ logo: 'data:image/png;base64,AAAA', size: 46 }).includes('data:image/png'),
       onlineByDomain: _gpjLogoHtml({ website: 'https://acme.com', size: 46 }).includes('icons.duckduckgo.com/ip3/acme.com.ico'),
+      guessedLastResort: /duckduckgo\.com\/ip3\/lgihomes\.com/.test(_gpjLogoHtml({ company: 'LGI Homes', size: 46 })),
+      clearbitFallback: /logo\.clearbit\.com\/lgihomes\.com/.test(_gpjLogoHtml({ company: 'LGI Homes', size: 46 })),
       emojiOnly: (function () { const h = _gpjLogoHtml({ size: 46, emoji: '💼' }); return h.includes('💼') && !h.includes('duckduckgo') && !h.includes('<img'); })(),
-      onerrorSafe: _gpjLogoHtml({ website: 'acme.com' }).includes('onerror="this.remove()"'),
-      // the domain is extracted ONLY from a real URL — a bare company name never yields a domain
+      onerrorSafe: _gpjLogoHtml({ website: 'acme.com' }).includes('this.remove()'),
+      // _gpjLogoDomain still extracts ONLY from a real URL (a bare name never yields a real domain here — the GUESS lives in _gpjGuessDomain, used only for the logo)
       domainRealOnly: _gpjLogoDomain('https://www.acme.com/careers') === 'acme.com' && _gpjLogoDomain('Acme Corp Inc') === '' && _gpjLogoDomain('') === '',
     }));
     expect(r.uploaded, 'an uploaded data-URL logo is used directly').toBe(true);
     expect(r.onlineByDomain, 'a real website domain → online logo').toBe(true);
-    expect(r.emojiOnly, 'no upload + no domain → emoji only (no guessed online call)').toBe(true);
-    expect(r.onerrorSafe, 'a broken online logo falls back to the emoji (onerror removes the img)').toBe(true);
-    expect(r.domainRealOnly, 'domain comes only from a real URL, never guessed from a company name').toBe(true);
+    expect(r.guessedLastResort, 'v281: a clean brand name → best-effort guessed-domain logo').toBe(true);
+    expect(r.clearbitFallback, 'v281: Clearbit is chained as a second logo source').toBe(true);
+    expect(r.emojiOnly, 'no upload + no name + no domain → emoji only').toBe(true);
+    expect(r.onerrorSafe, 'a broken/wrong logo still falls back to the emoji (onerror removes the img)').toBe(true);
+    expect(r.domainRealOnly, '_gpjLogoDomain extracts only from a real URL, never from a name').toBe(true);
   });
 });
 
@@ -9049,11 +9059,16 @@ test.describe('[STATE-COVERAGE] v235 company-card logo box', () => {
       openCompanyView('Acme', { title: 'X', t: 'X', co: 'Acme', companyWebsite: 'https://acme.com', desc: 'd' }); // real domain
       const withDom = document.getElementById('cm-logo').innerHTML;
       return {
-        placeholder: noDom.includes('🏢') && !noDom.includes('<img'),   /* v252: company cards default to 🏢 (job cards use 💼); both circular */
+        /* v252: company cards default to 🏢 (job cards use 💼); both circular. The 🏢 emoji
+           is ALWAYS present in the box as the fallback. v281: a card without a real domain now
+           also carries a best-effort GUESSED logo img that 404s back to the 🏢. */
+        emojiPresent: noDom.includes('🏢'),
+        guessedAttempt: noDom.includes('<img') && noDom.includes('this.remove()'),   /* v281: guessed logo, onerror-safe → 🏢 */
         online: withDom.includes('icons.duckduckgo.com/ip3/acme.com'),
       };
     });
-    expect(r.placeholder, 'no domain → 🏢 placeholder box (no wrong logo)').toBe(true);
+    expect(r.emojiPresent, 'the 🏢 fallback is always in the logo box').toBe(true);
+    expect(r.guessedAttempt, 'v281: no real domain → best-effort guessed logo that safely falls back to 🏢').toBe(true);
     expect(r.online, 'real domain → online logo in the box').toBe(true);
   });
 });
@@ -9210,25 +9225,30 @@ test.describe('[STATE-COVERAGE] v240 brand logos + honest ghost dropdown', () =>
     await page.waitForTimeout(200);
   });
 
-  test('curated brand map → real logo + website for big names; unknown → honest fallback (never a guessed domain)', async ({ page }) => {
+  /* v281: unknown companies now get a BEST-EFFORT guessed logo (name→domain) that 404s to
+     the emoji if wrong — but the curated brand map and the Website LINK are unchanged
+     (the link stays real/honest; only the low-harm logo is guessed). */
+  test('curated brand map → real logo + website for big names; unknown → best-effort guessed logo (404s to emoji), Website link stays real (v281)', async ({ page }) => {
     const r = await page.evaluate(() => ({
       amazon: _gpjBrandDomain('Amazon'),
       msft: _gpjBrandDomain('Microsoft Corporation'),         // legal suffix stripped
       jnj: _gpjBrandDomain('Johnson & Johnson'),
-      unknown: _gpjBrandDomain("Bob's Local Widgets LLC"),
+      unknownBrandMap: _gpjBrandDomain("Bob's Local Widgets LLC"),   // curated map still returns '' for unknowns
       logoHasImg: /icons\.duckduckgo\.com\/ip3\/amazon\.com\.ico/.test(_gpjLogoHtml({ company: 'Amazon' })),
-      logoUnknownNoImg: !/duckduckgo/.test(_gpjLogoHtml({ company: 'Zzq Nonexistent Co' })),
+      logoUnknownGuessed: /duckduckgo|clearbit/.test(_gpjLogoHtml({ company: 'Zzq Nonexistent Co' })),
+      unknownOnerrorSafe: _gpjLogoHtml({ company: 'Zzq Nonexistent Co' }).includes('this.remove()'),
       brandWeb: (typeof companyLinks === 'function') ? companyLinks('Microsoft', {}).web : '',
       unknownWeb: (typeof companyLinks === 'function') ? companyLinks('Zzq Nonexistent Co', {}).web : '',
     }));
     expect(r.amazon, 'Amazon → amazon.com').toBe('amazon.com');
     expect(r.msft, 'Microsoft Corporation → microsoft.com (suffix stripped)').toBe('microsoft.com');
     expect(r.jnj, 'Johnson & Johnson → jnj.com').toBe('jnj.com');
-    expect(r.unknown, 'unknown company → NO guessed domain (honest)').toBe('');
+    expect(r.unknownBrandMap, 'curated brand map returns nothing for an unknown company').toBe('');
     expect(r.logoHasImg, 'big brand → real logo resolved by domain').toBe(true);
-    expect(r.logoUnknownNoImg, 'unknown company → emoji only, no wrong logo').toBe(true);
+    expect(r.logoUnknownGuessed, 'v281: unknown company → best-effort guessed logo attempt').toBe(true);
+    expect(r.unknownOnerrorSafe, 'a wrong/dead guess safely falls back to the emoji').toBe(true);
     expect(r.brandWeb, 'known brand Website button → real domain (not a Google search)').toBe('https://microsoft.com');
-    expect(/google\.com\/search/.test(r.unknownWeb), 'unknown company → honest search fallback').toBe(true);
+    expect(/google\.com\/search/.test(r.unknownWeb), 'unknown company Website link stays honest (search fallback, never guessed)').toBe(true);
   });
 
   test('Ghost search dropdown never renders "null%" — honest "👻 —" for no-data companies', async ({ page }) => {
@@ -10552,5 +10572,44 @@ test.describe('[STATE-COVERAGE] v280 For-Employers entry: landing + menu only', 
     expect(r.menuItemShown, 'menu item shown for a candidate/guest context').toBe(true);
     expect(r.landingHeroKept, 'landing hero employer link kept').toBe(true);
     expect(r.openEmployerFn, 'openEmployer handler still wired').toBe(true);
+  });
+});
+
+/* v281 — three founder fixes: (1) Match Preferences can be CLEARED (they're optional);
+   (2) company-logo name→domain guess + Clearbit fallback; (3) smart section transition —
+   the Browse-modal summary is trimmed at the first Requirements/Benefits/Physical header. */
+test.describe('[STATE-COVERAGE] v281 prefs-clear + logo + smart section transition', () => {
+  test('blank pref clears (salary kept); logo guesses a domain + Clearbit fallback; summary trims at Benefits', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof savePref === 'function' && typeof _gpjSummaryOnly === 'function' && typeof _gpjGuessDomain === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      // (1) clearing a pref — real flow: open the editor (sets editingPref + prefills), delete, save
+      localStorage.setItem('gpj_prefs', JSON.stringify({ titles: 'Marketing Manager', salary: '$100,000' }));
+      editPref('titles');
+      document.getElementById('pref-modal-input').value = '';
+      savePref();
+      const after = JSON.parse(localStorage.getItem('gpj_prefs') || '{}');
+      // (2) logo
+      const guessLGI = _gpjGuessDomain('LGI Homes');
+      const guessJunk = _gpjGuessDomain('!!!');
+      const logoHtml = _gpjLogoHtml({ company: 'LGI Homes', size: 44 });
+      // (3) summary trim
+      const desc = 'Lead campaigns and own the calendar for our growing brand and team every single day here.\n\nValues\n- People: we empower people.\n\nBenefits\ncomprehensive benefits: medical, dental, vision, 401k.\n\nPhysical Requirements\nMust sit for long periods.';
+      const trimmed = _gpjSummaryOnly(desc);
+      return {
+        titleCleared: !after.titles, salaryKept: after.salary === '$100,000',
+        placeholderShown: document.getElementById('pref-titles').textContent === _GPJ_PREF_PLACEHOLDERS.titles,
+        guessLGI, guessJunk, logoHasClearbit: /clearbit\.com/.test(logoHtml),
+        trimKeepsValues: /Values/.test(trimmed), trimDropsBenefits: !/comprehensive benefits/.test(trimmed) && !/Physical Requirements/.test(trimmed),
+      };
+    });
+    expect(r.titleCleared, 'blank save clears the preference').toBe(true);
+    expect(r.salaryKept, 'clearing one field leaves the others').toBe(true);
+    expect(r.placeholderShown, 'cleared field shows the empty-state placeholder').toBe(true);
+    expect(r.guessLGI, 'clean brand name → .com guess').toBe('lgihomes.com');
+    expect(r.guessJunk, 'junk name → no guess').toBe('');
+    expect(r.logoHasClearbit, 'logo carries a Clearbit fallback source').toBe(true);
+    expect(r.trimKeepsValues, 'summary keeps the overview/values').toBe(true);
+    expect(r.trimDropsBenefits, 'summary trims the benefits/physical tail').toBe(true);
   });
 });

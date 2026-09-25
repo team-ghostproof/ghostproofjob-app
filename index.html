@@ -3512,7 +3512,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            the profile-menu item (#pm-employer) now cover it; the per-screen nav tab is
            hidden too (see _gpjSyncEmployerNav). Element removed to keep the footer clean. -->
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Always free 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v280</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v281</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -7239,7 +7239,11 @@ function buildBrowseExpanded(j,i){
        drawer uses (global handler ~17885), so the Browse modal and the deck behave
        identically ("one universal card"). Header stays visible; content previews then
        expands/collapses on tap. */
-    (summary?('<div style="margin-top:14px;"><div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-bottom:5px;">\ud83d\udcc4 JOB EXPECTATIONS &amp; SUMMARY</div><div class="desc-clamp">'+_fmt(summary,11000)+'</div></div>'):'')+
+    (function(){ /* v281: clean section transition \u2014 trim the summary at the first Requirements/Benefits/Physical header, then de-dup any paragraph the dedicated sections already show, so the Summary ends cleanly on overview/duties/values (no bleed, no repeat). */
+      var _sum=(typeof _gpjSummaryOnly==='function')?_gpjSummaryOnly(summary):summary;
+      _sum=(typeof _gpjDedupText==='function')?_gpjDedupText(_sum,[benT,reqT]):_sum;
+      return _sum.trim()?('<div style="margin-top:14px;"><div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-bottom:5px;">\ud83d\udcc4 JOB EXPECTATIONS &amp; SUMMARY</div><div class="desc-clamp">'+_fmt(_sum,11000)+'</div></div>'):'';
+    })()+
     ((reqT&&!_reqDup)?('<div style="margin-top:14px;"><div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-bottom:5px;">\u2705 REQUIREMENTS</div><div class="desc-clamp">'+_fmt(reqT,4000)+'</div></div>'):'')+
     (benT?('<div style="margin-top:14px;"><div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-bottom:5px;">\ud83c\udf81 BENEFITS</div><div class="desc-clamp">'+_fmt(benT,2500)+'</div></div>'):'')+
     /* F-CARD (v91): the job card carries the SAME company sections as the swipe
@@ -13101,6 +13105,23 @@ function _gpjDedupText(text, others){
   }
   return kept.join('\n\n');
 }
+/* v281 (founder: "a better, more intelligent transition between sections" — Values got
+   cut off and Benefits bled in). A scraped description is the WHOLE posting (overview +
+   duties + values + requirements + benefits + physical requirements), and we ALSO render
+   Requirements/Benefits as their own sections — so the "Summary" showed the benefits tail
+   cut mid-sentence right above a duplicate BENEFITS section. This trims the Summary at the
+   first REAL (line-start) Requirements / Benefits / Physical-Requirements / EEO header, so
+   it ends cleanly on the overview/duties/values and each later section renders once.
+   FAIL-SAFE: only trims when such a header is found AND a meaningful overview remains
+   (>=120 chars); otherwise returns the text unchanged (never guts a short/odd posting). */
+function _gpjSummaryOnly(text){
+  var s=String(text||''); if(!s.trim()) return s;
+  var RX=/(^|\n)[ \t]*(?:[••\-*]|\d+[.)])?[ \t]*(?:(?:employee|our|the)\s+)?(benefits|perks|what\s+we\s+offer|compensation\s+(?:and|&)\s+benefits|why\s+(?:join|work)|physical\s+(?:requirements|demands)|work\s+environment|requirements|qualifications|minimum\s+qualifications|basic\s+qualifications|what\s+you[’']?\s*ll\s+need|equal\s+opportunity|eeo)\b/i;
+  var m=s.match(RX);
+  if(m && m.index>=120){ return s.slice(0, m.index).replace(/\s+$/,''); }
+  return s;
+}
+window._gpjSummaryOnly=_gpjSummaryOnly;
 /* N16 (v253, founder-approved): a posting with NO disclosed employer, or clear recruitment-scam
    signals (crypto pay + Telegram/Discord "shifts" + far-below-minimum wage), is a red flag GPJ
    should not surface (founder repro: an Indeed "dropper" role, $1.55/hr in USDC via Telegram,
@@ -13313,25 +13334,35 @@ function editPref(key){
 }
 function savePref(){
   const v=document.getElementById('pref-modal-input').value.trim();
-  if(!v){ showToast('Enter a value or cancel'); return; }
-  /* v170: never persist placeholder/demo text as a real preference */
-  if(v===_GPJ_PREF_PLACEHOLDERS[editingPref]){ showToast('Enter your real value, not the example'); return; }
-  document.getElementById(prefMeta[editingPref].el).textContent=v;
-  /* v153: ACTUALLY persist. This used to write DOM text and nothing else — the edit
-     was lost on reload, and only reached the cloud if some unrelated action happened
-     to fire cloudSync later, all while the toast already claimed "saved". */
+  /* v281 (founder repro: couldn't clear a pref — blank save was blocked). Match
+     Preferences are OPTIONAL (the deck ranks by résumé + location without them, and
+     gpjPrefBoost returns 0 when empty), so a blank value now CLEARS the field instead
+     of erroring. Only guard against saving the example placeholder as a real value. */
+  if(v && v===_GPJ_PREF_PLACEHOLDERS[editingPref]){ showToast('Enter your real value, not the example'); return; }
+  document.getElementById(prefMeta[editingPref].el).textContent = v || _GPJ_PREF_PLACEHOLDERS[editingPref];
+  /* v153: ACTUALLY persist. v281: empty → remove the key so gpjPrefs treats it as unset. */
+  let _cur={};
   try{
-    const cur=JSON.parse(localStorage.getItem('gpj_prefs')||'{}')||{};
-    cur[editingPref]=v;
-    localStorage.setItem('gpj_prefs',JSON.stringify(cur));
+    _cur=JSON.parse(localStorage.getItem('gpj_prefs')||'{}')||{};
+    if(v){ _cur[editingPref]=v; } else { delete _cur[editingPref]; }
+    localStorage.setItem('gpj_prefs',JSON.stringify(_cur));
+  }catch(e){}
+  /* v281: write the FULL prefs (a cleared field as '') straight to the cloud. cloudSync
+     OMITS empty prefs (a merge-safe guard against placeholder overwrites), which would
+     leave the old cloud value and make a clear "come back" on reload — so an explicit
+     user edit persists the exact set here, including clears. */
+  try{
+    if(window.fb&&fb.current&&fb.current()&&fb.saveProfile){
+      fb.saveProfile(fb.current().uid,{prefs:{titles:_cur.titles||'',salary:_cur.salary||'',industries:_cur.industries||''},prefsEditedAt:Date.now()}).catch(function(){});
+    }
   }catch(e){}
   try{ cloudSync(); }catch(e){}
   document.getElementById('pref-modal').classList.remove('open');
-  showToast('✅ Preference saved');
+  showToast(v?'✅ Preference saved':'✅ Preference cleared');
   /* re-rank right away so the change is visible instead of waiting for a refetch */
   try{ if(typeof applySwipeFilters==='function') applySwipeFilters(); }catch(e){}
   try{ if(typeof renderBrowse==='function') renderBrowse(); }catch(e){}
-  showAdvice(prefAdvice(editingPref,v));
+  if(v) showAdvice(prefAdvice(editingPref,v));
 }
 function prefAdvice(key,v){
   if(key==='salary'){
@@ -16073,13 +16104,34 @@ function _gpjBrandDomain(name){
   return _GPJ_BRAND_DOMAINS[s]||'';
 }
 window._gpjBrandDomain=_gpjBrandDomain;
+/* v281 (founder: "why no logo on their company card?"): jobs scraped from LinkedIn/
+   Indeed usually carry no company website, and _gpjBrandDomain only knows big brands,
+   so most employers (e.g. "LGI Homes") showed no logo. As a LAST-resort fallback,
+   guess a .com from a clean brand name → "lgihomes.com". Used ONLY to look up a logo
+   (DuckDuckGo/Clearbit); a wrong/dead guess 404s and falls back to the emoji, so it can
+   never assert a false fact — just a best-effort icon. Conservative: alphanumeric brand
+   tokens 2–30 chars only, so junk/multi-clause names don't produce garbage lookups. */
+function _gpjGuessDomain(name){
+  var s=String(name||'').toLowerCase().replace(/&/g,'and')
+    .replace(/\b(inc|incorporated|corp|corporation|company|co|llc|llp|lp|ltd|limited|plc|group|holdings|technologies|technology|solutions|labs|systems|services|staffing|recruiting|the|of|and)\b/g,' ')
+    .replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,'').trim();
+  return (s.length>=2 && s.length<=30) ? (s+'.com') : '';
+}
+window._gpjGuessDomain=_gpjGuessDomain;
 function _gpjLogoHtml(o){
   o=o||{}; const s=o.size||46, r=(o.radius!=null?o.radius:12), em=o.emoji||'💼';
   const up=(o.logo&&/^data:image\//.test(o.logo))?o.logo:'';
-  const dom=up?'':(_gpjLogoDomain(o.website||o.domain||o.companyWebsite||'')||_gpjBrandDomain(o.company||o.name||o.co||'')||_gpjLogoDomainFromUrl(o.url||o.applyUrl||o.link||''));   /* N17 (v256): direct-employer apply URL → real logo */
+  /* v281: added _gpjGuessDomain as the LAST resort so non-big-brand employers still get a logo */
+  const dom=up?'':(_gpjLogoDomain(o.website||o.domain||o.companyWebsite||'')||_gpjBrandDomain(o.company||o.name||o.co||'')||_gpjLogoDomainFromUrl(o.url||o.applyUrl||o.link||'')||_gpjGuessDomain(o.company||o.name||o.co||''));
   const src=up||(dom?('https://icons.duckduckgo.com/ip3/'+dom+'.ico'):'');
+  /* v281: Clearbit (keyless, brand-matched, higher-quality logo) as a 2nd source before
+     the emoji — DDG favicon → Clearbit logo → emoji. Clearbit 404s for a dead/wrong guess,
+     so a bad domain guess still falls through to the honest emoji. */
+  const cb=(!up&&dom)?('https://logo.clearbit.com/'+dom):'';
   const wrap='position:relative;width:'+s+'px;height:'+s+'px;border-radius:50%;background:var(--plum3);display:flex;align-items:center;justify-content:center;font-size:'+Math.round(s*0.5)+'px;flex-shrink:0;overflow:hidden;';   /* N13 (v249): circular; r kept for back-compat but shape is now always a circle */
-  const img=src?('<img src="'+src+'" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:var(--plum3);" onerror="this.remove()"/>'):'';
+  const _st='position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:var(--plum3);';
+  const _onerr=cb?('if(!this.dataset.cb){this.dataset.cb=1;this.src=\''+cb+'\';}else{this.remove();}'):'this.remove()';
+  const img=src?('<img src="'+src+'" alt="" style="'+_st+'" onerror="'+_onerr+'"/>'):'';
   return '<div style="'+wrap+'">'+em+img+'</div>';
 }
 window._gpjLogoHtml=_gpjLogoHtml;
@@ -16236,8 +16288,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v280';
+const APP_VERSION = 'v281';
 const CHANGELOG = {
+  'v281':['3 founder fixes: (1) Match Preferences can be CLEARED (blank save now removes the field + persists the clear to cloud) — they were never required, the deck ranks by resume+location without them; (2) company logos: last-resort name->domain guess + keyless Clearbit fallback so non-big-brand employers (e.g. LGI Homes) show a real logo (bad guess 404s -> honest emoji); (3) smart section transition in the Browse job modal — the Summary is trimmed at the first Requirements/Benefits/Physical header + de-duped, so it ends cleanly on overview/duties/values instead of bleeding the benefits tail above a duplicate Benefits section.'],
   'v280':['For Employers entry → landing + menu only (founder: not on every screen). Removed the per-screen global-footer link + hid the per-screen nav tab; kept the landing hero link; added \'For Employers\' to the profile menu (hidden in recruiter mode). _gpjSyncEmployerNav updated.'],
   'v279':['Tier B: full-catalog search index. Keyword search reads a compact search index (Firestore job_pools/search-* shards, primary) covering ALL active jobs instead of the ~5K deck pool, with a static /search-index.json CDN fallback (0 reads) if Firestore search reads are capped. Lite rows render medium cards (title/company/location/salary/ghost/apply); match % appears on open after the full posting lazy-loads. Deck stays small; search reaches everything.'],
   'v278':['UI fixes: blank req-gap pill hidden on card face (.s-req:empty guard past the >span display:flex!important); notification bell flex-centered in its pill; drawer Job Expectations flows fully when expanded (removed the nested max-height:360px scroll box that clipped text mid-word).'],

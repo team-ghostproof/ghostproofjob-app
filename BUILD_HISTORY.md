@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-09-25 · Current live build: **v280**_
+_Last updated: 2026-09-25 · Current live build: **v281**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v281** — 3 founder fixes: (1) Match Preferences can be CLEARED (blank save now removes the field + persists the clear to cloud) — they were never required, the deck ranks by resume+location without them; (2) company logos: last-resort name->domain guess + keyless Clearbit fallback so non-big-brand employers (e.g. LGI Homes) show a real logo (bad guess 404s -> honest emoji); (3) smart section transition in the Browse job modal — the Summary is trimmed at the first Requirements/Benefits/Physical header + de-duped, so it ends cleanly on overview/duties/values instead of bleeding the benefits tail above a duplicate Benefits section.
 - **v280** — For Employers entry → landing + menu only (founder: not on every screen). Removed the per-screen global-footer link + hid the per-screen nav tab; kept the landing hero link; added 'For Employers' to the profile menu (hidden in recruiter mode). _gpjSyncEmployerNav updated.
 - **v279** — Tier B: full-catalog search index. Keyword search reads a compact search index (Firestore job_pools/search-* shards, primary) covering ALL active jobs instead of the ~5K deck pool, with a static /search-index.json CDN fallback (0 reads) if Firestore search reads are capped. Lite rows render medium cards (title/company/location/salary/ghost/apply); match % appears on open after the full posting lazy-loads. Deck stays small; search reaches everything.
 - **v278** — UI fixes: blank req-gap pill hidden on card face (.s-req:empty guard past the >span display:flex!important, + clear its text in the hide branch); notification bell flex-centered in its pill (inline align/justify + display:flex when signed in). (A third fix — letting the expanded drawer flow instead of nested-scroll — was reverted before commit: it conflicted with the v83 scroll-region behaviour and its test; the drawer-truncation trade-off is pending a founder decision.)
