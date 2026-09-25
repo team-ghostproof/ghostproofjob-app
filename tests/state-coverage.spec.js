@@ -3206,16 +3206,27 @@ test.describe('[STATE-COVERAGE] v141 notification toggles tell the truth', () =>
      alert (fires by default), so the switch now defaults ON to match, while the copy stays
      honest that the emailed version isn't live yet. (Superseded the v141 "must not default
      ON" rule, which was written when only the never-sent email was in view.) */
-  test('the emailed version is disclosed honestly; toggles default ON to match the in-app alert', async ({ page }) => {
+  test('v282: in-app alerts default ON; email is a nested opt-in that defaults OFF and honestly says email is not live yet', async ({ page }) => {
+    // v282 restructured these: the in-app alert (bell) is now real + live, so its MAIN toggle
+    // defaults ON. Email became a NESTED sub-toggle (opt-in, default OFF) so nothing emails until
+    // the user turns it on. The "email isn't live yet" honesty moved onto the email SUB-ROW, where
+    // it is now the truth (email delivery lands in v283 + is DRY-RUN/founder-gated until then).
     const r = await page.evaluate(() => {
-      const row = (id) => { const t = document.getElementById(id); return { on: t.classList.contains('on'), text: (t.closest('.pref-row') || {}).textContent || '' }; };
-      return { m: row('notif-newmatches'), g: row('notif-ghostrisk'), r: row('notif-ratingreminders'), cl: row('cl-offers-toggle') };
+      const tog = (id) => { const t = document.getElementById(id); return t ? t.classList.contains('on') : null; };
+      const txt = (id) => { const s = document.getElementById(id); return s ? s.textContent : ''; };
+      return {
+        mainOn: { m: tog('notif-newmatches'), g: tog('notif-ghostrisk'), r: tog('notif-ratingreminders') },
+        subOn: { m: tog('notif-newmatches-email'), g: tog('notif-ghostrisk-email'), r: tog('notif-ratingreminders-email') },
+        subText: { m: txt('sub-newmatches-email'), g: txt('sub-ghostrisk-email'), r: txt('sub-ratingreminders-email') },
+        cl: (document.getElementById('cl-offers-toggle').closest('.pref-row') || {}).textContent || '',
+      };
     });
     for (const k of ['m', 'g', 'r']) {
-      expect(r[k].text, 'still honest that the EMAIL is not live yet').toMatch(/email later|isn.?t live yet/i);
-      expect(r[k].on, 'v274: defaults ON to match its in-app alert (was a lie when shown OFF)').toBe(true);
+      expect(r.mainOn[k], 'the in-app (bell) alert defaults ON to match what it does').toBe(true);
+      expect(r.subOn[k], 'email is opt-in — the nested sub-toggle defaults OFF so nothing emails uninvited').toBe(false);
+      expect(r.subText[k], 'still honest, on the email sub-row, that EMAIL delivery is not live yet').toMatch(/aren.?t live yet|isn.?t live yet/i);
     }
-    expect(r.cl.text, 'the REAL toggle carries no email disclaimer').not.toMatch(/EMAIL NOT LIVE YET|email later/i);
+    expect(r.cl, 'the REAL cover-letter toggle carries no email disclaimer').not.toMatch(/aren.?t live yet|isn.?t live yet|email digests/i);
   });
 
   test('every toggle still persists the user\'s choice (local + cloud)', async ({ page }) => {
@@ -10611,5 +10622,50 @@ test.describe('[STATE-COVERAGE] v281 prefs-clear + logo + smart section transiti
     expect(r.logoHasClearbit, 'logo carries a Clearbit fallback source').toBe(true);
     expect(r.trimKeepsValues, 'summary keeps the overview/values').toBe(true);
     expect(r.trimDropsBenefits, 'summary trims the benefits/physical tail').toBe(true);
+  });
+});
+
+/* v282 — notifications (in-app): (1) New Job Matches adds a PERSISTENT bell notification
+   on deck-load (was toast-only); (2) each alert gains a nested "Also email me" sub-toggle,
+   DEFAULT OFF, shown only when the main is on, saved for the v283 digest — nothing emails
+   until it's on. */
+test.describe('[STATE-COVERAGE] v282 notifications: bell match-alert + nested email opt-in', () => {
+  test('email sub-toggles default OFF + show/hide with main + persist; login match-alert hits the bell', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof maybeAlertNewMatches === 'function' && typeof notifEmailOn === 'function' && typeof loadNotifPrefs === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(async () => {
+      // (1) email opt-in defaults OFF (nothing emails until turned on)
+      const emailDefaultOff = !notifEmailOn('newJobMatches') && !notifEmailOn('ghostRiskAlerts') && !notifEmailOn('companyRatingReminders');
+      const subRowsExist = !!document.getElementById('sub-newmatches-email') && !!document.getElementById('sub-ghostrisk-email') && !!document.getElementById('sub-ratingreminders-email');
+      loadNotifPrefs();  // main toggles default on → sub-rows shown
+      const shownWhenOn = getComputedStyle(document.getElementById('sub-newmatches-email')).display !== 'none';
+      const mainEl = document.getElementById('notif-newmatches');
+      setNotifPref(mainEl, 'newJobMatches');  // → off
+      const hiddenWhenOff = getComputedStyle(document.getElementById('sub-newmatches-email')).display === 'none';
+      setNotifPref(mainEl, 'newJobMatches');  // → on
+      setNotifEmailPref(document.getElementById('notif-newmatches-email'), 'newJobMatches');
+      const emailPersists = notifEmailOn('newJobMatches') === true;
+      // (2) bell match-alert (bare assignments reach the module-scoped vars)
+      resumeReady = true;
+      jobsQueue = [{ t: 'Marketing Manager', co: 'Acme', match: 80 }, { t: 'Brand Lead', co: 'Beta', match: 70 }];
+      seenJobKeys = () => new Set();
+      try { sessionStorage.removeItem('gpj_nm_sig'); sessionStorage.removeItem('gpj_nm_alert'); localStorage.removeItem('gpj_nm_notif'); } catch (e) {}
+      window._notifs = window._notifs || [];
+      maybeAlertNewMatches();
+      const bellHasMatch = (window._notifs || []).some(n => /new job match/i.test(n.title));
+      const candidateReincludes = (await _notifCandidate()).some(n => /new job match/i.test(n.title));
+      // (3) toggle OFF → the bell entry is NOT re-included by the builder
+      const p = getProfile(); p.preferences = p.preferences || {}; p.preferences.newJobMatches = false; localStorage.setItem('gpj_profile', JSON.stringify(p));
+      const suppressedWhenOff = !(await _notifCandidate()).some(n => /new job match/i.test(n.title));
+      return { emailDefaultOff, subRowsExist, shownWhenOn, hiddenWhenOff, emailPersists, bellHasMatch, candidateReincludes, suppressedWhenOff };
+    });
+    expect(r.emailDefaultOff, 'email opt-in defaults OFF — nothing emails until enabled').toBe(true);
+    expect(r.subRowsExist, 'all three nested email sub-rows exist').toBe(true);
+    expect(r.shownWhenOn, 'sub-row shown when its main alert is on').toBe(true);
+    expect(r.hiddenWhenOff, 'sub-row hidden when its main alert is off').toBe(true);
+    expect(r.emailPersists, 'turning the email sub-toggle on persists the pref').toBe(true);
+    expect(r.bellHasMatch, 'the login match-alert now lands on the 🔔 bell (not just a toast)').toBe(true);
+    expect(r.candidateReincludes, 'the bell entry survives a notif-list rebuild while the toggle is on').toBe(true);
+    expect(r.suppressedWhenOff, 'turning New Job Matches OFF suppresses the bell entry').toBe(true);
   });
 });

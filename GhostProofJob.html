@@ -3422,10 +3422,13 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
              silences its in-app alert (setNotifPref -> notifOn=false at the fire site). The Cover
              Letter offer below was already consistent (on/on). NO behaviour change — the toasts
              already fired; this only makes the switch honest. -->
-        <div class="pref-row"><div class="pref-icon" style="background:rgba(0,245,160,.12);">🔔</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">New Job Matches <span style="font-size:10px;font-weight:800;color:var(--muted);">· in-app now, email later</span></div><div style="font-size:11px;color:var(--muted);">On: fresh matches show on the 🔔 bell in-app. The emailed version isn't live yet — your choice is saved for when it is.</div></div><div class="toggle-switch on" id="notif-newmatches" onclick="setNotifPref(this,'newJobMatches')"></div></div>
-        <div class="pref-row"><div class="pref-icon" style="background:rgba(255,77,106,.12);">👻</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Ghost Risk Alerts <span style="font-size:10px;font-weight:800;color:var(--muted);">· in-app now, email later</span></div><div style="font-size:11px;color:var(--muted);">On: a heads-up when a company you open has high ghost risk (risk always shows on the job card too). Emailed version isn't live yet.</div></div><div class="toggle-switch on" id="notif-ghostrisk" onclick="setNotifPref(this,'ghostRiskAlerts')"></div></div>
+        <div class="pref-row"><div class="pref-icon" style="background:rgba(0,245,160,.12);">🔔</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">New Job Matches</div><div style="font-size:11px;color:var(--muted);">On: fresh matches that fit your résumé show on your 🔔 bell when you log in. Turn on email below to also get them in your weekly digest.</div></div><div class="toggle-switch on" id="notif-newmatches" onclick="setNotifPref(this,'newJobMatches')"></div></div>
+        <div class="pref-subrow" id="sub-newmatches-email" style="display:none;margin:-2px 16px 8px 46px;"><div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;font-size:11.5px;color:var(--muted);">✉️ Also email me these <span style="font-weight:700;">— in your weekly digest</span> <span style="opacity:.7;">(email digests aren't live yet — we'll start once they are)</span></div><div class="toggle-switch" id="notif-newmatches-email" onclick="setNotifEmailPref(this,'newJobMatches')"></div></div></div>
+        <div class="pref-row"><div class="pref-icon" style="background:rgba(255,77,106,.12);">👻</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Ghost Risk Alerts</div><div style="font-size:11px;color:var(--muted);">On: a heads-up when a company you open has high ghost risk (risk always shows on the job card too). Turn on email below to be warned when a company you <em>applied to</em> has high risk or a new report.</div></div><div class="toggle-switch on" id="notif-ghostrisk" onclick="setNotifPref(this,'ghostRiskAlerts')"></div></div>
+        <div class="pref-subrow" id="sub-ghostrisk-email" style="display:none;margin:-2px 16px 8px 46px;"><div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;font-size:11.5px;color:var(--muted);">✉️ Email me if a company I <em>applied to</em> gets flagged <span style="font-weight:700;">— in your weekly digest</span> <span style="opacity:.7;">(email digests aren't live yet — we'll start once they are)</span></div><div class="toggle-switch" id="notif-ghostrisk-email" onclick="setNotifEmailPref(this,'ghostRiskAlerts')"></div></div></div>
         <div class="pref-row"><div class="pref-icon" style="background:rgba(0,245,160,.12);">✉️</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Tailored Cover Letter Offers</div><div style="font-size:11px;color:var(--muted);">Ask after each apply · free, with generous daily limits</div></div><div class="toggle-switch on" id="cl-offers-toggle" onclick="setNotifPref(this,'coverLetterOffers');setCLOptOut(!this.classList.contains('on'))"></div></div>
-        <div class="pref-row"><div class="pref-icon" style="background:rgba(181,95,230,.12);">⭐</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Company Rating Reminders <span style="font-size:10px;font-weight:800;color:var(--muted);">· in-app now, email later</span></div><div style="font-size:11px;color:var(--muted);">On: a nudge to rate a company after you apply — it warns the next applicant. Emailed version isn't live yet.</div></div><div class="toggle-switch on" id="notif-ratingreminders" onclick="setNotifPref(this,'companyRatingReminders')"></div></div>
+        <div class="pref-row"><div class="pref-icon" style="background:rgba(181,95,230,.12);">⭐</div><div style="flex:1;"><div style="font-size:13px;font-weight:600;">Company Rating Reminders</div><div style="font-size:11px;color:var(--muted);">On: a nudge to rate a company after you apply — it warns the next applicant. Turn on email below to also get a gentle reminder in your weekly digest.</div></div><div class="toggle-switch on" id="notif-ratingreminders" onclick="setNotifPref(this,'companyRatingReminders')"></div></div>
+        <div class="pref-subrow" id="sub-ratingreminders-email" style="display:none;margin:-2px 16px 8px 46px;"><div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;font-size:11.5px;color:var(--muted);">✉️ Also remind me by email <span style="font-weight:700;">— in your weekly digest</span> <span style="opacity:.7;">(email digests aren't live yet — we'll start once they are)</span></div><div class="toggle-switch" id="notif-ratingreminders-email" onclick="setNotifEmailPref(this,'companyRatingReminders')"></div></div></div>
       </div>
 
       <!-- R2-D: candidate discoverable opt-in (default OFF). Plain consent copy;
@@ -3512,7 +3515,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            the profile-menu item (#pm-employer) now cover it; the per-screen nav tab is
            hidden too (see _gpjSyncEmployerNav). Element removed to keep the footer clean. -->
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Always free 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v281</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v282</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -5585,6 +5588,18 @@ function _notifPlanExpiry(){
 /* CANDIDATE: what employers did to you (reuses the R6 tray query) */
 async function _notifCandidate(){
   const out=[];
+  /* v282: the once/day "new matches" bell entry — persisted by maybeAlertNewMatches once
+     the deck has loaded (the deck isn't ready at first notif-load), re-added here so it
+     survives list rebuilds. Gated on the newJobMatches toggle; dropped once seen or stale. */
+  try{
+    if(notifOn('newJobMatches')){
+      const m=JSON.parse(localStorage.getItem('gpj_nm_notif')||'null');
+      if(m && m.day===new Date().toDateString() && m.n>0){
+        const id='nm:'+m.day;
+        if(!_notifSeen().has(id)) out.push({id:id,icon:'🎯',title:m.n+' new job match'+(m.n>1?'es':'')+' for you',body:'Fresh roles that fit your résumé — open Swipe to see them.',ts:m.ts||Date.now(),view:'swipe'});
+      }
+    }
+  }catch(e){}
   try{
     if(!(window.fb&&fb.loadMyReachouts)) return out;
     const list=await fb.loadMyReachouts();
@@ -15482,7 +15497,38 @@ function setNotifPref(el,key){
     localStorage.setItem('gpj_profile',JSON.stringify(p));
     if(window.fb&&fb.current()) fb.saveProfile(fb.current().uid,{preferences:p.preferences,prefsEditedAt:Date.now()});
   }catch(e){}
+  /* v282: the nested "Also email me" sub-row only makes sense when the in-app alert is ON.
+     Reveal it when on, hide it when off. Turning the main OFF does NOT change the saved
+     email sub-pref — it just hides the control (and email is gated on BOTH being on). */
+  try{ _gpjSyncNotifEmailRow(key); }catch(e){}
   if(typeof dbg==='function') dbg('notif pref '+key+'='+on);
+}
+/* v282: nested email opt-in per alert. DEFAULT OFF (opt-in) — nothing is ever emailed
+   until the user turns THIS on (and the batched digest in v283 checks both the main
+   alert AND this sub-toggle). Stored as preferences[key+'Email']. */
+function notifEmailOn(key){ try{ const p=((typeof getProfile==='function'&&getProfile())||{}).preferences||{}; return p[key+'Email']===true; }catch(e){ return false; } }
+function setNotifEmailPref(el,key){
+  el.classList.toggle('on');
+  const on=el.classList.contains('on');
+  try{
+    const p=(typeof getProfile==='function')?getProfile():{};
+    p.preferences=p.preferences||{};
+    p.preferences[key+'Email']=on;
+    localStorage.setItem('gpj_profile',JSON.stringify(p));
+    if(window.fb&&fb.current()) fb.saveProfile(fb.current().uid,{preferences:p.preferences,prefsEditedAt:Date.now()});
+  }catch(e){}
+  if(typeof dbg==='function') dbg('notif EMAIL pref '+key+'='+on);
+}
+/* Show the email sub-row iff its main alert is on; reflect the saved email sub-state. */
+function _gpjSyncNotifEmailRow(key){
+  const mainMap={newJobMatches:'notif-newmatches',ghostRiskAlerts:'notif-ghostrisk',companyRatingReminders:'notif-ratingreminders'};
+  const subRowMap={newJobMatches:'sub-newmatches-email',ghostRiskAlerts:'sub-ghostrisk-email',companyRatingReminders:'sub-ratingreminders-email'};
+  const subTogMap={newJobMatches:'notif-newmatches-email',ghostRiskAlerts:'notif-ghostrisk-email',companyRatingReminders:'notif-ratingreminders-email'};
+  const mainEl=document.getElementById(mainMap[key]); const row=document.getElementById(subRowMap[key]); const tog=document.getElementById(subTogMap[key]);
+  if(!row) return;
+  const mainOn=mainEl?mainEl.classList.contains('on'):false;
+  row.style.display=mainOn?'block':'none';
+  if(tog) tog.classList.toggle('on', notifEmailOn(key));
 }
 function loadNotifPrefs(){
   let prefs={}; try{ prefs=((getProfile&&getProfile())||{}).preferences||{}; }catch(e){}
@@ -15491,6 +15537,8 @@ function loadNotifPrefs(){
     const el=document.getElementById(map[k]);
     if(el && typeof prefs[k]==='boolean'){ el.classList.toggle('on',prefs[k]); }
   });
+  /* v282: reflect the nested email opt-ins + show each sub-row only when its main alert is on */
+  ['newJobMatches','ghostRiskAlerts','companyRatingReminders'].forEach(k=>{ try{ _gpjSyncNotifEmailRow(k); }catch(e){} });
   /* R2-D: reflect the discoverable opt-in (top-level field, default OFF) */
   try{ const dt=document.getElementById('discoverable-toggle'); if(dt){ const p=(getProfile&&getProfile())||{}; dt.classList.toggle('on', p.discoverable===true); } }catch(e){}
 }
@@ -15842,6 +15890,19 @@ function maybeAlertNewMatches(){
     if(Date.now()-last < 60000) return;                               /* at most once a minute */
     sessionStorage.setItem('gpj_nm_alert',String(Date.now())); sessionStorage.setItem('gpj_nm_sig',sig);
     showToast('\ud83c\udfaf '+n+' fresh job'+(n>1?'s':'')+' match your resume \u2014 start swiping');
+    /* v282 (founder repro: "no new-matches alert on my bell when I log in"): also add a
+       PERSISTENT \ud83d\udd14 bell notification, deduped once/day. Persist a marker so it survives a
+       later _gpjNotifLoad rebuild (which reconstructs window._notifs from _notifCandidate). */
+    try{
+      const day=new Date().toDateString();
+      localStorage.setItem('gpj_nm_notif', JSON.stringify({day:day, n:n, ts:Date.now()}));
+      const id='nm:'+day;
+      window._notifs=window._notifs||[];
+      if(!(_notifSeen().has(id)) && !window._notifs.some(function(x){return x&&x.id===id;})){
+        window._notifs.unshift({id:id,icon:'\ud83c\udfaf',title:n+' new job match'+(n>1?'es':'')+' for you',body:'Fresh roles that fit your r\u00e9sum\u00e9 \u2014 open Swipe to see them.',ts:Date.now(),view:'swipe'});
+        if(typeof _gpjNotifPaint==='function') _gpjNotifPaint();
+      }
+    }catch(e){}
   }catch(e){}
 }
 (function wireNotifs(){
@@ -16288,8 +16349,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v281';
+const APP_VERSION = 'v282';
 const CHANGELOG = {
+  'v282':['Notifications v282 (in-app): (1) New Job Matches now adds a PERSISTENT bell notification on login (once/day, gated on the toggle) — before, it was only a transient toast so the bell showed nothing; persisted via gpj_nm_notif + re-added in _notifCandidate so it survives list rebuilds. (2) Each alert toggle gains a nested \'Also email me\' sub-toggle that appears when the main is ON — DEFAULT OFF (opt-in); saves preferences[key+Email] for the v283 batched-digest sender; nothing emails until both on. (3) Reworded the 3 alert toggles honestly (in-app now; email opt-in below; Ghost Risk email = companies you APPLIED to). Email wiring + Ghost-Risk dismissible notice come in v283.'],
   'v281':['3 founder fixes: (1) Match Preferences can be CLEARED (blank save now removes the field + persists the clear to cloud) — they were never required, the deck ranks by resume+location without them; (2) company logos: last-resort name->domain guess + keyless Clearbit fallback so non-big-brand employers (e.g. LGI Homes) show a real logo (bad guess 404s -> honest emoji); (3) smart section transition in the Browse job modal — the Summary is trimmed at the first Requirements/Benefits/Physical header + de-duped, so it ends cleanly on overview/duties/values instead of bleeding the benefits tail above a duplicate Benefits section.'],
   'v280':['For Employers entry → landing + menu only (founder: not on every screen). Removed the per-screen global-footer link + hid the per-screen nav tab; kept the landing hero link; added \'For Employers\' to the profile menu (hidden in recruiter mode). _gpjSyncEmployerNav updated.'],
   'v279':['Tier B: full-catalog search index. Keyword search reads a compact search index (Firestore job_pools/search-* shards, primary) covering ALL active jobs instead of the ~5K deck pool, with a static /search-index.json CDN fallback (0 reads) if Firestore search reads are capped. Lite rows render medium cards (title/company/location/salary/ghost/apply); match % appears on open after the full posting lazy-loads. Deck stays small; search reaches everything.'],

@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-09-25 · Current live build: **v281**_
+_Last updated: 2026-09-25 · Current live build: **v282**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v282** — Notifications v282 (in-app): (1) New Job Matches now adds a PERSISTENT bell notification on login (once/day, gated on the toggle) — before, it was only a transient toast so the bell showed nothing; persisted via gpj_nm_notif + re-added in _notifCandidate so it survives list rebuilds. (2) Each alert toggle gains a nested 'Also email me' sub-toggle that appears when the main is ON — DEFAULT OFF (opt-in); saves preferences[key+Email] for the v283 batched-digest sender; nothing emails until both on. (3) Reworded the 3 alert toggles honestly (in-app now; email opt-in below; Ghost Risk email = companies you APPLIED to). Email wiring + Ghost-Risk dismissible notice come in v283.
 - **v281** — 3 founder fixes: (1) Match Preferences can be CLEARED (blank save now removes the field + persists the clear to cloud) — they were never required, the deck ranks by resume+location without them; (2) company logos: last-resort name->domain guess + keyless Clearbit fallback so non-big-brand employers (e.g. LGI Homes) show a real logo (bad guess 404s -> honest emoji); (3) smart section transition in the Browse job modal — the Summary is trimmed at the first Requirements/Benefits/Physical header + de-duped, so it ends cleanly on overview/duties/values instead of bleeding the benefits tail above a duplicate Benefits section.
 - **v280** — For Employers entry → landing + menu only (founder: not on every screen). Removed the per-screen global-footer link + hid the per-screen nav tab; kept the landing hero link; added 'For Employers' to the profile menu (hidden in recruiter mode). _gpjSyncEmployerNav updated.
 - **v279** — Tier B: full-catalog search index. Keyword search reads a compact search index (Firestore job_pools/search-* shards, primary) covering ALL active jobs instead of the ~5K deck pool, with a static /search-index.json CDN fallback (0 reads) if Firestore search reads are capped. Lite rows render medium cards (title/company/location/salary/ghost/apply); match % appears on open after the full posting lazy-loads. Deck stays small; search reaches everything.
