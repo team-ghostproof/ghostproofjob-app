@@ -2546,27 +2546,31 @@ test.describe('[STATE-COVERAGE] F-GEO distance filter (offline centroids + haver
 });
 
 test.describe('[STATE-COVERAGE] v109 R9-A employer nav visibility + desktop reachability', () => {
-  test('"For Employers" shows only to guests/admins — hidden for signed-in individuals AND recruiters', async ({ page }) => {
+  /* v280: "For Employers" moved to LANDING + MENU only. The per-screen footer link is
+     removed and the nav tab hidden; the landing hero is the guest entry and #pm-employer
+     is the signed-in entry — still hidden for recruiters (they ARE the employer side). */
+  test('"For Employers" — landing hero for guests; menu item for candidates, hidden for recruiters (v280)', async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1500);
     const r = await page.evaluate(() => {
       window.fb = window.fb || {};
-      const disp = () => getComputedStyle(document.getElementById('footer-employer-link')).display;
-      // guest
-      fb.current = () => null; window._recruiter = null; window.isAdmin = false;
-      _gpjSyncEmployerNav(); const guest = disp();
-      // signed-in individual
-      fb.current = () => ({ uid: 'c1' });
-      _gpjSyncEmployerNav(); const individual = disp();
+      const pe = () => { const el = document.getElementById('pm-employer'); return el ? getComputedStyle(el).display : '(absent)'; };
+      const landingHero = !!document.querySelector('[onclick*="heroEmployer"]');
+      const footerGone = !document.getElementById('footer-employer-link');
+      const navHidden = (() => { const nt = document.getElementById('nav-employer'); return !nt || getComputedStyle(nt).display === 'none'; });
+      // signed-in individual (candidate)
+      fb.current = () => ({ uid: 'c1' }); window._recruiter = null; window.isAdmin = false;
+      _gpjSyncEmployerNav(); const individual = pe(); const navAfterSync = navHidden();
       // recruiter
       window._recruiter = { uid: 'r1', company: 'Acme' };
-      _gpjSyncEmployerNav(); const recruiter = disp();
-      return { guest, individual, recruiter };
+      _gpjSyncEmployerNav(); const recruiter = pe();
+      return { landingHero, footerGone, navAfterSync, individual, recruiter };
     });
-    expect(r.guest, 'guests see the employer marketing entry').not.toBe('none');
-    expect(r.individual, 'a signed-in individual is not an employer -> hidden').toBe('none');
-    // v112: a recruiter is ALREADY inside a company account — the six tabs are the
-    // employer experience, so the marketing entry is noise. Hidden for them too.
+    expect(r.landingHero, 'landing hero employer entry present for first-time visitors').toBe(true);
+    expect(r.footerGone, 'per-screen footer employer link removed').toBe(true);
+    expect(r.navAfterSync, 'per-screen nav-employer tab hidden').toBe(true);
+    expect(r.individual, 'a signed-in candidate can reach For Employers from the profile menu').not.toBe('none');
+    // a recruiter is ALREADY inside a company account — the menu entry is noise for them.
     expect(r.recruiter, 'an employer should not be offered "For Employers"').toBe('none');
   });
 
@@ -4548,22 +4552,21 @@ test.describe('[STATE-COVERAGE] v111 recruiter header chrome (identity, menu, pl
       refreshGraceDisplays();          // the exact call that used to clobber it
       refreshGraceDisplays();
       const after = document.getElementById('grace-full').textContent;
-      const rec = { before, after, footerLink: getComputedStyle(document.getElementById('footer-employer-link')).display, promise: document.getElementById('footer-promise').textContent };
+      /* v280: the per-screen footer "For Employers" link was removed (landing + menu
+         only) — this test now covers just the day-counter/plan repaint + footer PROMISE
+         role-correctness; employer-entry visibility is covered by the v280 test above. */
+      const rec = { before, after, promise: document.getElementById('footer-promise').textContent };
       window._recruiter = null; fb.current = () => ({ uid: 'c1', email: 'jane@x.com' });
       _gpjApplyRecruiterSkin(); refreshGraceDisplays();
       await new Promise((r) => setTimeout(r, 60));
       const cand = { pill: document.getElementById('grace-full').textContent, promise: document.getElementById('footer-promise').textContent };
-      fb.current = () => null; _gpjSyncEmployerNav();
-      const guestLink = getComputedStyle(document.getElementById('footer-employer-link')).display;
-      return { rec, cand, guestLink };
+      return { rec, cand };
     });
     expect(r.rec.before).toBe('🏢 Free plan');
     expect(r.rec.after, 'refreshGraceDisplays must NOT repaint the candidate day-counter over a company plan').toBe('🏢 Free plan');
-    expect(r.rec.footerLink, 'an employer should not be offered "For Employers"').toBe('none');
     expect(r.rec.promise, 'the footer promise speaks to employers').toMatch(/never sold/i);
     expect(r.cand.pill, 'candidates keep their day counter').toMatch(/Day/);
     expect(r.cand.promise, 'candidates keep the always-free promise (v255 N18 reframe)').toMatch(/Always free/i);
-    expect(r.guestLink, 'guests still get the employer marketing entry').not.toBe('none');
   });
 
   test('NO regression: candidate chrome restores when the recruiter session ends', async ({ page }) => {
@@ -10520,5 +10523,34 @@ test.describe('[STATE-COVERAGE] v279 Tier B full-catalog search index', () => {
     expect(r.fullShowsMatch, 'a hydrated/normal card shows match %').toBe(true);
     expect(r.found, 'search finds a job that lives only in the full-catalog index').toBe(true);
     expect(r.usedIndexLite, 'results came from the lite search index').toBe(true);
+  });
+});
+
+/* v280 — "For Employers" entry is LANDING + MENU only (founder: not on every screen).
+   The per-screen global-footer link is removed and the per-screen nav tab is hidden;
+   the landing hero link is kept and a profile-menu item is added. */
+test.describe('[STATE-COVERAGE] v280 For-Employers entry: landing + menu only', () => {
+  test('footer link removed; nav tab hidden; menu item present; landing hero kept', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof _gpjSyncEmployerNav === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      try { _gpjSyncEmployerNav(); } catch (e) {}
+      const g = (id) => document.getElementById(id);
+      const disp = (el) => el ? getComputedStyle(el).display : '(absent)';
+      return {
+        footerLinkRemoved: !g('footer-employer-link'),
+        navTabHidden: disp(g('nav-employer')) === 'none',
+        menuItemPresent: !!g('pm-employer'),
+        menuItemShown: disp(g('pm-employer')) !== 'none',
+        landingHeroKept: !!document.querySelector('[onclick*="heroEmployer"]'),
+        openEmployerFn: typeof openEmployer === 'function',
+      };
+    });
+    expect(r.footerLinkRemoved, 'per-screen footer employer link removed').toBe(true);
+    expect(r.navTabHidden, 'per-screen nav-employer tab hidden').toBe(true);
+    expect(r.menuItemPresent, 'profile-menu "For Employers" item present').toBe(true);
+    expect(r.menuItemShown, 'menu item shown for a candidate/guest context').toBe(true);
+    expect(r.landingHeroKept, 'landing hero employer link kept').toBe(true);
+    expect(r.openEmployerFn, 'openEmployer handler still wired').toBe(true);
   });
 });
