@@ -1,8 +1,15 @@
-name: Candidate digest (weekly matches)
+name: Candidate digest (weekly)
 
-# P1-3: emails opted-in candidates their top new job matches (matches-first), scored with
-# the SAME engine as the app (api/match/scoreCore). Honors the "New Job Matches" toggle +
-# the email opt-out; bounded reads (one pool read + one bounded profiles read).
+# ONE batched weekly email per candidate, assembled from up to three sections — each gated by
+# its OWN "Also email me" sub-toggle (v282/v283), which DEFAULTS OFF, so nothing is emailed for
+# a section a candidate did not explicitly opt into:
+#   • top new job matches (scored with the SAME engine as the app, api/match/scoreCore)
+#   • a ghost-risk heads-up on companies they APPLIED to that the community has flagged
+#   • a nudge to rate a company they applied to but haven't rated yet
+# The in-app bell toggles never authorise email. Honors the canonical email opt-out
+# (email_suppress + emailUnsub) and appends the shared CAN-SPAM unsubscribe footer.
+# [FREE-TIER] bounded reads: one pool read + one profiles read + one ghost_reports read +
+# one email_suppress read, ALL shared across every candidate.
 #
 # GO-LIVE GATE — read before enabling:
 #   • workflow_dispatch is ON so the founder can run a DRY-RUN by hand. In DRY-RUN the script
