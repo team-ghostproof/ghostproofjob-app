@@ -10488,3 +10488,37 @@ test.describe('[STATE-COVERAGE] v278 card/header UI fixes', () => {
     expect(r.bJust, 'bell horizontally centered').toBe('center');
   });
 });
+
+/* v279 Tier B — full-catalog search index. Keyword search reads fb.fetchSearchIndex()
+   (Firestore search-* shards, primary; static /search-index.json fallback) instead of
+   the ~5K deck pool, so it reaches every active job. Lite rows render medium cards and
+   show match % only after the full posting loads on open. */
+test.describe('[STATE-COVERAGE] v279 Tier B full-catalog search index', () => {
+  test('search uses the index (finds a job the deck pool would miss); lite cards hide match % until open', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.fb && typeof window.fb.fetchSearchIndex === 'function', null, { timeout: 15000 });
+    const r = await page.evaluate(async () => {
+      // (1) _lite carried through the mapper
+      const mapped = mapFirestoreJob({ _docId: 'm1', title: 'Account Retention Specialist', company: 'Acme', location: 'Houston, TX', region: 'Houston, TX', direct_apply_url: 'https://x/1', salary_min: 50000, _lite: true, _clipped: true });
+      const liteFlag = mapped._lite === true;
+      // (2) lite card hides the match % badge; a normal card shows it
+      resumeReady = true;
+      const liteCard = browseJobCard(Object.assign({}, mapped, { match: 88 }), 0);
+      const fullCard = browseJobCard(Object.assign({}, mapped, { match: 88, _lite: false }), 0);
+      const liteHidesMatch = !/\d+% (Match|Fit)/.test(liteCard);
+      const fullShowsMatch = /88% (Match|Fit)/.test(fullCard);
+      // (3) end-to-end: search reads the INDEX (mock it), finds the row the deck pool lacks
+      window.fb.fetchSearchIndex = async () => ([{ _docId: 'idx1', title: 'Account Retention Specialist', company: 'Beta Corp', location: 'Remote', region: 'United States', is_remote: true, direct_apply_url: 'https://x/2', salary_min: 60000, _lite: true, _clipped: true }]);
+      const kwEl = document.getElementById('f-keyword'); kwEl.value = 'account retention';
+      await searchAllJobsForKeyword(true);   // nationwide → skips location resolve
+      const found = (typeof liveJobs !== 'undefined' ? liveJobs : []).some(j => /account retention/i.test(j.t || j.title || ''));
+      const usedIndexLite = (typeof liveJobs !== 'undefined' ? liveJobs : []).every(j => j._lite === true);
+      return { liteFlag, liteHidesMatch, fullShowsMatch, found, usedIndexLite, liveCount: (typeof liveJobs !== 'undefined' ? liveJobs.length : 0) };
+    });
+    expect(r.liteFlag, '_lite carried through mapFirestoreJob').toBe(true);
+    expect(r.liteHidesMatch, 'lite search card hides match % (no scored text yet)').toBe(true);
+    expect(r.fullShowsMatch, 'a hydrated/normal card shows match %').toBe(true);
+    expect(r.found, 'search finds a job that lives only in the full-catalog index').toBe(true);
+    expect(r.usedIndexLite, 'results came from the lite search index').toBe(true);
+  });
+});

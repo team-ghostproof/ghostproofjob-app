@@ -210,6 +210,21 @@ export function mergePoolRows(todayRows, priorRows, opts = {}) {
   return [...byId.values()].filter((r) => !r.ingestedAt || r.ingestedAt >= cutoff);
 }
 
+/** Tier B: pool rows -> LITE search rows. Keeps the SAME field names (so the client's
+ *  existing mapper renders them unchanged) but drops the heavy text (description /
+ *  requirements / benefits / matchTerms) — the full posting lazy-loads on open. `_lite`
+ *  tells the client this row has no scored text yet, so it renders a "medium" card
+ *  (title/company/location/salary/ghost/apply) and shows match % only after the open
+ *  fetch. Pure + tiny (~200 B/row) so the whole catalog fits a handful of shards. */
+export function searchIndexRows(rows) {
+  return (rows || []).filter((r) => r && r.title).map((r) => {
+    const o = { ...r };
+    delete o.description; delete o.requirements; delete o.benefits; delete o.matchTerms;
+    o._lite = true;
+    return o;
+  });
+}
+
 /** Pure: raw docs -> pool documents. Unit-testable wrapper over poolsFromRows
  *  (trims then shards). The live path streams + trims instead — see main(). */
 export function buildPool(docs, opts = {}) {
@@ -244,10 +259,13 @@ function fixtureDocs(n = 60) {
 /* Shared write path — used by BOTH the file-mode build (PLAN A) and the legacy
    stream build. A Firestore commit is capped on writes (500) AND ~10 MiB payload;
    pool shards run up to ~800 KB, so flush on whichever hits first. */
-async function writePoolDocs(db, pools, stats, mstats) {
+async function writePoolDocs(db, pools, stats, mstats, searchShards = []) {
   const MAX_BATCH_BYTES = 8 * 1024 * 1024;   // margin under Firestore's ~10 MiB request limit
+  /* Tier B (2026-09-24): the search shards ride in the SAME byte-budgeted batches as
+     the pool docs, so the whole write stays one atomic-ish flush loop. */
+  const allDocs = pools.concat(searchShards);
   let wrote = 0, batch = db.batch(), pending = 0, batchBytes = 0;
-  for (const p of pools) {
+  for (const p of allDocs) {
     const b = bytes(p.doc);
     if (pending && (pending >= 400 || batchBytes + b > MAX_BATCH_BYTES)) {
       await batch.commit(); batch = db.batch(); pending = 0; batchBytes = 0;
@@ -259,6 +277,8 @@ async function writePoolDocs(db, pools, stats, mstats) {
   await db.collection(POOL_COLLECTION).doc('_manifest').set({
     builtAt: stats.builtAt, docs: stats.docs, metros: stats.metros, liveJobs: stats.live,
     keys: pools.map((p) => p.key),
+    /* Tier B: keys of the full-catalog SEARCH index (read only when the user searches). */
+    searchKeys: searchShards.map((p) => p.key), searchCount: searchShards.reduce((n, p) => n + p.doc.count, 0),
   });
   const _top = (obj, n) => Object.fromEntries(Object.entries(obj || {}).sort((a, b) => b[1] - a[1]).slice(0, n));
   await db.collection('resources').doc('_market_stats').set({
@@ -373,9 +393,27 @@ async function main() {
     let maxBytes = 0; for (const p of pools) maxBytes = Math.max(maxBytes, bytes(p.doc));
     console.log('[pool] built', stats.docs, 'pool docs across', stats.metros, 'metros; largest', (maxBytes / 1024).toFixed(1) + 'KB');
     if (maxBytes > 1024 * 1024) { console.error('[pool] ABORT: a shard exceeds the 1MiB Firestore limit'); process.exit(1); }
+
+    /* Tier B (2026-09-24, "search the whole catalog"): a compact SEARCH INDEX over
+       ALL merged rows — far more than the deck pool — so keyword search reaches every
+       job while the deck stays small. Lite rows drop the heavy text (desc/req/benefits/
+       matchTerms); the full posting still lazy-loads on open. Two sinks (dual-source,
+       founder-requested): (1) Firestore search-* shards, read only WHEN searching
+       (~a few reads/search); (2) a static search-index.json the client falls back to
+       if Firestore search reads are ever capped (0 reads). */
+    const searchLite = searchIndexRows(merged);
+    const searchShards = shard('search', searchLite, stats.builtAt);
+    console.log('[pool] search index:', searchLite.length, 'rows →', searchShards.length, 'Firestore shards');
     if (DRY) { console.log('[pool] --dry-run (file mode): nothing written'); return; }
 
-    await writePoolDocs(db, pools, stats, mstats);
+    /* CDN fallback file (served static by Vercel; 0 Firestore reads). Minified. */
+    try {
+      const json = JSON.stringify({ builtAt: stats.builtAt, count: searchLite.length, jobs: searchLite });
+      fs.writeFileSync('search-index.json', json);
+      console.log('[pool] wrote search-index.json (' + (Buffer.byteLength(json) / 1024).toFixed(0) + 'KB static CDN fallback)');
+    } catch (e) { console.warn('[pool] search-index.json write failed:', e && e.message); }
+
+    await writePoolDocs(db, pools, stats, mstats, searchShards);
     return;
   }
 

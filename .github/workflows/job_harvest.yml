@@ -18,7 +18,7 @@ jobs:
   harvest:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write        # Tier B: commit the static search-index.json (CDN search fallback) back to the repo
       issues: write          # N12: the failure-alert step opens/updates a "harvest-failure" issue
     # 6h cap for a stacking run, 60m for normal. (Public-repo runners allow 360.)
     # normal run: JobSpy (~54m budget) + D1 pool build (~5m) + cleanup can exceed 60m, which
@@ -103,6 +103,27 @@ jobs:
           echo "→ running the pool builder (streams + trims; higher heap as a backstop)…"
           node --max-old-space-size=6144 scripts/build_job_pool.mjs \
             || { echo "::error title=D1 pool: build_job_pool.mjs failed::see the [pool] failed: … line above for the exact reason (read/write/OOM/timeout)."; exit 1; }
+
+      # ── Tier B: publish the static SEARCH-INDEX (CDN fallback) ─────────────
+      # build_job_pool.mjs (above) writes search-index.json — the 0-Firestore-read
+      # fallback the client uses if the primary Firestore search shards are ever
+      # capped. Commit it so Vercel serves it. continue-on-error + a rebase guard so a
+      # push race never turns the harvest red (the Firestore search shards are primary).
+      - name: Publish static search-index.json (CDN fallback)
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ ! -s search-index.json ]; then echo "no search-index.json this run — skipping"; exit 0; fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add search-index.json
+          if git diff --cached --quiet; then
+            echo "search-index.json unchanged — nothing to commit."
+          else
+            git commit -m "pool: refresh static search-index.json (CDN search fallback) [skip ci]"
+            git pull --rebase --autostash origin main || true
+            git push || echo "::warning title=search-index push failed::will refresh next run; Firestore search shards are primary."
+          fi
 
       # ── D1 GUARDRAIL (v186) ────────────────────────────────────────────────
       # The build above is continue-on-error so a pool failure never turns the

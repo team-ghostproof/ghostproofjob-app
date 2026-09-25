@@ -652,6 +652,40 @@
          lazy-load the FULL posting for a job whose pool row only had a ~600-char
          preview. One read, only for a job the user actually opened. */
       getJobFull: async (id)=>{ try{ if(!id) return null; const s=await getDoc(doc(db,'jobs',String(id))); return (s&&s.exists&&s.exists())?Object.assign({_docId:s.id},s.data()):null; }catch(e){ console.warn('[GPJ] getJobFull',e&&e.message); return null; } },
+      /* Tier B (2026-09-24): the FULL-CATALOG search index. Keyword search reads THIS
+         (only when the user searches) instead of the ~5K deck pool, so it reaches every
+         active job while the deck stays small. Dual-source, founder-requested:
+           PRIMARY  → Firestore job_pools/search-* shards (~a few reads per search)
+           FALLBACK → the static /search-index.json on the CDN (0 Firestore reads) — used
+                      automatically if the Firestore read fails or the quota is capped.
+         Cached in-memory 6h so repeat searches in a session cost nothing. Rows are lite
+         (no desc/matchTerms) and carry the SAME field names as pool rows, so the existing
+         mapper renders them unchanged; the full posting lazy-loads on open. */
+      fetchSearchIndex: async ()=>{
+        try{ if(window._gpjSearchIdx && (Date.now()-window._gpjSearchIdx.at)<6*3600*1000) return window._gpjSearchIdx.rows; }catch(e){}
+        let rows=null;
+        try{
+          const s0=await getDoc(doc(db,'job_pools','search-0'));
+          if(s0.exists()){
+            const d0=s0.data()||{};
+            if(Array.isArray(d0.jobs)&&d0.jobs.length){
+              let all=d0.jobs.slice();
+              const of=Math.min(parseInt(d0.of,10)||1,16);
+              if(of>1){
+                const rest=await Promise.all(Array.from({length:of-1},(_,i)=>getDoc(doc(db,'job_pools','search-'+(i+1))).then(s=>(s.exists()&&Array.isArray((s.data()||{}).jobs))?s.data().jobs:[]).catch(()=>[])));
+                rest.forEach(a=>{ all=all.concat(a); });
+              }
+              if(all.length) rows=all;
+            }
+          }
+        }catch(e){ console.warn('[GPJ] search index (Firestore) unavailable — trying CDN fallback:', e&&e.message); }
+        if(!rows){
+          try{ const res=await fetch('/search-index.json',{cache:'no-cache'}); if(res.ok){ const j=await res.json(); if(j&&Array.isArray(j.jobs)&&j.jobs.length) rows=j.jobs; } }
+          catch(e){ console.warn('[GPJ] search index (CDN) unavailable:', e&&e.message); }
+        }
+        if(rows){ try{ window._gpjSearchIdx={at:Date.now(),rows:rows}; }catch(e){} return rows; }
+        return null;
+      },
       loadJobApplicants: async (jobId)=>{ try{ const s=await getDocs(query(collection(db,'jobs',jobId,'applications'), limit(100))); const out=[]; s.forEach(d=>out.push(Object.assign({uid:d.id},d.data()))); out.sort((a,b)=>((b.ts||0)-(a.ts||0))); return out; }catch(e){ console.warn('[GPJ] loadJobApplicants',e&&e.message); return []; } },
       /* R4: a VERIFIED owner-recruiter reads the backend-written recommendations
          for their job (rules gate to isRecruiterVerified + jobOwner). Read-light:
@@ -3475,7 +3509,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            INDIVIDUALS (they aren't employers); shown to guests, admins, recruiters. -->
       <div id="footer-employer-link" style="margin-top:4px;"><span onclick="openEmployer()" style="cursor:pointer;text-decoration:underline;color:var(--cyber);font-weight:700;">💼 For Employers →</span></div>
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Always free 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v278</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v279</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -6636,6 +6670,7 @@ function mapFirestoreJob(r){
        a _clipped flag. Flag it so the drawer lazy-loads the FULL posting on open
        (the read that was designed at v152 but never wired up). */
     _clipped:!!r._clipped,
+    _lite:!!r._lite,                       /* Tier B: search-index row (no scored text yet) → medium card, match % on open */
     last_ping_status:'ok'
   };
 }
@@ -7039,7 +7074,11 @@ async function searchAllJobsForKeyword(nationwide){
       if(loc.metro && /,\s*[A-Z]{2}$/.test(loc.metro)) regionKey=loc.metro;
       else if(loc.city && loc.state) regionKey=(loc.city.charAt(0).toUpperCase()+loc.city.slice(1))+', '+loc.state;
     }
-    const pool=await fb.fetchJobs((!nationwide&&regionKey)?regionKey:'', 3000);
+    /* Tier B: search the FULL-CATALOG index (covers every active job, not the ~5K deck
+       pool). Falls back to the deck pool if the index is unavailable, so search never
+       breaks. The index is location-agnostic; the region scope below still applies. */
+    let pool=(fb.fetchSearchIndex)?await fb.fetchSearchIndex():null;
+    if(!pool||!pool.length){ pool=await fb.fetchJobs((!nationwide&&regionKey)?regionKey:'', 3000); }
     /* v190: title-based match (see _gpjKeywordMatch) — an "Account" search returns
        account roles, not every posting whose description mentions an account. */
     let matches=(pool||[]).filter(v=>_gpjKeywordMatch(kw, v.title, v.company||v.co));
@@ -7098,7 +7137,7 @@ function browseJobCard(j,i){
   const dt=function(s){ return String(s==null?'':s).replace(/</g,'&lt;'); };
   const gc=j.ghost<=15?'var(--mint)':(j.ghost<=35?'var(--warn)':'var(--danger)');
   const age=(j.posting_age_days!==null&&j.posting_age_days!==undefined)?(' \u00b7 '+j.posting_age_days+'d ago'):'';
-  const matchBadge=j.match?('<div style="background:linear-gradient(90deg,rgba(0,245,160,.18),rgba(181,95,230,.18));border:1px solid rgba(0,245,160,.4);color:var(--mint);font-size:11px;font-weight:800;padding:3px 9px;border-radius:8px;">\ud83c\udfaf '+j.match+'% '+(resumeReady?'Match':'Fit')+'</div>'):'';
+  const matchBadge=(j.match&&!j._lite)?('<div style="background:linear-gradient(90deg,rgba(0,245,160,.18),rgba(181,95,230,.18));border:1px solid rgba(0,245,160,.4);color:var(--mint);font-size:11px;font-weight:800;padding:3px 9px;border-radius:8px;">\ud83c\udfaf '+j.match+'% '+(resumeReady?'Match':'Fit')+'</div>'):'';   /* Tier B: a lite search-index row has no scored text yet \u2192 hide match % until the full posting loads on open */
   /* COLLAPSED list card — same look as the swipe card top, tappable to expand.
      Only Browse-specific extra: the \uD83D\uDEAB Not Interested button. */
   return '<div class="job-card-browse" onclick="openBrowseExpanded('+i+')" style="background:var(--plum2);border:1px solid var(--plum3);border-radius:18px;padding:14px 15px;margin:0 14px 12px;cursor:pointer;transition:border-color .12s;" onmouseover="this.style.borderColor=\'var(--plum4)\'" onmouseout="this.style.borderColor=\'var(--plum3)\'">'+
@@ -7138,7 +7177,7 @@ function buildBrowseExpanded(j,i){
   const url=String(j.url||'').replace(/'/g,'');
   const gc=j.ghost<=15?'var(--mint)':(j.ghost<=35?'var(--warn)':'var(--danger)');
   const age=(j.posting_age_days!==null&&j.posting_age_days!==undefined)?(' \u00b7 Posted '+j.posting_age_days+'d ago'):'';
-  const matchBadge=j.match?('<div onclick="liveMatchInsight('+i+',event)" style="background:linear-gradient(90deg,rgba(0,245,160,.18),rgba(181,95,230,.18));border:1px solid rgba(0,245,160,.4);color:var(--mint);font-size:11px;font-weight:800;padding:3px 9px;border-radius:8px;cursor:pointer;">\ud83c\udfaf '+j.match+'% '+(resumeReady?'Match':'Fit')+'</div>'):'';
+  const matchBadge=(j.match&&!j._lite)?('<div onclick="liveMatchInsight('+i+',event)" style="background:linear-gradient(90deg,rgba(0,245,160,.18),rgba(181,95,230,.18));border:1px solid rgba(0,245,160,.4);color:var(--mint);font-size:11px;font-weight:800;padding:3px 9px;border-radius:8px;cursor:pointer;">\ud83c\udfaf '+j.match+'% '+(resumeReady?'Match':'Fit')+'</div>'):'';   /* Tier B: match % appears once the full posting loads on open (lite rows clear _lite + recompute after hydrate) */
   const flagFresh=(j.posting_age_days==null||j.posting_age_days<=14||(j.sal&&j.sal!=='Salary on request'));
   const flag='<div style="border-left:3px solid '+(flagFresh?'var(--mint)':'var(--warn)')+';background:'+(flagFresh?'rgba(0,245,160,.08)':'rgba(255,176,32,.08)')+';padding:9px 11px;border-radius:0 8px 8px 0;font-size:12px;color:'+(flagFresh?'var(--mint)':'var(--warn)')+';margin:12px 0 0;">'+(flagFresh?'\ud83d\udfe2 <strong>Green Flag</strong> \u2014 ':'\u26a0\ufe0f ')+_browseActiveFlag(j)+'</div>';
   /* B-BROWSE-SUMMARY (v229): render the FULL description first — j.summary is a short
@@ -7259,6 +7298,9 @@ function openBrowseExpanded(i){
         if(fs.length>String(j.summary||'').length) j.summary=cw(fs,11000);
         else if(fd.length>String(j.summary||'').length) j.summary=cw(fd,11000);   /* B-BROWSE-SUMMARY: no separate summary field → keep summary in sync with the full desc */
         j._clipped=false;
+        /* Tier B: a lite search-index row now has its full text — recompute match % and
+           clear the lite flag so the medium card upgrades to the real fit score on open. */
+        if(j._lite){ try{ if(typeof computeMatch==='function') j.match=computeMatch(j.t||j.title||'', (typeof _gpjMatchText==='function'?_gpjMatchText(j, j.desc||''):(j.desc||''))); }catch(e){} j._lite=false; }
         /* re-render ONLY if the modal is still open on THIS same job (no stale clobber) */
         const m=document.getElementById('browse-expand-modal'), b2=document.getElementById('browse-expand-body');
         if(m && m.classList.contains('open') && b2 && liveJobs[i]===j){ b2.innerHTML=buildBrowseExpanded(j,i); }
@@ -16185,8 +16227,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v278';
+const APP_VERSION = 'v279';
 const CHANGELOG = {
+  'v279':['Tier B: full-catalog search index. Keyword search reads a compact search index (Firestore job_pools/search-* shards, primary) covering ALL active jobs instead of the ~5K deck pool, with a static /search-index.json CDN fallback (0 reads) if Firestore search reads are capped. Lite rows render medium cards (title/company/location/salary/ghost/apply); match % appears on open after the full posting lazy-loads. Deck stays small; search reaches everything.'],
   'v278':['UI fixes: blank req-gap pill hidden on card face (.s-req:empty guard past the >span display:flex!important); notification bell flex-centered in its pill; drawer Job Expectations flows fully when expanded (removed the nested max-height:360px scroll box that clipped text mid-word).'],
   'v277':['3 fixes: (A) req-pill honesty — the swipe card no longer shows \'✓ No gaps\' on a clipped/unhydrated posting (it flipped to \'⚠ N gaps\' once the drawer loaded the full text); now it only claims No gaps after the full posting is seen, and gaps found on partial text still show (they can only grow). (B) SEO: JSON-LD structured data (Organization + WebSite + free WebApplication) on the homepage + a WebApplication schema on the résumé checker. (C) SEO: 3 cornerstone evergreen \'ghost job\' article templates added to the Resources engine (is-it-real / what-to-do-when-ghosted / why-companies-post-ghost-jobs) — high-intent, low-competition, on-brand.'],
   'v276':['Role Fit now uses the SAME rater as the swipe cards (founder: \'it needs to use the same scale/rater\'). mineRoleKeywords also returns a bounded sample of the real matched role postings; the résumé rater computes Role Fit = MEDIAN of computeMatch(résumé, posting) across that sample — the identical card engine, averaged over many postings — instead of a separate keyword-coverage number. So Role Fit ≈ the average of the card matches you see; the two can\'t contradict. Keyword coverage still powers the \'add these terms\' suggestions; Résumé Strength untouched. Copy updated to \'same rater, different scope\'. Corpus cache key v1→v2 so it re-mines with the sample immediately. Falls back to coverage when no sample is cached.'],

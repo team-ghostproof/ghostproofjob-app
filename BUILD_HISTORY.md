@@ -5,11 +5,12 @@
 > bump (see the `[BUILD-DOC]` rule in CLAUDE.md), so it stays current without manual effort.
 > Older builds (v1–v99) are preserved in git history and CLAUDE.md §9.
 
-_Last updated: 2026-09-07 · Current live build: **v278**_
+_Last updated: 2026-09-24 · Current live build: **v279**_
 
 ---
 
 ## v219–v222 — founder live-test sprint (2026-08-20): CI integrity + logged-in card polish
+- **v279** — Tier B: full-catalog search index. Keyword search reads a compact search index (Firestore job_pools/search-* shards, primary) covering ALL active jobs instead of the ~5K deck pool, with a static /search-index.json CDN fallback (0 reads) if Firestore search reads are capped. Lite rows render medium cards (title/company/location/salary/ghost/apply); match % appears on open after the full posting lazy-loads. Deck stays small; search reaches everything.
 - **v278** — UI fixes: blank req-gap pill hidden on card face (.s-req:empty guard past the >span display:flex!important, + clear its text in the hide branch); notification bell flex-centered in its pill (inline align/justify + display:flex when signed in). (A third fix — letting the expanded drawer flow instead of nested-scroll — was reverted before commit: it conflicted with the v83 scroll-region behaviour and its test; the drawer-truncation trade-off is pending a founder decision.)
 - **v277** — 3 fixes: (A) req-pill honesty — the swipe card no longer shows '✓ No gaps' on a clipped/unhydrated posting (it flipped to '⚠ N gaps' once the drawer loaded the full text); now it only claims No gaps after the full posting is seen, and gaps found on partial text still show (they can only grow). (B) SEO: JSON-LD structured data (Organization + WebSite + free WebApplication) on the homepage + a WebApplication schema on the résumé checker. (C) SEO: 3 cornerstone evergreen 'ghost job' article templates added to the Resources engine (is-it-real / what-to-do-when-ghosted / why-companies-post-ghost-jobs) — high-intent, low-competition, on-brand.
 - **v276** — Role Fit now uses the SAME rater as the swipe cards (founder: 'it needs to use the same scale/rater'). mineRoleKeywords also returns a bounded sample of the real matched role postings; the résumé rater computes Role Fit = MEDIAN of computeMatch(résumé, posting) across that sample — the identical card engine, averaged over many postings — instead of a separate keyword-coverage number. So Role Fit ≈ the average of the card matches you see; the two can't contradict. Keyword coverage still powers the 'add these terms' suggestions; Résumé Strength untouched. Copy updated to 'same rater, different scope'. Corpus cache key v1→v2 so it re-mines with the sample immediately. Falls back to coverage when no sample is cached.

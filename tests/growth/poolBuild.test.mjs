@@ -9,7 +9,7 @@ process.env.GPJ_POOL_NO_MAIN = '1';   // don't run main() on import
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { mergePoolRows, buildPool, poolsFromRows } = await import('../../scripts/build_job_pool.mjs');
+const { mergePoolRows, buildPool, poolsFromRows, searchIndexRows } = await import('../../scripts/build_job_pool.mjs');
 
 const DAY = 86400000;
 const row = (id, over = {}) => ({ _docId: id, title: 'Sales Manager', company: 'Acme', location: 'Houston, TX', region: 'Houston, TX', ingestedAt: Date.now(), ...over });
@@ -66,4 +66,25 @@ test('buildPool: full text is trimmed to a preview but matchTerms keep whole-doc
 test('mergePoolRows: tolerates null/empty inputs (harvester crash → prior-only, no throw)', () => {
   assert.deepEqual(mergePoolRows(null, null), []);
   assert.equal(mergePoolRows([], [row('x')]).length, 1, 'empty today → prior pool rebuild');
+});
+
+/* Tier B — the full-catalog SEARCH index (lite rows over ALL jobs). */
+test('searchIndexRows: drops heavy text but keeps card fields + _lite flag', () => {
+  const full = buildPool([{ id: 'j', data: {
+    title: 'Account Retention Specialist', company: 'Acme', location: 'Houston, TX', region: 'Houston, TX',
+    description: 'x'.repeat(3000), requirements: 'y'.repeat(1000), benefits: 'z'.repeat(500),
+    direct_apply_url: 'https://x/1', salary_min: 60000, salary_max: 80000, active: true, ingestedAt: Date.now(),
+  } }]).pools[0].doc.jobs;
+  const lite = searchIndexRows(full);
+  assert.equal(lite.length, 1);
+  const r = lite[0];
+  assert.ok(!r.description && !r.requirements && !r.benefits && !r.matchTerms, 'heavy text dropped');
+  assert.ok(r.title && r.company && r.location && r.salary_min && (r.direct_apply_url || r.url), 'card fields kept');
+  assert.equal(r._lite, true, 'flagged lite so the client renders a medium card + lazy-loads on open');
+  assert.ok(Buffer.byteLength(JSON.stringify(r)) < 500, 'row stays compact (~200-300 B)');
+});
+
+test('searchIndexRows: null-safe and skips titleless rows', () => {
+  assert.deepEqual(searchIndexRows(null), []);
+  assert.equal(searchIndexRows([{ _docId: 'a' }, { _docId: 'b', title: 'Manager' }]).length, 1, 'titleless dropped');
 });
