@@ -200,6 +200,23 @@ export function subjectFor(sections) {
   return '[GhostProofJob] Your weekly update — ' + (parts.join(' · ') || 'news for you');
 }
 
+/** A representative, fully-populated three-section digest so the dry-run can always SHOW what a
+ *  candidate would receive — even when 0 real candidates have opted in yet. Clearly labelled SAMPLE. */
+export function sampleSections() {
+  return {
+    matches: [
+      { score: 88, job: { title: 'Senior Lifecycle Marketing Manager', company: 'Talkiatry', location: 'Remote', is_remote: true, salary_min: 120000 } },
+      { score: 81, job: { title: 'Growth Marketing Manager', company: 'Northwind', location: 'Remote', is_remote: true, salary_min: 110000 } },
+    ],
+    ghost: [
+      { company: 'Vertex Staffing', title: 'Operations Coordinator', reports: 4 },
+    ],
+    rate: [
+      { company: 'Brightline Logistics', title: 'Logistics Analyst' },
+    ],
+  };
+}
+
 /* ---- Firestore + Resend I/O (only used in the live run) ---- */
 async function readPoolBase(db, base) {
   const s0 = await db.collection('job_pools').doc(base + '-0').get();
@@ -293,8 +310,13 @@ async function main() {
       + `<ul style="font-size:13px;color:#333;"><li><b>${elig}</b> candidate(s) eligible (opted into ≥1 email section, address, not unsubscribed, ≥1 section with content)</li>`
       + `<li>matches section: <b>${secMatches}</b> · ghost-risk section: <b>${secGhost}</b> · rate section: <b>${secRate}</b></li>`
       + `<li>Pool jobs scored: <b>${pool.length}</b> · flagged companies: <b>${riskMap.size}</b></li></ul>`
-      + (previewHtml ? `<p style="font-size:13px;">A real sample digest that <b>would</b> have gone to <code>${esc(previewTo)}</code> — subject: <code>${esc(previewSubj)}</code>:</p><hr>${previewHtml}` : `<p style="font-size:13px;color:#999;">No eligible candidate yet (nobody has opted into an email section with content).</p>`)
-      + `<hr><p style="font-size:12px;color:#666;">To go live: set <code>DIGEST_LIVE=1</code> on the workflow. — GhostProofJob</p></div>`;
+      + (previewHtml
+          ? `<p style="font-size:13px;">A <b>real</b> sample digest that <b>would</b> have gone to <code>${esc(previewTo)}</code> — subject: <code>${esc(previewSubj)}</code>:</p><hr>${previewHtml}`
+          : `<p style="font-size:13px;color:#999;">No <b>real</b> candidate is eligible yet — that's the opt-in gate working: nobody has turned on an "Also email me" sub-toggle (or an opted-in section has no content). Below is a <b>SAMPLE</b> so you can see exactly what a candidate would receive once they opt in.</p>`)
+      + `<hr><p style="font-size:13px;margin:14px 0 4px;"><b>SAMPLE — representative data</b> (not a real candidate). The real send uses each candidate's own résumé, applications and ratings, and includes ONLY the sections they opted into:</p>`
+      + `<p style="font-size:12px;color:#666;margin:0 0 6px;">Subject: <code>${esc(subjectFor(sampleSections()))}</code></p>`
+      + withUnsubFooter(digestHtml('Alex', sampleSections()), { uid: 'sample', email: 'sample@candidate.com' })
+      + `<hr><p style="font-size:12px;color:#666;">To go live: set <code>DIGEST_LIVE=1</code> on the workflow (only after you're happy with this). — GhostProofJob</p></div>`;
     await sendEmail(key, TEST_EMAIL, `[GPJ] Candidate digest DRY RUN — ${elig} eligible`, summary);
     console.log('[cand-digest] dry-run preview sent to', TEST_EMAIL);
   }
