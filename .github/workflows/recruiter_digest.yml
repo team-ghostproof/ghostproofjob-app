@@ -18,8 +18,8 @@ name: Employer digest (weekly)
 #   • Requires RESEND_API_KEY + FIREBASE_SERVICE_ACCOUNT as GitHub ACTIONS secrets.
 on:
   workflow_dispatch:
-  # schedule:
-  #   - cron: '0 15 * * 1'      # Mondays 15:00 UTC — UNCOMMENT after the dry-run is approved
+  schedule:
+    - cron: '0 15 * * 1'      # Mondays 15:00 UTC — LIVE (v287)
 
 concurrency:
   group: rec-digest
@@ -38,5 +38,5 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          # DIGEST_LIVE: '1'    # UNCOMMENT to email real employers (only after the dry-run is approved)
+          DIGEST_LIVE: '1'    # v287: LIVE — emails opted-in employers (opt-in gated; requires RESEND_API_KEY Actions secret)
         run: node scripts/recruiter_digest.mjs

@@ -20,8 +20,8 @@ name: Candidate digest (weekly)
 #   • To go live: uncomment the cron AND set DIGEST_LIVE: '1' below.
 on:
   workflow_dispatch:
-  # schedule:
-  #   - cron: '0 14 * * 1'      # Mondays 14:00 UTC — UNCOMMENT after the dry-run is approved
+  schedule:
+    - cron: '0 14 * * 1'      # Mondays 14:00 UTC — LIVE (v287)
 
 concurrency:
   group: cand-digest
@@ -40,5 +40,5 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          # DIGEST_LIVE: '1'    # UNCOMMENT to email real candidates (only after the dry-run is approved)
+          DIGEST_LIVE: '1'    # v287: LIVE — emails opted-in candidates (opt-in gated; requires RESEND_API_KEY Actions secret)
         run: node scripts/candidate_digest.mjs

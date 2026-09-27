@@ -3206,11 +3206,11 @@ test.describe('[STATE-COVERAGE] v141 notification toggles tell the truth', () =>
      alert (fires by default), so the switch now defaults ON to match, while the copy stays
      honest that the emailed version isn't live yet. (Superseded the v141 "must not default
      ON" rule, which was written when only the never-sent email was in view.) */
-  test('v282: in-app alerts default ON; email is a nested opt-in that defaults OFF and honestly says email is not live yet', async ({ page }) => {
-    // v282 restructured these: the in-app alert (bell) is now real + live, so its MAIN toggle
-    // defaults ON. Email became a NESTED sub-toggle (opt-in, default OFF) so nothing emails until
-    // the user turns it on. The "email isn't live yet" honesty moved onto the email SUB-ROW, where
-    // it is now the truth (email delivery lands in v283 + is DRY-RUN/founder-gated until then).
+  test('v282/v287: in-app alerts default ON; email is a nested opt-in (default OFF) describing live weekly-digest delivery', async ({ page }) => {
+    // v282 restructured these: the in-app alert (bell) is real + live, so its MAIN toggle defaults ON.
+    // Email is a NESTED sub-toggle (opt-in, default OFF) so nothing emails until the user turns it on.
+    // v287: the candidate digest (candidate_digest.mjs) is now LIVE, so the sub-row states plain
+    // weekly-digest delivery — the interim "not live yet" note has been removed.
     const r = await page.evaluate(() => {
       const tog = (id) => { const t = document.getElementById(id); return t ? t.classList.contains('on') : null; };
       const txt = (id) => { const s = document.getElementById(id); return s ? s.textContent : ''; };
@@ -3224,9 +3224,11 @@ test.describe('[STATE-COVERAGE] v141 notification toggles tell the truth', () =>
     for (const k of ['m', 'g', 'r']) {
       expect(r.mainOn[k], 'the in-app (bell) alert defaults ON to match what it does').toBe(true);
       expect(r.subOn[k], 'email is opt-in — the nested sub-toggle defaults OFF so nothing emails uninvited').toBe(false);
-      expect(r.subText[k], 'still honest, on the email sub-row, that EMAIL delivery is not live yet').toMatch(/aren.?t live yet|isn.?t live yet/i);
+      // v287: the candidate digest is LIVE — the sub-row states weekly-digest delivery, no "not live yet"
+      expect(r.subText[k], 'the email sub-row describes weekly-digest delivery').toMatch(/weekly digest/i);
+      expect(r.subText[k], 'the stale "not live yet" note is gone now the digest sends').not.toMatch(/live yet/i);
     }
-    expect(r.cl, 'the REAL cover-letter toggle carries no email disclaimer').not.toMatch(/aren.?t live yet|isn.?t live yet|email digests/i);
+    expect(r.cl, 'the REAL cover-letter toggle carries no email disclaimer').not.toMatch(/live yet/i);
   });
 
   test('every toggle still persists the user\'s choice (local + cloud)', async ({ page }) => {
@@ -10773,24 +10775,27 @@ test.describe('[STATE-COVERAGE] v285 recruiter notification panel', () => {
     });
   });
 
-  test('four employer toggles: main defaults ON, email sub defaults OFF, honest "not live yet" note', async ({ page }) => {
+  test('four employer toggles: main defaults ON, email sub defaults OFF, live weekly-digest delivery', async ({ page }) => {
     const r = await page.evaluate(() => {
       const mains = ['notif-rec-applicants', 'notif-rec-responses', 'notif-rec-interviews', 'notif-rec-reviews'];
       const subs = ['notif-rec-applicants-email', 'notif-rec-responses-email', 'notif-rec-interviews-email', 'notif-rec-reviews-email'];
+      const host = document.getElementById('v285-host').innerHTML;
       return {
         allMainsExist: mains.every((id) => !!document.getElementById(id)),
         allMainsOn: mains.every((id) => document.getElementById(id).classList.contains('on')),
         allSubsExist: subs.every((id) => !!document.getElementById(id)),
         anySubOn: subs.some((id) => document.getElementById(id).classList.contains('on')),
-        hasNote: /aren.?t live yet/i.test(document.getElementById('v285-host').innerHTML),
-        rowCount: (document.getElementById('v285-host').innerHTML.match(/pref-row/g) || []).length,
+        hasDigest: /weekly employer digest/i.test(host),
+        noStaleNote: !/live yet/i.test(host),
+        rowCount: (host.match(/pref-row/g) || []).length,
       };
     });
     expect(r.allMainsExist, 'all 4 employer main toggles render').toBe(true);
     expect(r.allMainsOn, 'each in-app (bell) toggle defaults ON').toBe(true);
     expect(r.allSubsExist, 'each has a nested email sub-toggle').toBe(true);
     expect(r.anySubOn, 'no email sub-toggle is on by default (opt-in)').toBe(false);
-    expect(r.hasNote, 'email rows honestly say delivery is not live yet').toBe(true);
+    expect(r.hasDigest, 'v287: email rows describe live weekly-employer-digest delivery').toBe(true);
+    expect(r.noStaleNote, 'the interim "not live yet" note is gone').toBe(true);
     expect(r.rowCount, 'four employer rows').toBe(4);
   });
 
