@@ -10669,3 +10669,93 @@ test.describe('[STATE-COVERAGE] v282 notifications: bell match-alert + nested em
     expect(r.suppressedWhenOff, 'turning New Job Matches OFF suppresses the bell entry').toBe(true);
   });
 });
+
+test.describe('[STATE-COVERAGE] v284 ghost-risk heads-up overlay', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.gpjMuteGhost === 'function' && typeof window._gpjMaybeGhostHeadsUp === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(300);
+    await page.evaluate(() => { try { localStorage.removeItem('gpj_ghost_dismissed'); } catch (e) {} });
+  });
+
+  // Empty-data + Authenticated states: gate on the real risk value; never fabricate.
+  test('high-risk opens the overlay; low-risk and no-data never do', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.ghostRiskFor = (co) => (co === 'HighCo' ? 65 : (co === 'LowCo' ? 12 : null));
+      const opened = (co) => { closeGhostHeadsUp(); _ghostHeadsSession.clear(); _gpjMaybeGhostHeadsUp('job', co, {}); return document.getElementById('ghost-heads-modal').classList.contains('open'); };
+      return { high: opened('HighCo'), low: opened('LowCo'), empty: opened('NoDataCo') };
+    });
+    expect(r.high, 'high-risk (>35%) opens the heads-up').toBe(true);
+    expect(r.low, 'low-risk (<=35%) never opens').toBe(false);
+    expect(r.empty, 'no ghost data -> no overlay (empty-data state)').toBe(false);
+  });
+
+  test('mute silences the auto-open + persists; unmute restores it (Settings manager reflects both)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.ghostRiskFor = () => 65;
+      _ghostHeadsSession.clear();
+      gpjMuteGhost('Vertex Staffing');
+      const stored = JSON.parse(localStorage.getItem('gpj_ghost_dismissed') || '[]');
+      const secShown = getComputedStyle(document.getElementById('sec-mutedghost')).display !== 'none';
+      const hasUnmute = /Unmute/.test(document.getElementById('mutedghost-list').innerHTML);
+      _ghostHeadsSession.clear(); closeGhostHeadsUp();
+      _gpjMaybeGhostHeadsUp('job', 'Vertex Staffing', {});
+      const suppressed = !document.getElementById('ghost-heads-modal').classList.contains('open');
+      gpjUnmuteGhost('vertex staffing');
+      const afterUnmute = JSON.parse(localStorage.getItem('gpj_ghost_dismissed') || '[]');
+      _ghostHeadsSession.clear(); closeGhostHeadsUp();
+      _gpjMaybeGhostHeadsUp('job', 'Vertex Staffing', {});
+      const reopens = document.getElementById('ghost-heads-modal').classList.contains('open');
+      return { stored, secShown, hasUnmute, suppressed, afterUnmute, reopens };
+    });
+    expect(r.stored, 'mute persists to gpj_ghost_dismissed under the normalized _coKey').toContain('vertex');
+    expect(r.secShown, 'Settings -> Muted ghost-risk section shows when non-empty').toBe(true);
+    expect(r.hasUnmute, 'the muted company has an Unmute control').toBe(true);
+    expect(r.suppressed, 'a muted company no longer auto-opens the heads-up').toBe(true);
+    expect(r.afterUnmute, 'unmute removes it from the set').not.toContain('vertex');
+    expect(r.reopens, 'after unmute the heads-up auto-opens again').toBe(true);
+  });
+
+  test('once per session: acknowledging does not re-nag the same company that session', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.ghostRiskFor = () => 65;
+      _ghostHeadsSession.clear();
+      _gpjMaybeGhostHeadsUp('company', 'Brightline', {});
+      const first = document.getElementById('ghost-heads-modal').classList.contains('open');
+      closeGhostHeadsUp();  // acknowledge
+      _gpjMaybeGhostHeadsUp('company', 'Brightline', {});
+      const secondSameSession = document.getElementById('ghost-heads-modal').classList.contains('open');
+      return { first, secondSameSession };
+    });
+    expect(r.first, 'first open in a session shows').toBe(true);
+    expect(r.secondSameSession, 'does not re-nag the same session after acknowledge').toBe(false);
+  });
+
+  // Guest / logged-out + Interrupted-network states: mute must never throw and must save locally.
+  test('guest (no signed-in user): mute works local-only without throwing', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      try { if (window.fb) window.fb.current = () => null; } catch (e) {}
+      let threw = false;
+      try { gpjMuteGhost('GuestCo'); } catch (e) { threw = true; }
+      const stored = JSON.parse(localStorage.getItem('gpj_ghost_dismissed') || '[]');
+      return { threw, stored };
+    });
+    expect(r.threw, 'muting never throws for a guest').toBe(false);
+    expect(r.stored, 'guest mute still saved locally').toContain('guestco');
+  });
+
+  test('the 👻 chip-tap opens a neutral heads-up on demand (even after mute)', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      window.ghostRiskFor = () => 70;
+      closeGhostHeadsUp();
+      _ghostChipTap(null, 'ChipCo');
+      const open = document.getElementById('ghost-heads-modal').classList.contains('open');
+      const html = document.getElementById('ghost-heads-box').innerHTML;
+      return { open, hasGotIt: /Got it/.test(html), hasMute: /Mute ghost-risk/.test(html) };
+    });
+    expect(r.open, 'tapping a high-risk chip opens the heads-up').toBe(true);
+    expect(r.hasGotIt, 'chip variant offers a single Got it').toBe(true);
+    expect(r.hasMute, 'chip variant still offers Mute').toBe(true);
+  });
+});

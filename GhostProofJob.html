@@ -762,6 +762,7 @@
     'gpj_saved_jobs','gpj_saved_cos','gpj_user_cos','gpj_corate','gpj_reports',
     'gpj_optimized','gpj_coverletters','gpj_draft','gpj_apply_log','gpj_applies',
     'gpj_loc','gpj_recovery','gpj_signup','gpj_hardship_until','gpj_cl_optout',
+    'gpj_ghost_dismissed',   /* v284: muted ghost-risk heads-ups (per-company) */
     'gpj_role'   /* v101a #1c: a stale recruiter flag must never survive a sign-out/switch */
   ];
   window.gpjWipeLocalUserData = function(){
@@ -1956,6 +1957,12 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
         <div class="opt-btn-go" onclick="submitGhostReport()">👻 File Report</div>
       </div>
     </div>
+  </div>
+
+  <!-- v284: Ghost-Risk heads-up overlay (job + company + chip-tap). Floats OVER the card
+       (card layout untouched); populated by openGhostHeadsUp(). z 352 = above company-modal. -->
+  <div class="modal-scrim" id="ghost-heads-modal" style="z-index:352;">
+    <div class="modal-box" style="text-align:left;" id="ghost-heads-box"></div>
   </div>
 
   <!-- ===== COMPANY DETAIL VIEW MODAL ===== -->
@@ -3390,6 +3397,12 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
         <div id="hiddencos-list" style="margin-top:2px;"></div>
       </div>
 
+      <!-- v284: Muted ghost-risk warnings manager — unmute anything silenced from the heads-up. -->
+      <div class="pref-section" id="sec-mutedghost" style="display:none;">
+        <div class="pref-section-title">🔕 Muted ghost-risk warnings <span style="text-transform:none;font-weight:400;">(you won't get the heads-up; their roles still show)</span></div>
+        <div id="mutedghost-list" style="margin-top:2px;"></div>
+      </div>
+
       <!-- R6: employer messages tray — reach-outs + respectful declines from
            verified employers, with Interested / Not interested responses. Only
            populated when a candidate opted in (discoverable) or applied. -->
@@ -3515,7 +3528,7 @@ try{var _gt=localStorage.getItem('gpj_theme');var _gr=localStorage.getItem('gpj_
            the profile-menu item (#pm-employer) now cover it; the per-screen nav tab is
            hidden too (see _gpjSyncEmployerNav). Element removed to keep the footer clean. -->
       <div id="footer-promise" style="color:var(--plum4);margin-top:2px;">GhostProofJob · Always free 💚 · No ads, no data selling, ever.</div>
-      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v282</span> · Built with 👻 by hunters, for hunters</div>
+      <div style="color:var(--plum4);margin-top:2px;">GhostProofJob<span id="build-stamp" style="display:none;">v284</span> · Built with 👻 by hunters, for hunters</div>
       <div style="display:flex;justify-content:center;gap:18px;padding:12px 0 2px;">
         <span onclick="window.open('https://www.tiktok.com/@ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="TikTok"><svg width="18" height="18" viewBox="0 0 24 24" fill="#8a85a0"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg></span>
         <span onclick="window.open('https://www.instagram.com/ghostproofjob','_blank','noopener')" style="cursor:pointer;" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a85a0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#8a85a0" stroke="none"/></svg></span>
@@ -3743,7 +3756,7 @@ function switchView(id,el){
       _browseFilterSummary();
     }catch(e){}
   }
-  if(id==='account'){ try{ _renderHiddenCosList(); }catch(e){} try{ renderOptimizedList(); }catch(e){} try{ renderCoverLettersList(); }catch(e){} }   /* v146: hidden-companies manager · A3: refresh tailored-pill counts */
+  if(id==='account'){ try{ _renderHiddenCosList(); }catch(e){} try{ _renderMutedGhostList(); }catch(e){} try{ renderOptimizedList(); }catch(e){} try{ renderCoverLettersList(); }catch(e){} }   /* v146: hidden-companies manager · v284: muted ghost-risk manager · A3: refresh tailored-pill counts */
   if(id==='inbox'){ try{ renderInbox(); }catch(e){} }   /* v254 D2: full Inbox tab */
   try{ if(typeof _gpjRecruiterMode==='function' && _gpjRecruiterMode()) _gpjRenderRecPanel(id); }catch(e){}   /* v110 R9 */
 }
@@ -6121,7 +6134,10 @@ function toggleDrawer(e){
   if(e&&e.target&&e.target.closest('.ctrl-btn')) return;
   try{ var dk=document.getElementById('card-deck'); if(dk&&dk.dataset.gpjDragged){ dk.dataset.gpjDragged=''; return; } }catch(_){}   /* v270: a mouse drag just ended — don't also toggle the drawer */
   const d=document.getElementById('card-drawer');
-  if(d){ d.classList.toggle('open'); document.body.classList.toggle('card-open', d.classList.contains('open')); }
+  if(d){ d.classList.toggle('open'); const _drawerOpen=d.classList.contains('open'); document.body.classList.toggle('card-open', _drawerOpen);
+    /* v284: "before you apply" ghost-risk heads-up when a high-risk posting is opened */
+    if(_drawerOpen){ try{ const _tj=(typeof _currentTopJob==='function')?_currentTopJob():null; const _co=_tj&&(_tj.co||_tj.company); if(_co&&typeof _gpjMaybeGhostHeadsUp==='function') _gpjMaybeGhostHeadsUp('job', _co, {title:(_tj.t||_tj.title||'')}); }catch(e){} }
+  }
 }
 /* tapping the vibe stars on a card opens that company's full profile/reviews
    (mobile fix: previously the tap just bubbled to the card drawer toggle) */
@@ -10851,7 +10867,10 @@ function _ghostChipHtml(j){
   if(j&&j._verifiedCo) return '<div style="background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.4);color:var(--mint);font-size:11px;font-weight:800;padding:3px 8px;border-radius:8px;">✅ Verified employer</div>';
   if(!j||j.ghost==null) return '<div style="background:var(--plum3);border:1px solid var(--plum4);color:var(--muted);font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;">👻 —</div>';
   const gc=j.ghost<=15?'var(--mint)':(j.ghost<=35?'var(--warn)':'var(--danger)');
-  return '<div style="background:var(--plum3);border:1px solid var(--plum4);color:'+gc+';font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;">👻 '+j.ghost+'%</div>';
+  /* v284: a HIGH-risk chip opens the ghost-risk heads-up on tap (low/mid stay display-only) */
+  const _grco=(j&&(j.co||j.company))?String(j.co||j.company):'';
+  const _grtap=(_grco && j.ghost>35);
+  return '<div '+(_grtap?('onclick="_ghostChipTap(event,\''+_grco.replace(/[\\\x27"<>]/g,'')+'\')" title="Why this score?" style="cursor:pointer;'):'style="')+'background:var(--plum3);border:1px solid var(--plum4);color:'+gc+';font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;">👻 '+j.ghost+'%</div>';
 }
 /* ===== MATCH TO JOB =====
    Analyze the gap between the user's resume and a specific job, suggest REALISTIC
@@ -13611,6 +13630,105 @@ function _renderHiddenCosList(){
     return '<div class="pref-row" style="cursor:default;"><div class="pref-icon" style="background:rgba(255,77,106,.12);">🚫</div><div style="flex:1;text-transform:capitalize;font-size:13px;font-weight:600;">'+safe+'</div><div onclick="unhideCompany(\''+attr+'\')" style="font-size:11px;font-weight:800;color:var(--mint);cursor:pointer;">Unhide</div></div>';
   }).join('');
 }
+
+/* ===== v284: GHOST-RISK HEADS-UP OVERLAY =====
+   A native modal-scrim overlay that floats OVER the job/company card (card layout is never
+   touched) when a HIGH-risk company (>35%) is opened, plus on tapping a high-risk 👻 chip.
+   Three-tier action ladder: (1) acknowledge — Got it/Skip/Browse: closes, warns again next
+   SESSION; (2) mute — persistent, per-company, undo under Settings → Muted ghost-risk;
+   (3) hide — the existing hideCompanyRoles in the company view. Muting mirrors the v146
+   hidden-cos + v196 dismiss patterns (gpj_ghost_dismissed local + profile.ghostDismissed,
+   cross-device union). HONEST + [FREE-TIER]: the % is the already-loaded communityGhost
+   value; the count uses the MEMOIZED _gpjCountGhostReports (≤1 read/company); no fabrication. */
+var GHOST_HIGH=35;
+var _ghostHeadsSession=new Set();   /* per-session auto-open guard (once per company) */
+function gpjGhostMuted(){ try{ const a=JSON.parse(localStorage.getItem('gpj_ghost_dismissed')||'[]'); return new Set((Array.isArray(a)?a:[]).map(_coKey).filter(Boolean)); }catch(e){ return new Set(); } }
+function _saveGhostMuted(set){
+  try{ localStorage.setItem('gpj_ghost_dismissed', JSON.stringify(Array.from(set).slice(-500))); }catch(e){}
+  try{ if(window.fb&&fb.current&&fb.current()&&fb.saveProfile) fb.saveProfile(fb.current().uid,{ghostDismissed:Array.from(set)}); }catch(e){}   /* cross-device; failure is non-fatal */
+}
+function gpjMuteGhost(co){
+  const key=_coKey(co); if(!key) return;
+  const set=gpjGhostMuted(); if(!set.has(key)){ set.add(key); _saveGhostMuted(set); }
+  closeGhostHeadsUp();
+  try{ _renderMutedGhostList(); }catch(e){}
+  showToast('🔕 Muted ghost-risk for '+String(co||'this company')+'. Unmute under Settings → Muted ghost-risk warnings.');
+}
+function gpjUnmuteGhost(key){
+  const set=gpjGhostMuted(); if(!set.delete(_coKey(key))) return;
+  _saveGhostMuted(set);
+  try{ _renderMutedGhostList(); }catch(e){}
+  showToast('🔔 Ghost-risk warnings back on for that company');
+}
+function _renderMutedGhostList(){
+  const sec=document.getElementById('sec-mutedghost'), list=document.getElementById('mutedghost-list');
+  if(!list) return;
+  const arr=Array.from(gpjGhostMuted());
+  if(!arr.length){ if(sec) sec.style.display='none'; list.innerHTML=''; return; }
+  if(sec) sec.style.display='block';
+  list.innerHTML=arr.map(function(k){
+    const safe=_esc(k), attr=String(k).replace(/\x27/g,'');
+    return '<div class="pref-row" style="cursor:default;"><div class="pref-icon" style="background:rgba(181,95,230,.14);">🔕</div><div style="flex:1;text-transform:capitalize;font-size:13px;font-weight:600;">'+safe+'</div><div onclick="gpjUnmuteGhost(\''+attr+'\')" style="font-size:11px;font-weight:800;color:var(--mint);cursor:pointer;">Unmute</div></div>';
+  }).join('');
+}
+function closeGhostHeadsUp(){ try{ const m=document.getElementById('ghost-heads-modal'); if(m) m.classList.remove('open'); }catch(e){} }
+function _ghostHeadsUpHtml(ctx){
+  var isJob=ctx.kind==='job', isCo=ctx.kind==='company', co=ctx.co||'this company', risk=ctx.risk;
+  var title = isJob ? '👻 Before you apply' : (isCo ? ('👻 Heads-up about '+_esc(co)) : ('👻 Ghost-risk: '+_esc(co)));
+  var lead='<b>Community reports flag '+_esc(co)+'</b>'+(risk==null?'':(' as higher ghost-risk ('+risk+'%)'))+'. These are other job seekers’ reports — not a verdict. Worth confirming the role is still open.';
+  var actions;
+  if(isJob) actions='<div class="opt-actions"><div class="opt-btn-skip" onclick="_ghostHeadsSecondary()">Skip this role</div><div class="opt-btn-go" onclick="closeGhostHeadsUp()">Got it — continue</div></div>';
+  else if(isCo) actions='<div class="opt-actions"><div class="opt-btn-skip" onclick="_ghostHeadsSecondary()">Browse other roles</div><div class="opt-btn-go" onclick="closeGhostHeadsUp()">Got it</div></div>';
+  else actions='<div class="opt-actions"><div class="opt-btn-go" onclick="closeGhostHeadsUp()" style="flex:1;">Got it</div></div>';
+  return '<div style="display:flex;align-items:center;margin-bottom:4px;"><div style="font-size:15px;font-weight:800;flex:1;">'+title+'</div><div onclick="closeGhostHeadsUp()" style="color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;">✕</div></div>'
+    +'<div style="display:flex;align-items:flex-start;gap:8px;background:rgba(255,77,106,.10);border:1px solid rgba(255,77,106,.4);border-radius:11px;padding:9px 11px;margin:8px 0 8px;font-size:12.5px;line-height:1.5;"><span style="font-size:16px;">👻</span><div>'+lead+' <span id="ghost-heads-count" style="color:var(--muted);"></span></div></div>'
+    +'<div onclick="_ghostHeadsSeeReports()" style="font-size:12px;font-weight:700;color:var(--cyber);cursor:pointer;display:inline-block;margin:0 0 12px;">See community reports →</div>'
+    +actions
+    +'<div style="border-top:1px solid var(--plum4);margin:12px 0 0;padding-top:10px;text-align:center;"><span onclick="gpjMuteGhost((window._ghostHeadsCtx||{}).co)" style="font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer;">🔕 Mute ghost-risk for this company</span></div>';
+}
+function openGhostHeadsUp(ctx){
+  if(!ctx||!ctx.co) return;
+  window._ghostHeadsCtx=ctx;
+  const box=document.getElementById('ghost-heads-box'), modal=document.getElementById('ghost-heads-modal');
+  if(!box||!modal) return;
+  box.innerHTML=_ghostHeadsUpHtml(ctx);
+  modal.classList.add('open');
+  /* honest, MEMOIZED count (≤1 read/company), filled async — never a fabricated number */
+  try{
+    if(window.fb&&window._gpjCountGhostReports){
+      window._gpjCountGhostReports(ctx.co).then(function(n){
+        const el=document.getElementById('ghost-heads-count');
+        if(el&&n!=null&&n>0) el.textContent='· '+n+' community report'+(n===1?'':'s')+'.';
+      }).catch(function(){});
+    }
+  }catch(e){}
+}
+function _ghostHeadsSecondary(){
+  const ctx=window._ghostHeadsCtx||{}; closeGhostHeadsUp();
+  if(ctx.kind==='job'){ try{ swipeCard('left'); }catch(e){} }
+  else { try{ if(typeof closeCompanyView==='function') closeCompanyView(); }catch(e){} try{ switchView('browse'); }catch(e){} }
+}
+function _ghostHeadsSeeReports(){
+  const ctx=window._ghostHeadsCtx||{}; closeGhostHeadsUp();
+  try{
+    if(ctx.kind==='company'){ if(typeof openCmReviews==='function') openCmReviews(); }
+    else if(ctx.co){ openCompanyView(ctx.co,{title:ctx.title||''}); setTimeout(function(){ try{ if(typeof openCmReviews==='function') openCmReviews(); }catch(e){} },320); }
+  }catch(e){}
+}
+/* chip tap — neutral variant (context-agnostic), opens on demand regardless of session guard */
+function _ghostChipTap(ev, co){ try{ if(ev&&ev.stopPropagation) ev.stopPropagation(); }catch(e){} if(!co) return; var risk=(typeof ghostRiskFor==='function')?ghostRiskFor(co):null; openGhostHeadsUp({kind:'view',co:co,risk:risk}); }
+/* auto-open once per company per session on opening a high-risk card/company (not muted) */
+function _gpjMaybeGhostHeadsUp(kind, co, extra){
+  try{
+    const key=_coKey(co); if(!key) return;
+    const risk=(typeof ghostRiskFor==='function')?ghostRiskFor(co):null;
+    if(risk==null || risk<=GHOST_HIGH) return;
+    if(gpjGhostMuted().has(key)) return;
+    if(_ghostHeadsSession.has(key)) return;
+    _ghostHeadsSession.add(key);
+    openGhostHeadsUp(Object.assign({kind:kind,co:co,risk:risk}, extra||{}));
+  }catch(e){}
+}
 /* The current top deck job straight from the DATA MODEL (the same vis[0] that paints
    the card face), NOT the DOM. The expanded drawer + company view used to read the
    card's DOM dataset, which could lag a card behind after an advance — that's why a
@@ -16212,6 +16330,9 @@ window._gpjPersonAvatar=_gpjPersonAvatar;
 function openCompanyView(co,job){
   /* track as a viewed job (recall later) when opened against a specific role */
   if(job&&job.title){ try{ recordView({t:job.title,co:co,url:job.url||'',ghost:ghostRiskFor(co),desc:job.desc||''}); }catch(e){} }
+  /* v284: ghost-risk heads-up when opening a high-risk company (once/session, unless muted).
+     Deferred so it layers ABOVE the company modal after it paints. */
+  try{ if(typeof _gpjMaybeGhostHeadsUp==='function') setTimeout(function(){ _gpjMaybeGhostHeadsUp('company', co, {title:(job&&(job.title||job.t))||''}); }, 350); }catch(e){}
   /* show the clicked job's expandable summary at the top of the drawer */
   const js=document.getElementById('cm-jobsummary');
   if(js){
@@ -16349,8 +16470,9 @@ function injectLegalFooters(){
 /* Bump APP_VERSION to match each release (same number as the sw.js cache + footer
    stamp). Add a CHANGELOG entry for that version with 1-3 short user-facing notes.
    If you ship a version WITHOUT a CHANGELOG entry, no popup shows — silent update. */
-const APP_VERSION = 'v282';
+const APP_VERSION = 'v284';
 const CHANGELOG = {
+  'v284':['Ghost-Risk heads-up overlay (candidate): a native modal-scrim floats over the job/company card (layout untouched) when a high-risk company (>35%) is opened — deck drawer-open + company-view-open, once/session/company, unless muted; the 👻 chip re-opens it on demand. 3-tier action ladder: acknowledge (Got it/Skip/Browse — warns again next session), Mute ghost-risk (persistent per-company, undo under Settings -> Muted ghost-risk warnings), Hide company (existing hideCompanyRoles, company view). Honest + free-tier: shows the real communityGhost % + the memoized _gpjCountGhostReports count, no fabrication; See community reports links to real reviews. New gpj_ghost_dismissed key (+ profile.ghostDismissed cross-device union), registered in GPJ_USER_KEYS. INSERT-ONLY; candidate-first (no recruiter reads).'],
   'v282':['Notifications v282 (in-app): (1) New Job Matches now adds a PERSISTENT bell notification on login (once/day, gated on the toggle) — before, it was only a transient toast so the bell showed nothing; persisted via gpj_nm_notif + re-added in _notifCandidate so it survives list rebuilds. (2) Each alert toggle gains a nested \'Also email me\' sub-toggle that appears when the main is ON — DEFAULT OFF (opt-in); saves preferences[key+Email] for the v283 batched-digest sender; nothing emails until both on. (3) Reworded the 3 alert toggles honestly (in-app now; email opt-in below; Ghost Risk email = companies you APPLIED to). Email wiring + Ghost-Risk dismissible notice come in v283.'],
   'v281':['3 founder fixes: (1) Match Preferences can be CLEARED (blank save now removes the field + persists the clear to cloud) — they were never required, the deck ranks by resume+location without them; (2) company logos: last-resort name->domain guess + keyless Clearbit fallback so non-big-brand employers (e.g. LGI Homes) show a real logo (bad guess 404s -> honest emoji); (3) smart section transition in the Browse job modal — the Summary is trimmed at the first Requirements/Benefits/Physical header + de-duped, so it ends cleanly on overview/duties/values instead of bleeding the benefits tail above a duplicate Benefits section.'],
   'v280':['For Employers entry → landing + menu only (founder: not on every screen). Removed the per-screen global-footer link + hid the per-screen nav tab; kept the landing hero link; added \'For Employers\' to the profile menu (hidden in recruiter mode). _gpjSyncEmployerNav updated.'],
@@ -19909,6 +20031,14 @@ async function loadTierFromProfile(u){
       try{
         const merged=new Set([...gpjHiddenCos(), ...p.hiddenCompanies.map(_coKey).filter(Boolean)]);
         localStorage.setItem('gpj_hidden_cos', JSON.stringify(Array.from(merged)));
+      }catch(e){}
+    }
+    /* v284: restore muted ghost-risk warnings (UNION with local, same as hidden-companies). */
+    if(Array.isArray(p.ghostDismissed)){
+      try{
+        const mg=new Set([...gpjGhostMuted(), ...p.ghostDismissed.map(_coKey).filter(Boolean)]);
+        localStorage.setItem('gpj_ghost_dismissed', JSON.stringify(Array.from(mg)));
+        try{ _renderMutedGhostList(); }catch(e){}
       }catch(e){}
     }
     /* v119: restore TOP-LEVEL preferences (contact/address toggles) the same way
