@@ -10759,3 +10759,69 @@ test.describe('[STATE-COVERAGE] v284 ghost-risk heads-up overlay', () => {
     expect(r.hasMute, 'chip variant still offers Mute').toBe(true);
   });
 });
+
+test.describe('[STATE-COVERAGE] v285 recruiter notification panel', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window._recNotifSectionHtml === 'function' && typeof window.setNotifPref === 'function' && typeof window.notifOn === 'function', null, { timeout: 15000 });
+    await page.waitForFunction(() => window.fb === null || (window.fb && typeof window.fb.fileGhostReport === 'function'), null, { timeout: 15000 });
+    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      // fresh prefs; inject the recruiter notif section standalone (functions are global)
+      try { const p = getProfile() || {}; p.preferences = {}; localStorage.setItem('gpj_profile', JSON.stringify(p)); } catch (e) {}
+      const host = document.createElement('div'); host.id = 'v285-host'; host.innerHTML = window._recNotifSectionHtml(); document.body.appendChild(host);
+    });
+  });
+
+  test('four employer toggles: main defaults ON, email sub defaults OFF, honest "not live yet" note', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const mains = ['notif-rec-applicants', 'notif-rec-responses', 'notif-rec-interviews', 'notif-rec-reviews'];
+      const subs = ['notif-rec-applicants-email', 'notif-rec-responses-email', 'notif-rec-interviews-email', 'notif-rec-reviews-email'];
+      return {
+        allMainsExist: mains.every((id) => !!document.getElementById(id)),
+        allMainsOn: mains.every((id) => document.getElementById(id).classList.contains('on')),
+        allSubsExist: subs.every((id) => !!document.getElementById(id)),
+        anySubOn: subs.some((id) => document.getElementById(id).classList.contains('on')),
+        hasNote: /aren.?t live yet/i.test(document.getElementById('v285-host').innerHTML),
+        rowCount: (document.getElementById('v285-host').innerHTML.match(/pref-row/g) || []).length,
+      };
+    });
+    expect(r.allMainsExist, 'all 4 employer main toggles render').toBe(true);
+    expect(r.allMainsOn, 'each in-app (bell) toggle defaults ON').toBe(true);
+    expect(r.allSubsExist, 'each has a nested email sub-toggle').toBe(true);
+    expect(r.anySubOn, 'no email sub-toggle is on by default (opt-in)').toBe(false);
+    expect(r.hasNote, 'email rows honestly say delivery is not live yet').toBe(true);
+    expect(r.rowCount, 'four employer rows').toBe(4);
+  });
+
+  test('toggles persist by key + email sub shows/hides with its main', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const main = document.getElementById('notif-rec-applicants');
+      // turn the main OFF -> pref false + sub-row hidden
+      setNotifPref(main, 'recNewApplicants');
+      const prefAfterOff = notifOn('recNewApplicants');
+      const subHiddenWhenOff = getComputedStyle(document.getElementById('sub-rec-applicants-email')).display === 'none';
+      // back ON -> sub-row shows
+      setNotifPref(main, 'recNewApplicants');
+      const subShownWhenOn = getComputedStyle(document.getElementById('sub-rec-applicants-email')).display !== 'none';
+      // opt into email
+      setNotifEmailPref(document.getElementById('notif-rec-applicants-email'), 'recNewApplicants');
+      const emailOn = notifEmailOn('recNewApplicants');
+      const persisted = JSON.parse(localStorage.getItem('gpj_profile') || '{}').preferences || {};
+      return { prefAfterOff, subHiddenWhenOff, subShownWhenOn, emailOn, persisted };
+    });
+    expect(r.prefAfterOff, 'main toggle OFF persists to preferences[key]').toBe(false);
+    expect(r.subHiddenWhenOff, 'email sub-row hides when the main is off').toBe(true);
+    expect(r.subShownWhenOn, 'email sub-row shows when the main is on').toBe(true);
+    expect(r.emailOn, 'email opt-in persists to preferences[key+Email]').toBe(true);
+    expect(r.persisted.recNewApplicantsEmail, 'the email opt-in is saved to the profile').toBe(true);
+  });
+
+  test('guest (no signed-in user): toggling never throws', async ({ page }) => {
+    const threw = await page.evaluate(() => {
+      try { if (window.fb) window.fb.current = () => null; } catch (e) {}
+      try { setNotifPref(document.getElementById('notif-rec-reviews'), 'recReviews'); setNotifEmailPref(document.getElementById('notif-rec-reviews-email'), 'recReviews'); return false; } catch (e) { return true; }
+    });
+    expect(threw, 'recruiter toggles never throw for a guest/local-only state').toBe(false);
+  });
+});
