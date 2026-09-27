@@ -1,0 +1,42 @@
+name: Employer digest (weekly)
+
+# ONE batched weekly email per employer, assembled from up to four sections — each gated by
+# its OWN "Also email me" sub-toggle (v285), which DEFAULTS OFF, so nothing is emailed for a
+# section the recruiter did not opt into:
+#   • Roles & applicants   • Awaiting your response   • Upcoming interviews   • Reviews & disputes
+# Plus the Anti-Ghosting responsiveness line (reply count — the same metric the app shows).
+# The in-app bell toggles never authorise email. Honors the canonical opt-out
+# (email_suppress + emailUnsub) and appends the shared CAN-SPAM footer.
+# [FREE-TIER] bounded reads: recruiters (<=CAP) + per employer their jobs + a server-side
+# count per role + their reach-outs + one ghost count + their profile prefs.
+#
+# GO-LIVE GATE — read before enabling:
+#   • workflow_dispatch is ON so the founder can run a DRY-RUN by hand (emails only the founder).
+#   • The weekly `schedule` cron stays COMMENTED, and `DIGEST_LIVE` stays unset, until the
+#     founder has run the dry-run, reviewed the preview, and is happy with it.
+#   • To go live: uncomment the cron AND set DIGEST_LIVE: '1' below.
+#   • Requires RESEND_API_KEY + FIREBASE_SERVICE_ACCOUNT as GitHub ACTIONS secrets.
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: '0 15 * * 1'      # Mondays 15:00 UTC — UNCOMMENT after the dry-run is approved
+
+concurrency:
+  group: rec-digest
+  cancel-in-progress: true
+
+jobs:
+  digest:
+    name: "Weekly employer digest"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: '24' }
+      - run: npm ci || npm install
+      - name: Send the employer digest (DRY-RUN unless DIGEST_LIVE=1)
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          # DIGEST_LIVE: '1'    # UNCOMMENT to email real employers (only after the dry-run is approved)
+        run: node scripts/recruiter_digest.mjs
